@@ -7,6 +7,7 @@ General docs:
 - `build.md`
 - `jax_setup.md`
 - `precision.md`
+- `architecture.md`
 - `audit.md`
 - `todo.md`
 - `software.bib`
