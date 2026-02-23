@@ -1,0 +1,80 @@
+....................F.FF                                                 [100%]
+================================== FAILURES ===================================
+_________________________ test_hypgeom_prec_coverage __________________________
+
+    def test_hypgeom_prec_coverage():
+        callables = _hypgeom_callables()
+        names = set(callables)
+        missing = []
+        for name in names:
+            if name.endswith("_prec") or name.endswith("_jit") or name.endswith("_rigorous"):
+                continue
+            if name.endswith("_batch"):
+                if name + "_prec" not in names:
+                    missing.append(name + "_prec")
+                continue
+            if name + "_prec" not in names:
+                missing.append(name + "_prec")
+>       _check(len(missing) == 0)
+
+tests\test_hypgeom_completeness.py:35: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+cond = False, msg = None
+
+    def _check(cond, msg: str | None = None) -> None:
+        label = msg or "test_check"
+        try:
+            jax.debug.check(cond, "{}: {}", label, cond)
+        except Exception:
+            pass
+>       assert bool(cond)
+E       AssertionError
+
+tests\_test_checks.py:12: AssertionError
+___________________ test_hypgeom_lower_level_helpers_shapes ___________________
+
+    def test_hypgeom_lower_level_helpers_shapes():
+        xr = jnp.array([0.2, 0.3], dtype=jnp.float64)
+        xc = jnp.array([0.2, 0.25, 0.1, 0.15], dtype=jnp.float64)
+    
+        coeffs = hypgeom.arb_hypgeom_rising_coeffs_1(5, 6)
+        _check(coeffs.shape == (6,))
+        coeffs = hypgeom.arb_hypgeom_rising_coeffs_2(5, 6)
+        _check(coeffs.shape == (6,))
+        coeffs = hypgeom.arb_hypgeom_rising_coeffs_fmpz(5, 6)
+        _check(coeffs.shape == (6,))
+    
+>       shallow = hypgeom.arb_hypgeom_gamma_coeff_shallow(2)
+E       TypeError: arb_hypgeom_gamma_coeff_shallow() missing 1 required positional argument: 'length'
+
+tests\test_hypgeom_completeness.py:60: TypeError
+___________________ test_hypgeom_mode_wrappers_for_helpers ____________________
+
+    def test_hypgeom_mode_wrappers_for_helpers():
+        xr = jnp.array([0.2, 0.3], dtype=jnp.float64)
+        xc = jnp.array([0.2, 0.25, 0.1, 0.15], dtype=jnp.float64)
+    
+        out = hypgeom_wrappers.arb_hypgeom_si_1f2_mode(xr, impl="rigorous", prec_bits=40)
+>       _check(out.shape == (2,))
+
+tests\test_hypgeom_completeness.py:98: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+cond = False, msg = None
+
+    def _check(cond, msg: str | None = None) -> None:
+        label = msg or "test_check"
+        try:
+            jax.debug.check(cond, "{}: {}", label, cond)
+        except Exception:
+            pass
+>       assert bool(cond)
+E       AssertionError
+
+tests\_test_checks.py:12: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/test_hypgeom_completeness.py::test_hypgeom_prec_coverage - Asser...
+FAILED tests/test_hypgeom_completeness.py::test_hypgeom_lower_level_helpers_shapes
+FAILED tests/test_hypgeom_completeness.py::test_hypgeom_mode_wrappers_for_helpers
+3 failed, 21 passed, 1 skipped in 186.97s (0:03:06)

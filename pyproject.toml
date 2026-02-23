@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "arbPlusJAX"
+version = "0.1.0"
+description = "JAX-first Arb migration workspace with C parity tooling."
+requires-python = ">=3.10"
+dependencies = [
+  "jax>=0.4.35",
+  "numpy>=1.26",
+  "scipy>=1.10",
+  "pytest>=8.0",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+arbplusjax = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+  "parity: tests that require the C reference libraries",
+]
+
+[tool.ruff]
+line-length = 120

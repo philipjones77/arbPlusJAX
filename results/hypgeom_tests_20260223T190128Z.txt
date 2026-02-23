@@ -1,0 +1,53 @@
+......................F.                                                 [100%]
+================================== FAILURES ===================================
+___________________ test_hypgeom_lower_level_helpers_shapes ___________________
+
+    def test_hypgeom_lower_level_helpers_shapes():
+        xr = jnp.array([0.2, 0.3], dtype=jnp.float64)
+        xc = jnp.array([0.2, 0.25, 0.1, 0.15], dtype=jnp.float64)
+    
+        coeffs = hypgeom.arb_hypgeom_rising_coeffs_1(5, 6)
+        _check(coeffs.shape == (6,))
+        coeffs = hypgeom.arb_hypgeom_rising_coeffs_2(5, 6)
+        _check(coeffs.shape == (6,))
+        coeffs = hypgeom.arb_hypgeom_rising_coeffs_fmpz(5, 6)
+        _check(coeffs.shape == (6,))
+    
+        shallow = hypgeom.arb_hypgeom_gamma_coeff_shallow(2)
+        _check(shallow.shape == (2,))
+    
+        bounds = hypgeom.arb_hypgeom_gamma_stirling_term_bounds(jnp.array(0.2, dtype=jnp.float64), 4)
+        _check(bounds.shape == (4,))
+    
+        n1 = hypgeom.arb_hypgeom_gamma_lower_fmpq_0_choose_N(xr, xr)
+        n2 = hypgeom.arb_hypgeom_gamma_upper_fmpq_inf_choose_N(xr, xr)
+        n3 = hypgeom.arb_hypgeom_gamma_upper_singular_si_choose_N(2, xr)
+        _check(jnp.ndim(n1) == 0 and jnp.ndim(n2) == 0 and jnp.ndim(n3) == 0)
+    
+>       gl = hypgeom.arb_hypgeom_gamma_lower_fmpq_0_bsplit(xr, xr, n_terms=8)
+
+tests\test_hypgeom_completeness.py:71: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src\arbplusjax\hypgeom.py:5890: in arb_hypgeom_gamma_lower_fmpq_0_bsplit
+    return _smi.arb_hypgeom_gamma_lower_fmpq_0_bsplit(a, z, n_terms=n_terms)
+src\arbplusjax\series_missing_impl.py:2739: in arb_hypgeom_gamma_lower_fmpq_0_bsplit
+    res = hypgeom.arb_hypgeom_gamma_lower(di.as_interval(a), di.as_interval(z), regularized=False)
+src\arbplusjax\hypgeom.py:1874: in arb_hypgeom_gamma_lower
+    vals = jnp.asarray([eval_val(a), eval_val(b), eval_val(m)], dtype=jnp.float64)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+x = Traced<ShapedArray(float64[])>with<DynamicJaxprTrace(level=1/0)>
+
+    def eval_val(x: jax.Array) -> jax.Array:
+        v = jsp.gammainc(s_m, x)
+>       return v if regularized else jsp.gamma(s_m) * v
+E       jax.errors.TracerBoolConversionError: Attempted boolean conversion of traced array with shape bool[].
+E       The error occurred while tracing the function arb_hypgeom_gamma_lower at C:\Users\phili\OneDrive\Documents\GitHub\arbPlusJAX\src\arbplusjax\hypgeom.py:1861 for jit. This concrete value was not available in Python because it depends on the value of the argument regularized.
+E       See https://jax.readthedocs.io/en/latest/errors.html#jax.errors.TracerBoolConversionError
+E       --------------------
+E       For simplicity, JAX has removed its internal frames from the traceback of the following exception. Set JAX_TRACEBACK_FILTERING=off to include these.
+
+src\arbplusjax\hypgeom.py:1872: TracerBoolConversionError
+=========================== short test summary info ===========================
+FAILED tests/test_hypgeom_completeness.py::test_hypgeom_lower_level_helpers_shapes
+1 failed, 23 passed, 1 skipped in 168.25s (0:02:48)

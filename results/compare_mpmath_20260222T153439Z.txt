@@ -1,0 +1,21 @@
+mpmath midpoint widths (avg):
+exp    width=0.000e+00
+log    width=0.000e+00
+sqrt   width=0.000e+00
+sin    width=0.000e+00
+cos    width=0.000e+00
+tan    width=0.000e+00
+sinh   width=0.000e+00
+cosh   width=0.000e+00
+tanh   width=0.000e+00
+gamma  width=0.000e+00
+erf    width=0.000e+00
+erfc   width=0.000e+00
+erfi   width=0.000e+00
+barnesg width=0.000e+00
+No arb repo path set. Skipping C compare.
+
+Complex midpoint error vs JAX midpoint (avg |delta|):
+exp    err=1.062e-16
+log    err=6.518e-17
+sin    err=1.164e-16

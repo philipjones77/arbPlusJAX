@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "arbjax-chassis"
+version = "0.1.0"
+description = "Incremental C-to-JAX migration chassis for Arb."
+requires-python = ">=3.10"
+dependencies = [
+  "jax>=0.4.35",
+  "numpy>=1.26",
+  "pytest>=8.0",
+]
+
+[tool.setuptools]
+packages = ["arbjax"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+  "parity: tests that require the C reference libraries",
+]

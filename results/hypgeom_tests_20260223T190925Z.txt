@@ -1,0 +1,42 @@
+......................F.                                                 [100%]
+================================== FAILURES ===================================
+___________________ test_hypgeom_lower_level_helpers_shapes ___________________
+
+    def test_hypgeom_lower_level_helpers_shapes():
+        xr = jnp.array([0.2, 0.3], dtype=jnp.float64)
+        xc = jnp.array([0.2, 0.25, 0.1, 0.15], dtype=jnp.float64)
+    
+        coeffs = hypgeom.arb_hypgeom_rising_coeffs_1(5, 6)
+        _check(coeffs.shape == (6,))
+        coeffs = hypgeom.arb_hypgeom_rising_coeffs_2(5, 6)
+        _check(coeffs.shape == (6,))
+        coeffs = hypgeom.arb_hypgeom_rising_coeffs_fmpz(5, 6)
+        _check(coeffs.shape == (6,))
+    
+        shallow = hypgeom.arb_hypgeom_gamma_coeff_shallow(2)
+        _check(shallow.shape == (2,))
+    
+        bounds = hypgeom.arb_hypgeom_gamma_stirling_term_bounds(jnp.array(0.2, dtype=jnp.float64), 4)
+        _check(bounds.shape == (4,))
+    
+        n1 = hypgeom.arb_hypgeom_gamma_lower_fmpq_0_choose_N(xr, xr)
+        n2 = hypgeom.arb_hypgeom_gamma_upper_fmpq_inf_choose_N(xr, xr)
+        n3 = hypgeom.arb_hypgeom_gamma_upper_singular_si_choose_N(2, xr)
+        _check(jnp.ndim(n1) == 0 and jnp.ndim(n2) == 0 and jnp.ndim(n3) == 0)
+    
+        gl = hypgeom.arb_hypgeom_gamma_lower_fmpq_0_bsplit(xr, xr, n_terms=8)
+        gu = hypgeom.arb_hypgeom_gamma_upper_fmpq_inf_bsplit(xr, xr, n_terms=8)
+        gs = hypgeom.arb_hypgeom_gamma_upper_singular_si_bsplit(2, xr, n_terms=8)
+        _check(gl.shape == (2,) and gu.shape == (2,) and gs.shape == (2,))
+    
+        si = hypgeom.arb_hypgeom_si_1f2(xr, n_terms=8)
+        ci = hypgeom.arb_hypgeom_ci_2f3(xr, n_terms=8)
+        _check(si.shape == (2,) and ci.shape == (2,))
+    
+>       airy = hypgeom.acb_hypgeom_airy_series(xc, length=4)
+E       AttributeError: module 'arbplusjax.hypgeom' has no attribute 'acb_hypgeom_airy_series'
+
+tests\test_hypgeom_completeness.py:80: AttributeError
+=========================== short test summary info ===========================
+FAILED tests/test_hypgeom_completeness.py::test_hypgeom_lower_level_helpers_shapes
+1 failed, 23 passed, 1 skipped in 232.32s (0:03:52)

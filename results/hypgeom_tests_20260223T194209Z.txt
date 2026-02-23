@@ -1,0 +1,15 @@
+........................                                                 [100%]
+============================== warnings summary ===============================
+tests/test_hypgeom_completeness.py::test_hypgeom_lower_level_helpers_shapes
+tests/test_hypgeom_completeness.py::test_hypgeom_lower_level_helpers_shapes
+tests/test_hypgeom_completeness.py::test_hypgeom_lower_level_helpers_shapes
+tests/test_hypgeom_completeness.py::test_hypgeom_lower_level_helpers_shapes
+tests/test_hypgeom_completeness.py::test_hypgeom_lower_level_helpers_shapes
+tests/test_hypgeom_completeness.py::test_hypgeom_lower_level_helpers_shapes
+tests/test_hypgeom_completeness.py::test_hypgeom_lower_level_helpers_shapes
+tests/test_hypgeom_completeness.py::test_hypgeom_lower_level_helpers_shapes
+  C:\Users\phili\anaconda3\Lib\site-packages\jax\_src\numpy\lax_numpy.py:5426: ComplexWarning: Casting complex values to real discards the imaginary part
+    out_array: Array = lax_internal._convert_element_type(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+24 passed, 1 skipped, 8 warnings in 291.14s (0:04:51)

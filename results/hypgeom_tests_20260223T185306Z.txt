@@ -1,0 +1,273 @@
+......................FF                                                 [100%]
+================================== FAILURES ===================================
+___________________ test_hypgeom_lower_level_helpers_shapes ___________________
+
+    def test_hypgeom_lower_level_helpers_shapes():
+        xr = jnp.array([0.2, 0.3], dtype=jnp.float64)
+        xc = jnp.array([0.2, 0.25, 0.1, 0.15], dtype=jnp.float64)
+    
+        coeffs = hypgeom.arb_hypgeom_rising_coeffs_1(5, 6)
+        _check(coeffs.shape == (6,))
+        coeffs = hypgeom.arb_hypgeom_rising_coeffs_2(5, 6)
+        _check(coeffs.shape == (6,))
+        coeffs = hypgeom.arb_hypgeom_rising_coeffs_fmpz(5, 6)
+        _check(coeffs.shape == (6,))
+    
+        shallow = hypgeom.arb_hypgeom_gamma_coeff_shallow(2)
+        _check(shallow.shape == (2,))
+    
+>       bounds = hypgeom.arb_hypgeom_gamma_stirling_term_bounds(jnp.array(0.2, dtype=jnp.float64), 4)
+
+tests\test_hypgeom_completeness.py:63: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src\arbplusjax\hypgeom.py:5860: in arb_hypgeom_gamma_stirling_term_bounds
+    return _smi.arb_hypgeom_gamma_stirling_term_bounds(zinv, n_terms)
+src\arbplusjax\series_missing_impl.py:2704: in arb_hypgeom_gamma_stirling_term_bounds
+    coeffs_pad = jnp.where(ks < coeffs.shape[0], coeffs[ks], 0.0)
+..\..\..\..\anaconda3\Lib\site-packages\jax\_src\array.py:370: in __getitem__
+    return lax_numpy._rewriting_take(self, idx)
+..\..\..\..\anaconda3\Lib\site-packages\jax\_src\numpy\lax_numpy.py:11411: in _rewriting_take
+    return _gather(arr, treedef, static_idx, dynamic_idx, indices_are_sorted,
+..\..\..\..\anaconda3\Lib\site-packages\jax\_src\numpy\lax_numpy.py:11420: in _gather
+    indexer = _index_to_gather(shape(arr), idx)  # shared with _scatter_update
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+x_shape = (8,), idx = (Array([0., 1., 2., 3.], dtype=float64),)
+normalize_indices = True
+
+    def _index_to_gather(x_shape: Sequence[int], idx: Sequence[Any],
+                         normalize_indices: bool = True) -> _Indexer:
+      # Remove ellipses and add trailing slice(None)s.
+      idx = _canonicalize_tuple_index(len(x_shape), idx)
+    
+      # Check for scalar boolean indexing: this requires inserting extra dimensions
+      # before performing the rest of the logic.
+      scalar_bool_dims: Sequence[int] = [n for n, i in enumerate(idx) if isinstance(i, bool)]
+      if scalar_bool_dims:
+        idx = tuple(np.arange(int(i)) if isinstance(i, bool) else i for i in idx)
+        x_shape = list(x_shape)
+        for i in sorted(scalar_bool_dims):
+          x_shape.insert(i, 1)
+        x_shape = tuple(x_shape)
+    
+      # Check for advanced indexing:
+      # https://docs.scipy.org/doc/numpy/reference/arrays.indexing.html#advanced-indexing
+    
+      # Do the advanced indexing axes appear contiguously? If not, NumPy semantics
+      # move the advanced axes to the front.
+      advanced_axes_are_contiguous = False
+    
+      advanced_indexes: Sequence[Array | np.ndarray] | None = None
+    
+      # The positions of the advanced indexing axes in `idx`.
+      idx_advanced_axes: Sequence[int] = []
+    
+      # The positions of the advanced indexes in x's shape.
+      # collapsed, after None axes have been removed. See below.
+      x_advanced_axes: Sequence[int] | None = None
+    
+      if _is_advanced_int_indexer(idx):
+        idx_no_nones = [(i, d) for i, d in enumerate(idx) if d is not None]
+        advanced_pairs = (
+          (asarray(e), i, j) for j, (i, e) in enumerate(idx_no_nones)
+          if isscalar(e) or isinstance(e, (Sequence, Array, np.ndarray)))
+        if normalize_indices:
+          advanced_pairs = ((_normalize_index(e, x_shape[j]), i, j)
+                            for e, i, j in advanced_pairs)
+        advanced_indexes, idx_advanced_axes, x_advanced_axes = zip(*advanced_pairs)
+        advanced_axes_are_contiguous = bool(np.all(np.diff(idx_advanced_axes) == 1))
+    
+      x_axis = 0  # Current axis in x.
+      y_axis = 0  # Current axis in y, before collapsing. See below.
+      collapsed_y_axis = 0  # Current axis in y, after collapsing.
+    
+      # Scatter dimension numbers.
+      offset_dims: Sequence[int] = []
+      collapsed_slice_dims: Sequence[int] = []
+      start_index_map: Sequence[int] = []
+    
+      use_64bit_index = (
+        any(not core.is_constant_dim(d) or d >= (1 << 31) for d in x_shape) and
+        config.enable_x64.value)
+      index_dtype = int64 if use_64bit_index else int32
+    
+      # Gather indices.
+      # Pairs of (array, start_dim) values. These will be broadcast into
+      # gather_indices_shape, with the array dimensions aligned to start_dim, and
+      # then concatenated.
+      gather_indices: list[tuple[Array, int]] = []
+      gather_indices_shape: list[int] = []
+    
+      # We perform three transformations to y before the scatter op, in order:
+      # First, y is broadcast to slice_shape. In general `y` only need broadcast to
+      # the right shape.
+      slice_shape: Sequence[int] = []
+    
+      # Next, y is squeezed to remove newaxis_dims. This removes np.newaxis/`None`
+      # indices, which the scatter cannot remove itself.
+      newaxis_dims: Sequence[int] = []
+    
+      # Finally, we reverse reversed_y_dims to handle slices with negative strides.
+      reversed_y_dims: Sequence[int] = []
+    
+      gather_slice_shape: Sequence[int] = []
+    
+      for idx_pos, i in enumerate(idx):
+        # Handle the advanced indices here if:
+        # * the advanced indices were not contiguous and we are the start.
+        # * we are at the position of the first advanced index.
+        if (advanced_indexes is not None and
+            (advanced_axes_are_contiguous and idx_pos == idx_advanced_axes[0] or
+             not advanced_axes_are_contiguous and idx_pos == 0)):
+          advanced_indexes = broadcast_arrays(*advanced_indexes)
+          shape = advanced_indexes[0].shape
+          ndim = len(shape)
+    
+          start_dim = len(gather_indices_shape)
+          gather_indices += ((lax.convert_element_type(a, index_dtype), start_dim)
+                             for a in advanced_indexes)
+          gather_indices_shape += shape
+    
+          start_index_map.extend(x_advanced_axes)
+          collapsed_slice_dims.extend(x_advanced_axes)
+          slice_shape.extend(shape)
+          y_axis += ndim
+          collapsed_y_axis += ndim
+    
+        # Per-index bookkeeping for advanced indexes.
+        if idx_pos in idx_advanced_axes:
+          x_axis += 1
+          gather_slice_shape.append(1)
+          continue
+    
+        try:
+          abstract_i = core.get_aval(i)
+        except TypeError:
+          abstract_i = None
+        # Handle basic int indexes.
+        if isinstance(abstract_i, (ConcreteArray, ShapedArray)) and _int(abstract_i):
+          if core.definitely_equal(x_shape[x_axis], 0):
+            # XLA gives error when indexing into an axis of size 0
+            raise IndexError(f"index is out of bounds for axis {x_axis} with size 0")
+          i = _normalize_index(i, x_shape[x_axis]) if normalize_indices else i
+          i_converted = lax.convert_element_type(i, index_dtype)
+          gather_indices.append((i_converted, len(gather_indices_shape)))
+          collapsed_slice_dims.append(x_axis)
+          gather_slice_shape.append(1)
+          start_index_map.append(x_axis)
+          x_axis += 1
+        # Handle np.newaxis (None)
+        elif i is None:
+          slice_shape.append(1)
+          newaxis_dims.append(y_axis)
+          y_axis += 1
+    
+        elif isinstance(i, slice):
+          # Handle slice index (only static, otherwise an error is raised)
+          if not all(_is_slice_element_none_or_constant_or_symbolic(elt)
+                     for elt in (i.start, i.stop, i.step)):
+            msg = ("Array slice indices must have static start/stop/step to be used "
+                   "with NumPy indexing syntax. "
+                   f"Found slice({i.start}, {i.stop}, {i.step}). "
+                   "To index a statically sized "
+                   "array at a dynamic position, try lax.dynamic_slice/"
+                   "dynamic_update_slice (JAX does not support dynamically sized "
+                   "arrays within JIT compiled functions).")
+            raise IndexError(msg)
+    
+          start, step, slice_size = _preprocess_slice(i, x_shape[x_axis])
+          slice_shape.append(slice_size)
+    
+          if core.definitely_equal(step, 1):
+            # Avoid generating trivial gather (an optimization)
+            if not core.definitely_equal(slice_size, x_shape[x_axis]):
+              gather_indices.append((lax.convert_element_type(start, index_dtype),
+                                    len(gather_indices_shape)))
+              start_index_map.append(x_axis)
+            gather_slice_shape.append(slice_size)
+            offset_dims.append(collapsed_y_axis)
+          else:
+            indices = (array(start, dtype=index_dtype) +
+                       array(step, dtype=index_dtype) * lax.iota(index_dtype, slice_size))
+            if step < 0:
+              reversed_y_dims.append(collapsed_y_axis)
+              indices = lax.rev(indices, dimensions=(0,))
+    
+            gather_slice_shape.append(1)
+            gather_indices.append((indices, len(gather_indices_shape)))
+            start_index_map.append(x_axis)
+            gather_indices_shape.append(slice_size)
+            collapsed_slice_dims.append(x_axis)
+    
+          collapsed_y_axis += 1
+          y_axis += 1
+          x_axis += 1
+        else:
+          if (abstract_i is not None and
+              not (issubdtype(abstract_i.dtype, integer) or issubdtype(abstract_i.dtype, bool_))):
+            msg = ("Indexer must have integer or boolean type, got indexer "
+                   "with type {} at position {}, indexer value {}")
+>           raise TypeError(msg.format(abstract_i.dtype.name, idx_pos, i))
+E           TypeError: Indexer must have integer or boolean type, got indexer with type float64 at position 0, indexer value [0. 1. 2. 3.]
+
+..\..\..\..\anaconda3\Lib\site-packages\jax\_src\numpy\lax_numpy.py:11697: TypeError
+___________________ test_hypgeom_mode_wrappers_for_helpers ____________________
+
+    def test_hypgeom_mode_wrappers_for_helpers():
+        xr = jnp.array([0.2, 0.3], dtype=jnp.float64)
+        xc = jnp.array([0.2, 0.25, 0.1, 0.15], dtype=jnp.float64)
+    
+        out = hypgeom_wrappers.arb_hypgeom_si_1f2_mode(xr, impl="rigorous", prec_bits=40)
+        _check(out.shape == (2,))
+    
+        n = hypgeom_wrappers.arb_hypgeom_gamma_lower_fmpq_0_choose_N_mode(xr, xr, impl="rigorous", prec_bits=40)
+        _check(jnp.ndim(n) == 0)
+    
+        ai, aip, bi, bip = hypgeom_wrappers.acb_hypgeom_airy_mode(xc, impl="rigorous", prec_bits=40)
+        _check(ai.shape == (4,) and aip.shape == (4,) and bi.shape == (4,) and bip.shape == (4,))
+    
+        s, c = hypgeom_wrappers.acb_hypgeom_fresnel_mode(xc, impl="adaptive", prec_bits=40)
+        _check(s.shape == (4,) and c.shape == (4,))
+    
+        f, g = hypgeom_wrappers.acb_hypgeom_coulomb_mode(xc, xc, xc, impl="rigorous", prec_bits=40)
+        _check(f.shape == (4,) and g.shape == (4,))
+    
+        a = jnp.array([1.1, 1.2, 0.1, 0.2], dtype=jnp.float64)
+        b = jnp.array([2.1, 2.2, 0.1, 0.2], dtype=jnp.float64)
+        z = jnp.array([0.2, 0.3, 0.05, 0.1], dtype=jnp.float64)
+        s, t = hypgeom_wrappers.acb_hypgeom_pfq_sum_mode(a, b, z, impl="adaptive", prec_bits=40)
+        _check(s.shape == (4,) and t.shape == (4,))
+    
+>       p, dp = hypgeom_wrappers.acb_hypgeom_legendre_p_uiui_rec_mode(3, 0, xc, impl="rigorous", prec_bits=40)
+
+tests\test_hypgeom_completeness.py:118: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src\arbplusjax\hypgeom_wrappers.py:327: in wrapper
+    return wc.dispatch_mode(impl, base_fn, rig_fn, adapt_fn, is_acb, pb, args, kwargs)
+src\arbplusjax\wrappers_common.py:57: in dispatch_mode
+    return rig_fn(*args, prec_bits=prec_bits, **kwargs)
+src\arbplusjax\hypgeom_wrappers.py:309: in rig_fn
+    return _rigorous_tuple_acb(kernel_fn, r_args, prec_bits, **r_kwargs)
+src\arbplusjax\hypgeom_wrappers.py:278: in _rigorous_tuple_acb
+    items.append(wc.rigorous_acb_kernel(sel_fn, args, prec_bits, **kwargs))
+src\arbplusjax\wrappers_common.py:197: in rigorous_acb_kernel
+    re_mid, im_mid, re_rad, im_rad = _box_mid_rad(arg)
+src\arbplusjax\wrappers_common.py:92: in _box_mid_rad
+    re = acb_core.acb_real(x)
+src\arbplusjax\acb_core.py:31: in acb_real
+    box = as_acb_box(x)
+src\arbplusjax\acb_core.py:20: in as_acb_box
+    checks.check_last_dim(arr, 4, "acb_core.as_acb_box")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+arr = Array(3., dtype=float64), expected = 4, label = 'acb_core.as_acb_box'
+
+    def check_last_dim(arr: jax.Array, expected: int, label: str) -> None:
+>       _debug_check(arr.shape[-1] == expected, "{}: expected last dimension {}, got {}", label, expected, arr.shape)
+E       IndexError: tuple index out of range
+
+src\arbplusjax\checks.py:23: IndexError
+=========================== short test summary info ===========================
+FAILED tests/test_hypgeom_completeness.py::test_hypgeom_lower_level_helpers_shapes
+FAILED tests/test_hypgeom_completeness.py::test_hypgeom_mode_wrappers_for_helpers
+2 failed, 22 passed, 1 skipped in 162.94s (0:02:42)

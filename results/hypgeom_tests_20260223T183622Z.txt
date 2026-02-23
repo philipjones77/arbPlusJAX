@@ -1,0 +1,693 @@
+FFFFFFFFFFFFFFFFFFFFF.FF                                                 [100%]
+================================== FAILURES ===================================
+____________________ test_arb_rising_jit_and_vectorization ____________________
+
+    def test_arb_rising_jit_and_vectorization():
+        x = jnp.array([[1.0, 1.1], [2.0, 2.2], [3.0, 3.3]], dtype=jnp.float64)
+>       out = hypgeom.arb_hypgeom_rising_ui_batch_jit(x, n=6)
+
+tests\test_hypgeom_chassis.py:10: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src\arbplusjax\hypgeom.py:3645: in arb_hypgeom_rising_ui_batch
+    x = di.as_interval(x)
+src\arbplusjax\double_interval.py:20: in as_interval
+    checks.check_last_dim(arr, 2, "double_interval.as_interval")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+arr = Traced<ShapedArray(float64[3,2])>with<DynamicJaxprTrace(level=1/0)>
+expected = 2, label = 'double_interval.as_interval'
+
+    def check_last_dim(arr: jax.Array, expected: int, label: str) -> None:
+>       jax.debug.check(arr.shape[-1] == expected, "{}: expected last dimension {}, got {}", label, expected, arr.shape)
+E       AttributeError: module 'jax.debug' has no attribute 'check'
+E       --------------------
+E       For simplicity, JAX has removed its internal frames from the traceback of the following exception. Set JAX_TRACEBACK_FILTERING=off to include these.
+
+src\arbplusjax\checks.py:8: AttributeError
+________________________ test_acb_rising_jit_and_order ________________________
+
+    def test_acb_rising_jit_and_order():
+        x = jnp.array([[1.0, 1.1, 0.5, 0.6], [2.0, 2.2, 0.1, 0.2]], dtype=jnp.float64)
+>       out = hypgeom.acb_hypgeom_rising_ui_batch_jit(x, n=5)
+
+tests\test_hypgeom_chassis.py:17: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src\arbplusjax\hypgeom.py:3655: in acb_hypgeom_rising_ui_batch
+    x = as_acb_box(x)
+src\arbplusjax\hypgeom.py:78: in as_acb_box
+    checks.check_last_dim(arr, 4, "hypgeom.as_acb_box")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+arr = Traced<ShapedArray(float64[2,4])>with<DynamicJaxprTrace(level=1/0)>
+expected = 4, label = 'hypgeom.as_acb_box'
+
+    def check_last_dim(arr: jax.Array, expected: int, label: str) -> None:
+>       jax.debug.check(arr.shape[-1] == expected, "{}: expected last dimension {}, got {}", label, expected, arr.shape)
+E       AttributeError: module 'jax.debug' has no attribute 'check'
+E       --------------------
+E       For simplicity, JAX has removed its internal frames from the traceback of the following exception. Set JAX_TRACEBACK_FILTERING=off to include these.
+
+src\arbplusjax\checks.py:8: AttributeError
+_______________________ test_grad_real_rising_midpoint ________________________
+
+    def test_grad_real_rising_midpoint():
+        x = jnp.array([1.2, 1.3], dtype=jnp.float64)
+    
+        def loss(v):
+            y = hypgeom.arb_hypgeom_rising_ui(v, n=7)
+            return jnp.sum(y)
+    
+>       g = jax.grad(loss)(x)
+
+tests\test_hypgeom_chassis.py:30: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\test_hypgeom_chassis.py:27: in loss
+    y = hypgeom.arb_hypgeom_rising_ui(v, n=7)
+src\arbplusjax\hypgeom.py:1139: in arb_hypgeom_rising_ui
+    return arb_hypgeom_rising_ui_forward(x, n)
+src\arbplusjax\hypgeom.py:1117: in arb_hypgeom_rising_ui_forward
+    x = di.as_interval(x)
+src\arbplusjax\double_interval.py:20: in as_interval
+    checks.check_last_dim(arr, 2, "double_interval.as_interval")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+arr = Traced<ShapedArray(float64[2])>with<DynamicJaxprTrace(level=4/0)>
+expected = 2, label = 'double_interval.as_interval'
+
+    def check_last_dim(arr: jax.Array, expected: int, label: str) -> None:
+>       jax.debug.check(arr.shape[-1] == expected, "{}: expected last dimension {}, got {}", label, expected, arr.shape)
+E       AttributeError: module 'jax.debug' has no attribute 'check'
+E       --------------------
+E       For simplicity, JAX has removed its internal frames from the traceback of the following exception. Set JAX_TRACEBACK_FILTERING=off to include these.
+
+src\arbplusjax\checks.py:8: AttributeError
+___________________ test_grad_complex_rising_midpoint_abs2 ____________________
+
+    def test_grad_complex_rising_midpoint_abs2():
+        x = jnp.array([1.1, 1.2, 0.2, 0.3], dtype=jnp.float64)
+    
+        def loss(v):
+            y = hypgeom.acb_hypgeom_rising_ui(v, n=4)
+            m = hypgeom.acb_midpoint(y)
+            return jnp.real(m * jnp.conj(m))
+    
+>       g = jax.grad(loss)(x)
+
+tests\test_hypgeom_chassis.py:43: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\test_hypgeom_chassis.py:39: in loss
+    y = hypgeom.acb_hypgeom_rising_ui(v, n=4)
+src\arbplusjax\hypgeom.py:3054: in acb_hypgeom_rising_ui
+    return acb_hypgeom_rising_ui_forward(x, n)
+src\arbplusjax\hypgeom.py:3027: in acb_hypgeom_rising_ui_forward
+    x = as_acb_box(x)
+src\arbplusjax\hypgeom.py:78: in as_acb_box
+    checks.check_last_dim(arr, 4, "hypgeom.as_acb_box")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+arr = Traced<ShapedArray(float64[4])>with<DynamicJaxprTrace(level=4/0)>
+expected = 4, label = 'hypgeom.as_acb_box'
+
+    def check_last_dim(arr: jax.Array, expected: int, label: str) -> None:
+>       jax.debug.check(arr.shape[-1] == expected, "{}: expected last dimension {}, got {}", label, expected, arr.shape)
+E       AttributeError: module 'jax.debug' has no attribute 'check'
+E       --------------------
+E       For simplicity, JAX has removed its internal frames from the traceback of the following exception. Set JAX_TRACEBACK_FILTERING=off to include these.
+
+src\arbplusjax\checks.py:8: AttributeError
+______________________ test_lgamma_jit_real_and_complex _______________________
+
+    def test_lgamma_jit_real_and_complex():
+        xr = jnp.array([1.3, 1.6], dtype=jnp.float64)
+        xc = jnp.array([1.1, 1.3, 0.4, 0.5], dtype=jnp.float64)
+>       yr = hypgeom.arb_hypgeom_lgamma(xr)
+
+tests\test_hypgeom_chassis.py:51: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src\arbplusjax\hypgeom.py:1149: in arb_hypgeom_lgamma
+    x = di.as_interval(x)
+src\arbplusjax\double_interval.py:20: in as_interval
+    checks.check_last_dim(arr, 2, "double_interval.as_interval")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+arr = Traced<ShapedArray(float64[2])>with<DynamicJaxprTrace(level=1/0)>
+expected = 2, label = 'double_interval.as_interval'
+
+    def check_last_dim(arr: jax.Array, expected: int, label: str) -> None:
+>       jax.debug.check(arr.shape[-1] == expected, "{}: expected last dimension {}, got {}", label, expected, arr.shape)
+E       AttributeError: module 'jax.debug' has no attribute 'check'
+E       --------------------
+E       For simplicity, JAX has removed its internal frames from the traceback of the following exception. Set JAX_TRACEBACK_FILTERING=off to include these.
+
+src\arbplusjax\checks.py:8: AttributeError
+___________________________ test_lgamma_grad_paths ____________________________
+
+    def test_lgamma_grad_paths():
+        xr = jnp.array([1.2, 1.25], dtype=jnp.float64)
+        xc = jnp.array([1.4, 1.45, 0.3, 0.35], dtype=jnp.float64)
+    
+        def real_loss(v):
+            y = hypgeom.arb_hypgeom_lgamma(v)
+            return jnp.sum(y)
+    
+        def complex_loss(v):
+            y = hypgeom.acb_hypgeom_lgamma(v)
+            m = hypgeom.acb_midpoint(y)
+            return jnp.real(m * jnp.conj(m))
+    
+>       gr = jax.grad(real_loss)(xr)
+
+tests\test_hypgeom_chassis.py:73: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\test_hypgeom_chassis.py:65: in real_loss
+    y = hypgeom.arb_hypgeom_lgamma(v)
+src\arbplusjax\hypgeom.py:1149: in arb_hypgeom_lgamma
+    x = di.as_interval(x)
+src\arbplusjax\double_interval.py:20: in as_interval
+    checks.check_last_dim(arr, 2, "double_interval.as_interval")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+arr = Traced<ShapedArray(float64[2])>with<DynamicJaxprTrace(level=3/0)>
+expected = 2, label = 'double_interval.as_interval'
+
+    def check_last_dim(arr: jax.Array, expected: int, label: str) -> None:
+>       jax.debug.check(arr.shape[-1] == expected, "{}: expected last dimension {}, got {}", label, expected, arr.shape)
+E       AttributeError: module 'jax.debug' has no attribute 'check'
+E       --------------------
+E       For simplicity, JAX has removed its internal frames from the traceback of the following exception. Set JAX_TRACEBACK_FILTERING=off to include these.
+
+src\arbplusjax\checks.py:8: AttributeError
+________________________ test_gamma_rgamma_jit_shapes _________________________
+
+    def test_gamma_rgamma_jit_shapes():
+        xr = jnp.array([1.2, 1.3], dtype=jnp.float64)
+        xc = jnp.array([1.1, 1.2, 0.2, 0.25], dtype=jnp.float64)
+>       gr = hypgeom.arb_hypgeom_gamma(xr)
+
+tests\test_hypgeom_chassis.py:82: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src\arbplusjax\hypgeom.py:1176: in arb_hypgeom_gamma
+    x = di.as_interval(x)
+src\arbplusjax\double_interval.py:20: in as_interval
+    checks.check_last_dim(arr, 2, "double_interval.as_interval")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+arr = Traced<ShapedArray(float64[2])>with<DynamicJaxprTrace(level=1/0)>
+expected = 2, label = 'double_interval.as_interval'
+
+    def check_last_dim(arr: jax.Array, expected: int, label: str) -> None:
+>       jax.debug.check(arr.shape[-1] == expected, "{}: expected last dimension {}, got {}", label, expected, arr.shape)
+E       AttributeError: module 'jax.debug' has no attribute 'check'
+E       --------------------
+E       For simplicity, JAX has removed its internal frames from the traceback of the following exception. Set JAX_TRACEBACK_FILTERING=off to include these.
+
+src\arbplusjax\checks.py:8: AttributeError
+________________________ test_gamma_rgamma_grad_paths _________________________
+
+    def test_gamma_rgamma_grad_paths():
+        xr = jnp.array([1.25, 1.3], dtype=jnp.float64)
+        xc = jnp.array([1.35, 1.4, 0.2, 0.25], dtype=jnp.float64)
+    
+        def real_gamma_loss(v):
+            y = hypgeom.arb_hypgeom_gamma(v)
+            return jnp.sum(y)
+    
+        def real_rgamma_loss(v):
+            y = hypgeom.arb_hypgeom_rgamma(v)
+            return jnp.sum(y)
+    
+        def cplx_gamma_loss(v):
+            y = hypgeom.acb_hypgeom_gamma(v)
+            m = hypgeom.acb_midpoint(y)
+            return jnp.real(m * jnp.conj(m))
+    
+        def cplx_rgamma_loss(v):
+            y = hypgeom.acb_hypgeom_rgamma(v)
+            m = hypgeom.acb_midpoint(y)
+            return jnp.real(m * jnp.conj(m))
+    
+>       g1 = jax.grad(real_gamma_loss)(xr)
+
+tests\test_hypgeom_chassis.py:117: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\test_hypgeom_chassis.py:100: in real_gamma_loss
+    y = hypgeom.arb_hypgeom_gamma(v)
+src\arbplusjax\hypgeom.py:1176: in arb_hypgeom_gamma
+    x = di.as_interval(x)
+src\arbplusjax\double_interval.py:20: in as_interval
+    checks.check_last_dim(arr, 2, "double_interval.as_interval")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+arr = Traced<ShapedArray(float64[2])>with<DynamicJaxprTrace(level=3/0)>
+expected = 2, label = 'double_interval.as_interval'
+
+    def check_last_dim(arr: jax.Array, expected: int, label: str) -> None:
+>       jax.debug.check(arr.shape[-1] == expected, "{}: expected last dimension {}, got {}", label, expected, arr.shape)
+E       AttributeError: module 'jax.debug' has no attribute 'check'
+E       --------------------
+E       For simplicity, JAX has removed its internal frames from the traceback of the following exception. Set JAX_TRACEBACK_FILTERING=off to include these.
+
+src\arbplusjax\checks.py:8: AttributeError
+_________________________ test_erf_family_jit_shapes __________________________
+
+    def test_erf_family_jit_shapes():
+        xr = jnp.array([-0.8, 0.9], dtype=jnp.float64)
+        xc = jnp.array([-0.6, 0.7, -0.5, 0.6], dtype=jnp.float64)
+>       er = hypgeom.arb_hypgeom_erf(xr)
+
+tests\test_hypgeom_chassis.py:130: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src\arbplusjax\hypgeom.py:1292: in arb_hypgeom_erf
+    x = di.as_interval(x)
+src\arbplusjax\double_interval.py:20: in as_interval
+    checks.check_last_dim(arr, 2, "double_interval.as_interval")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+arr = Traced<ShapedArray(float64[2])>with<DynamicJaxprTrace(level=1/0)>
+expected = 2, label = 'double_interval.as_interval'
+
+    def check_last_dim(arr: jax.Array, expected: int, label: str) -> None:
+>       jax.debug.check(arr.shape[-1] == expected, "{}: expected last dimension {}, got {}", label, expected, arr.shape)
+E       AttributeError: module 'jax.debug' has no attribute 'check'
+E       --------------------
+E       For simplicity, JAX has removed its internal frames from the traceback of the following exception. Set JAX_TRACEBACK_FILTERING=off to include these.
+
+src\arbplusjax\checks.py:8: AttributeError
+_________________________ test_erf_family_grad_paths __________________________
+
+    def test_erf_family_grad_paths():
+        xr = jnp.array([-0.7, 0.8], dtype=jnp.float64)
+        xc = jnp.array([-0.6, 0.65, -0.4, 0.45], dtype=jnp.float64)
+    
+        def real_loss(v):
+            return jnp.sum(hypgeom.arb_hypgeom_erf(v)) + jnp.sum(hypgeom.arb_hypgeom_erfc(v)) + jnp.sum(hypgeom.arb_hypgeom_erfi(v))
+    
+        def complex_loss(v):
+            y = hypgeom.acb_hypgeom_erf(v)
+            z = hypgeom.acb_hypgeom_erfc(v)
+            w = hypgeom.acb_hypgeom_erfi(v)
+            m = hypgeom.acb_midpoint(y) + hypgeom.acb_midpoint(z) + hypgeom.acb_midpoint(w)
+            return jnp.real(m * jnp.conj(m))
+    
+>       gr = jax.grad(real_loss)(xr)
+
+tests\test_hypgeom_chassis.py:158: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\test_hypgeom_chassis.py:149: in real_loss
+    return jnp.sum(hypgeom.arb_hypgeom_erf(v)) + jnp.sum(hypgeom.arb_hypgeom_erfc(v)) + jnp.sum(hypgeom.arb_hypgeom_erfi(v))
+src\arbplusjax\hypgeom.py:1292: in arb_hypgeom_erf
+    x = di.as_interval(x)
+src\arbplusjax\double_interval.py:20: in as_interval
+    checks.check_last_dim(arr, 2, "double_interval.as_interval")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+arr = Traced<ShapedArray(float64[2])>with<DynamicJaxprTrace(level=3/0)>
+expected = 2, label = 'double_interval.as_interval'
+
+    def check_last_dim(arr: jax.Array, expected: int, label: str) -> None:
+>       jax.debug.check(arr.shape[-1] == expected, "{}: expected last dimension {}, got {}", label, expected, arr.shape)
+E       AttributeError: module 'jax.debug' has no attribute 'check'
+E       --------------------
+E       For simplicity, JAX has removed its internal frames from the traceback of the following exception. Set JAX_TRACEBACK_FILTERING=off to include these.
+
+src\arbplusjax\checks.py:8: AttributeError
+_____________________ test_barnesg_shapes_and_grad_paths ______________________
+
+    def test_barnesg_shapes_and_grad_paths():
+        xr = jnp.array([1.2, 1.4], dtype=jnp.float64)
+        xc = jnp.array([1.1, 1.3, 0.2, 0.25], dtype=jnp.float64)
+    
+>       gr = hypgeom.arb_hypgeom_barnesg(xr)
+
+tests\test_hypgeom_chassis.py:168: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src\arbplusjax\hypgeom.py:1202: in arb_hypgeom_barnesg
+    x = di.as_interval(x)
+src\arbplusjax\double_interval.py:20: in as_interval
+    checks.check_last_dim(arr, 2, "double_interval.as_interval")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+arr = Traced<ShapedArray(float64[2])>with<DynamicJaxprTrace(level=1/0)>
+expected = 2, label = 'double_interval.as_interval'
+
+    def check_last_dim(arr: jax.Array, expected: int, label: str) -> None:
+>       jax.debug.check(arr.shape[-1] == expected, "{}: expected last dimension {}, got {}", label, expected, arr.shape)
+E       AttributeError: module 'jax.debug' has no attribute 'check'
+E       --------------------
+E       For simplicity, JAX has removed its internal frames from the traceback of the following exception. Set JAX_TRACEBACK_FILTERING=off to include these.
+
+src\arbplusjax\checks.py:8: AttributeError
+__________________ test_erfinv_erfcinv_shapes_and_grad_paths __________________
+
+    def test_erfinv_erfcinv_shapes_and_grad_paths():
+        xr = jnp.array([-0.6, 0.7], dtype=jnp.float64)
+        xr_erfc = jnp.array([0.2, 1.7], dtype=jnp.float64)
+    
+>       erfi = hypgeom.arb_hypgeom_erfinv(xr)
+
+tests\test_hypgeom_chassis.py:193: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src\arbplusjax\hypgeom.py:1329: in arb_hypgeom_erfinv
+    x = di.as_interval(x)
+src\arbplusjax\double_interval.py:20: in as_interval
+    checks.check_last_dim(arr, 2, "double_interval.as_interval")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+arr = Traced<ShapedArray(float64[2])>with<DynamicJaxprTrace(level=1/0)>
+expected = 2, label = 'double_interval.as_interval'
+
+    def check_last_dim(arr: jax.Array, expected: int, label: str) -> None:
+>       jax.debug.check(arr.shape[-1] == expected, "{}: expected last dimension {}, got {}", label, expected, arr.shape)
+E       AttributeError: module 'jax.debug' has no attribute 'check'
+E       --------------------
+E       For simplicity, JAX has removed its internal frames from the traceback of the following exception. Set JAX_TRACEBACK_FILTERING=off to include these.
+
+src\arbplusjax\checks.py:8: AttributeError
+___________________________ test_1f1_2f1_jit_shapes ___________________________
+
+    def test_1f1_2f1_jit_shapes():
+        a = jnp.array([1.1, 1.2], dtype=jnp.float64)
+        b = jnp.array([2.0, 2.1], dtype=jnp.float64)
+        c = jnp.array([2.4, 2.5], dtype=jnp.float64)
+        z = jnp.array([-0.2, 0.3], dtype=jnp.float64)
+        ac = jnp.array([1.0, 1.1, 0.1, 0.2], dtype=jnp.float64)
+        bc = jnp.array([2.0, 2.1, 0.1, 0.2], dtype=jnp.float64)
+        cc = jnp.array([2.5, 2.6, 0.1, 0.2], dtype=jnp.float64)
+        zc = jnp.array([-0.3, 0.3, -0.2, 0.2], dtype=jnp.float64)
+    
+>       r0 = hypgeom.arb_hypgeom_0f1(b, z, regularized=False)
+
+tests\test_hypgeom_chassis.py:218: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src\arbplusjax\hypgeom.py:1346: in arb_hypgeom_0f1
+    a = di.as_interval(a)
+src\arbplusjax\double_interval.py:20: in as_interval
+    checks.check_last_dim(arr, 2, "double_interval.as_interval")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+arr = Traced<ShapedArray(float64[2])>with<DynamicJaxprTrace(level=1/0)>
+expected = 2, label = 'double_interval.as_interval'
+
+    def check_last_dim(arr: jax.Array, expected: int, label: str) -> None:
+>       jax.debug.check(arr.shape[-1] == expected, "{}: expected last dimension {}, got {}", label, expected, arr.shape)
+E       AttributeError: module 'jax.debug' has no attribute 'check'
+E       --------------------
+E       For simplicity, JAX has removed its internal frames from the traceback of the following exception. Set JAX_TRACEBACK_FILTERING=off to include these.
+
+src\arbplusjax\checks.py:8: AttributeError
+___________________________ test_1f1_2f1_grad_paths ___________________________
+
+    def test_1f1_2f1_grad_paths():
+        a = jnp.array([1.1, 1.15], dtype=jnp.float64)
+        b = jnp.array([2.1, 2.2], dtype=jnp.float64)
+        c = jnp.array([2.6, 2.7], dtype=jnp.float64)
+        z = jnp.array([-0.2, 0.25], dtype=jnp.float64)
+        ac = jnp.array([1.1, 1.2, 0.1, 0.2], dtype=jnp.float64)
+        bc = jnp.array([2.2, 2.3, 0.1, 0.2], dtype=jnp.float64)
+        cc = jnp.array([2.8, 2.9, 0.1, 0.2], dtype=jnp.float64)
+        zc = jnp.array([-0.2, 0.2, -0.15, 0.15], dtype=jnp.float64)
+    
+        def real_loss(v):
+            return (
+                jnp.sum(hypgeom.arb_hypgeom_0f1(b, v, regularized=False))
+                + jnp.sum(hypgeom.arb_hypgeom_m(a, b, v, regularized=True))
+                + jnp.sum(hypgeom.arb_hypgeom_1f1(a, b, v))
+                + jnp.sum(hypgeom.arb_hypgeom_2f1(a, b, c, v, regularized=True))
+            )
+    
+        def cplx_loss(v):
+            u = hypgeom.acb_hypgeom_0f1(bc, v, regularized=False)
+            y = hypgeom.acb_hypgeom_m(ac, bc, v, regularized=True)
+            w = hypgeom.acb_hypgeom_2f1(ac, bc, cc, v, regularized=True)
+            q = hypgeom.acb_hypgeom_1f1(ac, bc, v)
+            m = hypgeom.acb_midpoint(u) + hypgeom.acb_midpoint(y) + hypgeom.acb_midpoint(w) + hypgeom.acb_midpoint(q)
+            return jnp.real(m * jnp.conj(m))
+    
+>       gr = jax.grad(real_loss)(z)
+
+tests\test_hypgeom_chassis.py:261: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\test_hypgeom_chassis.py:247: in real_loss
+    jnp.sum(hypgeom.arb_hypgeom_0f1(b, v, regularized=False))
+src\arbplusjax\hypgeom.py:1346: in arb_hypgeom_0f1
+    a = di.as_interval(a)
+src\arbplusjax\double_interval.py:20: in as_interval
+    checks.check_last_dim(arr, 2, "double_interval.as_interval")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+arr = Traced<ShapedArray(float64[2])>with<DynamicJaxprTrace(level=3/0)>
+expected = 2, label = 'double_interval.as_interval'
+
+    def check_last_dim(arr: jax.Array, expected: int, label: str) -> None:
+>       jax.debug.check(arr.shape[-1] == expected, "{}: expected last dimension {}, got {}", label, expected, arr.shape)
+E       AttributeError: module 'jax.debug' has no attribute 'check'
+E       --------------------
+E       For simplicity, JAX has removed its internal frames from the traceback of the following exception. Set JAX_TRACEBACK_FILTERING=off to include these.
+
+src\arbplusjax\checks.py:8: AttributeError
+________________________ test_u_and_integration_paths _________________________
+
+    def test_u_and_integration_paths():
+        a = jnp.array([1.1, 1.2], dtype=jnp.float64)
+        b = jnp.array([1.8, 1.9], dtype=jnp.float64)
+        z = jnp.array([0.2, 0.3], dtype=jnp.float64)
+        ac = jnp.array([1.1, 1.2, 0.1, 0.2], dtype=jnp.float64)
+        bc = jnp.array([1.6, 1.7, 0.1, 0.2], dtype=jnp.float64)
+        zc = jnp.array([0.2, 0.3, 0.1, 0.15], dtype=jnp.float64)
+    
+>       ur = hypgeom.arb_hypgeom_u(a, b, z)
+
+tests\test_hypgeom_chassis.py:275: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src\arbplusjax\hypgeom.py:1583: in arb_hypgeom_u
+    a = di.as_interval(a)
+src\arbplusjax\double_interval.py:20: in as_interval
+    checks.check_last_dim(arr, 2, "double_interval.as_interval")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+arr = Traced<ShapedArray(float64[2])>with<DynamicJaxprTrace(level=1/0)>
+expected = 2, label = 'double_interval.as_interval'
+
+    def check_last_dim(arr: jax.Array, expected: int, label: str) -> None:
+>       jax.debug.check(arr.shape[-1] == expected, "{}: expected last dimension {}, got {}", label, expected, arr.shape)
+E       AttributeError: module 'jax.debug' has no attribute 'check'
+E       --------------------
+E       For simplicity, JAX has removed its internal frames from the traceback of the following exception. Set JAX_TRACEBACK_FILTERING=off to include these.
+
+src\arbplusjax\checks.py:8: AttributeError
+______________________ test_bessel_shapes_and_grad_paths ______________________
+
+    def test_bessel_shapes_and_grad_paths():
+        nu = jnp.array([0.5, 0.6], dtype=jnp.float64)
+        z = jnp.array([0.4, 0.5], dtype=jnp.float64)
+        nu_c = jnp.array([0.5, 0.6, 0.1, 0.2], dtype=jnp.float64)
+        z_c = jnp.array([0.4, 0.5, 0.2, 0.25], dtype=jnp.float64)
+    
+>       j = hypgeom.arb_hypgeom_bessel_j(nu, z)
+
+tests\test_hypgeom_chassis.py:303: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src\arbplusjax\hypgeom.py:2665: in arb_hypgeom_bessel_j
+    mode = _validate_bessel_real_mode(mode)
+src\arbplusjax\hypgeom.py:68: in _validate_bessel_real_mode
+    checks.check_in_set(mode, _BESSEL_REAL_MODES, "hypgeom.bessel_real_mode")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+val = 'sample', allowed = ('sample', 'midpoint')
+label = 'hypgeom.bessel_real_mode'
+
+    def check_in_set(val: str, allowed: tuple[str, ...], label: str) -> None:
+>       jax.debug.check(val in allowed, "{}: expected one of {}, got {}", label, allowed, val)
+E       AttributeError: module 'jax.debug' has no attribute 'check'
+E       --------------------
+E       For simplicity, JAX has removed its internal frames from the traceback of the following exception. Set JAX_TRACEBACK_FILTERING=off to include these.
+
+src\arbplusjax\checks.py:24: AttributeError
+________________ test_precision_semantics_for_hypgeom_kernels _________________
+
+    def test_precision_semantics_for_hypgeom_kernels():
+        xr = jnp.array([1.4, 1.41], dtype=jnp.float64)
+        xc = jnp.array([1.2, 1.25, 0.3, 0.35], dtype=jnp.float64)
+    
+>       r_hi = hypgeom.arb_hypgeom_rising_ui_prec(xr, n=8, prec_bits=53)
+
+tests\test_hypgeom_chassis.py:331: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src\arbplusjax\hypgeom.py:1144: in arb_hypgeom_rising_ui_prec
+    return arb_hypgeom_rising_ui_forward_prec(x, n, prec_bits)
+src\arbplusjax\hypgeom.py:1128: in arb_hypgeom_rising_ui_forward_prec
+    x = di.round_interval_outward(di.as_interval(x), prec_bits)
+src\arbplusjax\double_interval.py:20: in as_interval
+    checks.check_last_dim(arr, 2, "double_interval.as_interval")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+arr = Traced<ShapedArray(float64[2])>with<DynamicJaxprTrace(level=2/0)>
+expected = 2, label = 'double_interval.as_interval'
+
+    def check_last_dim(arr: jax.Array, expected: int, label: str) -> None:
+>       jax.debug.check(arr.shape[-1] == expected, "{}: expected last dimension {}, got {}", label, expected, arr.shape)
+E       AttributeError: module 'jax.debug' has no attribute 'check'
+E       --------------------
+E       For simplicity, JAX has removed its internal frames from the traceback of the following exception. Set JAX_TRACEBACK_FILTERING=off to include these.
+
+src\arbplusjax\checks.py:8: AttributeError
+_______________________ test_additional_specials_shapes _______________________
+
+    def test_additional_specials_shapes():
+        x = jnp.array([0.2, 0.3], dtype=jnp.float64)
+>       s, c = hypgeom.arb_hypgeom_fresnel(x, normalized=True)
+
+tests\test_hypgeom_chassis.py:366: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src\arbplusjax\hypgeom.py:1611: in arb_hypgeom_fresnel
+    z = di.as_interval(z)
+src\arbplusjax\double_interval.py:20: in as_interval
+    checks.check_last_dim(arr, 2, "double_interval.as_interval")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+arr = Traced<ShapedArray(float64[2])>with<DynamicJaxprTrace(level=1/0)>
+expected = 2, label = 'double_interval.as_interval'
+
+    def check_last_dim(arr: jax.Array, expected: int, label: str) -> None:
+>       jax.debug.check(arr.shape[-1] == expected, "{}: expected last dimension {}, got {}", label, expected, arr.shape)
+E       AttributeError: module 'jax.debug' has no attribute 'check'
+E       --------------------
+E       For simplicity, JAX has removed its internal frames from the traceback of the following exception. Set JAX_TRACEBACK_FILTERING=off to include these.
+
+src\arbplusjax\checks.py:8: AttributeError
+_____________________ test_new_arb_hypgeom_stage2_shapes ______________________
+
+    def test_new_arb_hypgeom_stage2_shapes():
+        x = jnp.array([0.2, 0.3], dtype=jnp.float64)
+        s = jnp.array([1.0, 1.0], dtype=jnp.float64)
+        a = jnp.array([0.5, 0.5], dtype=jnp.float64)
+        b = jnp.array([1.5, 1.5], dtype=jnp.float64)
+    
+>       ai, aip, bi, bip = hypgeom.arb_hypgeom_airy(x)
+
+tests\test_hypgeom_chassis.py:390: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src\arbplusjax\hypgeom.py:1818: in arb_hypgeom_airy
+    z = di.as_interval(z)
+src\arbplusjax\double_interval.py:20: in as_interval
+    checks.check_last_dim(arr, 2, "double_interval.as_interval")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+arr = Traced<ShapedArray(float64[2])>with<DynamicJaxprTrace(level=1/0)>
+expected = 2, label = 'double_interval.as_interval'
+
+    def check_last_dim(arr: jax.Array, expected: int, label: str) -> None:
+>       jax.debug.check(arr.shape[-1] == expected, "{}: expected last dimension {}, got {}", label, expected, arr.shape)
+E       AttributeError: module 'jax.debug' has no attribute 'check'
+E       --------------------
+E       For simplicity, JAX has removed its internal frames from the traceback of the following exception. Set JAX_TRACEBACK_FILTERING=off to include these.
+
+src\arbplusjax\checks.py:8: AttributeError
+___________________ test_hypgeom_series_and_helpers_shapes ____________________
+
+    def test_hypgeom_series_and_helpers_shapes():
+        x = jnp.array([0.2, 0.3], dtype=jnp.float64)
+        s = jnp.array([1.0, 1.0], dtype=jnp.float64)
+        a = jnp.array([0.5, 0.5], dtype=jnp.float64)
+        b = jnp.array([1.5, 1.5], dtype=jnp.float64)
+        eta = jnp.array([0.0, 0.0], dtype=jnp.float64)
+    
+>       _check(hypgeom.arb_hypgeom_rising_ui_jet(x, 3, 4).shape == (4, 2))
+
+tests\test_hypgeom_chassis.py:415: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src\arbplusjax\hypgeom.py:2282: in arb_hypgeom_rising_ui_jet
+    return arb_hypgeom_rising_ui_jet_powsum(x, n, length)
+src\arbplusjax\hypgeom.py:2268: in arb_hypgeom_rising_ui_jet_powsum
+    x0 = _interval_midpoint(x)
+src\arbplusjax\hypgeom.py:571: in _interval_midpoint
+    x = di.as_interval(x)
+src\arbplusjax\double_interval.py:20: in as_interval
+    checks.check_last_dim(arr, 2, "double_interval.as_interval")
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+arr = Array([0.2, 0.3], dtype=float64), expected = 2
+label = 'double_interval.as_interval'
+
+    def check_last_dim(arr: jax.Array, expected: int, label: str) -> None:
+>       jax.debug.check(arr.shape[-1] == expected, "{}: expected last dimension {}, got {}", label, expected, arr.shape)
+E       AttributeError: module 'jax.debug' has no attribute 'check'
+
+src\arbplusjax\checks.py:8: AttributeError
+_________________________ test_hypgeom_prec_coverage __________________________
+
+    def test_hypgeom_prec_coverage():
+        callables = _hypgeom_callables()
+        names = set(callables)
+        missing = []
+        for name in names:
+            if name.endswith("_prec") or name.endswith("_jit") or name.endswith("_rigorous"):
+                continue
+            if name.endswith("_batch"):
+                if name + "_prec" not in names:
+                    missing.append(name + "_prec")
+                continue
+            if name + "_prec" not in names:
+                missing.append(name + "_prec")
+>       _check(len(missing) == 0)
+
+tests\test_hypgeom_completeness.py:35: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+cond = False, msg = None
+
+    def _check(cond, msg: str | None = None) -> None:
+        label = msg or "test_check"
+        try:
+            jax.debug.check(cond, "{}: {}", label, cond)
+        except Exception:
+            pass
+>       assert bool(cond)
+E       AssertionError
+
+tests\_test_checks.py:12: AssertionError
+___________________ test_hypgeom_lower_level_helpers_shapes ___________________
+
+    def test_hypgeom_lower_level_helpers_shapes():
+        xr = jnp.array([0.2, 0.3], dtype=jnp.float64)
+        xc = jnp.array([0.2, 0.25, 0.1, 0.15], dtype=jnp.float64)
+    
+>       coeffs = hypgeom.arb_hypgeom_rising_coeffs_1(5, 6)
+E       AttributeError: module 'arbplusjax.hypgeom' has no attribute 'arb_hypgeom_rising_coeffs_1'. Did you mean: 'arb_hypgeom_rising_coeffs_1_prec'?
+
+tests\test_hypgeom_completeness.py:53: AttributeError
+___________________ test_hypgeom_mode_wrappers_for_helpers ____________________
+
+    def test_hypgeom_mode_wrappers_for_helpers():
+        xr = jnp.array([0.2, 0.3], dtype=jnp.float64)
+        xc = jnp.array([0.2, 0.25, 0.1, 0.15], dtype=jnp.float64)
+    
+>       out = hypgeom_wrappers.arb_hypgeom_si_1f2_mode(xr, impl="rigorous", prec_bits=40)
+E       AttributeError: module 'arbplusjax.hypgeom_wrappers' has no attribute 'arb_hypgeom_si_1f2_mode'. Did you mean: 'acb_hypgeom_m_1f1_mode'?
+
+tests\test_hypgeom_completeness.py:97: AttributeError
+=========================== short test summary info ===========================
+FAILED tests/test_hypgeom_chassis.py::test_arb_rising_jit_and_vectorization
+FAILED tests/test_hypgeom_chassis.py::test_acb_rising_jit_and_order - Attribu...
+FAILED tests/test_hypgeom_chassis.py::test_grad_real_rising_midpoint - Attrib...
+FAILED tests/test_hypgeom_chassis.py::test_grad_complex_rising_midpoint_abs2
+FAILED tests/test_hypgeom_chassis.py::test_lgamma_jit_real_and_complex - Attr...
+FAILED tests/test_hypgeom_chassis.py::test_lgamma_grad_paths - AttributeError...
+FAILED tests/test_hypgeom_chassis.py::test_gamma_rgamma_jit_shapes - Attribut...
+FAILED tests/test_hypgeom_chassis.py::test_gamma_rgamma_grad_paths - Attribut...
+FAILED tests/test_hypgeom_chassis.py::test_erf_family_jit_shapes - AttributeE...
+FAILED tests/test_hypgeom_chassis.py::test_erf_family_grad_paths - AttributeE...
+FAILED tests/test_hypgeom_chassis.py::test_barnesg_shapes_and_grad_paths - At...
+FAILED tests/test_hypgeom_chassis.py::test_erfinv_erfcinv_shapes_and_grad_paths
+FAILED tests/test_hypgeom_chassis.py::test_1f1_2f1_jit_shapes - AttributeErro...
+FAILED tests/test_hypgeom_chassis.py::test_1f1_2f1_grad_paths - AttributeErro...
+FAILED tests/test_hypgeom_chassis.py::test_u_and_integration_paths - Attribut...
+FAILED tests/test_hypgeom_chassis.py::test_bessel_shapes_and_grad_paths - Att...
+FAILED tests/test_hypgeom_chassis.py::test_precision_semantics_for_hypgeom_kernels
+FAILED tests/test_hypgeom_chassis.py::test_additional_specials_shapes - Attri...
+FAILED tests/test_hypgeom_chassis.py::test_new_arb_hypgeom_stage2_shapes - At...
+FAILED tests/test_hypgeom_chassis.py::test_hypgeom_series_and_helpers_shapes
+FAILED tests/test_hypgeom_completeness.py::test_hypgeom_prec_coverage - Asser...
+FAILED tests/test_hypgeom_completeness.py::test_hypgeom_lower_level_helpers_shapes
+FAILED tests/test_hypgeom_completeness.py::test_hypgeom_mode_wrappers_for_helpers
+23 failed, 1 passed, 1 skipped in 12.14s

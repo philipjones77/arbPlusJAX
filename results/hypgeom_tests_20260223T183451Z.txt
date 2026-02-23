@@ -1,0 +1,56 @@
+
+=================================== ERRORS ====================================
+_______________ ERROR collecting tests/test_hypgeom_chassis.py ________________
+tests\test_hypgeom_chassis.py:4: in <module>
+    from arbplusjax import hypgeom
+src\arbplusjax\__init__.py:1: in <module>
+    from . import acb_calc
+src\arbplusjax\acb_calc.py:8: in <module>
+    from . import acb_core
+src\arbplusjax\acb_core.py:11: in <module>
+    from . import acb_dirichlet
+src\arbplusjax\acb_dirichlet.py:118: in <module>
+    from . import series_missing_impl as _smi
+src\arbplusjax\series_missing_impl.py:13: in <module>
+    from . import hypgeom
+src\arbplusjax\hypgeom.py:5843: in <module>
+    arb_hypgeom_rising_coeffs_1_prec = _smi.arb_hypgeom_rising_coeffs_1_prec
+E   AttributeError: partially initialized module 'arbplusjax.series_missing_impl' from 'C:\Users\phili\OneDrive\Documents\GitHub\arbPlusJAX\src\arbplusjax\series_missing_impl.py' has no attribute 'arb_hypgeom_rising_coeffs_1_prec' (most likely due to a circular import)
+________________ ERROR collecting tests/test_hypgeom_parity.py ________________
+tests\test_hypgeom_parity.py:11: in <module>
+    from arbplusjax import hypgeom
+src\arbplusjax\__init__.py:1: in <module>
+    from . import acb_calc
+src\arbplusjax\acb_calc.py:8: in <module>
+    from . import acb_core
+src\arbplusjax\acb_core.py:11: in <module>
+    from . import acb_dirichlet
+src\arbplusjax\acb_dirichlet.py:118: in <module>
+    from . import series_missing_impl as _smi
+src\arbplusjax\series_missing_impl.py:13: in <module>
+    from . import hypgeom
+src\arbplusjax\hypgeom.py:5843: in <module>
+    arb_hypgeom_rising_coeffs_1_prec = _smi.arb_hypgeom_rising_coeffs_1_prec
+E   AttributeError: partially initialized module 'arbplusjax.series_missing_impl' from 'C:\Users\phili\OneDrive\Documents\GitHub\arbPlusJAX\src\arbplusjax\series_missing_impl.py' has no attribute 'arb_hypgeom_rising_coeffs_1_prec' (most likely due to a circular import)
+_____________ ERROR collecting tests/test_hypgeom_completeness.py _____________
+tests\test_hypgeom_completeness.py:5: in <module>
+    from arbplusjax import hypgeom
+src\arbplusjax\__init__.py:1: in <module>
+    from . import acb_calc
+src\arbplusjax\acb_calc.py:8: in <module>
+    from . import acb_core
+src\arbplusjax\acb_core.py:11: in <module>
+    from . import acb_dirichlet
+src\arbplusjax\acb_dirichlet.py:118: in <module>
+    from . import series_missing_impl as _smi
+src\arbplusjax\series_missing_impl.py:13: in <module>
+    from . import hypgeom
+src\arbplusjax\hypgeom.py:5843: in <module>
+    arb_hypgeom_rising_coeffs_1_prec = _smi.arb_hypgeom_rising_coeffs_1_prec
+E   AttributeError: partially initialized module 'arbplusjax.series_missing_impl' from 'C:\Users\phili\OneDrive\Documents\GitHub\arbPlusJAX\src\arbplusjax\series_missing_impl.py' has no attribute 'arb_hypgeom_rising_coeffs_1_prec' (most likely due to a circular import)
+=========================== short test summary info ===========================
+ERROR tests/test_hypgeom_chassis.py - AttributeError: partially initialized m...
+ERROR tests/test_hypgeom_parity.py - AttributeError: partially initialized mo...
+ERROR tests/test_hypgeom_completeness.py - AttributeError: partially initiali...
+!!!!!!!!!!!!!!!!!!! Interrupted: 3 errors during collection !!!!!!!!!!!!!!!!!!!
+3 errors in 6.02s

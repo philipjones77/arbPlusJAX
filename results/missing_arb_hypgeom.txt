@@ -1,0 +1,4 @@
+arb_hypgeom_erf_bb
+arb_hypgeom_gamma_taylor
+arb_hypgeom_infsum
+arb_hypgeom_sum

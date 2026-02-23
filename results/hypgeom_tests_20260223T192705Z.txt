@@ -1,0 +1,122 @@
+......................F.                                                 [100%]
+================================== FAILURES ===================================
+___________________ test_hypgeom_lower_level_helpers_shapes ___________________
+
+    def test_hypgeom_lower_level_helpers_shapes():
+        xr = jnp.array([0.2, 0.3], dtype=jnp.float64)
+        xc = jnp.array([0.2, 0.25, 0.1, 0.15], dtype=jnp.float64)
+    
+        coeffs = hypgeom.arb_hypgeom_rising_coeffs_1(5, 6)
+        _check(coeffs.shape == (6,))
+        coeffs = hypgeom.arb_hypgeom_rising_coeffs_2(5, 6)
+        _check(coeffs.shape == (6,))
+        coeffs = hypgeom.arb_hypgeom_rising_coeffs_fmpz(5, 6)
+        _check(coeffs.shape == (6,))
+    
+        shallow = hypgeom.arb_hypgeom_gamma_coeff_shallow(2)
+        _check(shallow.shape == (2,))
+    
+        bounds = hypgeom.arb_hypgeom_gamma_stirling_term_bounds(jnp.array(0.2, dtype=jnp.float64), 4)
+        _check(bounds.shape == (4,))
+    
+        n1 = hypgeom.arb_hypgeom_gamma_lower_fmpq_0_choose_N(xr, xr)
+        n2 = hypgeom.arb_hypgeom_gamma_upper_fmpq_inf_choose_N(xr, xr)
+        n3 = hypgeom.arb_hypgeom_gamma_upper_singular_si_choose_N(2, xr)
+        _check(jnp.ndim(n1) == 0 and jnp.ndim(n2) == 0 and jnp.ndim(n3) == 0)
+    
+        gl = hypgeom.arb_hypgeom_gamma_lower_fmpq_0_bsplit(xr, xr, n_terms=8)
+        gu = hypgeom.arb_hypgeom_gamma_upper_fmpq_inf_bsplit(xr, xr, n_terms=8)
+        gs = hypgeom.arb_hypgeom_gamma_upper_singular_si_bsplit(2, xr, n_terms=8)
+        _check(gl.shape == (2,) and gu.shape == (2,) and gs.shape == (2,))
+    
+        si = hypgeom.arb_hypgeom_si_1f2(xr, n_terms=8)
+        ci = hypgeom.arb_hypgeom_ci_2f3(xr, n_terms=8)
+        _check(si.shape == (2,) and ci.shape == (2,))
+    
+        airy = hypgeom.acb_hypgeom_airy_series(xc, length=4)
+        _check(airy.shape == (4, 4))
+>       ei = hypgeom.acb_hypgeom_ei_series(xc, length=4)
+
+tests\test_hypgeom_completeness.py:82: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+src\arbplusjax\hypgeom.py:5948: in acb_hypgeom_ei_series
+    return _smi.acb_hypgeom_ei_series(z, length=length)
+src\arbplusjax\series_missing_impl.py:1364: in acb_hypgeom_ei_series
+    return _jet_complex(f, z, length) if ('acb' in "acb_hypgeom_ei_series") else _jet_real(f, z, length)
+src\arbplusjax\series_missing_impl.py:147: in _jet_complex
+    vals = su.taylor_series_unary_complex(fn, mid, length)
+src\arbplusjax\series_utils.py:39: in taylor_series_unary_complex
+    val = fr(0.0) + 1j * fi(0.0)
+src\arbplusjax\series_utils.py:30: in f_real
+    return jnp.real(fn(z0 + t))
+..\..\..\..\anaconda3\Lib\site-packages\jax\_src\scipy\special.py:2046: in expi
+    return jnp.piecewise(x_arr, [x_arr < 0], [_expi_neg, _expi_pos])
+..\..\..\..\anaconda3\Lib\site-packages\jax\_src\numpy\lax_numpy.py:12684: in piecewise
+    return _piecewise(asarray(x), asarray(condlist, dtype=bool_), consts,
+..\..\..\..\anaconda3\Lib\site-packages\jax\_src\numpy\lax_numpy.py:12701: in _piecewise
+    return vectorize(lax.switch, excluded=(1,))(indices, funclist, x)
+..\..\..\..\anaconda3\Lib\site-packages\jax\_src\numpy\vectorize.py:341: in wrapped
+    result = vectorized_func(*squeezed_args)
+..\..\..\..\anaconda3\Lib\site-packages\jax\_src\numpy\vectorize.py:140: in wrapped
+    out = func(*args)
+..\..\..\..\anaconda3\Lib\site-packages\jax\_src\numpy\vectorize.py:183: in new_func
+    return func(*args, **kwargs, **static_kwargs)
+..\..\..\..\anaconda3\Lib\site-packages\jax\_src\numpy\lax_numpy.py:12697: in <lambda>
+    return lambda x: f(x, *args, **kw).astype(dtype)
+..\..\..\..\anaconda3\Lib\site-packages\jax\_src\scipy\special.py:2022: in _expi_neg
+    return -exp1(-x)
+..\..\..\..\anaconda3\Lib\site-packages\jax\_src\scipy\special.py:2238: in exp1
+    return cast(Array, expn(1, x))
+..\..\..\..\anaconda3\Lib\site-packages\jax\_src\numpy\vectorize.py:341: in wrapped
+    result = vectorized_func(*squeezed_args)
+..\..\..\..\anaconda3\Lib\site-packages\jax\_src\numpy\vectorize.py:140: in wrapped
+    out = func(*args)
+..\..\..\..\anaconda3\Lib\site-packages\jax\_src\scipy\special.py:2203: in expn
+    ret = jnp.piecewise(x, conds, vals)
+..\..\..\..\anaconda3\Lib\site-packages\jax\_src\numpy\lax_numpy.py:12684: in piecewise
+    return _piecewise(asarray(x), asarray(condlist, dtype=bool_), consts,
+..\..\..\..\anaconda3\Lib\site-packages\jax\_src\numpy\lax_numpy.py:12701: in _piecewise
+    return vectorize(lax.switch, excluded=(1,))(indices, funclist, x)
+..\..\..\..\anaconda3\Lib\site-packages\jax\_src\numpy\vectorize.py:341: in wrapped
+    result = vectorized_func(*squeezed_args)
+..\..\..\..\anaconda3\Lib\site-packages\jax\_src\numpy\vectorize.py:140: in wrapped
+    out = func(*args)
+..\..\..\..\anaconda3\Lib\site-packages\jax\_src\numpy\vectorize.py:183: in new_func
+    return func(*args, **kwargs, **static_kwargs)
+..\..\..\..\anaconda3\Lib\site-packages\jax\_src\numpy\lax_numpy.py:12697: in <lambda>
+    return lambda x: f(x, *args, **kw).astype(dtype)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+n = Traced<ShapedArray(complex128[])>with<DynamicJaxprTrace(level=4/2)>
+x = Traced<ShapedArray(complex128[])>with<DynamicJaxprTrace(level=6/2)>
+
+    def _expn1(n: Array, x: Array) -> Array:
+      # exponential integral En
+      _c = _lax_const
+      MACHEP = jnp.finfo(x.dtype).eps
+    
+      zero = _c(x, 0.0)
+      one = _c(x, 1.0)
+      psi = -jnp.euler_gamma - jnp.log(x)
+>     psi = lax.fori_loop(_c(n, 1), n, lambda i, psi: psi + one / i, psi)
+E     TypeError: lt does not accept dtype complex128 at position 0. Accepted dtypes at position 0 are subtypes of bool, integer, floating.
+E     --------------------
+E     For simplicity, JAX has removed its internal frames from the traceback of the following exception. Set JAX_TRACEBACK_FILTERING=off to include these.
+
+..\..\..\..\anaconda3\Lib\site-packages\jax\_src\scipy\special.py:2065: TypeError
+============================== warnings summary ===============================
+tests/test_hypgeom_completeness.py::test_hypgeom_lower_level_helpers_shapes
+tests/test_hypgeom_completeness.py::test_hypgeom_lower_level_helpers_shapes
+tests/test_hypgeom_completeness.py::test_hypgeom_lower_level_helpers_shapes
+tests/test_hypgeom_completeness.py::test_hypgeom_lower_level_helpers_shapes
+tests/test_hypgeom_completeness.py::test_hypgeom_lower_level_helpers_shapes
+tests/test_hypgeom_completeness.py::test_hypgeom_lower_level_helpers_shapes
+tests/test_hypgeom_completeness.py::test_hypgeom_lower_level_helpers_shapes
+tests/test_hypgeom_completeness.py::test_hypgeom_lower_level_helpers_shapes
+  C:\Users\phili\anaconda3\Lib\site-packages\jax\_src\numpy\lax_numpy.py:5426: ComplexWarning: Casting complex values to real discards the imaginary part
+    out_array: Array = lax_internal._convert_element_type(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/test_hypgeom_completeness.py::test_hypgeom_lower_level_helpers_shapes
+1 failed, 23 passed, 1 skipped, 8 warnings in 269.21s (0:04:29)
