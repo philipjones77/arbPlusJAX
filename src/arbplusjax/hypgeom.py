@@ -5,63 +5,38 @@ from functools import partial
 import jax
 from jax import lax
 import jax.numpy as jnp
-import jax.scipy.special as jsp
 
 from . import double_interval as di
 from . import checks
 from . import barnesg
+from . import coeffs
+from . import elementary as el
 
 jax.config.update("jax_enable_x64", True)
 
-_HAS_HYP1F1 = hasattr(jsp, "hyp1f1")
-_HAS_HYP2F1 = hasattr(jsp, "hyp2f1")
-_HAS_HYPERU = hasattr(jsp, "hyperu")
-_HAS_JV = hasattr(jsp, "jv")
-_HAS_YV = hasattr(jsp, "yv")
-_HAS_IV = hasattr(jsp, "iv")
-_HAS_KV = hasattr(jsp, "kv")
+_HAS_HYP1F1 = False
+_HAS_HYP2F1 = False
+_HAS_HYPERU = False
+_HAS_JV = False
+_HAS_YV = False
+_HAS_IV = False
+_HAS_KV = False
 
 _DIGAMMA_ZERO = jnp.float64(1.4616321449683623413)
-_LOG_SQRT_2PI = jnp.float64(0.91893853320467274178)
-_TWO_OVER_SQRT_PI = jnp.float64(1.12837916709551257390)
+_LOG_SQRT_2PI = el.LOG_SQRT_TWO_PI
+_TWO_OVER_SQRT_PI = jnp.float64(2.0) / el.SQRT_PI
 _ERF_TERMS = 48
 _HYP_TERMS = 80
-_BESSEL_TERMS = 60
-_LANCZOS = jnp.asarray(
-    [
-        0.99999999999980993,
-        676.5203681218851,
-        -1259.1392167224028,
-        771.32342877765313,
-        -176.61502916214059,
-        12.507343278686905,
-        -0.13857109526572012,
-        9.9843695780195716e-6,
-        1.5056327351493116e-7,
-    ],
-    dtype=jnp.float64,
-)
-
+_BESSEL_TERMS = 80
 _BESSEL_REAL_MODES = ("sample", "midpoint")
 _ERFINV_A = jnp.float64(0.147)
 _ERFINV_ITERS = 3
-_SQRT_2_OVER_PI = jnp.float64(0.79788456080286535588)
-_SQRT_PI_OVER_2 = jnp.float64(1.2533141373155002512)
+_SQRT_2_OVER_PI = jnp.sqrt(jnp.float64(2.0) / el.PI)
+_SQRT_PI_OVER_2 = jnp.sqrt(el.PI / jnp.float64(2.0))
 _SI_CI_TERMS = 60
 _AIRY_TERMS = 40
-_STIRLING_COEFFS = jnp.asarray(
-    [
-        1.0 / 12.0,
-        -1.0 / 360.0,
-        1.0 / 1260.0,
-        -1.0 / 1680.0,
-        1.0 / 1188.0,
-        -691.0 / 360360.0,
-        1.0 / 156.0,
-        -3617.0 / 122400.0,
-    ],
-    dtype=jnp.float64,
-)
+_LANCZOS = coeffs.LANCZOS
+_STIRLING_COEFFS = coeffs.STIRLING_COEFFS
 
 
 def _validate_bessel_real_mode(mode: str) -> str:
@@ -264,7 +239,7 @@ def _complex_loggamma(z: jax.Array) -> jax.Array:
     z = jnp.asarray(z, dtype=jnp.complex128)
 
     def reflection(w):
-        return jnp.log(jnp.pi) - jnp.log(jnp.sin(jnp.pi * w)) - _complex_loggamma_lanczos(1.0 - w)
+        return el.LOG_PI - jnp.log(jnp.sin(el.PI * w)) - _complex_loggamma_lanczos(1.0 - w)
 
     return lax.cond(jnp.real(z) < 0.5, reflection, _complex_loggamma_lanczos, z)
 
@@ -317,12 +292,12 @@ def _real_erfi(x: jax.Array) -> jax.Array:
 def _real_erfinv_scalar(y: jax.Array) -> jax.Array:
     y = jnp.asarray(y, dtype=jnp.float64)
     ln = jnp.log(1.0 - y * y)
-    t = 2.0 / (jnp.pi * _ERFINV_A) + 0.5 * ln
+    t = 2.0 / (el.PI * _ERFINV_A) + 0.5 * ln
     x0 = jnp.sqrt(jnp.maximum(0.0, jnp.sqrt(t * t - ln / _ERFINV_A) - t))
     x0 = jnp.where(y < 0.0, -x0, x0)
 
     def body(_, x):
-        err = jsp.erf(x) - y
+        err = lax.erf(x) - y
         der = _TWO_OVER_SQRT_PI * jnp.exp(-x * x)
         return x - err / der
 
@@ -390,22 +365,22 @@ def _complex_hyp1f1_scalar(a: jax.Array, b: jax.Array, z: jax.Array) -> jax.Arra
 
 
 def _real_hypu_scalar(a: jax.Array, b: jax.Array, z: jax.Array) -> jax.Array:
-    s = jnp.sin(jnp.pi * b)
+    s = jnp.sin(el.PI * b)
     m1 = _real_hyp1f1_scalar(a, b, z)
     m2 = _real_hyp1f1_scalar(1.0 + a - b, 2.0 - b, z)
-    t1 = m1 / jnp.exp(jsp.gammaln(1.0 + a - b))
-    t2 = jnp.power(z, 1.0 - b) * m2 / jnp.exp(jsp.gammaln(a))
-    val = jnp.pi * (t1 - t2) / s
+    t1 = m1 / jnp.exp(_gammaln_real(1.0 + a - b))
+    t2 = jnp.power(z, 1.0 - b) * m2 / jnp.exp(_gammaln_real(a))
+    val = el.PI * (t1 - t2) / s
     return jnp.where(jnp.abs(s) < 1e-8, jnp.nan, val)
 
 
 def _complex_hypu_scalar(a: jax.Array, b: jax.Array, z: jax.Array) -> jax.Array:
-    s = jnp.sin(jnp.pi * b)
+    s = jnp.sin(el.PI * b)
     m1 = _complex_hyp1f1_scalar(a, b, z)
     m2 = _complex_hyp1f1_scalar(1.0 + a - b, 2.0 - b, z)
     t1 = m1 / jnp.exp(_complex_loggamma(1.0 + a - b))
     t2 = jnp.exp((1.0 - b) * jnp.log(z)) * m2 / jnp.exp(_complex_loggamma(a))
-    val = jnp.pi * (t1 - t2) / s
+    val = el.PI * (t1 - t2) / s
     return jnp.where(jnp.abs(s) < 1e-8, jnp.nan + 1j * jnp.nan, val)
 
 
@@ -413,7 +388,7 @@ def _real_bessel_series(nu: jax.Array, z: jax.Array, sign: float) -> jax.Array:
     nu = jnp.asarray(nu, dtype=jnp.float64)
     z = jnp.asarray(z, dtype=jnp.float64)
     half = 0.5 * z
-    term0 = jnp.power(half, nu) / jnp.exp(jsp.gammaln(nu + 1.0))
+    term0 = jnp.power(half, nu) / jnp.exp(_gammaln_real(nu + 1.0))
     sum0 = term0
     z2 = z * z
 
@@ -429,49 +404,40 @@ def _real_bessel_series(nu: jax.Array, z: jax.Array, sign: float) -> jax.Array:
     return s
 
 
+def _real_bessel_asym_j(nu: jax.Array, z: jax.Array) -> jax.Array:
+    return jnp.sqrt(jnp.float64(2.0) / (el.PI * z)) * jnp.cos(z - el.HALF_PI * nu - jnp.float64(0.25) * el.PI)
+
+
+def _real_bessel_asym_y(nu: jax.Array, z: jax.Array) -> jax.Array:
+    return jnp.sqrt(jnp.float64(2.0) / (el.PI * z)) * jnp.sin(z - el.HALF_PI * nu - jnp.float64(0.25) * el.PI)
+
+
+def _real_bessel_asym_i(nu: jax.Array, z: jax.Array) -> jax.Array:
+    return jnp.exp(z) / jnp.sqrt(el.TWO_PI * z)
+
+
+def _real_bessel_asym_k(nu: jax.Array, z: jax.Array) -> jax.Array:
+    return jnp.sqrt(el.PI / (jnp.float64(2.0) * z)) * jnp.exp(-z)
+
+
 def _real_bessel_eval_j(nu: jax.Array, z: jax.Array) -> jax.Array:
-    if _HAS_JV:
-        return lax.cond(
-            jnp.abs(z) > 12.0,
-            lambda _: jsp.jv(nu, z),
-            lambda _: _real_bessel_series(nu, z, -1.0),
-            operand=None,
-        )
-    return _real_bessel_series(nu, z, -1.0)
+    use_asym = (jnp.abs(z) > 12.0) & (z > 0.0)
+    return jnp.where(use_asym, _real_bessel_asym_j(nu, z), _real_bessel_series(nu, z, -1.0))
 
 
 def _real_bessel_eval_i(nu: jax.Array, z: jax.Array) -> jax.Array:
-    if _HAS_IV:
-        return lax.cond(
-            jnp.abs(z) > 12.0,
-            lambda _: jsp.iv(nu, z),
-            lambda _: _real_bessel_series(nu, z, 1.0),
-            operand=None,
-        )
-    return _real_bessel_series(nu, z, 1.0)
+    use_asym = (jnp.abs(z) > 12.0) & (z > 0.0)
+    return jnp.where(use_asym, _real_bessel_asym_i(nu, z), _real_bessel_series(nu, z, 1.0))
 
 
 def _real_bessel_eval_y(nu: jax.Array, z: jax.Array) -> jax.Array:
-    if _HAS_YV:
-        return lax.cond(
-            jnp.abs(z) > 12.0,
-            lambda _: jsp.yv(nu, z),
-            lambda _: _real_bessel_y(nu, z),
-            operand=None,
-        )
-    return _real_bessel_y(nu, z)
+    use_asym = (jnp.abs(z) > 12.0) & (z > 0.0)
+    return jnp.where(use_asym, _real_bessel_asym_y(nu, z), _real_bessel_y(nu, z))
 
 
 def _real_bessel_eval_k(nu: jax.Array, z: jax.Array) -> jax.Array:
-    if _HAS_KV:
-        use_asym = (jnp.abs(z) > 12.0) & (z > 0.0)
-        return lax.cond(
-            use_asym,
-            lambda _: jsp.kv(nu, z),
-            lambda _: _real_bessel_k(nu, z),
-            operand=None,
-        )
-    return _real_bessel_k(nu, z)
+    use_asym = (jnp.abs(z) > 12.0) & (z > 0.0)
+    return jnp.where(use_asym, _real_bessel_asym_k(nu, z), _real_bessel_k(nu, z))
 
 
 def _complex_bessel_series(nu: jax.Array, z: jax.Array, sign: float) -> jax.Array:
@@ -497,34 +463,34 @@ def _complex_bessel_series(nu: jax.Array, z: jax.Array, sign: float) -> jax.Arra
 
 
 def _real_bessel_y(nu: jax.Array, z: jax.Array) -> jax.Array:
-    s = jnp.sin(jnp.pi * nu)
+    s = jnp.sin(el.PI * nu)
     jnu = _real_bessel_series(nu, z, -1.0)
     jneg = _real_bessel_series(-nu, z, -1.0)
-    val = (jnu * jnp.cos(jnp.pi * nu) - jneg) / s
+    val = (jnu * jnp.cos(el.PI * nu) - jneg) / s
     return jnp.where(jnp.abs(s) < 1e-8, jnp.inf, val)
 
 
 def _real_bessel_k(nu: jax.Array, z: jax.Array) -> jax.Array:
-    s = jnp.sin(jnp.pi * nu)
+    s = jnp.sin(el.PI * nu)
     inu = _real_bessel_series(nu, z, 1.0)
     ineg = _real_bessel_series(-nu, z, 1.0)
-    val = 0.5 * jnp.pi * (ineg - inu) / s
+    val = el.HALF_PI * (ineg - inu) / s
     return jnp.where(jnp.abs(s) < 1e-8, jnp.inf, val)
 
 
 def _complex_bessel_y(nu: jax.Array, z: jax.Array) -> jax.Array:
-    s = jnp.sin(jnp.pi * nu)
+    s = jnp.sin(el.PI * nu)
     jnu = _complex_bessel_series(nu, z, -1.0)
     jneg = _complex_bessel_series(-nu, z, -1.0)
-    val = (jnu * jnp.cos(jnp.pi * nu) - jneg) / s
+    val = (jnu * jnp.cos(el.PI * nu) - jneg) / s
     return jnp.where(jnp.abs(s) < 1e-8, jnp.nan + 1j * jnp.nan, val)
 
 
 def _complex_bessel_k(nu: jax.Array, z: jax.Array) -> jax.Array:
-    s = jnp.sin(jnp.pi * nu)
+    s = jnp.sin(el.PI * nu)
     inu = _complex_bessel_series(nu, z, 1.0)
     ineg = _complex_bessel_series(-nu, z, 1.0)
-    val = 0.5 * jnp.pi * (ineg - inu) / s
+    val = el.HALF_PI * (ineg - inu) / s
     return jnp.where(jnp.abs(s) < 1e-8, jnp.nan + 1j * jnp.nan, val)
 
 
@@ -533,6 +499,19 @@ def _interval_from_samples(vals: jax.Array) -> jax.Array:
     out = di.interval(di._below(jnp.min(vals)), di._above(jnp.max(vals)))
     full = di.interval(-jnp.inf, jnp.inf)
     return jnp.where(finite, out, full)
+
+
+def _interval_from_bivariate_samples(fn, nu: jax.Array, z: jax.Array) -> jax.Array:
+    nu_vals = jnp.asarray([nu[0], nu[1], 0.5 * (nu[0] + nu[1])], dtype=jnp.float64)
+    z_vals = jnp.asarray([z[0], z[1], 0.5 * (z[0] + z[1])], dtype=jnp.float64)
+    vals = jax.vmap(lambda ni: jax.vmap(lambda zi: fn(ni, zi))(z_vals))(nu_vals).reshape(-1)
+    return _interval_from_samples(vals)
+
+
+def _nu_interval_crosses_integer(nu: jax.Array) -> jax.Array:
+    n0 = jnp.ceil(nu[0])
+    n1 = jnp.floor(nu[1])
+    return n0 <= n1
 
 
 def _interval_width(x: jax.Array) -> jax.Array:
@@ -750,10 +729,6 @@ def _real_hyp2f1_scalar_tail(
 def _real_hyp1f1_regime(a: jax.Array, b: jax.Array, z: jax.Array) -> jax.Array:
     z = jnp.asarray(z, dtype=jnp.float64)
     use_kummer = z > 6.0
-    if _HAS_HYP1F1:
-        direct = jsp.hyp1f1(a, b, z)
-        transformed = jnp.exp(z) * jsp.hyp1f1(b - a, b, -z)
-        return jnp.where(use_kummer, transformed, direct)
     transformed = jnp.exp(z) * _real_hyp1f1_scalar(b - a, b, -z)
     return jnp.where(use_kummer, transformed, _real_hyp1f1_scalar(a, b, z))
 
@@ -762,14 +737,6 @@ def _real_hyp0f1_regime(a: jax.Array, z: jax.Array) -> jax.Array:
     z = jnp.asarray(z, dtype=jnp.float64)
     absz = jnp.abs(z)
     use_bessel = absz > 9.0
-    if _HAS_IV and _HAS_JV:
-        r = jnp.sqrt(jnp.abs(z))
-        order = a - 1.0
-        iv = jsp.iv(order, 2.0 * r)
-        jv = jsp.jv(order, 2.0 * r)
-        scale = jsp.gamma(a) / jnp.power(r, order)
-        val = jnp.where(z >= 0.0, scale * iv, scale * jv)
-        return jnp.where(use_bessel, val, _real_hyp0f1_scalar(a, z))
     return _real_hyp0f1_scalar(a, z)
 
 
@@ -778,10 +745,6 @@ def _real_hyp2f1_regime(a: jax.Array, b: jax.Array, c: jax.Array, z: jax.Array) 
     absz = jnp.abs(z)
     use_transform = absz > 0.75
     zt = jnp.where(z == 1.0, jnp.nan, z / (z - 1.0))
-    if _HAS_HYP2F1:
-        direct = jsp.hyp2f1(a, b, c, z)
-        transformed = jnp.power(1.0 - z, -a) * jsp.hyp2f1(a, c - b, c, zt)
-        return jnp.where(use_transform, transformed, direct)
     transformed = jnp.power(1.0 - z, -a) * _real_hyp2f1_scalar(a, c - b, c, zt)
     return jnp.where(use_transform, transformed, _real_hyp2f1_scalar(a, b, c, z))
 
@@ -789,20 +752,12 @@ def _real_hyp2f1_regime(a: jax.Array, b: jax.Array, c: jax.Array, z: jax.Array) 
 def _real_hypu_regime(a: jax.Array, b: jax.Array, z: jax.Array) -> jax.Array:
     z = jnp.asarray(z, dtype=jnp.float64)
     use_asymp = (z > 8.0) & (z > 0.0)
-    if _HAS_HYPERU:
-        direct = jsp.hyperu(a, b, z)
-        fallback = _real_hypu_scalar(a, b, z)
-        return jnp.where(use_asymp, direct, fallback)
     return _real_hypu_scalar(a, b, z)
 
 
 def _complex_hypu_regime(a: jax.Array, b: jax.Array, z: jax.Array) -> jax.Array:
     z = jnp.asarray(z, dtype=jnp.complex128)
     use_asymp = (jnp.real(z) > 0.0) & (jnp.abs(z) > 8.0)
-    if _HAS_HYPERU:
-        direct = jsp.hyperu(a, b, z)
-        fallback = _complex_hypu_scalar(a, b, z)
-        return jnp.where(use_asymp, direct, fallback)
     return _complex_hypu_scalar(a, b, z)
 
 
@@ -856,8 +811,8 @@ def _real_jacobi_p_scalar(n: int, a: jax.Array, b: jax.Array, x: jax.Array) -> j
 
     def body(k, acc):
         kf = jnp.float64(k)
-        c1 = jnp.exp(jsp.gammaln(n + a + 1.0) - jsp.gammaln(n - k + 1.0) - jsp.gammaln(a + k + 1.0))
-        c2 = jnp.exp(jsp.gammaln(n + b + 1.0) - jsp.gammaln(k + 1.0) - jsp.gammaln(b + n - k + 1.0))
+        c1 = jnp.exp(_gammaln_real(n + a + 1.0) - _gammaln_real(n - k + 1.0) - _gammaln_real(a + k + 1.0))
+        c2 = jnp.exp(_gammaln_real(n + b + 1.0) - _gammaln_real(k + 1.0) - _gammaln_real(b + n - k + 1.0))
         term = c1 * c2 * jnp.power(t1, kf) * jnp.power(t2, jnp.float64(n) - kf)
         return acc + term
 
@@ -869,8 +824,8 @@ def _real_gegenbauer_c_scalar(n: int, lam: jax.Array, x: jax.Array) -> jax.Array
     lam = jnp.asarray(lam, dtype=jnp.float64)
     x = jnp.asarray(x, dtype=jnp.float64)
     jac = _real_jacobi_p_scalar(n, lam - 0.5, lam - 0.5, x)
-    num = jnp.exp(jsp.gammaln(n + 2.0 * lam) - jsp.gammaln(2.0 * lam))
-    den = jnp.exp(jsp.gammaln(n + lam + 0.5) - jsp.gammaln(lam + 0.5))
+    num = jnp.exp(_gammaln_real(n + 2.0 * lam) - _gammaln_real(2.0 * lam))
+    den = jnp.exp(_gammaln_real(n + lam + 0.5) - _gammaln_real(lam + 0.5))
     return jac * (num / den)
 
 
@@ -1103,10 +1058,10 @@ def _series_intervals_from_midpoint(vals: jax.Array) -> jax.Array:
 
 def _fresnel_eval(x: jax.Array, normalized: bool) -> tuple[jax.Array, jax.Array]:
     if normalized:
-        s, c = jsp.fresnel(x)
+        s, c = _complex_fresnel(jnp.complex128(x), True)
     else:
         t = x * _SQRT_2_OVER_PI
-        s, c = jsp.fresnel(t)
+        s, c = _complex_fresnel(jnp.complex128(t), True)
         s = _SQRT_PI_OVER_2 * s
         c = _SQRT_PI_OVER_2 * c
     return s, c
@@ -1154,10 +1109,10 @@ def arb_hypgeom_lgamma(x: jax.Array) -> jax.Array:
 
     vals = jnp.asarray(
         [
-            jsp.gammaln(a),
-            jsp.gammaln(b),
-            jsp.gammaln(m),
-            jsp.gammaln(_DIGAMMA_ZERO),
+            _gammaln_real(a),
+            _gammaln_real(b),
+            _gammaln_real(m),
+            _gammaln_real(_DIGAMMA_ZERO),
         ],
         dtype=jnp.float64,
     )
@@ -1181,10 +1136,10 @@ def arb_hypgeom_gamma(x: jax.Array) -> jax.Array:
 
     vals = jnp.asarray(
         [
-            jnp.exp(jsp.gammaln(a)),
-            jnp.exp(jsp.gammaln(b)),
-            jnp.exp(jsp.gammaln(m)),
-            jnp.exp(jsp.gammaln(_DIGAMMA_ZERO)),
+            jnp.exp(_gammaln_real(a)),
+            jnp.exp(_gammaln_real(b)),
+            jnp.exp(_gammaln_real(m)),
+            jnp.exp(_gammaln_real(_DIGAMMA_ZERO)),
         ],
         dtype=jnp.float64,
     )
@@ -1511,14 +1466,14 @@ def arb_hypgeom_u_rigorous(a: jax.Array, b: jax.Array, z: jax.Array, prec_bits: 
     m2 = arb_hypgeom_1f1_rigorous(a1, b2, z, prec_bits=prec_bits, regularized=False)
     gam1 = ball_wrappers.arb_ball_gamma(a1, prec_bits)
     gam2 = ball_wrappers.arb_ball_gamma(a, prec_bits)
-    sinb = ball_wrappers.arb_ball_sin(di.fast_mul(b, di.interval(jnp.pi, jnp.pi)), prec_bits)
+    sinb = ball_wrappers.arb_ball_sin(di.fast_mul(b, di.interval(el.PI, el.PI)), prec_bits)
     logz = ball_wrappers.arb_ball_log(z, prec_bits)
     one_minus_b = di.fast_sub(di.interval(1.0, 1.0), b)
     powz = ball_wrappers.arb_ball_exp(di.fast_mul(one_minus_b, logz), prec_bits)
     t1 = di.fast_div(m1, gam1)
     t2 = di.fast_div(di.fast_mul(powz, m2), gam2)
     diff = di.fast_sub(t1, t2)
-    scale = di.fast_div(di.interval(jnp.pi, jnp.pi), sinb)
+    scale = di.fast_div(di.interval(el.PI, el.PI), sinb)
     out = di.fast_mul(scale, diff)
     return jnp.where(z[0] <= 0.0, _full_interval(), out)
 
@@ -1629,7 +1584,7 @@ def arb_hypgeom_ei(z: jax.Array) -> jax.Array:
     a = z[0]
     b = z[1]
     m = 0.5 * (a + b)
-    vals = jnp.asarray([jsp.expi(a), jsp.expi(b), jsp.expi(m)], dtype=jnp.float64)
+    vals = jnp.asarray([_expi_real(a), _expi_real(b), _expi_real(m)], dtype=jnp.float64)
     return _interval_from_samples(vals)
 
 
@@ -1671,7 +1626,7 @@ def _si_ci_asymp(x: jax.Array) -> tuple[jax.Array, jax.Array]:
     s = jnp.sin(x_abs)
     a = 1.0 - 2.0 * inv2 + 24.0 * inv2 * inv2
     b = 1.0 - 6.0 * inv2 + 120.0 * inv2 * inv2
-    si_pos = 0.5 * jnp.pi - c * inv * a - s * inv2 * b
+    si_pos = el.HALF_PI - c * inv * a - s * inv2 * b
     ci_pos = s * inv * a + c * inv2 * b
     si = jnp.where(x < 0.0, -si_pos, si_pos)
     return si, ci_pos
@@ -1717,9 +1672,9 @@ def arb_hypgeom_shi(z: jax.Array) -> jax.Array:
     m = 0.5 * (a + b)
     vals = jnp.asarray(
         [
-            0.5 * (jsp.expi(a) - jsp.expi(-a)),
-            0.5 * (jsp.expi(b) - jsp.expi(-b)),
-            0.5 * (jsp.expi(m) - jsp.expi(-m)),
+            0.5 * (_expi_real(a) - _expi_real(-a)),
+            0.5 * (_expi_real(b) - _expi_real(-b)),
+            0.5 * (_expi_real(m) - _expi_real(-m)),
         ],
         dtype=jnp.float64,
     )
@@ -1734,9 +1689,9 @@ def arb_hypgeom_chi(z: jax.Array) -> jax.Array:
     m = 0.5 * (a + b)
     vals = jnp.asarray(
         [
-            0.5 * (jsp.expi(a) + jsp.expi(-a)),
-            0.5 * (jsp.expi(b) + jsp.expi(-b)),
-            0.5 * (jsp.expi(m) + jsp.expi(-m)),
+            0.5 * (_expi_real(a) + _expi_real(-a)),
+            0.5 * (_expi_real(b) + _expi_real(-b)),
+            0.5 * (_expi_real(m) + _expi_real(-m)),
         ],
         dtype=jnp.float64,
     )
@@ -1751,11 +1706,11 @@ def arb_hypgeom_li(z: jax.Array, offset: int = 0) -> jax.Array:
     m = 0.5 * (a + b)
     offset_term = jnp.float64(0.0)
     if offset > 0:
-        offset_term = jsp.expi(jnp.log(jnp.float64(offset)))
+        offset_term = _expi_real(jnp.log(jnp.float64(offset)))
 
     def eval_val(x: jax.Array) -> jax.Array:
         valid = x > 0.0
-        v = jsp.expi(jnp.log(x)) - offset_term
+        v = _expi_real(jnp.log(x)) - offset_term
         return jnp.where(valid, v, jnp.nan)
 
     vals = jnp.asarray([eval_val(a), eval_val(b), eval_val(m)], dtype=jnp.float64)
@@ -1770,9 +1725,9 @@ def arb_hypgeom_dilog(z: jax.Array) -> jax.Array:
     m = 0.5 * (a + b)
     vals = jnp.asarray(
         [
-            jsp.spence(1.0 - a),
-            jsp.spence(1.0 - b),
-            jsp.spence(1.0 - m),
+            _dilog_real(a),
+            _dilog_real(b),
+            _dilog_real(m),
         ],
         dtype=jnp.float64,
     )
@@ -1784,8 +1739,8 @@ def _airy_series(z: jax.Array, sign: float) -> tuple[jax.Array, jax.Array]:
     z3 = z * z * z
     inv_z = jnp.where(z == 0.0, 0.0, 1.0 / z)
 
-    a0 = 1.0 / jsp.gamma(jnp.float64(2.0 / 3.0))
-    b0 = 1.0 / (3.0 * jsp.gamma(jnp.float64(4.0 / 3.0)))
+    a0 = 1.0 / _gamma_real(jnp.float64(2.0 / 3.0))
+    b0 = 1.0 / (3.0 * _gamma_real(jnp.float64(4.0 / 3.0)))
 
     term_a = a0
     term_b = b0
@@ -1850,7 +1805,8 @@ def arb_hypgeom_expint(s: jax.Array, z: jax.Array) -> jax.Array:
     m = 0.5 * (a + b)
 
     def eval_val(x: jax.Array) -> jax.Array:
-        return jsp.expn(n, x)
+        a = 1.0 - jnp.asarray(n, dtype=jnp.float64)
+        return jnp.power(x, jnp.float64(n - 1)) * _gamma_real(a) * _gammaincc_real(a, x)
 
     vals = jnp.asarray([eval_val(a), eval_val(b), eval_val(m)], dtype=jnp.float64)
     out = _interval_from_samples(vals)
@@ -1868,13 +1824,13 @@ def arb_hypgeom_gamma_lower(s: jax.Array, z: jax.Array, regularized: bool = Fals
     m = 0.5 * (a + b)
 
     def eval_val(x: jax.Array) -> jax.Array:
-        v = jsp.gammainc(s_m, x)
-        return v if regularized else jsp.gamma(s_m) * v
+        v = _gammainc_real(s_m, x)
+        return v if regularized else _gamma_real(s_m) * v
 
     vals = jnp.asarray([eval_val(a), eval_val(b), eval_val(m)], dtype=jnp.float64)
     direct = _interval_from_samples(vals)
-    gamma_s = jsp.gamma(s_m)
-    upper_vals = jnp.asarray([jsp.gammaincc(s_m, a), jsp.gammaincc(s_m, b), jsp.gammaincc(s_m, m)], dtype=jnp.float64)
+    gamma_s = _gamma_real(s_m)
+    upper_vals = jnp.asarray([_gammaincc_real(s_m, a), _gammaincc_real(s_m, b), _gammaincc_real(s_m, m)], dtype=jnp.float64)
     upper = _interval_from_samples(upper_vals)
     if regularized:
         comp = di.fast_sub(di.interval(1.0, 1.0), upper)
@@ -1895,13 +1851,13 @@ def arb_hypgeom_gamma_upper(s: jax.Array, z: jax.Array, regularized: bool = Fals
     m = 0.5 * (a + b)
 
     def eval_val(x: jax.Array) -> jax.Array:
-        v = jsp.gammaincc(s_m, x)
-        return v if regularized else jsp.gamma(s_m) * v
+        v = _gammaincc_real(s_m, x)
+        return v if regularized else _gamma_real(s_m) * v
 
     vals = jnp.asarray([eval_val(a), eval_val(b), eval_val(m)], dtype=jnp.float64)
     direct = _interval_from_samples(vals)
-    gamma_s = jsp.gamma(s_m)
-    lower_vals = jnp.asarray([jsp.gammainc(s_m, a), jsp.gammainc(s_m, b), jsp.gammainc(s_m, m)], dtype=jnp.float64)
+    gamma_s = _gamma_real(s_m)
+    lower_vals = jnp.asarray([_gammainc_real(s_m, a), _gammainc_real(s_m, b), _gammainc_real(s_m, m)], dtype=jnp.float64)
     lower = _interval_from_samples(lower_vals)
     if regularized:
         comp = di.fast_sub(di.interval(1.0, 1.0), lower)
@@ -1924,8 +1880,8 @@ def arb_hypgeom_beta_lower(a: jax.Array, b: jax.Array, z: jax.Array, regularized
     x2 = 0.5 * (x0 + x1)
 
     def eval_val(x: jax.Array) -> jax.Array:
-        v = jsp.betainc(a_m, b_m, x)
-        return v if regularized else jnp.exp(jsp.betaln(a_m, b_m)) * v
+        v = _betainc_real(a_m, b_m, x)
+        return v if regularized else jnp.exp(_betaln_real(a_m, b_m)) * v
 
     vals = jnp.asarray([eval_val(x0), eval_val(x1), eval_val(x2)], dtype=jnp.float64)
     return _interval_from_samples(vals)
@@ -1967,8 +1923,8 @@ def arb_hypgeom_laguerre_l(n: int, m: jax.Array, z: jax.Array) -> jax.Array:
 
     def body(k, acc):
         kf = jnp.float64(k)
-        coeff = jnp.exp(jsp.gammaln(n + m_m + 1.0) - jsp.gammaln(n - k + 1.0) - jsp.gammaln(m_m + k + 1.0))
-        term = coeff * jnp.power(-x, kf) / jnp.exp(jsp.gammaln(kf + 1.0))
+        coeff = jnp.exp(_gammaln_real(n + m_m + 1.0) - _gammaln_real(n - k + 1.0) - _gammaln_real(m_m + k + 1.0))
+        term = coeff * jnp.power(-x, kf) / jnp.exp(_gammaln_real(kf + 1.0))
         return acc + term
 
     val = lax.fori_loop(0, n + 1, body, jnp.float64(0.0))
@@ -2143,8 +2099,8 @@ def arb_hypgeom_jacobi_p(n: int, a: jax.Array, b: jax.Array, z: jax.Array) -> ja
 
     def body(k, acc):
         kf = jnp.float64(k)
-        c1 = jnp.exp(jsp.gammaln(n + a_m + 1.0) - jsp.gammaln(n - k + 1.0) - jsp.gammaln(a_m + k + 1.0))
-        c2 = jnp.exp(jsp.gammaln(n + b_m + 1.0) - jsp.gammaln(k + 1.0) - jsp.gammaln(b_m + n - k + 1.0))
+        c1 = jnp.exp(_gammaln_real(n + a_m + 1.0) - _gammaln_real(n - k + 1.0) - _gammaln_real(a_m + k + 1.0))
+        c2 = jnp.exp(_gammaln_real(n + b_m + 1.0) - _gammaln_real(k + 1.0) - _gammaln_real(b_m + n - k + 1.0))
         term = c1 * c2 * jnp.power(t1, kf) * jnp.power(t2, jnp.float64(n) - kf)
         return acc + term
 
@@ -2238,7 +2194,7 @@ def arb_hypgeom_central_bin_ui(n: int) -> jax.Array:
     n = int(n)
     if n < 0:
         return di.interval(-jnp.inf, jnp.inf)
-    val = jnp.exp(jsp.gammaln(2.0 * n + 1.0) - 2.0 * jsp.gammaln(n + 1.0))
+    val = jnp.exp(_gammaln_real(2.0 * n + 1.0) - 2.0 * _gammaln_real(n + 1.0))
     return _interval_from_midpoint(val)
 
 
@@ -2285,12 +2241,12 @@ def arb_hypgeom_rising_ui_jet(x: jax.Array, n: int, length: int) -> jax.Array:
 def arb_hypgeom_gamma_fmpq(p: int, q: int) -> jax.Array:
     if q == 0:
         return _full_interval()
-    val = jsp.gamma(jnp.float64(p) / jnp.float64(q))
+    val = _gamma_real(jnp.float64(p) / jnp.float64(q))
     return _interval_from_midpoint(val)
 
 
 def arb_hypgeom_gamma_fmpz(n: int) -> jax.Array:
-    val = jsp.gamma(jnp.float64(n))
+    val = _gamma_real(jnp.float64(n))
     return _interval_from_midpoint(val)
 
 
@@ -2345,8 +2301,8 @@ def arb_hypgeom_gamma_lower_series(s: jax.Array, z: jax.Array, length: int, regu
     x0 = _interval_midpoint(z)
 
     def fn(x):
-        v = jsp.gammainc(s_m, x)
-        return v if regularized else jsp.gamma(s_m) * v
+        v = _gammainc_real(s_m, x)
+        return v if regularized else _gamma_real(s_m) * v
 
     coeffs = _taylor_series_unary(fn, x0, length)
     return _series_intervals_from_midpoint(coeffs)
@@ -2358,8 +2314,8 @@ def arb_hypgeom_gamma_upper_series(s: jax.Array, z: jax.Array, length: int, regu
     x0 = _interval_midpoint(z)
 
     def fn(x):
-        v = jsp.gammaincc(s_m, x)
-        return v if regularized else jsp.gamma(s_m) * v
+        v = _gammaincc_real(s_m, x)
+        return v if regularized else _gamma_real(s_m) * v
 
     coeffs = _taylor_series_unary(fn, x0, length)
     return _series_intervals_from_midpoint(coeffs)
@@ -2377,8 +2333,8 @@ def arb_hypgeom_beta_lower_series(a: jax.Array, b: jax.Array, z: jax.Array, leng
     x0 = _interval_midpoint(z)
 
     def fn(x):
-        v = jsp.betainc(a_m, b_m, x)
-        return v if regularized else jnp.exp(jsp.betaln(a_m, b_m)) * v
+        v = _betainc_real(a_m, b_m, x)
+        return v if regularized else jnp.exp(_betaln_real(a_m, b_m)) * v
 
     coeffs = _taylor_series_unary(fn, x0, length)
     return _series_intervals_from_midpoint(coeffs)
@@ -2402,7 +2358,7 @@ def arb_hypgeom_fresnel_series(z: jax.Array, length: int, normalized: bool = Fal
 
 def arb_hypgeom_ei_series(z: jax.Array, length: int) -> jax.Array:
     x0 = _interval_midpoint(z)
-    coeffs = _taylor_series_unary(jsp.expi, x0, length)
+    coeffs = _taylor_series_unary(_expi_real, x0, length)
     return _series_intervals_from_midpoint(coeffs)
 
 
@@ -2420,13 +2376,13 @@ def arb_hypgeom_ci_series(z: jax.Array, length: int) -> jax.Array:
 
 def arb_hypgeom_shi_series(z: jax.Array, length: int) -> jax.Array:
     x0 = _interval_midpoint(z)
-    coeffs = _taylor_series_unary(lambda x: 0.5 * (jsp.expi(x) - jsp.expi(-x)), x0, length)
+    coeffs = _taylor_series_unary(lambda x: 0.5 * (_expi_real(x) - _expi_real(-x)), x0, length)
     return _series_intervals_from_midpoint(coeffs)
 
 
 def arb_hypgeom_chi_series(z: jax.Array, length: int) -> jax.Array:
     x0 = _interval_midpoint(z)
-    coeffs = _taylor_series_unary(lambda x: 0.5 * (jsp.expi(x) + jsp.expi(-x)), x0, length)
+    coeffs = _taylor_series_unary(lambda x: 0.5 * (_expi_real(x) + _expi_real(-x)), x0, length)
     return _series_intervals_from_midpoint(coeffs)
 
 
@@ -2434,10 +2390,10 @@ def arb_hypgeom_li_series(z: jax.Array, length: int, offset: int = 0) -> jax.Arr
     x0 = _interval_midpoint(z)
     offset_term = jnp.float64(0.0)
     if offset > 0:
-        offset_term = jsp.expi(jnp.log(jnp.float64(offset)))
+        offset_term = _expi_real(jnp.log(jnp.float64(offset)))
 
     def fn(x):
-        return jsp.expi(jnp.log(x)) - offset_term
+        return _expi_real(jnp.log(x)) - offset_term
 
     coeffs = _taylor_series_unary(fn, x0, length)
     return _series_intervals_from_midpoint(coeffs)
@@ -2445,13 +2401,13 @@ def arb_hypgeom_li_series(z: jax.Array, length: int, offset: int = 0) -> jax.Arr
 
 def arb_hypgeom_erf_series(z: jax.Array, length: int) -> jax.Array:
     x0 = _interval_midpoint(z)
-    coeffs = _taylor_series_unary(jsp.erf, x0, length)
+    coeffs = _taylor_series_unary(lax.erf, x0, length)
     return _series_intervals_from_midpoint(coeffs)
 
 
 def arb_hypgeom_erfc_series(z: jax.Array, length: int) -> jax.Array:
     x0 = _interval_midpoint(z)
-    coeffs = _taylor_series_unary(jsp.erfc, x0, length)
+    coeffs = _taylor_series_unary(lambda x: 1.0 - lax.erf(x), x0, length)
     return _series_intervals_from_midpoint(coeffs)
 
 
@@ -2486,7 +2442,7 @@ def arb_hypgeom_airy_zero(n: int) -> tuple[jax.Array, jax.Array, jax.Array, jax.
     n = int(n)
     if n <= 0:
         return _full_interval(), _full_interval(), _full_interval(), _full_interval()
-    t = (3.0 * jnp.pi * (n - 0.25) / 2.0) ** (2.0 / 3.0)
+    t = (3.0 * el.PI * (n - 0.25) / 2.0) ** (2.0 / 3.0)
     z0 = -t
     return arb_hypgeom_airy(di.interval(z0, z0))
 
@@ -2494,7 +2450,7 @@ def arb_hypgeom_airy_zero(n: int) -> tuple[jax.Array, jax.Array, jax.Array, jax.
 def arb_hypgeom_coulomb(l: jax.Array, eta: jax.Array, z: jax.Array) -> tuple[jax.Array, jax.Array]:
     l_m = _interval_midpoint(l)
     x0 = _interval_midpoint(z)
-    phase = x0 - 0.5 * jnp.pi * l_m
+    phase = x0 - el.HALF_PI * l_m
     f = jnp.sin(phase)
     g = jnp.cos(phase)
     return _interval_from_midpoint(f), _interval_from_midpoint(g)
@@ -2503,9 +2459,9 @@ def arb_hypgeom_coulomb(l: jax.Array, eta: jax.Array, z: jax.Array) -> tuple[jax
 def arb_hypgeom_coulomb_jet(l: jax.Array, eta: jax.Array, z: jax.Array, length: int) -> tuple[jax.Array, jax.Array]:
     l_m = _interval_midpoint(l)
     x0 = _interval_midpoint(z)
-    phase0 = x0 - 0.5 * jnp.pi * l_m
-    f_coeffs = _taylor_series_unary(lambda t: jnp.sin(t - 0.5 * jnp.pi * l_m), x0, length)
-    g_coeffs = _taylor_series_unary(lambda t: jnp.cos(t - 0.5 * jnp.pi * l_m), x0, length)
+    phase0 = x0 - el.HALF_PI * l_m
+    f_coeffs = _taylor_series_unary(lambda t: jnp.sin(t - el.HALF_PI * l_m), x0, length)
+    g_coeffs = _taylor_series_unary(lambda t: jnp.cos(t - el.HALF_PI * l_m), x0, length)
     return _series_intervals_from_midpoint(f_coeffs), _series_intervals_from_midpoint(g_coeffs)
 
 
@@ -2610,7 +2566,7 @@ def arb_hypgeom_legendre_p_ui_root(n: int, k: int) -> tuple[jax.Array, jax.Array
     k = int(k)
     if n <= 0 or k <= 0 or k > n:
         return _full_interval(), _full_interval()
-    xk = jnp.cos(jnp.pi * (k - 0.25) / (n + 0.5))
+    xk = jnp.cos(el.PI * (k - 0.25) / (n + 0.5))
     pn = _interval_midpoint(arb_hypgeom_legendre_p_ui(n, di.interval(xk, xk)))
     pn1 = _interval_midpoint(arb_hypgeom_legendre_p_ui(n - 1, di.interval(xk, xk)))
     denom = xk * xk - 1.0
@@ -2672,14 +2628,7 @@ def arb_hypgeom_bessel_j(nu: jax.Array, z: jax.Array, mode: str = "sample") -> j
     if mode == "midpoint":
         val = _real_bessel_eval_j(nu_m, m)
         return jnp.where(jnp.isfinite(val), _interval_from_midpoint(val), di.interval(-jnp.inf, jnp.inf))
-    vals = jnp.asarray(
-        [
-            _real_bessel_eval_j(nu_m, a),
-            _real_bessel_eval_j(nu_m, b),
-            _real_bessel_eval_j(nu_m, m),
-        ]
-    )
-    return _interval_from_samples(vals)
+    return _interval_from_bivariate_samples(_real_bessel_eval_j, nu, z)
 
 
 @partial(jax.jit, static_argnames=("mode",))
@@ -2694,14 +2643,7 @@ def arb_hypgeom_bessel_i(nu: jax.Array, z: jax.Array, mode: str = "sample") -> j
     if mode == "midpoint":
         val = _real_bessel_eval_i(nu_m, m)
         return jnp.where(jnp.isfinite(val), _interval_from_midpoint(val), di.interval(-jnp.inf, jnp.inf))
-    vals = jnp.asarray(
-        [
-            _real_bessel_eval_i(nu_m, a),
-            _real_bessel_eval_i(nu_m, b),
-            _real_bessel_eval_i(nu_m, m),
-        ]
-    )
-    return _interval_from_samples(vals)
+    return _interval_from_bivariate_samples(_real_bessel_eval_i, nu, z)
 
 
 @partial(jax.jit, static_argnames=("mode",))
@@ -2714,17 +2656,11 @@ def arb_hypgeom_bessel_y(nu: jax.Array, z: jax.Array, mode: str = "sample") -> j
         z_m = 0.5 * (z[0] + z[1])
         val = _real_bessel_eval_y(nu_m, z_m)
         return jnp.where(jnp.isfinite(val), _interval_from_midpoint(val), di.interval(-jnp.inf, jnp.inf))
-    nu_vals = jnp.asarray([nu[0], nu[1], 0.5 * (nu[0] + nu[1])], dtype=jnp.float64)
-    z_vals = jnp.asarray([z[0], z[1], 0.5 * (z[0] + z[1])], dtype=jnp.float64)
-
-    def eval_pair(nu_i, z_i):
-        return _real_bessel_eval_y(nu_i, z_i)
-
-    vals = jax.vmap(lambda ni: jax.vmap(lambda zi: eval_pair(ni, zi))(z_vals))(nu_vals).reshape(-1)
-    finite = jnp.all(jnp.isfinite(vals))
-    out = _interval_from_samples(vals)
     full = di.interval(-jnp.inf, jnp.inf)
-    return jnp.where(finite, out, full)
+    out = _interval_from_bivariate_samples(_real_bessel_eval_y, nu, z)
+    finite = jnp.isfinite(out[0]) & jnp.isfinite(out[1])
+    out = jnp.where(finite, out, full)
+    return jnp.where(_nu_interval_crosses_integer(nu), full, out)
 
 
 @partial(jax.jit, static_argnames=("mode",))
@@ -2737,17 +2673,11 @@ def arb_hypgeom_bessel_k(nu: jax.Array, z: jax.Array, mode: str = "sample") -> j
         z_m = 0.5 * (z[0] + z[1])
         val = _real_bessel_eval_k(nu_m, z_m)
         return jnp.where(jnp.isfinite(val), _interval_from_midpoint(val), di.interval(-jnp.inf, jnp.inf))
-    nu_vals = jnp.asarray([nu[0], nu[1], 0.5 * (nu[0] + nu[1])], dtype=jnp.float64)
-    z_vals = jnp.asarray([z[0], z[1], 0.5 * (z[0] + z[1])], dtype=jnp.float64)
-
-    def eval_pair(nu_i, z_i):
-        return _real_bessel_eval_k(nu_i, z_i)
-
-    vals = jax.vmap(lambda ni: jax.vmap(lambda zi: eval_pair(ni, zi))(z_vals))(nu_vals).reshape(-1)
-    finite = jnp.all(jnp.isfinite(vals))
-    out = _interval_from_samples(vals)
     full = di.interval(-jnp.inf, jnp.inf)
-    return jnp.where(finite, out, full)
+    out = _interval_from_bivariate_samples(_real_bessel_eval_k, nu, z)
+    finite = jnp.isfinite(out[0]) & jnp.isfinite(out[1])
+    out = jnp.where(finite, out, full)
+    return jnp.where(_nu_interval_crosses_integer(nu), full, out)
 
 
 @partial(jax.jit, static_argnames=("mode",))
@@ -3461,14 +3391,14 @@ def acb_hypgeom_u_rigorous(a: jax.Array, b: jax.Array, z: jax.Array, prec_bits: 
     m2 = acb_hypgeom_1f1_rigorous(a1, b2, z, prec_bits=prec_bits, regularized=False)
     gam1 = ball_wrappers.acb_ball_gamma(a1, prec_bits)
     gam2 = ball_wrappers.acb_ball_gamma(a, prec_bits)
-    sinb = ball_wrappers.acb_ball_sin(acb_box_scale_real(b, di.interval(jnp.pi, jnp.pi)), prec_bits)
+    sinb = ball_wrappers.acb_ball_sin(acb_box_scale_real(b, di.interval(el.PI, el.PI)), prec_bits)
     logz = ball_wrappers.acb_ball_log(z, prec_bits)
     one_minus_b = acb_box_add_ui(acb_box_neg(b), 1)
     powz = ball_wrappers.acb_ball_exp(acb_box_mul(one_minus_b, logz), prec_bits)
     t1 = acb_box_div(m1, gam1)
     t2 = acb_box_div(acb_box_mul(powz, m2), gam2)
     diff = acb_box_sub(t1, t2)
-    scale = acb_box_div(acb_box(di.interval(jnp.pi, jnp.pi), di.interval(0.0, 0.0)), sinb)
+    scale = acb_box_div(acb_box(di.interval(el.PI, el.PI), di.interval(0.0, 0.0)), sinb)
     return acb_box_mul(scale, diff)
 
 
@@ -4705,6 +4635,52 @@ arb_hypgeom_bessel_k_scaled_batch_prec_jit = jax.jit(
 arb_hypgeom_bessel_i_integration_batch_prec_jit = jax.jit(
     arb_hypgeom_bessel_i_integration_batch_prec, static_argnames=("prec_bits", "scaled", "mode")
 )
+
+
+def _gammaln_real(x: jax.Array) -> jax.Array:
+    return lax.lgamma(x)
+
+
+def _gamma_real(x: jax.Array) -> jax.Array:
+    return jnp.exp(_gammaln_real(x))
+
+
+def _gammaln(x: jax.Array) -> jax.Array:
+    x = jnp.asarray(x)
+    if jnp.issubdtype(x.dtype, jnp.complexfloating):
+        return _complex_loggamma(x)
+    return _gammaln_real(x)
+
+
+def _gamma(x: jax.Array) -> jax.Array:
+    x = jnp.asarray(x)
+    if jnp.issubdtype(x.dtype, jnp.complexfloating):
+        return jnp.exp(_complex_loggamma(x))
+    return _gamma_real(x)
+
+
+def _expi_real(x: jax.Array) -> jax.Array:
+    return jnp.real(_complex_ei_series(jnp.asarray(x, dtype=jnp.complex128)))
+
+
+def _dilog_real(x: jax.Array) -> jax.Array:
+    return jnp.real(_complex_dilog_series(jnp.asarray(x, dtype=jnp.complex128)))
+
+
+def _betainc_real(a: jax.Array, b: jax.Array, x: jax.Array) -> jax.Array:
+    return lax.betainc(a, b, x)
+
+
+def _betaln_real(a: jax.Array, b: jax.Array) -> jax.Array:
+    return _gammaln_real(a) + _gammaln_real(b) - _gammaln_real(a + b)
+
+
+def _gammainc_real(a: jax.Array, x: jax.Array) -> jax.Array:
+    return lax.igamma(a, x)
+
+
+def _gammaincc_real(a: jax.Array, x: jax.Array) -> jax.Array:
+    return lax.igammac(a, x)
 arb_hypgeom_bessel_k_integration_batch_prec_jit = jax.jit(
     arb_hypgeom_bessel_k_integration_batch_prec, static_argnames=("prec_bits", "scaled", "mode")
 )
@@ -4908,8 +4884,8 @@ def _airy_series_complex(z: jax.Array, sign: float) -> tuple[jax.Array, jax.Arra
     z3 = z * z * z
     inv_z = jnp.where(z == 0.0, 0.0, 1.0 / z)
 
-    a0 = 1.0 / jsp.gamma(jnp.float64(2.0 / 3.0))
-    b0 = 1.0 / (3.0 * jsp.gamma(jnp.float64(4.0 / 3.0)))
+    a0 = 1.0 / _gamma_real(jnp.float64(2.0 / 3.0))
+    b0 = 1.0 / (3.0 * _gamma_real(jnp.float64(4.0 / 3.0)))
 
     term_a = jnp.complex128(a0)
     term_b = jnp.complex128(b0)
@@ -4941,7 +4917,7 @@ def _complex_fresnel(z: jax.Array, normalized: bool) -> tuple[jax.Array, jax.Arr
     z = jnp.asarray(z, dtype=jnp.complex128)
     if not normalized:
         z = z * _SQRT_2_OVER_PI
-    w = (1.0 - 1.0j) * (jnp.sqrt(jnp.pi) * 0.5) * z
+    w = (1.0 - 1.0j) * (el.SQRT_PI * jnp.float64(0.5)) * z
     f = 0.5 * (1.0 + 1.0j) * _complex_erf_series(w)
     c = jnp.real(f)
     s = jnp.imag(f)
@@ -5605,7 +5581,7 @@ def acb_hypgeom_rising_ui_rec(x: jax.Array, n: int) -> jax.Array:
 def acb_hypgeom_spherical_y(n: int, z: jax.Array) -> jax.Array:
     z_m = acb_midpoint(z)
     nu = jnp.float64(n) + 0.5
-    val = jnp.sqrt(jnp.pi / (2.0 * z_m)) * _complex_bessel_y(nu, z_m)
+    val = jnp.sqrt(el.PI / (jnp.float64(2.0) * z_m)) * _complex_bessel_y(nu, z_m)
     return _acb_from_complex(val)
 
 
@@ -5628,7 +5604,7 @@ def acb_hypgeom_u_use_asymp(a: jax.Array, b: jax.Array, z: jax.Array) -> jax.Arr
 def acb_hypgeom_coulomb(l: jax.Array, eta: jax.Array, z: jax.Array) -> tuple[jax.Array, jax.Array]:
     l_m = acb_midpoint(l)
     z_m = acb_midpoint(z)
-    phase = z_m - 0.5 * jnp.pi * l_m
+    phase = z_m - el.HALF_PI * l_m
     f = jnp.sin(phase)
     g = jnp.cos(phase)
     return _acb_from_complex(f), _acb_from_complex(g)

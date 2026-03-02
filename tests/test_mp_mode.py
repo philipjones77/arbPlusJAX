@@ -22,23 +22,23 @@ def test_mp_mode_uses_dps() -> None:
     _check(jnp.allclose(expected, got))
 
 
-def test_core_wrapper_baseline_matches_prec() -> None:
+def test_core_wrapper_basic_matches_prec() -> None:
     x = jnp.array([[0.25, 0.5]], dtype=jnp.float64)
     expected = arb_core.arb_exp_prec(x, prec_bits=precision.dps_to_bits(40))
-    got = core_wrappers.arb_exp_mode(x, impl="baseline", dps=40)
+    got = core_wrappers.arb_exp_mode(x, impl="basic", dps=40)
     _check(jnp.allclose(expected, got))
 
 
 def test_double_interval_modes() -> None:
     x = jnp.array([[1.0, 2.0]], dtype=jnp.float64)
     y = jnp.array([[3.0, 4.0]], dtype=jnp.float64)
-    base = double_interval_wrappers.fast_add_mode(x, y, impl="baseline")
+    base = double_interval_wrappers.fast_add_mode(x, y, impl="basic")
     rig = double_interval_wrappers.fast_add_mode(x, y, impl="rigorous", dps=40)
     _check(jnp.allclose(base, double_interval.fast_add(x, y)))
     _check(double_interval.contains(rig, base).all())
 
 
-def test_core_wrapper_acb_rigorous_contains_baseline() -> None:
+def test_core_wrapper_acb_rigorous_contains_basic() -> None:
     x = jnp.array([[0.1, 0.2, -0.3, -0.1]], dtype=jnp.float64)
     base = acb_core.acb_exp_prec(x, prec_bits=precision.dps_to_bits(40))
     rig = core_wrappers.acb_exp_mode(x, impl="rigorous", dps=40)
@@ -47,8 +47,8 @@ def test_core_wrapper_acb_rigorous_contains_baseline() -> None:
     _check(r_ok and i_ok)
 
 
-def test_dirichlet_wrapper_baseline_matches_prec() -> None:
+def test_dirichlet_wrapper_basic_matches_prec() -> None:
     x = jnp.array([[1.1, 1.2]], dtype=jnp.float64)
     expected = dirichlet.dirichlet_zeta_prec(x, prec_bits=precision.dps_to_bits(40), n_terms=32)
-    got = dirichlet_wrappers.dirichlet_zeta_mode(x, impl="baseline", dps=40, n_terms=32)
+    got = dirichlet_wrappers.dirichlet_zeta_mode(x, impl="basic", dps=40, n_terms=32)
     _check(jnp.allclose(expected, got))

@@ -10,6 +10,34 @@ from . import wrappers_common as wc
 
 jax.config.update("jax_enable_x64", True)
 
+_ACB_DFT_ALIAS_PRECS = {
+    "acb_dft_bluestein_prec",
+    "acb_dft_bluestein_precomp_prec",
+    "acb_dft_convol_prec",
+    "acb_dft_convol_dft_prec",
+    "acb_dft_convol_mullow_prec",
+    "acb_dft_convol_naive_prec",
+    "acb_dft_convol_rad2_prec",
+    "acb_dft_convol_rad2_precomp_prec",
+    "acb_dft_crt_prec",
+    "acb_dft_crt_precomp_prec",
+    "acb_dft_cyc_prec",
+    "acb_dft_cyc_precomp_prec",
+    "acb_dft_inverse_prec",
+    "acb_dft_inverse_precomp_prec",
+    "acb_dft_inverse_rad2_precomp_prec",
+    "acb_dft_inverse_rad2_precomp_inplace_prec",
+    "acb_dft_naive_precomp_prec",
+    "acb_dft_precomp_prec",
+    "acb_dft_prod_precomp_prec",
+    "acb_dft_rad2_inplace_prec",
+    "acb_dft_rad2_inplace_threaded_prec",
+    "acb_dft_rad2_precomp_prec",
+    "acb_dft_rad2_precomp_inplace_prec",
+    "acb_dft_rad2_precomp_inplace_threaded_prec",
+    "acb_dft_step_prec",
+}
+
 
 def _kernel_name(name: str) -> str:
     if name.endswith("_batch_prec"):
@@ -19,10 +47,44 @@ def _kernel_name(name: str) -> str:
     return name
 
 
+def _mode_name(name: str) -> str:
+    if name.endswith("_batch_prec"):
+        return name[:-11] + "_batch_mode"
+    if name.endswith("_prec"):
+        return name[:-5] + "_mode"
+    return name + "_mode"
+
+
 def _make_wrapper(name: str, base_fn: Callable[..., jax.Array], kernel_fn: Callable[..., jax.Array]) -> Callable[..., jax.Array]:
     is_acb = name.startswith("acb_")
 
     def rig_fn(*args, prec_bits: int, **kwargs):
+        if name in _ACB_DFT_ALIAS_PRECS:
+            return base_fn(*args, prec_bits=prec_bits, **kwargs)
+        if name.startswith("acb_dft_bluestein_precomp"):
+            return dft.acb_dft_bluestein_precomp_prec(*args, prec_bits=prec_bits, **kwargs)
+        if name.startswith("acb_dft_bluestein"):
+            return dft.acb_dft_bluestein_prec(*args, prec_bits=prec_bits, **kwargs)
+        if name.startswith("acb_dft_convol_rad2"):
+            return dft.acb_convol_circular_rad2_rigorous(*args, **kwargs)
+        if name.startswith("acb_dft_convol_dft"):
+            return dft.acb_convol_circular_dft_rigorous(*args, **kwargs)
+        if name.startswith("acb_dft_convol_mullow") or name.startswith("acb_dft_convol_naive"):
+            return dft.acb_convol_circular_naive_rigorous(*args, **kwargs)
+        if name.startswith("acb_dft_convol"):
+            return dft.acb_convol_circular_rigorous(*args, **kwargs)
+        if name.startswith("acb_dft_crt") or name.startswith("acb_dft_cyc") or name.startswith("acb_dft_prod_precomp"):
+            return dft.acb_dft_prod_rigorous(*args, **kwargs)
+        if name.startswith("acb_dft_inverse"):
+            return dft.acb_idft_rigorous(*args, **kwargs)
+        if name.startswith("acb_dft_naive_precomp"):
+            return dft.acb_dft_naive_rigorous(*args, **kwargs)
+        if name.startswith("acb_dft_precomp"):
+            return dft.acb_dft_rigorous(*args, **kwargs)
+        if name.startswith("acb_dft_rad2_inplace") or name.startswith("acb_dft_rad2_precomp"):
+            return dft.acb_dft_rad2_rigorous(*args, **kwargs)
+        if name.startswith("acb_dft_step"):
+            return dft.acb_dft_rigorous(*args, **kwargs)
         if name.startswith("acb_dft_naive"):
             return dft.acb_dft_naive_rigorous(*args, **kwargs)
         if name.startswith("acb_idft_naive"):
@@ -50,14 +112,40 @@ def _make_wrapper(name: str, base_fn: Callable[..., jax.Array], kernel_fn: Calla
         return wc.rigorous_acb_kernel(kernel_fn, args, prec_bits, **kwargs)
 
     def adapt_fn(*args, prec_bits: int, **kwargs):
+        if name in _ACB_DFT_ALIAS_PRECS:
+            return base_fn(*args, prec_bits=prec_bits, **kwargs)
+        if name.startswith("acb_dft_bluestein_precomp"):
+            return dft.acb_dft_bluestein_precomp_prec(*args, prec_bits=prec_bits, **kwargs)
+        if name.startswith("acb_dft_bluestein"):
+            return dft.acb_dft_bluestein_prec(*args, prec_bits=prec_bits, **kwargs)
+        if name.startswith("acb_dft_convol_rad2"):
+            return dft.acb_convol_circular_rad2_rigorous(*args, **kwargs)
+        if name.startswith("acb_dft_convol_dft"):
+            return dft.acb_convol_circular_dft_rigorous(*args, **kwargs)
+        if name.startswith("acb_dft_convol_mullow") or name.startswith("acb_dft_convol_naive"):
+            return dft.acb_convol_circular_naive_rigorous(*args, **kwargs)
+        if name.startswith("acb_dft_convol"):
+            return dft.acb_convol_circular_rigorous(*args, **kwargs)
+        if name.startswith("acb_dft_crt") or name.startswith("acb_dft_cyc") or name.startswith("acb_dft_prod_precomp"):
+            return dft.acb_dft_prod_rigorous(*args, **kwargs)
+        if name.startswith("acb_dft_inverse"):
+            return dft.acb_idft_rigorous(*args, **kwargs)
+        if name.startswith("acb_dft_naive_precomp"):
+            return dft.acb_dft_naive_rigorous(*args, **kwargs)
+        if name.startswith("acb_dft_precomp"):
+            return dft.acb_dft_rigorous(*args, **kwargs)
+        if name.startswith("acb_dft_rad2_inplace") or name.startswith("acb_dft_rad2_precomp"):
+            return dft.acb_dft_rad2_rigorous(*args, **kwargs)
+        if name.startswith("acb_dft_step"):
+            return dft.acb_dft_rigorous(*args, **kwargs)
         return wc.adaptive_acb_kernel(kernel_fn, args, prec_bits, **kwargs)
 
-    def wrapper(*args, impl: str = "baseline", dps: int | None = None, prec_bits: int | None = None, **kwargs):
+    def wrapper(*args, impl: str = "basic", dps: int | None = None, prec_bits: int | None = None, **kwargs):
         pb = wc.resolve_prec_bits(dps, prec_bits)
         return wc.dispatch_mode(impl, base_fn, rig_fn, adapt_fn, is_acb, pb, args, kwargs)
 
-    wrapper.__name__ = name.replace("_prec", "_mode")
-    wrapper.__doc__ = f"Mode-dispatched wrapper around {name}. impl: baseline|rigorous|adaptive."
+    wrapper.__name__ = _mode_name(name)
+    wrapper.__doc__ = f"Mode-dispatched wrapper around {name}. impl: basic|rigorous|adaptive."
     return wrapper
 
 
@@ -82,3 +170,4 @@ for _name in dir(dft):
     _wrapper = _make_wrapper(_name, _fn, kernel_fn)
     globals()[_wrapper.__name__] = _wrapper
     __all__.append(_wrapper.__name__)
+

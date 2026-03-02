@@ -9,6 +9,7 @@ from jax import lax
 from . import double_interval as di
 from . import arb_core
 from . import acb_dirichlet
+from . import elementary as el
 from . import hypgeom
 from . import checks
 
@@ -117,14 +118,14 @@ def _complex_loggamma_lanczos(z: jax.Array) -> jax.Array:
     for k in range(1, coeffs.shape[0]):
         x = x + coeffs[k] / (z1 + jnp.float64(k))
     t = z1 + jnp.float64(7.5)
-    return jnp.float64(0.91893853320467274178) + (z1 + 0.5) * jnp.log(t) - t + jnp.log(x)
+    return el.LOG_SQRT_TWO_PI + (z1 + 0.5) * jnp.log(t) - t + jnp.log(x)
 
 
 def _complex_loggamma(z: jax.Array) -> jax.Array:
     z = jnp.asarray(z, dtype=jnp.complex128)
 
     def reflection(w):
-        return jnp.log(jnp.pi) - jnp.log(jnp.sin(jnp.pi * w)) - _complex_loggamma_lanczos(1.0 - w)
+        return el.LOG_PI - jnp.log(jnp.sin(el.PI * w)) - _complex_loggamma_lanczos(1.0 - w)
 
     return lax.cond(jnp.real(z) < 0.5, reflection, _complex_loggamma_lanczos, z)
 
@@ -494,6 +495,36 @@ def acb_tanh(x: jax.Array) -> jax.Array:
 
 
 @jax.jit
+def acb_asin(x: jax.Array) -> jax.Array:
+    return _acb_unary_from_midpoint(x, jnp.arcsin)
+
+
+@jax.jit
+def acb_acos(x: jax.Array) -> jax.Array:
+    return _acb_unary_from_midpoint(x, jnp.arccos)
+
+
+@jax.jit
+def acb_atan(x: jax.Array) -> jax.Array:
+    return _acb_unary_from_midpoint(x, jnp.arctan)
+
+
+@jax.jit
+def acb_asinh(x: jax.Array) -> jax.Array:
+    return _acb_unary_from_midpoint(x, jnp.arcsinh)
+
+
+@jax.jit
+def acb_acosh(x: jax.Array) -> jax.Array:
+    return _acb_unary_from_midpoint(x, jnp.arccosh)
+
+
+@jax.jit
+def acb_atanh(x: jax.Array) -> jax.Array:
+    return _acb_unary_from_midpoint(x, jnp.arctanh)
+
+
+@jax.jit
 def acb_sech(x: jax.Array) -> jax.Array:
     return _acb_unary_from_midpoint(x, lambda z: 1.0 / jnp.cosh(z))
 
@@ -505,32 +536,32 @@ def acb_csch(x: jax.Array) -> jax.Array:
 
 @jax.jit
 def acb_sin_pi(x: jax.Array) -> jax.Array:
-    return _acb_unary_from_midpoint(x, lambda z: jnp.sin(jnp.pi * z))
+    return _acb_unary_from_midpoint(x, lambda z: jnp.sin(el.PI * z))
 
 
 @jax.jit
 def acb_cos_pi(x: jax.Array) -> jax.Array:
-    return _acb_unary_from_midpoint(x, lambda z: jnp.cos(jnp.pi * z))
+    return _acb_unary_from_midpoint(x, lambda z: jnp.cos(el.PI * z))
 
 
 @jax.jit
 def acb_sin_cos_pi(x: jax.Array) -> tuple[jax.Array, jax.Array]:
-    return _acb_unary_pair_from_midpoint(x, lambda z: (jnp.sin(jnp.pi * z), jnp.cos(jnp.pi * z)))
+    return _acb_unary_pair_from_midpoint(x, lambda z: (jnp.sin(el.PI * z), jnp.cos(el.PI * z)))
 
 
 @jax.jit
 def acb_tan_pi(x: jax.Array) -> jax.Array:
-    return _acb_unary_from_midpoint(x, lambda z: jnp.tan(jnp.pi * z))
+    return _acb_unary_from_midpoint(x, lambda z: jnp.tan(el.PI * z))
 
 
 @jax.jit
 def acb_cot_pi(x: jax.Array) -> jax.Array:
-    return _acb_unary_from_midpoint(x, lambda z: 1.0 / jnp.tan(jnp.pi * z))
+    return _acb_unary_from_midpoint(x, lambda z: 1.0 / jnp.tan(el.PI * z))
 
 
 @jax.jit
 def acb_csc_pi(x: jax.Array) -> jax.Array:
-    return _acb_unary_from_midpoint(x, lambda z: 1.0 / jnp.sin(jnp.pi * z))
+    return _acb_unary_from_midpoint(x, lambda z: 1.0 / jnp.sin(el.PI * z))
 
 
 @jax.jit
@@ -544,7 +575,7 @@ def acb_sinc(x: jax.Array) -> jax.Array:
 @jax.jit
 def acb_sinc_pi(x: jax.Array) -> jax.Array:
     def fn(z):
-        t = jnp.pi * z
+        t = el.PI * z
         return jnp.where(jnp.abs(z) < 1e-12, 1.0 + 0.0j, jnp.sin(t) / t)
 
     return _acb_unary_from_midpoint(x, fn)
@@ -552,7 +583,7 @@ def acb_sinc_pi(x: jax.Array) -> jax.Array:
 
 @jax.jit
 def acb_exp_pi_i(x: jax.Array) -> jax.Array:
-    return _acb_unary_from_midpoint(x, lambda z: jnp.exp(1j * jnp.pi * z))
+    return _acb_unary_from_midpoint(x, lambda z: jnp.exp(1j * el.PI * z))
 
 
 @jax.jit
@@ -579,7 +610,7 @@ def acb_pow(x: jax.Array, y: jax.Array) -> jax.Array:
     yb = as_acb_box(y)
     z = acb_midpoint(xb)
     w = acb_midpoint(yb)
-    v = jnp.exp(w * jnp.log(z))
+    v = el.cpow(z, w)
     finite = jnp.isfinite(jnp.real(v)) & jnp.isfinite(jnp.imag(v))
     out = _acb_from_complex(v)
     return jnp.where(finite[..., None], out, _full_box_like(xb))
@@ -635,7 +666,7 @@ def acb_lgamma(x: jax.Array) -> jax.Array:
 
 @jax.jit
 def acb_log_sin_pi(x: jax.Array) -> jax.Array:
-    return _acb_unary_from_midpoint(x, lambda z: jnp.log(jnp.sin(jnp.pi * z)))
+    return _acb_unary_from_midpoint(x, lambda z: jnp.log(jnp.sin(el.PI * z)))
 
 
 @jax.jit
@@ -861,15 +892,82 @@ def acb_cosh_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Ar
 def acb_tanh_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return acb_box_round_prec(acb_tanh(x), prec_bits)
 
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def acb_asin_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _acb_round_output(acb_asin(x), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def acb_acos_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _acb_round_output(acb_acos(x), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def acb_atan_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _acb_round_output(acb_atan(x), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def acb_asinh_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _acb_round_output(acb_asinh(x), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def acb_acosh_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _acb_round_output(acb_acosh(x), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def acb_atanh_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _acb_round_output(acb_atanh(x), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def acb_abs_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return di.round_interval_outward(acb_abs(x), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def acb_add_prec(x: jax.Array, y: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _acb_round_output(acb_add(x, y), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def acb_sub_prec(x: jax.Array, y: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _acb_round_output(acb_sub(x, y), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def acb_mul_prec(x: jax.Array, y: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _acb_round_output(acb_mul(x, y), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def acb_div_prec(x: jax.Array, y: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _acb_round_output(acb_div(x, y), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def acb_inv_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _acb_round_output(acb_inv(x), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def acb_fma_prec(x: jax.Array, y: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _acb_round_output(acb_add(acb_mul(x, y), z), prec_bits)
+
+
 def _acb_round_output(out, prec_bits: int):
     if isinstance(out, tuple):
         return tuple(_acb_round_output(item, prec_bits) for item in out)
     arr = jnp.asarray(out)
     last = arr.shape[-1] if arr.ndim > 0 else None
-    return {
-        4: acb_box_round_prec(arr, prec_bits),
-        2: di.round_interval_outward(arr, prec_bits),
-    }.get(last, out)
+    if last == 4:
+        return acb_box_round_prec(arr, prec_bits)
+    if last == 2:
+        return di.round_interval_outward(arr, prec_bits)
+    return out
 
 
 @partial(jax.jit, static_argnames=("prec_bits",))
@@ -1136,6 +1234,70 @@ def acb_tanh_batch(x: jax.Array) -> jax.Array:
     return acb_tanh(as_acb_box(x))
 
 
+def acb_asin_batch(x: jax.Array) -> jax.Array:
+    return acb_asin(as_acb_box(x))
+
+
+def acb_acos_batch(x: jax.Array) -> jax.Array:
+    return acb_acos(as_acb_box(x))
+
+
+def acb_atan_batch(x: jax.Array) -> jax.Array:
+    return acb_atan(as_acb_box(x))
+
+
+def acb_asinh_batch(x: jax.Array) -> jax.Array:
+    return acb_asinh(as_acb_box(x))
+
+
+def acb_acosh_batch(x: jax.Array) -> jax.Array:
+    return acb_acosh(as_acb_box(x))
+
+
+def acb_atanh_batch(x: jax.Array) -> jax.Array:
+    return acb_atanh(as_acb_box(x))
+
+
+def acb_abs_batch(x: jax.Array) -> jax.Array:
+    return acb_abs(as_acb_box(x))
+
+
+def acb_add_batch(x: jax.Array, y: jax.Array) -> jax.Array:
+    return acb_add(as_acb_box(x), as_acb_box(y))
+
+
+def acb_sub_batch(x: jax.Array, y: jax.Array) -> jax.Array:
+    return acb_sub(as_acb_box(x), as_acb_box(y))
+
+
+def acb_mul_batch(x: jax.Array, y: jax.Array) -> jax.Array:
+    return acb_mul(as_acb_box(x), as_acb_box(y))
+
+
+def acb_div_batch(x: jax.Array, y: jax.Array) -> jax.Array:
+    return acb_div(as_acb_box(x), as_acb_box(y))
+
+
+def acb_inv_batch(x: jax.Array) -> jax.Array:
+    return acb_inv(as_acb_box(x))
+
+
+def acb_fma_batch(x: jax.Array, y: jax.Array, z: jax.Array) -> jax.Array:
+    return acb_add(acb_mul(as_acb_box(x), as_acb_box(y)), as_acb_box(z))
+
+
+def acb_log1p_batch(x: jax.Array) -> jax.Array:
+    return acb_log1p(as_acb_box(x))
+
+
+def acb_expm1_batch(x: jax.Array) -> jax.Array:
+    return acb_expm1(as_acb_box(x))
+
+
+def acb_sin_cos_batch(x: jax.Array):
+    return acb_sin_cos(as_acb_box(x))
+
+
 def acb_exp_batch_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return acb_box_round_prec(acb_exp_batch(x), prec_bits)
 
@@ -1172,6 +1334,70 @@ def acb_tanh_batch_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> 
     return acb_box_round_prec(acb_tanh_batch(x), prec_bits)
 
 
+def acb_asin_batch_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _acb_round_output(acb_asin_batch(x), prec_bits)
+
+
+def acb_acos_batch_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _acb_round_output(acb_acos_batch(x), prec_bits)
+
+
+def acb_atan_batch_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _acb_round_output(acb_atan_batch(x), prec_bits)
+
+
+def acb_asinh_batch_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _acb_round_output(acb_asinh_batch(x), prec_bits)
+
+
+def acb_acosh_batch_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _acb_round_output(acb_acosh_batch(x), prec_bits)
+
+
+def acb_atanh_batch_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _acb_round_output(acb_atanh_batch(x), prec_bits)
+
+
+def acb_abs_batch_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return di.round_interval_outward(acb_abs_batch(x), prec_bits)
+
+
+def acb_add_batch_prec(x: jax.Array, y: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _acb_round_output(acb_add_batch(x, y), prec_bits)
+
+
+def acb_sub_batch_prec(x: jax.Array, y: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _acb_round_output(acb_sub_batch(x, y), prec_bits)
+
+
+def acb_mul_batch_prec(x: jax.Array, y: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _acb_round_output(acb_mul_batch(x, y), prec_bits)
+
+
+def acb_div_batch_prec(x: jax.Array, y: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _acb_round_output(acb_div_batch(x, y), prec_bits)
+
+
+def acb_inv_batch_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _acb_round_output(acb_inv_batch(x), prec_bits)
+
+
+def acb_fma_batch_prec(x: jax.Array, y: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _acb_round_output(acb_fma_batch(x, y, z), prec_bits)
+
+
+def acb_log1p_batch_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _acb_round_output(acb_log1p_batch(x), prec_bits)
+
+
+def acb_expm1_batch_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _acb_round_output(acb_expm1_batch(x), prec_bits)
+
+
+def acb_sin_cos_batch_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS):
+    return _acb_round_output(acb_sin_cos_batch(x), prec_bits)
+
+
 acb_exp_batch_jit = jax.jit(acb_exp_batch)
 acb_log_batch_jit = jax.jit(acb_log_batch)
 acb_sqrt_batch_jit = jax.jit(acb_sqrt_batch)
@@ -1181,6 +1407,22 @@ acb_tan_batch_jit = jax.jit(acb_tan_batch)
 acb_sinh_batch_jit = jax.jit(acb_sinh_batch)
 acb_cosh_batch_jit = jax.jit(acb_cosh_batch)
 acb_tanh_batch_jit = jax.jit(acb_tanh_batch)
+acb_asin_batch_jit = jax.jit(acb_asin_batch)
+acb_acos_batch_jit = jax.jit(acb_acos_batch)
+acb_atan_batch_jit = jax.jit(acb_atan_batch)
+acb_asinh_batch_jit = jax.jit(acb_asinh_batch)
+acb_acosh_batch_jit = jax.jit(acb_acosh_batch)
+acb_atanh_batch_jit = jax.jit(acb_atanh_batch)
+acb_abs_batch_jit = jax.jit(acb_abs_batch)
+acb_add_batch_jit = jax.jit(acb_add_batch)
+acb_sub_batch_jit = jax.jit(acb_sub_batch)
+acb_mul_batch_jit = jax.jit(acb_mul_batch)
+acb_div_batch_jit = jax.jit(acb_div_batch)
+acb_inv_batch_jit = jax.jit(acb_inv_batch)
+acb_fma_batch_jit = jax.jit(acb_fma_batch)
+acb_log1p_batch_jit = jax.jit(acb_log1p_batch)
+acb_expm1_batch_jit = jax.jit(acb_expm1_batch)
+acb_sin_cos_batch_jit = jax.jit(acb_sin_cos_batch)
 
 acb_exp_batch_prec_jit = jax.jit(acb_exp_batch_prec, static_argnames=("prec_bits",))
 acb_log_batch_prec_jit = jax.jit(acb_log_batch_prec, static_argnames=("prec_bits",))
@@ -1191,6 +1433,22 @@ acb_tan_batch_prec_jit = jax.jit(acb_tan_batch_prec, static_argnames=("prec_bits
 acb_sinh_batch_prec_jit = jax.jit(acb_sinh_batch_prec, static_argnames=("prec_bits",))
 acb_cosh_batch_prec_jit = jax.jit(acb_cosh_batch_prec, static_argnames=("prec_bits",))
 acb_tanh_batch_prec_jit = jax.jit(acb_tanh_batch_prec, static_argnames=("prec_bits",))
+acb_asin_batch_prec_jit = jax.jit(acb_asin_batch_prec, static_argnames=("prec_bits",))
+acb_acos_batch_prec_jit = jax.jit(acb_acos_batch_prec, static_argnames=("prec_bits",))
+acb_atan_batch_prec_jit = jax.jit(acb_atan_batch_prec, static_argnames=("prec_bits",))
+acb_asinh_batch_prec_jit = jax.jit(acb_asinh_batch_prec, static_argnames=("prec_bits",))
+acb_acosh_batch_prec_jit = jax.jit(acb_acosh_batch_prec, static_argnames=("prec_bits",))
+acb_atanh_batch_prec_jit = jax.jit(acb_atanh_batch_prec, static_argnames=("prec_bits",))
+acb_abs_batch_prec_jit = jax.jit(acb_abs_batch_prec, static_argnames=("prec_bits",))
+acb_add_batch_prec_jit = jax.jit(acb_add_batch_prec, static_argnames=("prec_bits",))
+acb_sub_batch_prec_jit = jax.jit(acb_sub_batch_prec, static_argnames=("prec_bits",))
+acb_mul_batch_prec_jit = jax.jit(acb_mul_batch_prec, static_argnames=("prec_bits",))
+acb_div_batch_prec_jit = jax.jit(acb_div_batch_prec, static_argnames=("prec_bits",))
+acb_inv_batch_prec_jit = jax.jit(acb_inv_batch_prec, static_argnames=("prec_bits",))
+acb_fma_batch_prec_jit = jax.jit(acb_fma_batch_prec, static_argnames=("prec_bits",))
+acb_log1p_batch_prec_jit = jax.jit(acb_log1p_batch_prec, static_argnames=("prec_bits",))
+acb_expm1_batch_prec_jit = jax.jit(acb_expm1_batch_prec, static_argnames=("prec_bits",))
+acb_sin_cos_batch_prec_jit = jax.jit(acb_sin_cos_batch_prec, static_argnames=("prec_bits",))
 
 
 __all__ = [
@@ -1346,6 +1604,13 @@ __all__ = [
     "acb_sinh_prec",
     "acb_cosh_prec",
     "acb_tanh_prec",
+    "acb_abs_prec",
+    "acb_add_prec",
+    "acb_sub_prec",
+    "acb_mul_prec",
+    "acb_div_prec",
+    "acb_inv_prec",
+    "acb_fma_prec",
     "acb_exp_batch",
     "acb_log_batch",
     "acb_sqrt_batch",
@@ -1355,6 +1620,16 @@ __all__ = [
     "acb_sinh_batch",
     "acb_cosh_batch",
     "acb_tanh_batch",
+    "acb_abs_batch",
+    "acb_add_batch",
+    "acb_sub_batch",
+    "acb_mul_batch",
+    "acb_div_batch",
+    "acb_inv_batch",
+    "acb_fma_batch",
+    "acb_log1p_batch",
+    "acb_expm1_batch",
+    "acb_sin_cos_batch",
     "acb_exp_batch_prec",
     "acb_log_batch_prec",
     "acb_sqrt_batch_prec",
@@ -1364,6 +1639,16 @@ __all__ = [
     "acb_sinh_batch_prec",
     "acb_cosh_batch_prec",
     "acb_tanh_batch_prec",
+    "acb_abs_batch_prec",
+    "acb_add_batch_prec",
+    "acb_sub_batch_prec",
+    "acb_mul_batch_prec",
+    "acb_div_batch_prec",
+    "acb_inv_batch_prec",
+    "acb_fma_batch_prec",
+    "acb_log1p_batch_prec",
+    "acb_expm1_batch_prec",
+    "acb_sin_cos_batch_prec",
     "acb_exp_batch_jit",
     "acb_log_batch_jit",
     "acb_sqrt_batch_jit",
@@ -1373,6 +1658,16 @@ __all__ = [
     "acb_sinh_batch_jit",
     "acb_cosh_batch_jit",
     "acb_tanh_batch_jit",
+    "acb_abs_batch_jit",
+    "acb_add_batch_jit",
+    "acb_sub_batch_jit",
+    "acb_mul_batch_jit",
+    "acb_div_batch_jit",
+    "acb_inv_batch_jit",
+    "acb_fma_batch_jit",
+    "acb_log1p_batch_jit",
+    "acb_expm1_batch_jit",
+    "acb_sin_cos_batch_jit",
     "acb_exp_batch_prec_jit",
     "acb_log_batch_prec_jit",
     "acb_sqrt_batch_prec_jit",
@@ -1382,4 +1677,55 @@ __all__ = [
     "acb_sinh_batch_prec_jit",
     "acb_cosh_batch_prec_jit",
     "acb_tanh_batch_prec_jit",
+    "acb_abs_batch_prec_jit",
+    "acb_add_batch_prec_jit",
+    "acb_sub_batch_prec_jit",
+    "acb_mul_batch_prec_jit",
+    "acb_div_batch_prec_jit",
+    "acb_inv_batch_prec_jit",
+    "acb_fma_batch_prec_jit",
+    "acb_log1p_batch_prec_jit",
+    "acb_expm1_batch_prec_jit",
+    "acb_sin_cos_batch_prec_jit",
 ]
+
+__all__.extend(
+    [
+        "acb_asin",
+        "acb_acos",
+        "acb_atan",
+        "acb_asinh",
+        "acb_acosh",
+        "acb_atanh",
+        "acb_asin_prec",
+        "acb_acos_prec",
+        "acb_atan_prec",
+        "acb_asinh_prec",
+        "acb_acosh_prec",
+        "acb_atanh_prec",
+        "acb_asin_batch",
+        "acb_acos_batch",
+        "acb_atan_batch",
+        "acb_asinh_batch",
+        "acb_acosh_batch",
+        "acb_atanh_batch",
+        "acb_asin_batch_prec",
+        "acb_acos_batch_prec",
+        "acb_atan_batch_prec",
+        "acb_asinh_batch_prec",
+        "acb_acosh_batch_prec",
+        "acb_atanh_batch_prec",
+        "acb_asin_batch_jit",
+        "acb_acos_batch_jit",
+        "acb_atan_batch_jit",
+        "acb_asinh_batch_jit",
+        "acb_acosh_batch_jit",
+        "acb_atanh_batch_jit",
+        "acb_asin_batch_prec_jit",
+        "acb_acos_batch_prec_jit",
+        "acb_atan_batch_prec_jit",
+        "acb_asinh_batch_prec_jit",
+        "acb_acosh_batch_prec_jit",
+        "acb_atanh_batch_prec_jit",
+    ]
+)

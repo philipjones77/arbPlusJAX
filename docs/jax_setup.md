@@ -1,3 +1,5 @@
+Last updated: 2026-02-25T03:51:38Z
+
 # JAX Setup and Implementation Conventions
 
 This document describes how the JAX implementation is structured and the patterns used to keep the API consistent.
@@ -36,7 +38,7 @@ For a kernel `foo`:
 
 This keeps call sites consistent and predictable.
 
-## Mode selection (baseline vs rigorous vs adaptive)
+## Mode selection (basic vs rigorous vs adaptive)
 
 For `exp`, `log`, `sin`, `gamma` there are **mode-selectable** wrappers:
 
@@ -45,7 +47,7 @@ For `exp`, `log`, `sin`, `gamma` there are **mode-selectable** wrappers:
 
 Each accepts:
 
-- `mode="baseline" | "rigorous" | "adaptive"`
+- `mode="basic" | "rigorous" | "adaptive"`
 - `prec_bits` or `dps`
 
 Example:
@@ -53,7 +55,7 @@ Example:
 ```python
 from arbplusjax import baseline_wrappers as bw
 
-y = bw.arb_exp_mp(x, mode="baseline", dps=50)
+y = bw.arb_exp_mp(x, mode="basic", dps=50)
 y = bw.arb_exp_mp(x, mode="rigorous", prec_bits=80)
 y = bw.arb_exp_mp(x, mode="adaptive", dps=80)
 ```

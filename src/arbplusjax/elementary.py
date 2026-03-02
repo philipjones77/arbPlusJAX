@@ -1,0 +1,220 @@
+from __future__ import annotations
+
+import jax
+import jax.numpy as jnp
+
+jax.config.update("jax_enable_x64", True)
+
+# Central constants
+PI = jnp.float64(3.1415926535897932384626433832795028841971)
+TWO_PI = jnp.float64(2.0) * PI
+HALF_PI = jnp.float64(0.5) * PI
+LOG_PI = jnp.log(PI)
+SQRT_PI = jnp.sqrt(PI)
+LOG_TWO = jnp.log(jnp.float64(2.0))
+LOG_TWO_PI = jnp.log(TWO_PI)
+LOG_SQRT_TWO_PI = jnp.float64(0.5) * LOG_TWO_PI
+E = jnp.exp(jnp.float64(1.0))
+I = jnp.complex128(1j)
+
+
+def _dtype_from(*xs: jax.Array):
+    if not xs:
+        return jnp.float64
+    return jnp.result_type(*[jnp.asarray(x).dtype for x in xs])
+
+
+def pi_like(*xs: jax.Array) -> jax.Array:
+    return jnp.asarray(PI, dtype=_dtype_from(*xs))
+
+
+def two_pi_like(*xs: jax.Array) -> jax.Array:
+    return jnp.asarray(TWO_PI, dtype=_dtype_from(*xs))
+
+
+def half_pi_like(*xs: jax.Array) -> jax.Array:
+    return jnp.asarray(HALF_PI, dtype=_dtype_from(*xs))
+
+
+def log_pi_like(*xs: jax.Array) -> jax.Array:
+    return jnp.asarray(LOG_PI, dtype=_dtype_from(*xs))
+
+
+def sqrt_pi_like(*xs: jax.Array) -> jax.Array:
+    return jnp.asarray(SQRT_PI, dtype=_dtype_from(*xs))
+
+
+def log_two_like(*xs: jax.Array) -> jax.Array:
+    return jnp.asarray(LOG_TWO, dtype=_dtype_from(*xs))
+
+
+def log_two_pi_like(*xs: jax.Array) -> jax.Array:
+    return jnp.asarray(LOG_TWO_PI, dtype=_dtype_from(*xs))
+
+
+def log_sqrt_two_pi_like(*xs: jax.Array) -> jax.Array:
+    return jnp.asarray(LOG_SQRT_TWO_PI, dtype=_dtype_from(*xs))
+
+
+def as_real(x: jax.Array) -> jax.Array:
+    return jnp.asarray(x, dtype=jnp.float64)
+
+
+def as_complex(x: jax.Array) -> jax.Array:
+    return jnp.asarray(x, dtype=jnp.complex128)
+
+
+def promote_dtype(*xs: jax.Array):
+    dt = jnp.result_type(*xs)
+    return tuple(jnp.asarray(x, dtype=dt) for x in xs)
+
+
+def complex_promote(x: jax.Array) -> jax.Array:
+    xx = jnp.asarray(x)
+    if jnp.issubdtype(xx.dtype, jnp.complexfloating):
+        return xx
+    return xx.astype(jnp.complex128)
+
+
+def eps(dtype=jnp.float64) -> jax.Array:
+    return jnp.finfo(dtype).eps
+
+
+def tiny(dtype=jnp.float64) -> jax.Array:
+    return jnp.finfo(dtype).tiny
+
+
+def max_value(dtype=jnp.float64) -> jax.Array:
+    return jnp.finfo(dtype).max
+
+
+def safe_div(a: jax.Array, b: jax.Array, fill: float = 0.0) -> jax.Array:
+    aa, bb = promote_dtype(a, b)
+    denom_zero = bb == 0
+    safe_b = jnp.where(denom_zero, jnp.asarray(1, dtype=aa.dtype), bb)
+    out = aa / safe_b
+    return jnp.where(denom_zero, jnp.asarray(fill, dtype=aa.dtype), out)
+
+
+def logaddexp(a: jax.Array, b: jax.Array) -> jax.Array:
+    return jnp.logaddexp(a, b)
+
+
+def logsubexp(a: jax.Array, b: jax.Array) -> jax.Array:
+    aa, bb = promote_dtype(a, b)
+    return aa + jnp.log1p(-jnp.exp(bb - aa))
+
+
+def logsumexp(v: jax.Array, axis: int = -1, keepdims: bool = False) -> jax.Array:
+    vv = jnp.asarray(v)
+    m = jnp.max(vv, axis=axis, keepdims=True)
+    s = jnp.sum(jnp.exp(vv - m), axis=axis, keepdims=True)
+    out = m + jnp.log(s)
+    if keepdims:
+        return out
+    return jnp.squeeze(out, axis=axis)
+
+
+def log1mexp(x: jax.Array) -> jax.Array:
+    xx = jnp.asarray(x)
+    cutoff = -log_two_like(xx)
+    return jnp.where(xx < cutoff, jnp.log1p(-jnp.exp(xx)), jnp.log(-jnp.expm1(xx)))
+
+
+def logexpm1(x: jax.Array) -> jax.Array:
+    xx = jnp.asarray(x)
+    cutoff = log_two_like(xx)
+    return jnp.where(xx > cutoff, xx + jnp.log1p(-jnp.exp(-xx)), jnp.log(jnp.expm1(xx)))
+
+
+def log_abs(z: jax.Array) -> jax.Array:
+    zz = complex_promote(z)
+    return jnp.log(jnp.abs(zz))
+
+
+def log_pow_abs(x: jax.Array, a: jax.Array) -> jax.Array:
+    aa, xx = promote_dtype(a, jnp.asarray(x))
+    return aa * jnp.log(jnp.abs(xx))
+
+
+def x_pow_a(x: jax.Array, a: jax.Array) -> jax.Array:
+    xx = complex_promote(x)
+    aa = complex_promote(a)
+    return jnp.exp(aa * jnp.log(xx))
+
+
+def cis(x: jax.Array) -> jax.Array:
+    xx = jnp.asarray(x)
+    return jnp.cos(xx) + 1j * jnp.sin(xx)
+
+
+def sinc(x: jax.Array) -> jax.Array:
+    xx = jnp.asarray(x)
+    return jnp.where(jnp.abs(xx) < 1e-15, jnp.asarray(1, dtype=xx.dtype), jnp.sin(xx) / xx)
+
+
+def sinc_pi(x: jax.Array) -> jax.Array:
+    xx = jnp.asarray(x)
+    t = pi_like(xx) * xx
+    return jnp.where(jnp.abs(xx) < 1e-15, jnp.asarray(1, dtype=xx.dtype), jnp.sin(t) / t)
+
+
+def clog(z: jax.Array) -> jax.Array:
+    zz = complex_promote(z)
+    return jnp.log(jnp.abs(zz)) + 1j * jnp.angle(zz)
+
+
+def cpow(z: jax.Array, a: jax.Array) -> jax.Array:
+    zz = complex_promote(z)
+    aa = complex_promote(a)
+    return jnp.exp(aa * clog(zz))
+
+
+def z_to_minus_s(z: jax.Array, s: jax.Array) -> jax.Array:
+    zz = complex_promote(z)
+    ss = complex_promote(s)
+    return jnp.exp(-ss * clog(zz))
+
+
+__all__ = [
+    "PI",
+    "TWO_PI",
+    "HALF_PI",
+    "LOG_PI",
+    "SQRT_PI",
+    "LOG_TWO",
+    "LOG_TWO_PI",
+    "LOG_SQRT_TWO_PI",
+    "E",
+    "I",
+    "pi_like",
+    "two_pi_like",
+    "half_pi_like",
+    "log_pi_like",
+    "sqrt_pi_like",
+    "log_two_like",
+    "log_two_pi_like",
+    "log_sqrt_two_pi_like",
+    "as_real",
+    "as_complex",
+    "promote_dtype",
+    "complex_promote",
+    "eps",
+    "tiny",
+    "max_value",
+    "safe_div",
+    "logaddexp",
+    "logsubexp",
+    "logsumexp",
+    "log1mexp",
+    "logexpm1",
+    "log_abs",
+    "log_pow_abs",
+    "x_pow_a",
+    "cis",
+    "sinc",
+    "sinc_pi",
+    "clog",
+    "cpow",
+    "z_to_minus_s",
+]

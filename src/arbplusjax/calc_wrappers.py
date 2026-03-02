@@ -22,27 +22,32 @@ def _kernel_name(name: str) -> str:
 
 def _make_wrapper(name: str, base_fn: Callable[..., jax.Array], kernel_fn: Callable[..., jax.Array]) -> Callable[..., jax.Array]:
     is_acb = name.startswith("acb_")
+    is_line_integral = "calc_integrate_line" in name
 
     def rig_fn(*args, prec_bits: int, **kwargs):
         if is_acb:
-            if name.startswith("acb_calc_integrate_line"):
+            if is_line_integral:
                 return acb_calc.acb_calc_integrate_line_rigorous(*args, prec_bits=prec_bits, **kwargs)
-            return wc.rigorous_acb_kernel(kernel_fn, args, prec_bits, **kwargs)
-        if name.startswith("arb_calc_integrate_line"):
+            # Many calc kernels include non-interval args (e.g. parts/steps). Use the
+            # precision form directly for robust mode semantics.
+            return base_fn(*args, prec_bits=prec_bits, **kwargs)
+        if is_line_integral:
             return arb_calc.arb_calc_integrate_line_rigorous(*args, **kwargs)
-        return wc.rigorous_interval_kernel(kernel_fn, args, prec_bits, **kwargs)
+        return base_fn(*args, prec_bits=prec_bits, **kwargs)
 
     def adapt_fn(*args, prec_bits: int, **kwargs):
-        if is_acb:
+        if is_acb and is_line_integral:
             return wc.adaptive_acb_kernel(kernel_fn, args, prec_bits, **kwargs)
-        return wc.adaptive_interval_kernel(kernel_fn, args, prec_bits, **kwargs)
+        if (not is_acb) and is_line_integral:
+            return wc.adaptive_interval_kernel(kernel_fn, args, prec_bits, **kwargs)
+        return base_fn(*args, prec_bits=prec_bits, **kwargs)
 
-    def wrapper(*args, impl: str = "baseline", dps: int | None = None, prec_bits: int | None = None, **kwargs):
+    def wrapper(*args, impl: str = "basic", dps: int | None = None, prec_bits: int | None = None, **kwargs):
         pb = wc.resolve_prec_bits(dps, prec_bits)
         return wc.dispatch_mode(impl, base_fn, rig_fn, adapt_fn, is_acb, pb, args, kwargs)
 
     wrapper.__name__ = name.replace("_prec", "_mode")
-    wrapper.__doc__ = f"Mode-dispatched wrapper around {name}. impl: baseline|rigorous|adaptive."
+    wrapper.__doc__ = f"Mode-dispatched wrapper around {name}. impl: basic|rigorous|adaptive."
     return wrapper
 
 
@@ -68,3 +73,4 @@ for _mod in (acb_calc, arb_calc):
         _wrapper = _make_wrapper(_name, _fn, kernel_fn)
         globals()[_wrapper.__name__] = _wrapper
         __all__.append(_wrapper.__name__)
+

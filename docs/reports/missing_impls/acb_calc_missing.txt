@@ -1,0 +1,4 @@
+acb_calc_cauchy_bound
+acb_calc_integrate
+acb_calc_integrate_gl_auto_deg
+acb_calc_integrate_taylor

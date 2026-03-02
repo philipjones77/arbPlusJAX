@@ -10,6 +10,7 @@ from . import acb_core
 from . import arb_core
 from . import ball_wrappers
 from . import double_interval as di
+from . import elementary as el
 from . import wrappers_common as wc
 
 jax.config.update("jax_enable_x64", True)
@@ -100,7 +101,7 @@ def _arg_interval(re: jax.Array, im: jax.Array) -> jax.Array:
     c, d = di.lower(im), di.upper(im)
     contains_zero = (a <= 0.0) & (b >= 0.0) & (c <= 0.0) & (d >= 0.0)
     crosses_neg_real = (a <= 0.0) & (c <= 0.0) & (d >= 0.0)
-    full = di.interval(-jnp.pi, jnp.pi)
+    full = di.interval(-el.PI, el.PI)
 
     def atan2_pair(xv, yv):
         return jnp.arctan2(yv, xv)
@@ -145,6 +146,13 @@ def _acb_sqrt_rigorous(x: jax.Array, prec_bits: int) -> jax.Array:
     return acb_core.acb_box_round_prec(out, prec_bits)
 
 
+def _acb_passthrough_prec(fn: Callable[..., jax.Array]) -> Callable[..., jax.Array]:
+    def wrapped(*args, prec_bits: int, **kwargs):
+        return fn(*args, prec_bits=prec_bits, **kwargs)
+
+    return wrapped
+
+
 def _acb_rigorous_adapter(name: str) -> Callable[..., jax.Array] | None:
     if name in ("acb_exp_prec", "acb_exp_batch_prec"):
         return _acb_exp_rigorous
@@ -164,6 +172,10 @@ def _acb_rigorous_adapter(name: str) -> Callable[..., jax.Array] | None:
         return _acb_cosh_rigorous
     if name in ("acb_tanh_prec", "acb_tanh_batch_prec"):
         return _acb_tanh_rigorous
+    if name in ("acb_abs_prec", "acb_abs_batch_prec"):
+        return _acb_passthrough_prec(acb_core.acb_abs_prec)
+    if name in ("acb_sin_cos_prec", "acb_sin_cos_batch_prec"):
+        return _acb_passthrough_prec(acb_core.acb_sin_cos_prec)
     return None
 
 
@@ -174,6 +186,10 @@ def _acb_adaptive_adapter(name: str) -> Callable[..., jax.Array] | None:
         return ball_wrappers.acb_ball_log_adaptive
     if name in ("acb_sin_prec", "acb_sin_batch_prec"):
         return ball_wrappers.acb_ball_sin_adaptive
+    if name in ("acb_abs_prec", "acb_abs_batch_prec"):
+        return _acb_passthrough_prec(acb_core.acb_abs_prec)
+    if name in ("acb_sin_cos_prec", "acb_sin_cos_batch_prec"):
+        return _acb_passthrough_prec(acb_core.acb_sin_cos_prec)
     return None
 
 
@@ -249,12 +265,12 @@ def _make_wrapper(name: str, base_fn: Callable[..., jax.Array]) -> Callable[...,
             adapt_fn = _arb_adaptive_adapter(name)
     is_acb = name.startswith("acb_")
 
-    def wrapper(*args, impl: str = "baseline", dps: int | None = None, prec_bits: int | None = None, **kwargs):
+    def wrapper(*args, impl: str = "basic", dps: int | None = None, prec_bits: int | None = None, **kwargs):
         pb = _resolve_prec_bits(dps, prec_bits)
         return _dispatch(impl, base_fn, rig_fn, adapt_fn, is_acb, pb, args, kwargs)
 
     wrapper.__name__ = name.replace("_prec", "_mode")
-    wrapper.__doc__ = f"Mode-dispatched wrapper around {name}. impl: baseline|rigorous|adaptive."
+    wrapper.__doc__ = f"Mode-dispatched wrapper around {name}. impl: basic|rigorous|adaptive."
     return wrapper
 
 
@@ -278,3 +294,4 @@ for _mod in (arb_core, acb_core):
         _wrapper = _make_wrapper(_name, _fn)
         globals()[_wrapper.__name__] = _wrapper
         __all__.append(_wrapper.__name__)
+

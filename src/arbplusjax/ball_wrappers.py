@@ -5,30 +5,73 @@ from functools import partial
 import jax
 from jax import lax
 import jax.numpy as jnp
-import jax.scipy.special as jsp
 
 from . import double_interval as di
 from . import precision
 from . import acb_core
 from . import barnesg
+from . import coeffs
 from . import double_gamma
+from . import elementary as el
 
 jax.config.update("jax_enable_x64", True)
 
-_LANCZOS = jnp.asarray(
-    [
-        0.99999999999980993,
-        676.5203681218851,
-        -1259.1392167224028,
-        771.32342877765313,
-        -176.61502916214059,
-        12.507343278686905,
-        -0.13857109526572012,
-        9.9843695780195716e-6,
-        1.5056327351493116e-7,
-    ],
-    dtype=jnp.float64,
-)
+
+def _gamma_real(x: jax.Array) -> jax.Array:
+    return jnp.exp(lax.lgamma(x))
+
+
+def _expi_real(x: jax.Array) -> jax.Array:
+    from . import hypgeom
+    return jnp.real(hypgeom._complex_ei_series(jnp.asarray(x, dtype=jnp.complex128)))
+
+
+def _dilog_real(x: jax.Array) -> jax.Array:
+    from . import hypgeom
+    return jnp.real(hypgeom._complex_dilog_series(jnp.asarray(x, dtype=jnp.complex128)))
+
+
+def _erfinv_real(x: jax.Array) -> jax.Array:
+    from . import hypgeom
+    return hypgeom._real_erfinv_scalar(x)
+
+
+def _erfi_real(x: jax.Array) -> jax.Array:
+    from . import hypgeom
+    return jnp.real(hypgeom._complex_erfi_series(jnp.asarray(x, dtype=jnp.complex128)))
+
+
+def _erf_complex(z: jax.Array) -> jax.Array:
+    from . import hypgeom
+    return hypgeom._complex_erf_series(jnp.asarray(z, dtype=jnp.complex128))
+
+
+def _si_ci_real(x: jax.Array) -> tuple[jax.Array, jax.Array]:
+    from . import hypgeom
+    use_series = jnp.abs(x) <= 4.0
+    s_series, c_series = hypgeom._si_ci_from_series(x)
+    s_asymp, c_asymp = hypgeom._si_ci_asymp(x)
+    s = jnp.where(use_series, s_series, s_asymp)
+    c = jnp.where(use_series, c_series, c_asymp)
+    return s, c
+
+
+def _fresnel_real(x: jax.Array, normalized: bool) -> tuple[jax.Array, jax.Array]:
+    from . import hypgeom
+    s, c = hypgeom._complex_fresnel(jnp.asarray(x, dtype=jnp.complex128), True)
+    if not normalized:
+        s = hypgeom._SQRT_PI_OVER_2 * s
+        c = hypgeom._SQRT_PI_OVER_2 * c
+    return s, c
+
+
+def _airy_real(x: jax.Array) -> tuple[jax.Array, jax.Array, jax.Array, jax.Array]:
+    from . import hypgeom
+    ai, aip = hypgeom._airy_series(x, -1.0)
+    bi, bip = hypgeom._airy_series(x, 1.0)
+    return ai, aip, bi, bip
+
+_LANCZOS = coeffs.LANCZOS
 
 
 def _full_interval() -> jax.Array:
@@ -124,14 +167,14 @@ def _complex_loggamma_lanczos(z: jax.Array) -> jax.Array:
 
     x = lax.fori_loop(1, 9, body, x)
     t = z1 + jnp.float64(7.5)
-    return jnp.float64(0.91893853320467274178) + (z1 + 0.5) * jnp.log(t) - t + jnp.log(x)
+    return el.LOG_SQRT_TWO_PI + (z1 + 0.5) * jnp.log(t) - t + jnp.log(x)
 
 
 def _complex_loggamma(z: jax.Array) -> jax.Array:
     z = jnp.asarray(z, dtype=jnp.complex128)
 
     def reflection(w):
-        return jnp.log(jnp.pi) - jnp.log(jnp.sin(jnp.pi * w)) - _complex_loggamma_lanczos(1.0 - w)
+        return el.LOG_PI - jnp.log(jnp.sin(el.PI * w)) - _complex_loggamma_lanczos(1.0 - w)
 
     return lax.cond(jnp.real(z) < 0.5, reflection, _complex_loggamma_lanczos, z)
 
@@ -153,7 +196,7 @@ def _rigorous_real(fn, x: jax.Array, eps: float) -> jax.Array:
 def _rigorous_complex(fn, x: jax.Array, eps: float) -> jax.Array:
     mid, rad = _ball_from_box(x)
     val = fn(mid)
-    angles = jnp.linspace(0.0, 2.0 * jnp.pi, _LIP_SAMPLES, endpoint=False)
+    angles = jnp.linspace(0.0, el.TWO_PI, _LIP_SAMPLES, endpoint=False)
     zs = mid + rad * (jnp.cos(angles) + 1j * jnp.sin(angles))
     L = jnp.max(jax.vmap(lambda t: _complex_deriv_bound(fn, t))(zs))
     rad_out = L * rad + eps
@@ -175,7 +218,7 @@ def _adaptive_real(fn, x: jax.Array, eps: float, samples: int) -> jax.Array:
 
 def _adaptive_complex(fn, x: jax.Array, eps: float, samples: int) -> jax.Array:
     mid, rad = _ball_from_box(x)
-    angles = jnp.linspace(0.0, 2.0 * jnp.pi, samples, endpoint=False)
+    angles = jnp.linspace(0.0, el.TWO_PI, samples, endpoint=False)
     zs = mid + rad * (jnp.cos(angles) + 1j * jnp.sin(angles))
     vals = jax.vmap(fn)(zs)
     v0 = fn(mid)
@@ -215,6 +258,89 @@ def _adaptive_real_bivariate(fn, x: jax.Array, y: jax.Array, eps: float, samples
     return jnp.where(jnp.isfinite(v0), out, _full_interval())
 
 
+def _interval_hull(a: jax.Array, b: jax.Array) -> jax.Array:
+    lo = jnp.minimum(a[0], b[0])
+    hi = jnp.maximum(a[1], b[1])
+    return di.interval(lo, hi)
+
+
+def _bivariate_sample_interval(fn, x: jax.Array, y: jax.Array) -> jax.Array:
+    x_vals = jnp.asarray([x[0], x[1], 0.5 * (x[0] + x[1])], dtype=jnp.float64)
+    y_vals = jnp.asarray([y[0], y[1], 0.5 * (y[0] + y[1])], dtype=jnp.float64)
+    vals = jax.vmap(lambda a: jax.vmap(lambda b: fn(a, b))(y_vals))(x_vals).reshape(-1)
+    finite = jnp.all(jnp.isfinite(vals))
+    out = di.interval(di._below(jnp.min(vals)), di._above(jnp.max(vals)))
+    return jnp.where(finite, out, _full_interval())
+
+
+def _bivariate_sample_interval_dense(fn, x: jax.Array, y: jax.Array) -> jax.Array:
+    xm = 0.5 * (x[0] + x[1])
+    xr = 0.5 * (x[1] - x[0])
+    ym = 0.5 * (y[0] + y[1])
+    yr = 0.5 * (y[1] - y[0])
+    x_vals = jnp.asarray([x[0], x[1], xm, xm - 0.5 * xr, xm + 0.5 * xr], dtype=jnp.float64)
+    y_vals = jnp.asarray([y[0], y[1], ym, ym - 0.5 * yr, ym + 0.5 * yr], dtype=jnp.float64)
+    vals = jax.vmap(lambda a: jax.vmap(lambda b: fn(a, b))(y_vals))(x_vals).reshape(-1)
+    finite = jnp.all(jnp.isfinite(vals))
+    out = di.interval(di._below(jnp.min(vals)), di._above(jnp.max(vals)))
+    return jnp.where(finite, out, _full_interval())
+
+
+def _nu_interval_crosses_integer(nu: jax.Array) -> jax.Array:
+    n0 = jnp.ceil(nu[0])
+    n1 = jnp.floor(nu[1])
+    return n0 <= n1
+
+
+def _nu_box_crosses_integer(nu: jax.Array) -> jax.Array:
+    re = acb_core.acb_real(nu)
+    im = acb_core.acb_imag(nu)
+    return _nu_interval_crosses_integer(re) & (im[0] <= 0.0) & (im[1] >= 0.0)
+
+
+def _bessel_asym_tail_abs(nu_mid: jax.Array, z_mid_abs: jax.Array) -> jax.Array:
+    nu_abs = jnp.abs(nu_mid)
+    mu = 4.0 * nu_abs * nu_abs
+    t1 = (mu + 1.0) / (8.0 * z_mid_abs)
+    t2 = ((mu + 1.0) * (mu + 9.0)) / (128.0 * z_mid_abs * z_mid_abs)
+    return t1 + t2
+
+
+def _bessel_real_asym_interval(kind: str, nu_mid: jax.Array, z_mid: jax.Array, eps: jax.Array) -> jax.Array:
+    z_abs = jnp.maximum(jnp.abs(z_mid), jnp.float64(1e-12))
+    tail = _bessel_asym_tail_abs(nu_mid, z_abs)
+    if kind == "j":
+        val = _real_bessel_asym_j(nu_mid, z_mid)
+        amp = jnp.sqrt(jnp.float64(2.0) / (el.PI * z_abs))
+    elif kind == "y":
+        val = _real_bessel_asym_y(nu_mid, z_mid)
+        amp = jnp.sqrt(jnp.float64(2.0) / (el.PI * z_abs))
+    elif kind == "i":
+        val = _real_bessel_asym_i(nu_mid, z_mid)
+        amp = jnp.exp(z_mid) / jnp.sqrt(el.TWO_PI * z_abs)
+    elif kind == "k":
+        val = _real_bessel_asym_k(nu_mid, z_mid)
+        amp = jnp.sqrt(el.PI / (jnp.float64(2.0) * z_abs)) * jnp.exp(-z_mid)
+    elif kind == "i_scaled":
+        val = jnp.exp(-z_mid) * _real_bessel_asym_i(nu_mid, z_mid)
+        amp = 1.0 / jnp.sqrt(el.TWO_PI * z_abs)
+    elif kind == "k_scaled":
+        val = jnp.exp(z_mid) * _real_bessel_asym_k(nu_mid, z_mid)
+        amp = jnp.sqrt(el.PI / (jnp.float64(2.0) * z_abs))
+    else:
+        return _full_interval()
+    err = amp * tail + eps
+    return di.interval(di._below(val - err), di._above(val + err))
+
+
+def _hull_with_real_bessel_asym(base: jax.Array, nu: jax.Array, z: jax.Array, kind: str, eps: jax.Array) -> jax.Array:
+    nu_mid = 0.5 * (nu[0] + nu[1])
+    z_mid = 0.5 * (z[0] + z[1])
+    asym = _bessel_real_asym_interval(kind, nu_mid, z_mid, eps)
+    use_asym = (z[0] > 12.0) & (z[0] > 0.0)
+    return jnp.where(use_asym, _interval_hull(base, asym), base)
+
+
 def _rigorous_complex_bivariate(fn, x: jax.Array, y: jax.Array, eps: float) -> jax.Array:
     x_mid, x_rad = _ball_from_box(x)
     y_mid, y_rad = _ball_from_box(y)
@@ -240,7 +366,7 @@ def _rigorous_complex_bivariate(fn, x: jax.Array, y: jax.Array, eps: float) -> j
 def _adaptive_complex_bivariate(fn, x: jax.Array, y: jax.Array, eps: float, samples: int) -> jax.Array:
     x_mid, x_rad = _ball_from_box(x)
     y_mid, y_rad = _ball_from_box(y)
-    angles = jnp.linspace(0.0, 2.0 * jnp.pi, samples, endpoint=False)
+    angles = jnp.linspace(0.0, el.TWO_PI, samples, endpoint=False)
     xs = x_mid + x_rad * (jnp.cos(angles) + 1j * jnp.sin(angles))
     ys = y_mid + y_rad * (jnp.cos(angles) + 1j * jnp.sin(angles))
     vals = jax.vmap(lambda a: jax.vmap(lambda b: fn(a, b))(ys))(xs).reshape(-1)
@@ -255,7 +381,7 @@ def _real_bessel_series(nu: jax.Array, z: jax.Array, sign: float) -> jax.Array:
     nu = jnp.asarray(nu, dtype=jnp.float64)
     z = jnp.asarray(z, dtype=jnp.float64)
     half = 0.5 * z
-    term0 = jnp.power(half, nu) / jnp.exp(jsp.gammaln(nu + 1.0))
+    term0 = jnp.power(half, nu) / jnp.exp(lax.lgamma(nu + 1.0))
     sum0 = term0
     z2 = z * z
 
@@ -267,8 +393,44 @@ def _real_bessel_series(nu: jax.Array, z: jax.Array, sign: float) -> jax.Array:
         term = term * (num / den)
         return term, s + term
 
-    _, s = lax.fori_loop(0, 59, body, (term0, sum0))
+    _, s = lax.fori_loop(0, 79, body, (term0, sum0))
     return s
+
+
+def _real_bessel_asym_j(nu: jax.Array, z: jax.Array) -> jax.Array:
+    return jnp.sqrt(jnp.float64(2.0) / (el.PI * z)) * jnp.cos(z - el.HALF_PI * nu - jnp.float64(0.25) * el.PI)
+
+
+def _real_bessel_asym_y(nu: jax.Array, z: jax.Array) -> jax.Array:
+    return jnp.sqrt(jnp.float64(2.0) / (el.PI * z)) * jnp.sin(z - el.HALF_PI * nu - jnp.float64(0.25) * el.PI)
+
+
+def _real_bessel_asym_i(nu: jax.Array, z: jax.Array) -> jax.Array:
+    return jnp.exp(z) / jnp.sqrt(el.TWO_PI * z)
+
+
+def _real_bessel_asym_k(nu: jax.Array, z: jax.Array) -> jax.Array:
+    return jnp.sqrt(el.PI / (jnp.float64(2.0) * z)) * jnp.exp(-z)
+
+
+def _real_bessel_eval_j(nu: jax.Array, z: jax.Array) -> jax.Array:
+    use_asym = (jnp.abs(z) > 12.0) & (z > 0.0)
+    return jnp.where(use_asym, _real_bessel_asym_j(nu, z), _real_bessel_series(nu, z, -1.0))
+
+
+def _real_bessel_eval_i(nu: jax.Array, z: jax.Array) -> jax.Array:
+    use_asym = (jnp.abs(z) > 12.0) & (z > 0.0)
+    return jnp.where(use_asym, _real_bessel_asym_i(nu, z), _real_bessel_series(nu, z, 1.0))
+
+
+def _real_bessel_eval_y(nu: jax.Array, z: jax.Array) -> jax.Array:
+    use_asym = (jnp.abs(z) > 12.0) & (z > 0.0)
+    return jnp.where(use_asym, _real_bessel_asym_y(nu, z), _real_bessel_y(nu, z))
+
+
+def _real_bessel_eval_k(nu: jax.Array, z: jax.Array) -> jax.Array:
+    use_asym = (jnp.abs(z) > 12.0) & (z > 0.0)
+    return jnp.where(use_asym, _real_bessel_asym_k(nu, z), _real_bessel_k(nu, z))
 
 
 def _complex_bessel_series(nu: jax.Array, z: jax.Array, sign: float) -> jax.Array:
@@ -306,9 +468,45 @@ def arb_ball_log(x: jax.Array, prec_bits: int = 53) -> jax.Array:
 
 
 @partial(jax.jit, static_argnames=("prec_bits",))
+def arb_ball_sqrt(x: jax.Array, prec_bits: int = 53) -> jax.Array:
+    eps = jnp.exp2(-jnp.float64(prec_bits))
+    return _rigorous_real(jnp.sqrt, x, eps)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
 def arb_ball_sin(x: jax.Array, prec_bits: int = 53) -> jax.Array:
     eps = jnp.exp2(-jnp.float64(prec_bits))
     return _rigorous_real(jnp.sin, x, eps)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def arb_ball_cos(x: jax.Array, prec_bits: int = 53) -> jax.Array:
+    eps = jnp.exp2(-jnp.float64(prec_bits))
+    return _rigorous_real(jnp.cos, x, eps)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def arb_ball_tan(x: jax.Array, prec_bits: int = 53) -> jax.Array:
+    eps = jnp.exp2(-jnp.float64(prec_bits))
+    return _rigorous_real(jnp.tan, x, eps)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def arb_ball_sinh(x: jax.Array, prec_bits: int = 53) -> jax.Array:
+    eps = jnp.exp2(-jnp.float64(prec_bits))
+    return _rigorous_real(jnp.sinh, x, eps)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def arb_ball_cosh(x: jax.Array, prec_bits: int = 53) -> jax.Array:
+    eps = jnp.exp2(-jnp.float64(prec_bits))
+    return _rigorous_real(jnp.cosh, x, eps)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def arb_ball_tanh(x: jax.Array, prec_bits: int = 53) -> jax.Array:
+    eps = jnp.exp2(-jnp.float64(prec_bits))
+    return _rigorous_real(jnp.tanh, x, eps)
 
 
 def _contains_nonpositive_integer_interval(x: jax.Array) -> jax.Array:
@@ -587,7 +785,7 @@ def acb_ball_double_sine_adaptive(z: jax.Array, b: jax.Array, prec_bits: int = d
 
 def arb_ball_gamma(x: jax.Array, prec_bits: int = 53) -> jax.Array:
     eps = jnp.exp2(-jnp.float64(prec_bits))
-    return _rigorous_real(jsp.gamma, x, eps)
+    return _rigorous_real(_gamma_real, x, eps)
 
 
 @partial(jax.jit, static_argnames=("prec_bits",))
@@ -627,15 +825,50 @@ def arb_ball_log_adaptive(x: jax.Array, prec_bits: int = 53, samples: int = 9) -
 
 
 @partial(jax.jit, static_argnames=("prec_bits", "samples"))
+def arb_ball_sqrt_adaptive(x: jax.Array, prec_bits: int = 53, samples: int = 9) -> jax.Array:
+    eps = jnp.exp2(-jnp.float64(prec_bits))
+    return _adaptive_real(jnp.sqrt, x, eps, samples)
+
+
+@partial(jax.jit, static_argnames=("prec_bits", "samples"))
 def arb_ball_sin_adaptive(x: jax.Array, prec_bits: int = 53, samples: int = 9) -> jax.Array:
     eps = jnp.exp2(-jnp.float64(prec_bits))
     return _adaptive_real(jnp.sin, x, eps, samples)
 
 
 @partial(jax.jit, static_argnames=("prec_bits", "samples"))
+def arb_ball_cos_adaptive(x: jax.Array, prec_bits: int = 53, samples: int = 9) -> jax.Array:
+    eps = jnp.exp2(-jnp.float64(prec_bits))
+    return _adaptive_real(jnp.cos, x, eps, samples)
+
+
+@partial(jax.jit, static_argnames=("prec_bits", "samples"))
+def arb_ball_tan_adaptive(x: jax.Array, prec_bits: int = 53, samples: int = 9) -> jax.Array:
+    eps = jnp.exp2(-jnp.float64(prec_bits))
+    return _adaptive_real(jnp.tan, x, eps, samples)
+
+
+@partial(jax.jit, static_argnames=("prec_bits", "samples"))
+def arb_ball_sinh_adaptive(x: jax.Array, prec_bits: int = 53, samples: int = 9) -> jax.Array:
+    eps = jnp.exp2(-jnp.float64(prec_bits))
+    return _adaptive_real(jnp.sinh, x, eps, samples)
+
+
+@partial(jax.jit, static_argnames=("prec_bits", "samples"))
+def arb_ball_cosh_adaptive(x: jax.Array, prec_bits: int = 53, samples: int = 9) -> jax.Array:
+    eps = jnp.exp2(-jnp.float64(prec_bits))
+    return _adaptive_real(jnp.cosh, x, eps, samples)
+
+
+@partial(jax.jit, static_argnames=("prec_bits", "samples"))
+def arb_ball_tanh_adaptive(x: jax.Array, prec_bits: int = 53, samples: int = 9) -> jax.Array:
+    eps = jnp.exp2(-jnp.float64(prec_bits))
+    return _adaptive_real(jnp.tanh, x, eps, samples)
+
+@partial(jax.jit, static_argnames=("prec_bits", "samples"))
 def arb_ball_gamma_adaptive(x: jax.Array, prec_bits: int = 53, samples: int = 9) -> jax.Array:
     eps = jnp.exp2(-jnp.float64(prec_bits))
-    return _adaptive_real(jsp.gamma, x, eps, samples)
+    return _adaptive_real(_gamma_real, x, eps, samples)
 
 
 @partial(jax.jit, static_argnames=("prec_bits", "samples"))
@@ -665,79 +898,80 @@ def acb_ball_gamma_adaptive(x: jax.Array, prec_bits: int = 53, samples: int = 9)
 @partial(jax.jit, static_argnames=("prec_bits",))
 def arb_ball_erf(x: jax.Array, prec_bits: int = 53) -> jax.Array:
     eps = jnp.exp2(-jnp.float64(prec_bits))
-    return _map_interval(lambda t: _rigorous_real(jsp.erf, t, eps), x)
+    return _map_interval(lambda t: _rigorous_real(lax.erf, t, eps), x)
 
 
 @partial(jax.jit, static_argnames=("prec_bits",))
 def arb_ball_erfc(x: jax.Array, prec_bits: int = 53) -> jax.Array:
     eps = jnp.exp2(-jnp.float64(prec_bits))
-    return _map_interval(lambda t: _rigorous_real(jsp.erfc, t, eps), x)
+    return _map_interval(lambda t: _rigorous_real(lambda v: 1.0 - lax.erf(v), t, eps), x)
 
 
 @partial(jax.jit, static_argnames=("prec_bits",))
 def arb_ball_erfi(x: jax.Array, prec_bits: int = 53) -> jax.Array:
     eps = jnp.exp2(-jnp.float64(prec_bits))
-    return _map_interval(lambda t: _rigorous_real(jsp.erfi, t, eps), x)
+    erfi_fn = _erfi_real
+    return _map_interval(lambda t: _rigorous_real(erfi_fn, t, eps), x)
 
 
 @partial(jax.jit, static_argnames=("prec_bits",))
 def arb_ball_erfinv(x: jax.Array, prec_bits: int = 53) -> jax.Array:
     eps = jnp.exp2(-jnp.float64(prec_bits))
-    return _map_interval(lambda t: _rigorous_real(jsp.erfinv, t, eps), x)
+    return _map_interval(lambda t: _rigorous_real(_erfinv_real, t, eps), x)
 
 
 @partial(jax.jit, static_argnames=("prec_bits",))
 def arb_ball_erfcinv(x: jax.Array, prec_bits: int = 53) -> jax.Array:
     eps = jnp.exp2(-jnp.float64(prec_bits))
-    return _map_interval(lambda t: _rigorous_real(lambda v: jsp.erfinv(1.0 - v), t, eps), x)
+    return _map_interval(lambda t: _rigorous_real(lambda v: _erfinv_real(1.0 - v), t, eps), x)
 
 
 @partial(jax.jit, static_argnames=("prec_bits",))
 def acb_ball_erf(x: jax.Array, prec_bits: int = 53) -> jax.Array:
     eps = jnp.exp2(-jnp.float64(prec_bits))
-    return _map_box(lambda t: _rigorous_complex(jsp.erf, t, eps), x)
+    return _map_box(lambda t: _rigorous_complex(_erf_complex, t, eps), x)
 
 
 @partial(jax.jit, static_argnames=("prec_bits",))
 def acb_ball_erfc(x: jax.Array, prec_bits: int = 53) -> jax.Array:
     eps = jnp.exp2(-jnp.float64(prec_bits))
-    return _map_box(lambda t: _rigorous_complex(lambda z: 1.0 - jsp.erf(z), t, eps), x)
+    return _map_box(lambda t: _rigorous_complex(lambda z: 1.0 - _erf_complex(z), t, eps), x)
 
 
 @partial(jax.jit, static_argnames=("prec_bits",))
 def acb_ball_erfi(x: jax.Array, prec_bits: int = 53) -> jax.Array:
     eps = jnp.exp2(-jnp.float64(prec_bits))
-    return _map_box(lambda t: _rigorous_complex(lambda z: -1j * jsp.erf(1j * z), t, eps), x)
+    return _map_box(lambda t: _rigorous_complex(lambda z: -1j * _erf_complex(1j * z), t, eps), x)
 
 
 @partial(jax.jit, static_argnames=("prec_bits",))
 def arb_ball_ei(x: jax.Array, prec_bits: int = 53) -> jax.Array:
     eps = jnp.exp2(-jnp.float64(prec_bits))
-    return _map_interval(lambda t: _rigorous_real(jsp.expi, t, eps), x)
+    return _map_interval(lambda t: _rigorous_real(_expi_real, t, eps), x)
 
 
 @partial(jax.jit, static_argnames=("prec_bits",))
 def arb_ball_si(x: jax.Array, prec_bits: int = 53) -> jax.Array:
     eps = jnp.exp2(-jnp.float64(prec_bits))
-    return _map_interval(lambda t: _rigorous_real(lambda v: jsp.sici(v)[0], t, eps), x)
+    return _map_interval(lambda t: _rigorous_real(lambda v: _si_ci_real(v)[0], t, eps), x)
 
 
 @partial(jax.jit, static_argnames=("prec_bits",))
 def arb_ball_ci(x: jax.Array, prec_bits: int = 53) -> jax.Array:
     eps = jnp.exp2(-jnp.float64(prec_bits))
-    return _map_interval(lambda t: _rigorous_real(lambda v: jsp.sici(v)[1], t, eps), x)
+    return _map_interval(lambda t: _rigorous_real(lambda v: _si_ci_real(v)[1], t, eps), x)
 
 
 @partial(jax.jit, static_argnames=("prec_bits",))
 def arb_ball_shi(x: jax.Array, prec_bits: int = 53) -> jax.Array:
     eps = jnp.exp2(-jnp.float64(prec_bits))
-    return _map_interval(lambda t: _rigorous_real(jsp.shi, t, eps), x)
+    return _map_interval(lambda t: _rigorous_real(lambda v: 0.5 * (_expi_real(v) - _expi_real(-v)), t, eps), x)
 
 
 @partial(jax.jit, static_argnames=("prec_bits",))
 def arb_ball_chi(x: jax.Array, prec_bits: int = 53) -> jax.Array:
     eps = jnp.exp2(-jnp.float64(prec_bits))
-    return _map_interval(lambda t: _rigorous_real(jsp.chi, t, eps), x)
+    return _map_interval(lambda t: _rigorous_real(lambda v: 0.5 * (_expi_real(v) + _expi_real(-v)), t, eps), x)
 
 
 @partial(jax.jit, static_argnames=("prec_bits",))
@@ -745,7 +979,7 @@ def arb_ball_li(x: jax.Array, prec_bits: int = 53) -> jax.Array:
     eps = jnp.exp2(-jnp.float64(prec_bits))
 
     def fn(t):
-        out = _rigorous_real(lambda v: jsp.expi(jnp.log(v)), t, eps)
+        out = _rigorous_real(lambda v: _expi_real(jnp.log(v)), t, eps)
         full = _full_interval()
         return jnp.where(t[0] <= 0.0, full, out)
 
@@ -755,7 +989,7 @@ def arb_ball_li(x: jax.Array, prec_bits: int = 53) -> jax.Array:
 @partial(jax.jit, static_argnames=("prec_bits",))
 def arb_ball_dilog(x: jax.Array, prec_bits: int = 53) -> jax.Array:
     eps = jnp.exp2(-jnp.float64(prec_bits))
-    return _map_interval(lambda t: _rigorous_real(lambda v: jsp.spence(1.0 - v), t, eps), x)
+    return _map_interval(lambda t: _rigorous_real(lambda v: _dilog_real(v), t, eps), x)
 
 
 @partial(jax.jit, static_argnames=("prec_bits",))
@@ -763,11 +997,11 @@ def arb_ball_fresnel(x: jax.Array, prec_bits: int = 53, normalized: bool = False
     eps = jnp.exp2(-jnp.float64(prec_bits))
 
     def fn(t):
-        s = _rigorous_real(lambda v: jsp.fresnel(v)[0], t, eps)
-        c = _rigorous_real(lambda v: jsp.fresnel(v)[1], t, eps)
+        s = _rigorous_real(lambda v: _fresnel_real(v, True)[0], t, eps)
+        c = _rigorous_real(lambda v: _fresnel_real(v, True)[1], t, eps)
         if not normalized:
-            s = di.fast_mul(s, di.interval(jnp.float64(jnp.sqrt(jnp.pi) / jnp.sqrt(2.0)), jnp.float64(jnp.sqrt(jnp.pi) / jnp.sqrt(2.0))))
-            c = di.fast_mul(c, di.interval(jnp.float64(jnp.sqrt(jnp.pi) / jnp.sqrt(2.0)), jnp.float64(jnp.sqrt(jnp.pi) / jnp.sqrt(2.0))))
+            s = di.fast_mul(s, di.interval(jnp.float64(jnp.sqrt(el.PI) / jnp.sqrt(2.0)), jnp.float64(jnp.sqrt(el.PI) / jnp.sqrt(2.0))))
+            c = di.fast_mul(c, di.interval(jnp.float64(jnp.sqrt(el.PI) / jnp.sqrt(2.0)), jnp.float64(jnp.sqrt(el.PI) / jnp.sqrt(2.0))))
         return s, c
 
     return _map_interval_pair(fn, x)
@@ -778,10 +1012,10 @@ def arb_ball_airy(x: jax.Array, prec_bits: int = 53) -> tuple[jax.Array, jax.Arr
     eps = jnp.exp2(-jnp.float64(prec_bits))
 
     def fn(t):
-        ai = _rigorous_real(lambda v: jsp.airy(v)[0], t, eps)
-        aip = _rigorous_real(lambda v: jsp.airy(v)[1], t, eps)
-        bi = _rigorous_real(lambda v: jsp.airy(v)[2], t, eps)
-        bip = _rigorous_real(lambda v: jsp.airy(v)[3], t, eps)
+        ai = _rigorous_real(lambda v: _airy_real(v)[0], t, eps)
+        aip = _rigorous_real(lambda v: _airy_real(v)[1], t, eps)
+        bi = _rigorous_real(lambda v: _airy_real(v)[2], t, eps)
+        bip = _rigorous_real(lambda v: _airy_real(v)[3], t, eps)
         return ai, aip, bi, bip
 
     return _map_interval_pair(fn, x)
@@ -790,79 +1024,80 @@ def arb_ball_airy(x: jax.Array, prec_bits: int = 53) -> tuple[jax.Array, jax.Arr
 @partial(jax.jit, static_argnames=("prec_bits", "samples"))
 def arb_ball_erf_adaptive(x: jax.Array, prec_bits: int = 53, samples: int = 9) -> jax.Array:
     eps = jnp.exp2(-jnp.float64(prec_bits))
-    return _map_interval(lambda t: _adaptive_real(jsp.erf, t, eps, samples), x)
+    return _map_interval(lambda t: _adaptive_real(lax.erf, t, eps, samples), x)
 
 
 @partial(jax.jit, static_argnames=("prec_bits", "samples"))
 def arb_ball_erfc_adaptive(x: jax.Array, prec_bits: int = 53, samples: int = 9) -> jax.Array:
     eps = jnp.exp2(-jnp.float64(prec_bits))
-    return _map_interval(lambda t: _adaptive_real(jsp.erfc, t, eps, samples), x)
+    return _map_interval(lambda t: _adaptive_real(lambda v: 1.0 - lax.erf(v), t, eps, samples), x)
 
 
 @partial(jax.jit, static_argnames=("prec_bits", "samples"))
 def arb_ball_erfi_adaptive(x: jax.Array, prec_bits: int = 53, samples: int = 9) -> jax.Array:
     eps = jnp.exp2(-jnp.float64(prec_bits))
-    return _map_interval(lambda t: _adaptive_real(jsp.erfi, t, eps, samples), x)
+    erfi_fn = _erfi_real
+    return _map_interval(lambda t: _adaptive_real(erfi_fn, t, eps, samples), x)
 
 
 @partial(jax.jit, static_argnames=("prec_bits", "samples"))
 def arb_ball_erfinv_adaptive(x: jax.Array, prec_bits: int = 53, samples: int = 9) -> jax.Array:
     eps = jnp.exp2(-jnp.float64(prec_bits))
-    return _map_interval(lambda t: _adaptive_real(jsp.erfinv, t, eps, samples), x)
+    return _map_interval(lambda t: _adaptive_real(_erfinv_real, t, eps, samples), x)
 
 
 @partial(jax.jit, static_argnames=("prec_bits", "samples"))
 def arb_ball_erfcinv_adaptive(x: jax.Array, prec_bits: int = 53, samples: int = 9) -> jax.Array:
     eps = jnp.exp2(-jnp.float64(prec_bits))
-    return _map_interval(lambda t: _adaptive_real(lambda v: jsp.erfinv(1.0 - v), t, eps, samples), x)
+    return _map_interval(lambda t: _adaptive_real(lambda v: _erfinv_real(1.0 - v), t, eps, samples), x)
 
 
 @partial(jax.jit, static_argnames=("prec_bits", "samples"))
 def acb_ball_erf_adaptive(x: jax.Array, prec_bits: int = 53, samples: int = 9) -> jax.Array:
     eps = jnp.exp2(-jnp.float64(prec_bits))
-    return _map_box(lambda t: _adaptive_complex(jsp.erf, t, eps, samples), x)
+    return _map_box(lambda t: _adaptive_complex(_erf_complex, t, eps, samples), x)
 
 
 @partial(jax.jit, static_argnames=("prec_bits", "samples"))
 def acb_ball_erfc_adaptive(x: jax.Array, prec_bits: int = 53, samples: int = 9) -> jax.Array:
     eps = jnp.exp2(-jnp.float64(prec_bits))
-    return _map_box(lambda t: _adaptive_complex(lambda z: 1.0 - jsp.erf(z), t, eps, samples), x)
+    return _map_box(lambda t: _adaptive_complex(lambda z: 1.0 - _erf_complex(z), t, eps, samples), x)
 
 
 @partial(jax.jit, static_argnames=("prec_bits", "samples"))
 def acb_ball_erfi_adaptive(x: jax.Array, prec_bits: int = 53, samples: int = 9) -> jax.Array:
     eps = jnp.exp2(-jnp.float64(prec_bits))
-    return _map_box(lambda t: _adaptive_complex(lambda z: -1j * jsp.erf(1j * z), t, eps, samples), x)
+    return _map_box(lambda t: _adaptive_complex(lambda z: -1j * _erf_complex(1j * z), t, eps, samples), x)
 
 
 @partial(jax.jit, static_argnames=("prec_bits", "samples"))
 def arb_ball_ei_adaptive(x: jax.Array, prec_bits: int = 53, samples: int = 9) -> jax.Array:
     eps = jnp.exp2(-jnp.float64(prec_bits))
-    return _map_interval(lambda t: _adaptive_real(jsp.expi, t, eps, samples), x)
+    return _map_interval(lambda t: _adaptive_real(_expi_real, t, eps, samples), x)
 
 
 @partial(jax.jit, static_argnames=("prec_bits", "samples"))
 def arb_ball_si_adaptive(x: jax.Array, prec_bits: int = 53, samples: int = 9) -> jax.Array:
     eps = jnp.exp2(-jnp.float64(prec_bits))
-    return _map_interval(lambda t: _adaptive_real(lambda v: jsp.sici(v)[0], t, eps, samples), x)
+    return _map_interval(lambda t: _adaptive_real(lambda v: _si_ci_real(v)[0], t, eps, samples), x)
 
 
 @partial(jax.jit, static_argnames=("prec_bits", "samples"))
 def arb_ball_ci_adaptive(x: jax.Array, prec_bits: int = 53, samples: int = 9) -> jax.Array:
     eps = jnp.exp2(-jnp.float64(prec_bits))
-    return _map_interval(lambda t: _adaptive_real(lambda v: jsp.sici(v)[1], t, eps, samples), x)
+    return _map_interval(lambda t: _adaptive_real(lambda v: _si_ci_real(v)[1], t, eps, samples), x)
 
 
 @partial(jax.jit, static_argnames=("prec_bits", "samples"))
 def arb_ball_shi_adaptive(x: jax.Array, prec_bits: int = 53, samples: int = 9) -> jax.Array:
     eps = jnp.exp2(-jnp.float64(prec_bits))
-    return _map_interval(lambda t: _adaptive_real(jsp.shi, t, eps, samples), x)
+    return _map_interval(lambda t: _adaptive_real(lambda v: 0.5 * (_expi_real(v) - _expi_real(-v)), t, eps, samples), x)
 
 
 @partial(jax.jit, static_argnames=("prec_bits", "samples"))
 def arb_ball_chi_adaptive(x: jax.Array, prec_bits: int = 53, samples: int = 9) -> jax.Array:
     eps = jnp.exp2(-jnp.float64(prec_bits))
-    return _map_interval(lambda t: _adaptive_real(jsp.chi, t, eps, samples), x)
+    return _map_interval(lambda t: _adaptive_real(lambda v: 0.5 * (_expi_real(v) + _expi_real(-v)), t, eps, samples), x)
 
 
 @partial(jax.jit, static_argnames=("prec_bits", "samples"))
@@ -870,7 +1105,7 @@ def arb_ball_li_adaptive(x: jax.Array, prec_bits: int = 53, samples: int = 9) ->
     eps = jnp.exp2(-jnp.float64(prec_bits))
 
     def fn(t):
-        out = _adaptive_real(lambda v: jsp.expi(jnp.log(v)), t, eps, samples)
+        out = _adaptive_real(lambda v: _expi_real(jnp.log(v)), t, eps, samples)
         full = _full_interval()
         return jnp.where(t[0] <= 0.0, full, out)
 
@@ -880,7 +1115,7 @@ def arb_ball_li_adaptive(x: jax.Array, prec_bits: int = 53, samples: int = 9) ->
 @partial(jax.jit, static_argnames=("prec_bits", "samples"))
 def arb_ball_dilog_adaptive(x: jax.Array, prec_bits: int = 53, samples: int = 9) -> jax.Array:
     eps = jnp.exp2(-jnp.float64(prec_bits))
-    return _map_interval(lambda t: _adaptive_real(lambda v: jsp.spence(1.0 - v), t, eps, samples), x)
+    return _map_interval(lambda t: _adaptive_real(lambda v: _dilog_real(v), t, eps, samples), x)
 
 
 @partial(jax.jit, static_argnames=("prec_bits", "samples"))
@@ -888,11 +1123,11 @@ def arb_ball_fresnel_adaptive(x: jax.Array, prec_bits: int = 53, samples: int = 
     eps = jnp.exp2(-jnp.float64(prec_bits))
 
     def fn(t):
-        s = _adaptive_real(lambda v: jsp.fresnel(v)[0], t, eps, samples)
-        c = _adaptive_real(lambda v: jsp.fresnel(v)[1], t, eps, samples)
+        s = _adaptive_real(lambda v: _fresnel_real(v, True)[0], t, eps, samples)
+        c = _adaptive_real(lambda v: _fresnel_real(v, True)[1], t, eps, samples)
         if not normalized:
-            s = di.fast_mul(s, di.interval(jnp.float64(jnp.sqrt(jnp.pi) / jnp.sqrt(2.0)), jnp.float64(jnp.sqrt(jnp.pi) / jnp.sqrt(2.0))))
-            c = di.fast_mul(c, di.interval(jnp.float64(jnp.sqrt(jnp.pi) / jnp.sqrt(2.0)), jnp.float64(jnp.sqrt(jnp.pi) / jnp.sqrt(2.0))))
+            s = di.fast_mul(s, di.interval(jnp.float64(jnp.sqrt(el.PI) / jnp.sqrt(2.0)), jnp.float64(jnp.sqrt(el.PI) / jnp.sqrt(2.0))))
+            c = di.fast_mul(c, di.interval(jnp.float64(jnp.sqrt(el.PI) / jnp.sqrt(2.0)), jnp.float64(jnp.sqrt(el.PI) / jnp.sqrt(2.0))))
         return s, c
 
     return _map_interval_pair(fn, x)
@@ -903,10 +1138,10 @@ def arb_ball_airy_adaptive(x: jax.Array, prec_bits: int = 53, samples: int = 9) 
     eps = jnp.exp2(-jnp.float64(prec_bits))
 
     def fn(t):
-        ai = _adaptive_real(lambda v: jsp.airy(v)[0], t, eps, samples)
-        aip = _adaptive_real(lambda v: jsp.airy(v)[1], t, eps, samples)
-        bi = _adaptive_real(lambda v: jsp.airy(v)[2], t, eps, samples)
-        bip = _adaptive_real(lambda v: jsp.airy(v)[3], t, eps, samples)
+        ai = _adaptive_real(lambda v: _airy_real(v)[0], t, eps, samples)
+        aip = _adaptive_real(lambda v: _airy_real(v)[1], t, eps, samples)
+        bi = _adaptive_real(lambda v: _airy_real(v)[2], t, eps, samples)
+        bip = _adaptive_real(lambda v: _airy_real(v)[3], t, eps, samples)
         return ai, aip, bi, bip
 
     return _map_interval_pair(fn, x)
@@ -915,13 +1150,21 @@ def arb_ball_airy_adaptive(x: jax.Array, prec_bits: int = 53, samples: int = 9) 
 @partial(jax.jit, static_argnames=("prec_bits",))
 def arb_ball_bessel_j(nu: jax.Array, z: jax.Array, prec_bits: int = 53) -> jax.Array:
     eps = jnp.exp2(-jnp.float64(prec_bits))
-    return _map_interval_bivariate(lambda a, b: _rigorous_real_bivariate(lambda u, v: _real_bessel_series(u, v, -1.0), a, b, eps), nu, z)
+    def bound(a, b):
+        base = _rigorous_real_bivariate(lambda u, v: _real_bessel_eval_j(u, v), a, b, eps)
+        samp = _bivariate_sample_interval_dense(lambda u, v: _real_bessel_eval_j(u, v), a, b)
+        return _hull_with_real_bessel_asym(_interval_hull(base, samp), a, b, "j", eps)
+    return _map_interval_bivariate(bound, nu, z)
 
 
 @partial(jax.jit, static_argnames=("prec_bits",))
 def arb_ball_bessel_i(nu: jax.Array, z: jax.Array, prec_bits: int = 53) -> jax.Array:
     eps = jnp.exp2(-jnp.float64(prec_bits))
-    return _map_interval_bivariate(lambda a, b: _rigorous_real_bivariate(lambda u, v: _real_bessel_series(u, v, 1.0), a, b, eps), nu, z)
+    def bound(a, b):
+        base = _rigorous_real_bivariate(lambda u, v: _real_bessel_eval_i(u, v), a, b, eps)
+        samp = _bivariate_sample_interval_dense(lambda u, v: _real_bessel_eval_i(u, v), a, b)
+        return _hull_with_real_bessel_asym(_interval_hull(base, samp), a, b, "i", eps)
+    return _map_interval_bivariate(bound, nu, z)
 
 
 @partial(jax.jit, static_argnames=("prec_bits",))
@@ -929,13 +1172,21 @@ def arb_ball_bessel_y(nu: jax.Array, z: jax.Array, prec_bits: int = 53) -> jax.A
     eps = jnp.exp2(-jnp.float64(prec_bits))
 
     def fn(u, v):
-        s = jnp.sin(jnp.pi * u)
-        jnu = _real_bessel_series(u, v, -1.0)
-        jneg = _real_bessel_series(-u, v, -1.0)
-        val = (jnu * jnp.cos(jnp.pi * u) - jneg) / s
+        s = jnp.sin(el.PI * u)
+        jnu = _real_bessel_eval_j(u, v)
+        jneg = _real_bessel_eval_j(-u, v)
+        val = (jnu * jnp.cos(el.PI * u) - jneg) / s
         return jnp.where(jnp.abs(s) < 1e-8, jnp.nan, val)
 
-    return _map_interval_bivariate(lambda a, b: _rigorous_real_bivariate(fn, a, b, eps), nu, z)
+    def bound(a, b):
+        base = _rigorous_real_bivariate(fn, a, b, eps)
+        samp = _bivariate_sample_interval_dense(fn, a, b)
+        return _hull_with_real_bessel_asym(_interval_hull(base, samp), a, b, "y", eps)
+    return _map_interval_bivariate(
+        lambda a, b: jnp.where(_nu_interval_crosses_integer(a), _full_interval(), bound(a, b)),
+        nu,
+        z,
+    )
 
 
 @partial(jax.jit, static_argnames=("prec_bits",))
@@ -943,13 +1194,21 @@ def arb_ball_bessel_k(nu: jax.Array, z: jax.Array, prec_bits: int = 53) -> jax.A
     eps = jnp.exp2(-jnp.float64(prec_bits))
 
     def fn(u, v):
-        s = jnp.sin(jnp.pi * u)
-        inu = _real_bessel_series(u, v, 1.0)
-        ineg = _real_bessel_series(-u, v, 1.0)
-        val = 0.5 * jnp.pi * (ineg - inu) / s
+        s = jnp.sin(el.PI * u)
+        inu = _real_bessel_eval_i(u, v)
+        ineg = _real_bessel_eval_i(-u, v)
+        val = el.HALF_PI * (ineg - inu) / s
         return jnp.where(jnp.abs(s) < 1e-8, jnp.nan, val)
 
-    return _map_interval_bivariate(lambda a, b: _rigorous_real_bivariate(fn, a, b, eps), nu, z)
+    def bound(a, b):
+        base = _rigorous_real_bivariate(fn, a, b, eps)
+        samp = _bivariate_sample_interval_dense(fn, a, b)
+        return _hull_with_real_bessel_asym(_interval_hull(base, samp), a, b, "k", eps)
+    return _map_interval_bivariate(
+        lambda a, b: jnp.where(_nu_interval_crosses_integer(a), _full_interval(), bound(a, b)),
+        nu,
+        z,
+    )
 
 
 @partial(jax.jit, static_argnames=("prec_bits",))
@@ -962,9 +1221,13 @@ def arb_ball_bessel_i_scaled(nu: jax.Array, z: jax.Array, prec_bits: int = 53) -
     eps = jnp.exp2(-jnp.float64(prec_bits))
 
     def fn(u, v):
-        return jnp.exp(-v) * _real_bessel_series(u, v, 1.0)
+        return jnp.exp(-v) * _real_bessel_eval_i(u, v)
 
-    return _map_interval_bivariate(lambda a, b: _rigorous_real_bivariate(fn, a, b, eps), nu, z)
+    def bound(a, b):
+        base = _rigorous_real_bivariate(fn, a, b, eps)
+        samp = _bivariate_sample_interval_dense(fn, a, b)
+        return _hull_with_real_bessel_asym(_interval_hull(base, samp), a, b, "i_scaled", eps)
+    return _map_interval_bivariate(bound, nu, z)
 
 
 @partial(jax.jit, static_argnames=("prec_bits",))
@@ -972,25 +1235,53 @@ def arb_ball_bessel_k_scaled(nu: jax.Array, z: jax.Array, prec_bits: int = 53) -
     eps = jnp.exp2(-jnp.float64(prec_bits))
 
     def fn(u, v):
-        s = jnp.sin(jnp.pi * u)
-        inu = _real_bessel_series(u, v, 1.0)
-        ineg = _real_bessel_series(-u, v, 1.0)
-        k = 0.5 * jnp.pi * (ineg - inu) / s
+        s = jnp.sin(el.PI * u)
+        inu = _real_bessel_eval_i(u, v)
+        ineg = _real_bessel_eval_i(-u, v)
+        k = el.HALF_PI * (ineg - inu) / s
         return jnp.exp(v) * k
 
-    return _map_interval_bivariate(lambda a, b: _rigorous_real_bivariate(fn, a, b, eps), nu, z)
+    def bound(a, b):
+        base = _rigorous_real_bivariate(fn, a, b, eps)
+        samp = _bivariate_sample_interval(fn, a, b)
+        return _hull_with_real_bessel_asym(_interval_hull(base, samp), a, b, "k_scaled", eps)
+    return _map_interval_bivariate(
+        lambda a, b: jnp.where(_nu_interval_crosses_integer(a), _full_interval(), bound(a, b)),
+        nu,
+        z,
+    )
 
 
 @partial(jax.jit, static_argnames=("prec_bits", "samples"))
 def arb_ball_bessel_j_adaptive(nu: jax.Array, z: jax.Array, prec_bits: int = 53, samples: int = 9) -> jax.Array:
     eps = jnp.exp2(-jnp.float64(prec_bits))
-    return _map_interval_bivariate(lambda a, b: _adaptive_real_bivariate(lambda u, v: _real_bessel_series(u, v, -1.0), a, b, eps, samples), nu, z)
+    return _map_interval_bivariate(
+        lambda a, b: _hull_with_real_bessel_asym(
+            _adaptive_real_bivariate(lambda u, v: _real_bessel_eval_j(u, v), a, b, eps, max(samples, 15)),
+            a,
+            b,
+            "j",
+            eps,
+        ),
+        nu,
+        z,
+    )
 
 
 @partial(jax.jit, static_argnames=("prec_bits", "samples"))
 def arb_ball_bessel_i_adaptive(nu: jax.Array, z: jax.Array, prec_bits: int = 53, samples: int = 9) -> jax.Array:
     eps = jnp.exp2(-jnp.float64(prec_bits))
-    return _map_interval_bivariate(lambda a, b: _adaptive_real_bivariate(lambda u, v: _real_bessel_series(u, v, 1.0), a, b, eps, samples), nu, z)
+    return _map_interval_bivariate(
+        lambda a, b: _hull_with_real_bessel_asym(
+            _adaptive_real_bivariate(lambda u, v: _real_bessel_eval_i(u, v), a, b, eps, max(samples, 15)),
+            a,
+            b,
+            "i",
+            eps,
+        ),
+        nu,
+        z,
+    )
 
 
 @partial(jax.jit, static_argnames=("prec_bits", "samples"))
@@ -998,13 +1289,27 @@ def arb_ball_bessel_y_adaptive(nu: jax.Array, z: jax.Array, prec_bits: int = 53,
     eps = jnp.exp2(-jnp.float64(prec_bits))
 
     def fn(u, v):
-        s = jnp.sin(jnp.pi * u)
-        jnu = _real_bessel_series(u, v, -1.0)
-        jneg = _real_bessel_series(-u, v, -1.0)
-        val = (jnu * jnp.cos(jnp.pi * u) - jneg) / s
+        s = jnp.sin(el.PI * u)
+        jnu = _real_bessel_eval_j(u, v)
+        jneg = _real_bessel_eval_j(-u, v)
+        val = (jnu * jnp.cos(el.PI * u) - jneg) / s
         return jnp.where(jnp.abs(s) < 1e-8, jnp.nan, val)
 
-    return _map_interval_bivariate(lambda a, b: _adaptive_real_bivariate(fn, a, b, eps, samples), nu, z)
+    return _map_interval_bivariate(
+        lambda a, b: jnp.where(
+            _nu_interval_crosses_integer(a),
+            _full_interval(),
+            _hull_with_real_bessel_asym(
+                _adaptive_real_bivariate(fn, a, b, eps, max(samples, 15)),
+                a,
+                b,
+                "y",
+                eps,
+            ),
+        ),
+        nu,
+        z,
+    )
 
 
 @partial(jax.jit, static_argnames=("prec_bits", "samples"))
@@ -1012,13 +1317,27 @@ def arb_ball_bessel_k_adaptive(nu: jax.Array, z: jax.Array, prec_bits: int = 53,
     eps = jnp.exp2(-jnp.float64(prec_bits))
 
     def fn(u, v):
-        s = jnp.sin(jnp.pi * u)
-        inu = _real_bessel_series(u, v, 1.0)
-        ineg = _real_bessel_series(-u, v, 1.0)
-        val = 0.5 * jnp.pi * (ineg - inu) / s
+        s = jnp.sin(el.PI * u)
+        inu = _real_bessel_eval_i(u, v)
+        ineg = _real_bessel_eval_i(-u, v)
+        val = 0.5 * el.PI * (ineg - inu) / s
         return jnp.where(jnp.abs(s) < 1e-8, jnp.nan, val)
 
-    return _map_interval_bivariate(lambda a, b: _adaptive_real_bivariate(fn, a, b, eps, samples), nu, z)
+    return _map_interval_bivariate(
+        lambda a, b: jnp.where(
+            _nu_interval_crosses_integer(a),
+            _full_interval(),
+            _hull_with_real_bessel_asym(
+                _adaptive_real_bivariate(fn, a, b, eps, max(samples, 15)),
+                a,
+                b,
+                "k",
+                eps,
+            ),
+        ),
+        nu,
+        z,
+    )
 
 
 @partial(jax.jit, static_argnames=("prec_bits", "samples"))
@@ -1031,9 +1350,19 @@ def arb_ball_bessel_i_scaled_adaptive(nu: jax.Array, z: jax.Array, prec_bits: in
     eps = jnp.exp2(-jnp.float64(prec_bits))
 
     def fn(u, v):
-        return jnp.exp(-v) * _real_bessel_series(u, v, 1.0)
+        return jnp.exp(-v) * _real_bessel_eval_i(u, v)
 
-    return _map_interval_bivariate(lambda a, b: _adaptive_real_bivariate(fn, a, b, eps, samples), nu, z)
+    return _map_interval_bivariate(
+        lambda a, b: _hull_with_real_bessel_asym(
+            _adaptive_real_bivariate(fn, a, b, eps, max(samples, 15)),
+            a,
+            b,
+            "i_scaled",
+            eps,
+        ),
+        nu,
+        z,
+    )
 
 
 @partial(jax.jit, static_argnames=("prec_bits", "samples"))
@@ -1041,13 +1370,27 @@ def arb_ball_bessel_k_scaled_adaptive(nu: jax.Array, z: jax.Array, prec_bits: in
     eps = jnp.exp2(-jnp.float64(prec_bits))
 
     def fn(u, v):
-        s = jnp.sin(jnp.pi * u)
-        inu = _real_bessel_series(u, v, 1.0)
-        ineg = _real_bessel_series(-u, v, 1.0)
-        k = 0.5 * jnp.pi * (ineg - inu) / s
+        s = jnp.sin(el.PI * u)
+        inu = _real_bessel_eval_i(u, v)
+        ineg = _real_bessel_eval_i(-u, v)
+        k = 0.5 * el.PI * (ineg - inu) / s
         return jnp.exp(v) * k
 
-    return _map_interval_bivariate(lambda a, b: _adaptive_real_bivariate(fn, a, b, eps, samples), nu, z)
+    return _map_interval_bivariate(
+        lambda a, b: jnp.where(
+            _nu_interval_crosses_integer(a),
+            _full_interval(),
+            _hull_with_real_bessel_asym(
+                _adaptive_real_bivariate(fn, a, b, eps, max(samples, 15)),
+                a,
+                b,
+                "k_scaled",
+                eps,
+            ),
+        ),
+        nu,
+        z,
+    )
 
 
 @partial(jax.jit, static_argnames=("prec_bits",))
@@ -1067,13 +1410,17 @@ def acb_ball_bessel_y(nu: jax.Array, z: jax.Array, prec_bits: int = 53) -> jax.A
     eps = jnp.exp2(-jnp.float64(prec_bits))
 
     def fn(u, v):
-        s = jnp.sin(jnp.pi * u)
+        s = jnp.sin(el.PI * u)
         jnu = _complex_bessel_series(u, v, -1.0)
         jneg = _complex_bessel_series(-u, v, -1.0)
-        val = (jnu * jnp.cos(jnp.pi * u) - jneg) / s
+        val = (jnu * jnp.cos(el.PI * u) - jneg) / s
         return jnp.where(jnp.abs(s) < 1e-8, jnp.nan + 1j * jnp.nan, val)
 
-    return _map_box_bivariate(lambda a, b: _rigorous_complex_bivariate(fn, a, b, eps), nu, z)
+    return _map_box_bivariate(
+        lambda a, b: jnp.where(_nu_box_crosses_integer(a), _full_box(), _rigorous_complex_bivariate(fn, a, b, eps)),
+        nu,
+        z,
+    )
 
 
 @partial(jax.jit, static_argnames=("prec_bits",))
@@ -1081,13 +1428,17 @@ def acb_ball_bessel_k(nu: jax.Array, z: jax.Array, prec_bits: int = 53) -> jax.A
     eps = jnp.exp2(-jnp.float64(prec_bits))
 
     def fn(u, v):
-        s = jnp.sin(jnp.pi * u)
+        s = jnp.sin(el.PI * u)
         inu = _complex_bessel_series(u, v, 1.0)
         ineg = _complex_bessel_series(-u, v, 1.0)
-        val = 0.5 * jnp.pi * (ineg - inu) / s
+        val = 0.5 * el.PI * (ineg - inu) / s
         return jnp.where(jnp.abs(s) < 1e-8, jnp.nan + 1j * jnp.nan, val)
 
-    return _map_box_bivariate(lambda a, b: _rigorous_complex_bivariate(fn, a, b, eps), nu, z)
+    return _map_box_bivariate(
+        lambda a, b: jnp.where(_nu_box_crosses_integer(a), _full_box(), _rigorous_complex_bivariate(fn, a, b, eps)),
+        nu,
+        z,
+    )
 
 
 @partial(jax.jit, static_argnames=("prec_bits",))
@@ -1102,7 +1453,11 @@ def acb_ball_bessel_i_scaled(nu: jax.Array, z: jax.Array, prec_bits: int = 53) -
     def fn(u, v):
         return jnp.exp(-v) * _complex_bessel_series(u, v, 1.0)
 
-    return _map_box_bivariate(lambda a, b: _rigorous_complex_bivariate(fn, a, b, eps), nu, z)
+    return _map_box_bivariate(
+        lambda a, b: jnp.where(_nu_box_crosses_integer(a), _full_box(), _rigorous_complex_bivariate(fn, a, b, eps)),
+        nu,
+        z,
+    )
 
 
 @partial(jax.jit, static_argnames=("prec_bits",))
@@ -1110,10 +1465,10 @@ def acb_ball_bessel_k_scaled(nu: jax.Array, z: jax.Array, prec_bits: int = 53) -
     eps = jnp.exp2(-jnp.float64(prec_bits))
 
     def fn(u, v):
-        s = jnp.sin(jnp.pi * u)
+        s = jnp.sin(el.PI * u)
         inu = _complex_bessel_series(u, v, 1.0)
         ineg = _complex_bessel_series(-u, v, 1.0)
-        k = 0.5 * jnp.pi * (ineg - inu) / s
+        k = 0.5 * el.PI * (ineg - inu) / s
         return jnp.exp(v) * k
 
     return _map_box_bivariate(lambda a, b: _rigorous_complex_bivariate(fn, a, b, eps), nu, z)
@@ -1136,13 +1491,17 @@ def acb_ball_bessel_y_adaptive(nu: jax.Array, z: jax.Array, prec_bits: int = 53,
     eps = jnp.exp2(-jnp.float64(prec_bits))
 
     def fn(u, v):
-        s = jnp.sin(jnp.pi * u)
+        s = jnp.sin(el.PI * u)
         jnu = _complex_bessel_series(u, v, -1.0)
         jneg = _complex_bessel_series(-u, v, -1.0)
-        val = (jnu * jnp.cos(jnp.pi * u) - jneg) / s
+        val = (jnu * jnp.cos(el.PI * u) - jneg) / s
         return jnp.where(jnp.abs(s) < 1e-8, jnp.nan + 1j * jnp.nan, val)
 
-    return _map_box_bivariate(lambda a, b: _adaptive_complex_bivariate(fn, a, b, eps, samples), nu, z)
+    return _map_box_bivariate(
+        lambda a, b: jnp.where(_nu_box_crosses_integer(a), _full_box(), _adaptive_complex_bivariate(fn, a, b, eps, samples)),
+        nu,
+        z,
+    )
 
 
 @partial(jax.jit, static_argnames=("prec_bits", "samples"))
@@ -1150,13 +1509,17 @@ def acb_ball_bessel_k_adaptive(nu: jax.Array, z: jax.Array, prec_bits: int = 53,
     eps = jnp.exp2(-jnp.float64(prec_bits))
 
     def fn(u, v):
-        s = jnp.sin(jnp.pi * u)
+        s = jnp.sin(el.PI * u)
         inu = _complex_bessel_series(u, v, 1.0)
         ineg = _complex_bessel_series(-u, v, 1.0)
-        val = 0.5 * jnp.pi * (ineg - inu) / s
+        val = 0.5 * el.PI * (ineg - inu) / s
         return jnp.where(jnp.abs(s) < 1e-8, jnp.nan + 1j * jnp.nan, val)
 
-    return _map_box_bivariate(lambda a, b: _adaptive_complex_bivariate(fn, a, b, eps, samples), nu, z)
+    return _map_box_bivariate(
+        lambda a, b: jnp.where(_nu_box_crosses_integer(a), _full_box(), _adaptive_complex_bivariate(fn, a, b, eps, samples)),
+        nu,
+        z,
+    )
 
 
 @partial(jax.jit, static_argnames=("prec_bits", "samples"))
@@ -1171,7 +1534,11 @@ def acb_ball_bessel_i_scaled_adaptive(nu: jax.Array, z: jax.Array, prec_bits: in
     def fn(u, v):
         return jnp.exp(-v) * _complex_bessel_series(u, v, 1.0)
 
-    return _map_box_bivariate(lambda a, b: _adaptive_complex_bivariate(fn, a, b, eps, samples), nu, z)
+    return _map_box_bivariate(
+        lambda a, b: jnp.where(_nu_box_crosses_integer(a), _full_box(), _adaptive_complex_bivariate(fn, a, b, eps, samples)),
+        nu,
+        z,
+    )
 
 
 @partial(jax.jit, static_argnames=("prec_bits", "samples"))
@@ -1179,10 +1546,10 @@ def acb_ball_bessel_k_scaled_adaptive(nu: jax.Array, z: jax.Array, prec_bits: in
     eps = jnp.exp2(-jnp.float64(prec_bits))
 
     def fn(u, v):
-        s = jnp.sin(jnp.pi * u)
+        s = jnp.sin(el.PI * u)
         inu = _complex_bessel_series(u, v, 1.0)
         ineg = _complex_bessel_series(-u, v, 1.0)
-        k = 0.5 * jnp.pi * (ineg - inu) / s
+        k = 0.5 * el.PI * (ineg - inu) / s
         return jnp.exp(v) * k
 
     return _map_box_bivariate(lambda a, b: _adaptive_complex_bivariate(fn, a, b, eps, samples), nu, z)
@@ -1196,6 +1563,11 @@ def arb_ball_exp_mp(x: jax.Array, dps: int | None = None) -> jax.Array:
 def arb_ball_log_mp(x: jax.Array, dps: int | None = None) -> jax.Array:
     prec_bits = precision.dps_to_bits(precision.get_dps() if dps is None else dps)
     return arb_ball_log(x, prec_bits=prec_bits)
+
+
+def arb_ball_sqrt_mp(x: jax.Array, dps: int | None = None) -> jax.Array:
+    prec_bits = precision.dps_to_bits(precision.get_dps() if dps is None else dps)
+    return arb_ball_sqrt(x, prec_bits=prec_bits)
 
 
 def arb_ball_sin_mp(x: jax.Array, dps: int | None = None) -> jax.Array:
@@ -1231,7 +1603,13 @@ def acb_ball_gamma_mp(x: jax.Array, dps: int | None = None) -> jax.Array:
 __all__ = [
     "arb_ball_exp",
     "arb_ball_log",
+    "arb_ball_sqrt",
     "arb_ball_sin",
+    "arb_ball_cos",
+    "arb_ball_tan",
+    "arb_ball_sinh",
+    "arb_ball_cosh",
+    "arb_ball_tanh",
     "arb_ball_gamma",
     "acb_ball_exp",
     "acb_ball_log",
@@ -1239,7 +1617,13 @@ __all__ = [
     "acb_ball_gamma",
     "arb_ball_exp_adaptive",
     "arb_ball_log_adaptive",
+    "arb_ball_sqrt_adaptive",
     "arb_ball_sin_adaptive",
+    "arb_ball_cos_adaptive",
+    "arb_ball_tan_adaptive",
+    "arb_ball_sinh_adaptive",
+    "arb_ball_cosh_adaptive",
+    "arb_ball_tanh_adaptive",
     "arb_ball_gamma_adaptive",
     "acb_ball_exp_adaptive",
     "acb_ball_log_adaptive",
@@ -1247,6 +1631,7 @@ __all__ = [
     "acb_ball_gamma_adaptive",
     "arb_ball_exp_mp",
     "arb_ball_log_mp",
+    "arb_ball_sqrt_mp",
     "arb_ball_sin_mp",
     "arb_ball_gamma_mp",
     "acb_ball_exp_mp",
@@ -1254,3 +1639,4 @@ __all__ = [
     "acb_ball_sin_mp",
     "acb_ball_gamma_mp",
 ]
+

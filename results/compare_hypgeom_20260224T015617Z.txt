@@ -1,0 +1,63 @@
+tool: compare_hypgeom
+timestamp_utc: 2026-02-24T01:56:17Z
+command: compare_hypgeom.py --samples-real 200 --samples-complex 200 --bessel-real-mode sample
+commit: c7eb18c5a981b89fd05548a1df3ea79168dda1b7
+platform: Windows-11-10.0.22631-SP0
+elapsed_s: 65.07
+result: PASS
+
+checks:
+- arb_rising_ui n=0: ok=True max_abs_diff=0.000e+00
+- acb_rising_ui n=0: ok=True max_abs_diff=0.000e+00
+- arb_rising_ui n=1: ok=True max_abs_diff=0.000e+00
+- acb_rising_ui n=1: ok=True max_abs_diff=0.000e+00
+- arb_rising_ui n=2: ok=True max_abs_diff=0.000e+00
+- acb_rising_ui n=2: ok=True max_abs_diff=0.000e+00
+- arb_rising_ui n=5: ok=True max_abs_diff=0.000e+00
+- acb_rising_ui n=5: ok=True max_abs_diff=0.000e+00
+- arb_rising_ui n=9: ok=True max_abs_diff=0.000e+00
+- acb_rising_ui n=9: ok=True max_abs_diff=0.000e+00
+- arb_rising_ui n=15: ok=True max_abs_diff=0.000e+00
+- acb_rising_ui n=15: ok=True max_abs_diff=0.000e+00
+- arb_lgamma: ok=True max_abs_diff=8.882e-15
+- acb_lgamma: ok=True max_abs_diff=4.441e-15
+- arb_gamma: ok=True max_abs_diff=1.455e-09
+- acb_gamma: ok=True max_abs_diff=1.066e-14
+- arb_rgamma: ok=True max_abs_diff=2.220e-15
+- acb_rgamma: ok=True max_abs_diff=1.214e-06
+- arb_erf: ok=True max_abs_diff=2.220e-16
+- acb_erf: ok=True max_abs_diff=8.882e-16
+- arb_erfc: ok=True max_abs_diff=2.220e-16
+- acb_erfc: ok=True max_abs_diff=8.882e-16
+- arb_erfi: ok=True max_abs_diff=8.882e-16
+- acb_erfi: ok=True max_abs_diff=8.882e-16
+- arb_erfinv: ok=True max_abs_diff=5.551e-16
+- arb_erfcinv: ok=True max_abs_diff=4.441e-16
+- arb_0f1_reg: ok=True max_abs_diff=2.442e-15
+- acb_0f1_reg: ok=True max_abs_diff=9.592e-13
+- arb_m_reg: ok=True max_abs_diff=2.842e-14
+- acb_m_reg: ok=True max_abs_diff=1.343e-12
+- arb_1f1: ok=True max_abs_diff=0.000e+00
+- acb_1f1: ok=True max_abs_diff=0.000e+00
+- arb_1f1_reg: ok=True max_abs_diff=2.842e-14
+- acb_1f1_reg: ok=True max_abs_diff=1.343e-12
+- arb_2f1: ok=True max_abs_diff=0.000e+00
+- acb_2f1: ok=True max_abs_diff=0.000e+00
+- arb_2f1_reg: ok=True max_abs_diff=3.125e-01
+- acb_2f1_reg: ok=True max_abs_diff=3.085e-09
+- arb_1f1_int: ok=True max_abs_diff=2.842e-14
+- acb_1f1_int: ok=True max_abs_diff=1.343e-12
+- arb_2f1_int: ok=True max_abs_diff=3.125e-01
+- acb_2f1_int: ok=True max_abs_diff=3.085e-09
+- arb_u: ok=True max_abs_diff=3.200e+01
+- acb_u: ok=True max_abs_diff=1.023e-12
+- arb_u_int: ok=True max_abs_diff=3.200e+01
+- acb_u_int: ok=True max_abs_diff=1.023e-12
+- arb_bessel_j: ok=True max_abs_diff=1.221e-15
+- arb_bessel_y: ok=True max_abs_diff=2.547e-11
+- arb_bessel_i: ok=True max_abs_diff=2.442e-15
+- arb_bessel_k: ok=True max_abs_diff=4.002e-11
+- acb_bessel_j: ok=True max_abs_diff=9.770e-15
+- acb_bessel_y: ok=True max_abs_diff=1.688e-14
+- acb_bessel_i: ok=True max_abs_diff=1.954e-14
+- acb_bessel_k: ok=True max_abs_diff=1.807e-14

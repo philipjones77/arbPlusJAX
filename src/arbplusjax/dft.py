@@ -8,6 +8,7 @@ import jax.numpy as jnp
 
 from . import acb_core
 from . import double_interval as di
+from . import elementary as el
 from . import checks
 
 jax.config.update("jax_enable_x64", True)
@@ -27,7 +28,7 @@ def _dft_matrix(n: int, inverse: bool = False) -> jax.Array:
     k = jnp.arange(n, dtype=jnp.float64)[:, None]
     t = jnp.arange(n, dtype=jnp.float64)[None, :]
     sign = 1.0 if inverse else -1.0
-    expo = sign * 2.0j * jnp.pi * (k * t) / float(n)
+    expo = sign * 2.0j * el.PI * (k * t) / float(n)
     return jnp.exp(expo)
 
 
@@ -86,7 +87,7 @@ def _acb_twiddle_matrix(n: int, inverse: bool = False) -> jax.Array:
     k = jnp.arange(n, dtype=jnp.float64)[:, None]
     t = jnp.arange(n, dtype=jnp.float64)[None, :]
     sign = 1.0 if inverse else -1.0
-    ang = sign * 2.0 * jnp.pi * (k * t) / float(n)
+    ang = sign * el.TWO_PI * (k * t) / float(n)
     wr = jnp.cos(ang)
     wi = jnp.sin(ang)
     return jnp.stack([wr, wr, wi, wi], axis=-1)
@@ -96,7 +97,7 @@ def _acb_twiddle_matrix_interval(n: int, inverse: bool = False) -> jax.Array:
     k = jnp.arange(n, dtype=jnp.float64)[:, None]
     t = jnp.arange(n, dtype=jnp.float64)[None, :]
     sign = 1.0 if inverse else -1.0
-    ang = sign * 2.0 * jnp.pi * (k * t) / float(n)
+    ang = sign * el.TWO_PI * (k * t) / float(n)
     wr = jnp.cos(ang)
     wi = jnp.sin(ang)
     wr_iv = di.interval(di._below(wr), di._above(wr))
@@ -430,6 +431,131 @@ def acb_convol_circular_rigorous(f: jax.Array, g: jax.Array) -> jax.Array:
     return acb_convol_circular_rad2_rigorous(f, g)
 
 
+@jax.jit
+def acb_dft_bluestein(x: jax.Array) -> jax.Array:
+    return acb_dft(x)
+
+
+@jax.jit
+def acb_dft_bluestein_precomp(x: jax.Array, precomp: jax.Array | None = None) -> jax.Array:
+    return acb_dft_bluestein(x)
+
+
+@jax.jit
+def acb_dft_convol(f: jax.Array, g: jax.Array) -> jax.Array:
+    return acb_convol_circular(f, g)
+
+
+@jax.jit
+def acb_dft_convol_dft(f: jax.Array, g: jax.Array) -> jax.Array:
+    return acb_convol_circular_dft(f, g)
+
+
+@jax.jit
+def acb_dft_convol_mullow(f: jax.Array, g: jax.Array) -> jax.Array:
+    return acb_convol_circular_naive(f, g)
+
+
+@jax.jit
+def acb_dft_convol_naive(f: jax.Array, g: jax.Array) -> jax.Array:
+    return acb_convol_circular_naive(f, g)
+
+
+@jax.jit
+def acb_dft_convol_rad2(f: jax.Array, g: jax.Array) -> jax.Array:
+    return acb_convol_circular_rad2(f, g)
+
+
+@jax.jit
+def acb_dft_convol_rad2_precomp(f: jax.Array, g: jax.Array, precomp: jax.Array | None = None) -> jax.Array:
+    return acb_dft_convol_rad2(f, g)
+
+
+@partial(jax.jit, static_argnames=("cyc",))
+def acb_dft_crt(x: jax.Array, cyc: tuple[int, ...]) -> jax.Array:
+    return acb_dft_prod(x, cyc)
+
+
+@partial(jax.jit, static_argnames=("cyc",))
+def acb_dft_crt_precomp(x: jax.Array, cyc: tuple[int, ...], precomp: jax.Array | None = None) -> jax.Array:
+    return acb_dft_crt(x, cyc)
+
+
+@partial(jax.jit, static_argnames=("cyc",))
+def acb_dft_cyc(x: jax.Array, cyc: tuple[int, ...]) -> jax.Array:
+    return acb_dft_prod(x, cyc)
+
+
+@partial(jax.jit, static_argnames=("cyc",))
+def acb_dft_cyc_precomp(x: jax.Array, cyc: tuple[int, ...], precomp: jax.Array | None = None) -> jax.Array:
+    return acb_dft_cyc(x, cyc)
+
+
+@jax.jit
+def acb_dft_inverse(x: jax.Array) -> jax.Array:
+    return acb_idft(x)
+
+
+@jax.jit
+def acb_dft_inverse_precomp(x: jax.Array, precomp: jax.Array | None = None) -> jax.Array:
+    return acb_dft_inverse(x)
+
+
+@jax.jit
+def acb_dft_inverse_rad2_precomp(x: jax.Array, precomp: jax.Array | None = None) -> jax.Array:
+    return acb_idft_rad2(x)
+
+
+@jax.jit
+def acb_dft_inverse_rad2_precomp_inplace(x: jax.Array, precomp: jax.Array | None = None) -> jax.Array:
+    return acb_dft_inverse_rad2_precomp(x, precomp)
+
+
+@partial(jax.jit, static_argnames=("inverse",))
+def acb_dft_naive_precomp(x: jax.Array, inverse: bool = False, precomp: jax.Array | None = None) -> jax.Array:
+    return acb_dft_naive(x, inverse=inverse)
+
+
+@jax.jit
+def acb_dft_precomp(x: jax.Array, precomp: jax.Array | None = None) -> jax.Array:
+    return acb_dft(x)
+
+
+@partial(jax.jit, static_argnames=("cyc",))
+def acb_dft_prod_precomp(x: jax.Array, cyc: tuple[int, ...], precomp: jax.Array | None = None) -> jax.Array:
+    return acb_dft_prod(x, cyc)
+
+
+@jax.jit
+def acb_dft_rad2_inplace(x: jax.Array) -> jax.Array:
+    return acb_dft_rad2(x)
+
+
+@jax.jit
+def acb_dft_rad2_inplace_threaded(x: jax.Array) -> jax.Array:
+    return acb_dft_rad2(x)
+
+
+@jax.jit
+def acb_dft_rad2_precomp(x: jax.Array, precomp: jax.Array | None = None) -> jax.Array:
+    return acb_dft_rad2(x)
+
+
+@jax.jit
+def acb_dft_rad2_precomp_inplace(x: jax.Array, precomp: jax.Array | None = None) -> jax.Array:
+    return acb_dft_rad2_precomp(x, precomp)
+
+
+@jax.jit
+def acb_dft_rad2_precomp_inplace_threaded(x: jax.Array, precomp: jax.Array | None = None) -> jax.Array:
+    return acb_dft_rad2_precomp(x, precomp)
+
+
+@jax.jit
+def acb_dft_step(x: jax.Array) -> jax.Array:
+    return acb_dft(x)
+
+
 dft_naive_jit = jax.jit(dft_naive, static_argnames=("inverse",))
 idft_naive_jit = jax.jit(idft_naive)
 dft_rad2_jit = jax.jit(dft_rad2)
@@ -514,6 +640,131 @@ def acb_mul_vec_prec(x: jax.Array, y: jax.Array, prec_bits: int = di.DEFAULT_PRE
     return acb_core.acb_box_round_prec(acb_mul_vec(x, y), prec_bits)
 
 
+@partial(jax.jit, static_argnames=("prec_bits",))
+def acb_dft_bluestein_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_dft_bluestein(x), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def acb_dft_bluestein_precomp_prec(x: jax.Array, precomp: jax.Array | None = None, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_dft_bluestein_precomp(x, precomp), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def acb_dft_convol_prec(f: jax.Array, g: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_dft_convol(f, g), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def acb_dft_convol_dft_prec(f: jax.Array, g: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_dft_convol_dft(f, g), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def acb_dft_convol_mullow_prec(f: jax.Array, g: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_dft_convol_mullow(f, g), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def acb_dft_convol_naive_prec(f: jax.Array, g: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_dft_convol_naive(f, g), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def acb_dft_convol_rad2_prec(f: jax.Array, g: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_dft_convol_rad2(f, g), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def acb_dft_convol_rad2_precomp_prec(f: jax.Array, g: jax.Array, precomp: jax.Array | None = None, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_dft_convol_rad2_precomp(f, g, precomp), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("cyc", "prec_bits"))
+def acb_dft_crt_prec(x: jax.Array, cyc: tuple[int, ...], prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_dft_crt(x, cyc), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("cyc", "prec_bits"))
+def acb_dft_crt_precomp_prec(x: jax.Array, cyc: tuple[int, ...], precomp: jax.Array | None = None, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_dft_crt_precomp(x, cyc, precomp), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("cyc", "prec_bits"))
+def acb_dft_cyc_prec(x: jax.Array, cyc: tuple[int, ...], prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_dft_cyc(x, cyc), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("cyc", "prec_bits"))
+def acb_dft_cyc_precomp_prec(x: jax.Array, cyc: tuple[int, ...], precomp: jax.Array | None = None, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_dft_cyc_precomp(x, cyc, precomp), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def acb_dft_inverse_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_dft_inverse(x), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def acb_dft_inverse_precomp_prec(x: jax.Array, precomp: jax.Array | None = None, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_dft_inverse_precomp(x, precomp), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def acb_dft_inverse_rad2_precomp_prec(x: jax.Array, precomp: jax.Array | None = None, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_dft_inverse_rad2_precomp(x, precomp), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def acb_dft_inverse_rad2_precomp_inplace_prec(x: jax.Array, precomp: jax.Array | None = None, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_dft_inverse_rad2_precomp_inplace(x, precomp), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("inverse", "prec_bits"))
+def acb_dft_naive_precomp_prec(x: jax.Array, inverse: bool = False, precomp: jax.Array | None = None, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_dft_naive_precomp(x, inverse=inverse, precomp=precomp), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def acb_dft_precomp_prec(x: jax.Array, precomp: jax.Array | None = None, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_dft_precomp(x, precomp), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("cyc", "prec_bits"))
+def acb_dft_prod_precomp_prec(x: jax.Array, cyc: tuple[int, ...], precomp: jax.Array | None = None, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_dft_prod_precomp(x, cyc, precomp), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def acb_dft_rad2_inplace_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_dft_rad2_inplace(x), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def acb_dft_rad2_inplace_threaded_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_dft_rad2_inplace_threaded(x), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def acb_dft_rad2_precomp_prec(x: jax.Array, precomp: jax.Array | None = None, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_dft_rad2_precomp(x, precomp), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def acb_dft_rad2_precomp_inplace_prec(x: jax.Array, precomp: jax.Array | None = None, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_dft_rad2_precomp_inplace(x, precomp), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def acb_dft_rad2_precomp_inplace_threaded_prec(x: jax.Array, precomp: jax.Array | None = None, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_dft_rad2_precomp_inplace_threaded(x, precomp), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def acb_dft_step_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_dft_step(x), prec_bits)
+
+
 __all__ = [
     "dft_naive",
     "idft_naive",
@@ -587,4 +838,54 @@ __all__ = [
     "acb_convol_circular_rad2_prec",
     "acb_convol_circular_prec",
     "acb_mul_vec_prec",
+    "acb_dft_bluestein",
+    "acb_dft_bluestein_precomp",
+    "acb_dft_convol",
+    "acb_dft_convol_dft",
+    "acb_dft_convol_mullow",
+    "acb_dft_convol_naive",
+    "acb_dft_convol_rad2",
+    "acb_dft_convol_rad2_precomp",
+    "acb_dft_crt",
+    "acb_dft_crt_precomp",
+    "acb_dft_cyc",
+    "acb_dft_cyc_precomp",
+    "acb_dft_inverse",
+    "acb_dft_inverse_precomp",
+    "acb_dft_inverse_rad2_precomp",
+    "acb_dft_inverse_rad2_precomp_inplace",
+    "acb_dft_naive_precomp",
+    "acb_dft_precomp",
+    "acb_dft_prod_precomp",
+    "acb_dft_rad2_inplace",
+    "acb_dft_rad2_inplace_threaded",
+    "acb_dft_rad2_precomp",
+    "acb_dft_rad2_precomp_inplace",
+    "acb_dft_rad2_precomp_inplace_threaded",
+    "acb_dft_step",
+    "acb_dft_bluestein_prec",
+    "acb_dft_bluestein_precomp_prec",
+    "acb_dft_convol_prec",
+    "acb_dft_convol_dft_prec",
+    "acb_dft_convol_mullow_prec",
+    "acb_dft_convol_naive_prec",
+    "acb_dft_convol_rad2_prec",
+    "acb_dft_convol_rad2_precomp_prec",
+    "acb_dft_crt_prec",
+    "acb_dft_crt_precomp_prec",
+    "acb_dft_cyc_prec",
+    "acb_dft_cyc_precomp_prec",
+    "acb_dft_inverse_prec",
+    "acb_dft_inverse_precomp_prec",
+    "acb_dft_inverse_rad2_precomp_prec",
+    "acb_dft_inverse_rad2_precomp_inplace_prec",
+    "acb_dft_naive_precomp_prec",
+    "acb_dft_precomp_prec",
+    "acb_dft_prod_precomp_prec",
+    "acb_dft_rad2_inplace_prec",
+    "acb_dft_rad2_inplace_threaded_prec",
+    "acb_dft_rad2_precomp_prec",
+    "acb_dft_rad2_precomp_inplace_prec",
+    "acb_dft_rad2_precomp_inplace_threaded_prec",
+    "acb_dft_step_prec",
 ]

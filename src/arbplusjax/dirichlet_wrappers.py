@@ -37,12 +37,12 @@ def _make_wrapper(name: str, base_fn: Callable[..., jax.Array], kernel_fn: Calla
             return wc.adaptive_acb_kernel(kernel_fn, args, prec_bits, **kwargs)
         return wc.adaptive_interval_kernel(kernel_fn, args, prec_bits, **kwargs)
 
-    def wrapper(*args, impl: str = "baseline", dps: int | None = None, prec_bits: int | None = None, **kwargs):
+    def wrapper(*args, impl: str = "basic", dps: int | None = None, prec_bits: int | None = None, **kwargs):
         pb = wc.resolve_prec_bits(dps, prec_bits)
         return wc.dispatch_mode(impl, base_fn, rig_fn, adapt_fn, is_acb, pb, args, kwargs)
 
     wrapper.__name__ = name.replace("_prec", "_mode")
-    wrapper.__doc__ = f"Mode-dispatched wrapper around {name}. impl: baseline|rigorous|adaptive."
+    wrapper.__doc__ = f"Mode-dispatched wrapper around {name}. impl: basic|rigorous|adaptive."
     return wrapper
 
 
@@ -68,3 +68,4 @@ for _mod in (acb_dirichlet, dirichlet):
         _wrapper = _make_wrapper(_name, _fn, kernel_fn)
         globals()[_wrapper.__name__] = _wrapper
         __all__.append(_wrapper.__name__)
+

@@ -32,9 +32,17 @@ def _find_lib(build_dir: Path, names: list[str]) -> Path | None:
 
 
 def default_paths() -> tuple[Path | None, Path | None]:
-    repo_root = Path(__file__).resolve().parents[2]
-    build_dir = repo_root / "migration" / "c_chassis" / "build"
-    if not build_dir.exists():
+    repo_root = Path(__file__).resolve().parents[1]
+    candidates = [
+        repo_root / "stuff" / "migration" / "c_chassis" / "build",
+        repo_root / "migration" / "c_chassis" / "build",
+    ]
+    build_dir = None
+    for cand in candidates:
+        if cand.exists():
+            build_dir = cand
+            break
+    if build_dir is None:
         return None, None
 
     di = _find_lib(build_dir, ["double_interval_ref.dll", "libdouble_interval_ref.dll", "libdouble_interval_ref.so", "libdouble_interval_ref.dylib"])

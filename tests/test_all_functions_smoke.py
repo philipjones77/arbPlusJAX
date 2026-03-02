@@ -76,7 +76,7 @@ def _pick_value(func_name: str, param: inspect.Parameter) -> Any:
     if pname in ("dps",):
         return 50
     if pname in ("mode", "impl"):
-        return "baseline"
+        return "basic"
     if pname in ("regularized", "scaled"):
         return False
     if pname in ("n", "m", "k", "terms", "length", "order", "max_terms", "min_terms", "N", "M"):

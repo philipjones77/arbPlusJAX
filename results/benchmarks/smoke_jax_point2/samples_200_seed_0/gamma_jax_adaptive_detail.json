@@ -1,0 +1,15 @@
+{
+  "function": "gamma",
+  "backend": "jax_adaptive",
+  "samples": 200,
+  "seed": 0,
+  "error_stats": {
+    "mean": 1.3697089573661003e-11,
+    "median": 6.434852650727407e-13,
+    "p95": 3.2997693466541015e-11,
+    "p99": 2.8602685553380415e-10,
+    "max": 9.736229600321167e-10
+  },
+  "containment_rate": 0.0,
+  "mean_width": 5.657355764001615e-06
+}

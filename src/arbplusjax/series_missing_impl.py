@@ -5,12 +5,13 @@ from functools import partial
 import jax
 from jax import lax
 import jax.numpy as jnp
-import jax.scipy.special as jsp
 
 from . import double_interval as di
 from . import acb_core
 from . import series_utils as su
 from . import hypgeom
+from . import coeffs
+from . import elementary as el
 
 jax.config.update('jax_enable_x64', True)
 
@@ -33,14 +34,14 @@ def _lambertw(z: jax.Array, iters: int = 12) -> jax.Array:
 
 def _theta3(tau: jax.Array, terms: int = 12) -> jax.Array:
     tau = jnp.asarray(tau, dtype=jnp.complex128)
-    q = jnp.exp(1j * jnp.pi * tau)
+    q = jnp.exp(1j * el.PI * tau)
     ns = jnp.arange(1, terms + 1, dtype=jnp.float64)
     return 1.0 + 2.0 * jnp.sum(q ** (ns * ns))
 
 
 def _qseries_simple(tau: jax.Array, terms: int = 12) -> jax.Array:
     tau = jnp.asarray(tau, dtype=jnp.complex128)
-    q = jnp.exp(2j * jnp.pi * tau)
+    q = jnp.exp(2j * el.PI * tau)
     ns = jnp.arange(1, terms + 1, dtype=jnp.float64)
     return jnp.sum(q ** ns)
 
@@ -111,7 +112,7 @@ def _jet_real_cauchy(fn, x, length, bound_fn):
 
 def _theta3_bound(mid, r, terms):
     im_min = jnp.imag(mid) - r
-    q = jnp.exp(-jnp.pi * im_min)
+    q = jnp.exp(-el.PI * im_min)
     ns = jnp.arange(1, terms + 1, dtype=jnp.float64)
     partial = jnp.sum(q ** (ns * ns))
     tail = jnp.where(q < 1.0, (q ** ((terms + 1) ** 2)) / (1.0 - q), jnp.inf)
@@ -121,7 +122,7 @@ def _theta3_bound(mid, r, terms):
 
 def _qseries_bound(mid, r, terms):
     im_min = jnp.imag(mid) - r
-    q = jnp.exp(-2.0 * jnp.pi * im_min)
+    q = jnp.exp(-2.0 * el.PI * im_min)
     partial = q * (1.0 - q ** terms) / (1.0 - q)
     tail = q ** (terms + 1) / (1.0 - q)
     bound = partial + tail
@@ -180,28 +181,33 @@ def _fn_from_name(name: str):
     if 'fresnel' in n:
         return lambda x: hypgeom._fresnel_eval(x, False)[0]
     if 'erfc' in n:
-
-        return jsp.erfc
+        return lambda x: 1.0 - lax.erf(x)
     if 'erf' in n:
-        return jsp.erf
+        return lax.erf
     if 'si' in n:
         return lambda x: hypgeom._si_ci_from_series(x)[0]
     if 'ci' in n:
         return lambda x: hypgeom._si_ci_from_series(x)[1]
     if 'shi' in n:
-        return lambda x: 0.5 * (jsp.expi(x) - jsp.expi(-x))
+        return lambda x: 0.5 * (
+            jnp.real(hypgeom._complex_ei_series(jnp.asarray(x, dtype=jnp.complex128)))
+            - jnp.real(hypgeom._complex_ei_series(jnp.asarray(-x, dtype=jnp.complex128)))
+        )
     if 'chi' in n:
-        return lambda x: 0.5 * (jsp.expi(x) + jsp.expi(-x))
+        return lambda x: 0.5 * (
+            jnp.real(hypgeom._complex_ei_series(jnp.asarray(x, dtype=jnp.complex128)))
+            + jnp.real(hypgeom._complex_ei_series(jnp.asarray(-x, dtype=jnp.complex128)))
+        )
     if 'li' in n:
-        return lambda x: jsp.expi(jnp.log(x))
+        return lambda x: jnp.real(hypgeom._complex_ei_series(jnp.log(jnp.asarray(x, dtype=jnp.complex128))))
     if 'digamma' in n:
-        return jsp.digamma
+        return lax.digamma
     if 'gamma' in n and 'lgamma' not in n and 'rgamma' not in n:
-        return jsp.gamma
+        return lambda x: jnp.exp(lax.lgamma(x))
     if 'lgamma' in n:
-        return jsp.gammaln
+        return lax.lgamma
     if 'rgamma' in n:
-        return lambda x: 1.0 / jsp.gamma(x)
+        return lambda x: jnp.exp(-lax.lgamma(x))
     if 'zeta' in n:
         return lambda x: _zeta_series_complex(x, terms=32)
     if 'lambertw' in n:
@@ -213,21 +219,21 @@ def _fn_from_name(name: str):
     if 'pfq' in n:
         return jnp.exp
     if 'sinc_pi' in n:
-        return lambda x: jnp.where(x == 0.0, 1.0, jnp.sin(jnp.pi * x) / (jnp.pi * x))
+        return lambda x: jnp.where(x == 0.0, 1.0, jnp.sin(el.PI * x) / (el.PI * x))
     if 'sinc' in n:
         return lambda x: jnp.where(x == 0.0, 1.0, jnp.sin(x) / x)
     if 'sin_pi' in n:
-        return lambda x: jnp.sin(jnp.pi * x)
+        return lambda x: jnp.sin(el.PI * x)
     if 'cos_pi' in n:
-        return lambda x: jnp.cos(jnp.pi * x)
+        return lambda x: jnp.cos(el.PI * x)
     if 'cot_pi' in n:
-        return lambda x: jnp.cos(jnp.pi * x) / jnp.sin(jnp.pi * x)
+        return lambda x: jnp.cos(el.PI * x) / jnp.sin(el.PI * x)
     if 'exp_pi_i' in n:
-        return lambda x: jnp.exp(1j * jnp.pi * x)
+        return lambda x: jnp.exp(1j * el.PI * x)
     if ('expi' in n or 'ei' in n) and 'acb' in n:
         return hypgeom._complex_ei_series
     if 'expi' in n or 'ei' in n:
-        return jsp.expi
+        return lambda x: jnp.real(hypgeom._complex_ei_series(jnp.asarray(x, dtype=jnp.complex128)))
     return None
 
 def _arb_poly_compose(f, g, length):
@@ -634,7 +640,7 @@ def _acb_poly_rgamma_series(h, length, *args, **kwargs):
 
 
 def _acb_poly_rising_ui_series(x, n=2, length=8, *args, **kwargs):
-    f = lambda t: jnp.exp(jsp.gammaln(t + n) - jsp.gammaln(t))
+    f = lambda t: jnp.exp(lax.lgamma(t + n) - lax.lgamma(t))
     return _jet_complex(f, x, length)
 
 
@@ -1915,7 +1921,7 @@ def acb_poly_rgamma_series_prec(h, length, prec_bits: int = di.DEFAULT_PREC_BITS
 
 
 def acb_poly_rising_ui_series(x, n=2, length=8, *args, **kwargs):
-    f = lambda t: jnp.exp(jsp.gammaln(t + n) - jsp.gammaln(t))
+    f = lambda t: jnp.exp(lax.lgamma(t + n) - lax.lgamma(t))
     return _jet_complex(f, x, length)
 
 
@@ -2683,9 +2689,9 @@ def _arb_hypgeom_rising_coeffs_fmpz(k: int, length: int) -> jax.Array:
 
 
 def arb_hypgeom_gamma_coeff_shallow(i: int, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
-    coeffs = jnp.asarray(hypgeom._STIRLING_COEFFS, dtype=jnp.float64)
+    stirling = jnp.asarray(coeffs.STIRLING_COEFFS, dtype=jnp.float64)
     idx = jnp.asarray(i, dtype=jnp.int32)
-    val = jnp.where((idx >= 0) & (idx < coeffs.shape[0]), coeffs[idx], 0.0)
+    val = jnp.where((idx >= 0) & (idx < stirling.shape[0]), stirling[idx], 0.0)
     err = jnp.exp2(-jnp.float64(prec_bits))
     return di.interval(di._below(val - err), di._above(val + err))
 
@@ -2701,9 +2707,9 @@ def _arb_hypgeom_gamma_coeff_shallow(i: int, prec_bits: int = di.DEFAULT_PREC_BI
 def arb_hypgeom_gamma_stirling_term_bounds(zinv: jax.Array, n_terms: int) -> jax.Array:
     zinv = jnp.asarray(zinv, dtype=jnp.float64)
     zabs = jnp.abs(zinv)
-    coeffs = jnp.asarray(hypgeom._STIRLING_COEFFS, dtype=jnp.float64)
+    stirling = jnp.asarray(coeffs.STIRLING_COEFFS, dtype=jnp.float64)
     ks = jnp.arange(n_terms, dtype=jnp.int32)
-    coeffs_pad = jnp.where(ks < coeffs.shape[0], coeffs[ks], 0.0)
+    coeffs_pad = jnp.where(ks < stirling.shape[0], stirling[ks], 0.0)
     ks_f = ks.astype(jnp.float64)
     powers = zabs ** (2.0 * ks_f + 1.0)
     bounds = jnp.ceil(jnp.abs(coeffs_pad) * powers)
@@ -2955,4 +2961,5 @@ def _arb_hypgeom_ci_asymp(
     prec_bits: int = di.DEFAULT_PREC_BITS,
 ) -> jax.Array:
     return arb_hypgeom_ci_asymp(z, n_terms=n_terms, prec_bits=prec_bits)
+
 

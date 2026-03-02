@@ -13,6 +13,7 @@ from . import acb_core
 from . import wrappers_common as wc
 from . import precision
 from . import checks
+from . import elementary as el
 
 jax.config.update("jax_enable_x64", True)
 
@@ -64,7 +65,7 @@ def _modularC(tau: jax.Array, prec_bits: int) -> jax.Array:
     val = _integrate_trapz(fn, float(cutoff), float(upper), 256)
     c0 = (2.0 / tau - 1.5 + tau / 6.0) * cutoff + (5.0 / 12.0 - 1.0 / tau + tau / 12.0) * cutoff ** 2
     c0 = c0 + (4.0 / (9.0 * tau) - 2.0 / 9.0 + tau / 54.0 - (tau ** 3) / 270.0) * cutoff ** 3
-    return (1.0 / (2.0 * tau)) * jnp.log(2.0 * jnp.pi) - val - c0
+    return (1.0 / (2.0 * tau)) * jnp.log(2.0 * el.PI) - val - c0
 
 
 def _modularD(tau: jax.Array, prec_bits: int) -> jax.Array:
@@ -78,7 +79,7 @@ def _modularD(tau: jax.Array, prec_bits: int) -> jax.Array:
 
 def _modularcoeff_a(tau: jax.Array, prec_bits: int) -> jax.Array:
     modc = _modularC(tau, prec_bits)
-    return 0.5 * tau * jnp.log(2.0 * (jnp.pi * tau)) + 0.5 * jnp.log(tau) - tau * modc
+    return 0.5 * tau * jnp.log(2.0 * (el.PI * tau)) + 0.5 * jnp.log(tau) - tau * modc
 
 
 def _modularcoeff_b(tau: jax.Array, prec_bits: int) -> jax.Array:
@@ -172,7 +173,7 @@ def loggamma2(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BI
     invb = 1.0 / beta
     tau = invb * invb
     logb = jnp.log(beta)
-    c1 = 0.5 * invb * jnp.log(2.0 * jnp.pi)
+    c1 = 0.5 * invb * jnp.log(2.0 * el.PI)
     c2 = -beta - invb
     l = log_barnesdoublegamma(w / beta, tau, prec_bits)
     return w * c1 + (0.5 * w * (w + c2) + 1.0) * logb - l
@@ -196,10 +197,10 @@ def double_sine(z: jax.Array, b: jax.Array, prec_bits: int = di.DEFAULT_PREC_BIT
     b2 = b * b
     Nmax = max(4, int(prec_bits // 4))
     Q = b + 1.0 / b
-    minus_ipiover2 = -1.0j * jnp.pi / 2.0
+    minus_ipiover2 = -1.0j * el.PI / 2.0
     sixth = (Q * Q + 1.0) / 6.0
-    twopii_binv = 2.0 * jnp.pi * 1.0j / b
-    twopii_b = 2.0 * jnp.pi * 1.0j * b
+    twopii_binv = 2.0 * el.PI * 1.0j / b
+    twopii_b = 2.0 * el.PI * 1.0j * b
     twopii_m_bsq_inv = twopii_binv / b
     twopii_m_b2 = twopii_b * b
 
@@ -314,7 +315,7 @@ def arb_doublegamma(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_P
 def arb_log_barnesdoublegamma_mode(
     z: jax.Array,
     tau: jax.Array,
-    impl: str = "baseline",
+    impl: str = "basic",
     prec_bits: int | None = None,
     dps: int | None = None,
 ) -> jax.Array:
@@ -336,7 +337,7 @@ def arb_log_barnesdoublegamma_mode(
 def arb_barnesdoublegamma_mode(
     z: jax.Array,
     tau: jax.Array,
-    impl: str = "baseline",
+    impl: str = "basic",
     prec_bits: int | None = None,
     dps: int | None = None,
 ) -> jax.Array:
@@ -355,7 +356,7 @@ def arb_barnesdoublegamma_mode(
 
 
 @partial(jax.jit, static_argnames=("impl", "prec_bits", "dps"))
-def arb_loggamma2_mode(w: jax.Array, beta: jax.Array, impl: str = "baseline", prec_bits: int | None = None, dps: int | None = None) -> jax.Array:
+def arb_loggamma2_mode(w: jax.Array, beta: jax.Array, impl: str = "basic", prec_bits: int | None = None, dps: int | None = None) -> jax.Array:
     pb = precision.get_prec_bits() if prec_bits is None and dps is None else wc.resolve_prec_bits(dps, prec_bits)
     from . import ball_wrappers
     return wc.dispatch_mode(
@@ -371,7 +372,7 @@ def arb_loggamma2_mode(w: jax.Array, beta: jax.Array, impl: str = "baseline", pr
 
 
 @partial(jax.jit, static_argnames=("impl", "prec_bits", "dps"))
-def arb_gamma2_mode(w: jax.Array, beta: jax.Array, impl: str = "baseline", prec_bits: int | None = None, dps: int | None = None) -> jax.Array:
+def arb_gamma2_mode(w: jax.Array, beta: jax.Array, impl: str = "basic", prec_bits: int | None = None, dps: int | None = None) -> jax.Array:
     pb = precision.get_prec_bits() if prec_bits is None and dps is None else wc.resolve_prec_bits(dps, prec_bits)
     from . import ball_wrappers
     return wc.dispatch_mode(
@@ -387,7 +388,7 @@ def arb_gamma2_mode(w: jax.Array, beta: jax.Array, impl: str = "baseline", prec_
 
 
 @partial(jax.jit, static_argnames=("impl", "prec_bits", "dps"))
-def arb_logdoublegamma_mode(w: jax.Array, beta: jax.Array, impl: str = "baseline", prec_bits: int | None = None, dps: int | None = None) -> jax.Array:
+def arb_logdoublegamma_mode(w: jax.Array, beta: jax.Array, impl: str = "basic", prec_bits: int | None = None, dps: int | None = None) -> jax.Array:
     pb = precision.get_prec_bits() if prec_bits is None and dps is None else wc.resolve_prec_bits(dps, prec_bits)
     from . import ball_wrappers
     return wc.dispatch_mode(
@@ -403,7 +404,7 @@ def arb_logdoublegamma_mode(w: jax.Array, beta: jax.Array, impl: str = "baseline
 
 
 @partial(jax.jit, static_argnames=("impl", "prec_bits", "dps"))
-def arb_doublegamma_mode(w: jax.Array, beta: jax.Array, impl: str = "baseline", prec_bits: int | None = None, dps: int | None = None) -> jax.Array:
+def arb_doublegamma_mode(w: jax.Array, beta: jax.Array, impl: str = "basic", prec_bits: int | None = None, dps: int | None = None) -> jax.Array:
     pb = precision.get_prec_bits() if prec_bits is None and dps is None else wc.resolve_prec_bits(dps, prec_bits)
     from . import ball_wrappers
     return wc.dispatch_mode(
@@ -422,7 +423,7 @@ def arb_doublegamma_mode(w: jax.Array, beta: jax.Array, impl: str = "baseline", 
 def acb_log_barnesdoublegamma_mode(
     z: jax.Array,
     tau: jax.Array,
-    impl: str = "baseline",
+    impl: str = "basic",
     prec_bits: int | None = None,
     dps: int | None = None,
 ) -> jax.Array:
@@ -441,7 +442,7 @@ def acb_log_barnesdoublegamma_mode(
 
 
 @partial(jax.jit, static_argnames=("impl", "prec_bits", "dps"))
-def acb_barnesdoublegamma_mode(z: jax.Array, tau: jax.Array, impl: str = "baseline", prec_bits: int | None = None, dps: int | None = None) -> jax.Array:
+def acb_barnesdoublegamma_mode(z: jax.Array, tau: jax.Array, impl: str = "basic", prec_bits: int | None = None, dps: int | None = None) -> jax.Array:
     pb = precision.get_prec_bits() if prec_bits is None and dps is None else wc.resolve_prec_bits(dps, prec_bits)
     from . import ball_wrappers
     return wc.dispatch_mode(
@@ -457,7 +458,7 @@ def acb_barnesdoublegamma_mode(z: jax.Array, tau: jax.Array, impl: str = "baseli
 
 
 @partial(jax.jit, static_argnames=("impl", "prec_bits", "dps"))
-def acb_loggamma2_mode(w: jax.Array, beta: jax.Array, impl: str = "baseline", prec_bits: int | None = None, dps: int | None = None) -> jax.Array:
+def acb_loggamma2_mode(w: jax.Array, beta: jax.Array, impl: str = "basic", prec_bits: int | None = None, dps: int | None = None) -> jax.Array:
     pb = precision.get_prec_bits() if prec_bits is None and dps is None else wc.resolve_prec_bits(dps, prec_bits)
     from . import ball_wrappers
     return wc.dispatch_mode(
@@ -473,7 +474,7 @@ def acb_loggamma2_mode(w: jax.Array, beta: jax.Array, impl: str = "baseline", pr
 
 
 @partial(jax.jit, static_argnames=("impl", "prec_bits", "dps"))
-def acb_gamma2_mode(w: jax.Array, beta: jax.Array, impl: str = "baseline", prec_bits: int | None = None, dps: int | None = None) -> jax.Array:
+def acb_gamma2_mode(w: jax.Array, beta: jax.Array, impl: str = "basic", prec_bits: int | None = None, dps: int | None = None) -> jax.Array:
     pb = precision.get_prec_bits() if prec_bits is None and dps is None else wc.resolve_prec_bits(dps, prec_bits)
     from . import ball_wrappers
     return wc.dispatch_mode(
@@ -489,7 +490,7 @@ def acb_gamma2_mode(w: jax.Array, beta: jax.Array, impl: str = "baseline", prec_
 
 
 @partial(jax.jit, static_argnames=("impl", "prec_bits", "dps"))
-def acb_logdoublegamma_mode(w: jax.Array, beta: jax.Array, impl: str = "baseline", prec_bits: int | None = None, dps: int | None = None) -> jax.Array:
+def acb_logdoublegamma_mode(w: jax.Array, beta: jax.Array, impl: str = "basic", prec_bits: int | None = None, dps: int | None = None) -> jax.Array:
     pb = precision.get_prec_bits() if prec_bits is None and dps is None else wc.resolve_prec_bits(dps, prec_bits)
     from . import ball_wrappers
     return wc.dispatch_mode(
@@ -505,7 +506,7 @@ def acb_logdoublegamma_mode(w: jax.Array, beta: jax.Array, impl: str = "baseline
 
 
 @partial(jax.jit, static_argnames=("impl", "prec_bits", "dps"))
-def acb_doublegamma_mode(w: jax.Array, beta: jax.Array, impl: str = "baseline", prec_bits: int | None = None, dps: int | None = None) -> jax.Array:
+def acb_doublegamma_mode(w: jax.Array, beta: jax.Array, impl: str = "basic", prec_bits: int | None = None, dps: int | None = None) -> jax.Array:
     pb = precision.get_prec_bits() if prec_bits is None and dps is None else wc.resolve_prec_bits(dps, prec_bits)
     from . import ball_wrappers
     return wc.dispatch_mode(
@@ -521,7 +522,7 @@ def acb_doublegamma_mode(w: jax.Array, beta: jax.Array, impl: str = "baseline", 
 
 
 @partial(jax.jit, static_argnames=("impl", "prec_bits", "dps"))
-def acb_double_sine_mode(z: jax.Array, b: jax.Array, impl: str = "baseline", prec_bits: int | None = None, dps: int | None = None) -> jax.Array:
+def acb_double_sine_mode(z: jax.Array, b: jax.Array, impl: str = "basic", prec_bits: int | None = None, dps: int | None = None) -> jax.Array:
     pb = precision.get_prec_bits() if prec_bits is None and dps is None else wc.resolve_prec_bits(dps, prec_bits)
     from . import ball_wrappers
     return wc.dispatch_mode(
@@ -571,3 +572,4 @@ __all__ = [
     "acb_doublegamma_mode",
     "acb_double_sine_mode",
 ]
+

@@ -6,10 +6,13 @@ import jax
 from jax import lax
 import jax.numpy as jnp
 
+from . import coeffs
+from . import elementary as el
+
 jax.config.update("jax_enable_x64", True)
 
 _LOG_A = jnp.float64(0.248754477)  # log Glaisher-Kinkelin constant
-_LOG_2PI = jnp.log(jnp.float64(2.0 * jnp.pi))
+_LOG_2PI = el.LOG_TWO_PI
 
 _BARNESG_B = jnp.asarray(
     [
@@ -26,20 +29,7 @@ _BARNESG_B = jnp.asarray(
     dtype=jnp.float64,
 )
 
-_LANCZOS = jnp.asarray(
-    [
-        0.99999999999980993,
-        676.5203681218851,
-        -1259.1392167224028,
-        771.32342877765313,
-        -176.61502916214059,
-        12.507343278686905,
-        -0.13857109526572012,
-        9.9843695780195716e-6,
-        1.5056327351493116e-7,
-    ],
-    dtype=jnp.float64,
-)
+_LANCZOS = coeffs.LANCZOS
 
 
 def _complex_loggamma_lanczos(z: jax.Array) -> jax.Array:
@@ -52,14 +42,14 @@ def _complex_loggamma_lanczos(z: jax.Array) -> jax.Array:
 
     x = lax.fori_loop(1, 9, body, x)
     t = z1 + jnp.float64(7.5)
-    return jnp.float64(0.91893853320467274178) + (z1 + 0.5) * jnp.log(t) - t + jnp.log(x)
+    return el.LOG_SQRT_TWO_PI + (z1 + 0.5) * jnp.log(t) - t + jnp.log(x)
 
 
 def _complex_loggamma(z: jax.Array) -> jax.Array:
     z = jnp.asarray(z, dtype=jnp.complex128)
 
     def reflection(w):
-        return jnp.log(jnp.pi) - jnp.log(jnp.sin(jnp.pi * w)) - _complex_loggamma_lanczos(1.0 - w)
+        return el.LOG_PI - jnp.log(jnp.sin(el.PI * w)) - _complex_loggamma_lanczos(1.0 - w)
 
     return lax.cond(jnp.real(z) < 0.5, reflection, _complex_loggamma_lanczos, z)
 

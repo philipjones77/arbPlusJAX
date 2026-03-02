@@ -1,0 +1,17 @@
+function,backend,samples,mean_abs_err,max_abs_err,containment_rate,mean_width,time_ms,notes
+log,c_arb,20,,,,3.56723e-06,0.078,
+log,jax_baseline,20,2.84495e-17,4.44089e-16,0,3.56723e-06,225.109,
+log,jax_adaptive,20,4.65604e-12,4.29132e-11,0,3.56724e-06,157.948,
+log,jax_rigorous,20,4.65604e-12,4.29132e-11,0,3.56725e-06,144.173,
+log,scipy,20,4.65604e-12,4.29132e-11,1,,0.0174,
+log,jax_scipy,20,4.65604e-12,4.29132e-11,1,,63.0845,
+log,mpmath,20,4.65604e-12,4.29132e-11,1,,0.5766,
+log,mathematica_local,20,4.65604e-12,4.29132e-11,1,,2390.01,C:\Program Files\Wolfram Research\Wolfram\14.3\wolframscript.exe
+exp,c_arb,20,,,,4.33804e-06,0.0459,
+exp,jax_baseline,20,5.68989e-17,8.88178e-16,0,4.33804e-06,251.458,
+exp,jax_adaptive,20,1.0846e-12,3.65308e-12,0,4.33805e-06,147.778,
+exp,jax_rigorous,20,1.0846e-12,3.65308e-12,0,4.33805e-06,152.906,
+exp,scipy,20,1.0846e-12,3.65308e-12,1,,0.0047,
+exp,jax_scipy,20,1.0846e-12,3.65308e-12,1,,16.8614,
+exp,mpmath,20,1.0846e-12,3.65308e-12,1,,0.2342,
+exp,mathematica_local,20,1.0846e-12,3.65308e-12,1,,2428.55,C:\Program Files\Wolfram Research\Wolfram\14.3\wolframscript.exe

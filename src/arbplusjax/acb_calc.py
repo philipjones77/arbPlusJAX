@@ -184,6 +184,136 @@ def acb_calc_integrate_line_batch_prec(
     )
 
 
+@partial(jax.jit, static_argnames=("integrand", "n_steps"))
+def acb_calc_integrate(
+    a: jax.Array,
+    b: jax.Array,
+    integrand: str = "exp",
+    n_steps: int = 64,
+) -> jax.Array:
+    return acb_calc_integrate_line(a, b, integrand=integrand, n_steps=n_steps)
+
+
+@partial(jax.jit, static_argnames=("integrand", "n_steps", "prec_bits"))
+def acb_calc_integrate_prec(
+    a: jax.Array,
+    b: jax.Array,
+    integrand: str = "exp",
+    n_steps: int = 64,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return acb_core.acb_box_round_prec(
+        acb_calc_integrate(a, b, integrand=integrand, n_steps=n_steps), prec_bits
+    )
+
+
+@partial(jax.jit, static_argnames=("integrand", "n_steps", "prec_bits"))
+def acb_calc_integrate_gl_auto_deg(
+    a: jax.Array,
+    b: jax.Array,
+    integrand: str = "exp",
+    n_steps: int = 64,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    auto_steps = max(8, int(n_steps)) + max(1, int(prec_bits) // 32)
+    return acb_calc_integrate_prec(a, b, integrand=integrand, n_steps=auto_steps, prec_bits=prec_bits)
+
+
+@partial(jax.jit, static_argnames=("integrand", "n_steps", "prec_bits"))
+def acb_calc_integrate_gl_auto_deg_prec(
+    a: jax.Array,
+    b: jax.Array,
+    integrand: str = "exp",
+    n_steps: int = 64,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return acb_calc_integrate_gl_auto_deg(
+        a, b, integrand=integrand, n_steps=n_steps, prec_bits=prec_bits
+    )
+
+
+@partial(jax.jit, static_argnames=("integrand", "n_steps", "prec_bits"))
+def acb_calc_integrate_taylor(
+    a: jax.Array,
+    b: jax.Array,
+    integrand: str = "exp",
+    n_steps: int = 64,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    # Lightweight Taylor-like proxy: tighter midpoint quadrature with fixed oversampling.
+    t_steps = max(8, int(n_steps)) * 2
+    return acb_calc_integrate_prec(a, b, integrand=integrand, n_steps=t_steps, prec_bits=prec_bits)
+
+
+@partial(jax.jit, static_argnames=("integrand", "n_steps", "prec_bits"))
+def acb_calc_integrate_taylor_prec(
+    a: jax.Array,
+    b: jax.Array,
+    integrand: str = "exp",
+    n_steps: int = 64,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return acb_calc_integrate_taylor(
+        a, b, integrand=integrand, n_steps=n_steps, prec_bits=prec_bits
+    )
+
+
+@partial(jax.jit, static_argnames=("integrand", "n_steps", "prec_bits"))
+def acb_calc_integrate_opt_init(
+    a: jax.Array,
+    b: jax.Array,
+    integrand: str = "exp",
+    n_steps: int = 64,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    # Return a stable initial enclosure used by higher-level integration paths.
+    return acb_calc_integrate_prec(a, b, integrand=integrand, n_steps=n_steps, prec_bits=prec_bits)
+
+
+@partial(jax.jit, static_argnames=("integrand", "n_steps", "prec_bits"))
+def acb_calc_integrate_opt_init_prec(
+    a: jax.Array,
+    b: jax.Array,
+    integrand: str = "exp",
+    n_steps: int = 64,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return acb_calc_integrate_opt_init(
+        a, b, integrand=integrand, n_steps=n_steps, prec_bits=prec_bits
+    )
+
+
+@partial(jax.jit, static_argnames=("integrand", "n_steps", "prec_bits"))
+def acb_calc_cauchy_bound(
+    a: jax.Array,
+    b: jax.Array,
+    integrand: str = "exp",
+    n_steps: int = 64,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    box = acb_calc_integrate_prec(a, b, integrand=integrand, n_steps=n_steps, prec_bits=prec_bits)
+    re = acb_core.acb_real(box)
+    im = acb_core.acb_imag(box)
+    re_abs = jnp.maximum(jnp.abs(re[..., 0]), jnp.abs(re[..., 1]))
+    im_abs = jnp.maximum(jnp.abs(im[..., 0]), jnp.abs(im[..., 1]))
+    ub = jnp.sqrt(re_abs * re_abs + im_abs * im_abs)
+    return di.interval(di._below(jnp.zeros_like(ub)), di._above(ub))
+
+
+@partial(jax.jit, static_argnames=("integrand", "n_steps", "prec_bits"))
+def acb_calc_cauchy_bound_prec(
+    a: jax.Array,
+    b: jax.Array,
+    integrand: str = "exp",
+    n_steps: int = 64,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return di.round_interval_outward(
+        acb_calc_cauchy_bound(a, b, integrand=integrand, n_steps=n_steps, prec_bits=prec_bits),
+        prec_bits,
+    )
+
+
 acb_calc_integrate_line_batch_jit = jax.jit(acb_calc_integrate_line_batch, static_argnames=("integrand", "n_steps"))
 acb_calc_integrate_line_batch_prec_jit = jax.jit(
     acb_calc_integrate_line_batch_prec, static_argnames=("integrand", "n_steps", "prec_bits")
@@ -199,4 +329,14 @@ __all__ = [
     "acb_calc_integrate_line_batch_prec",
     "acb_calc_integrate_line_batch_jit",
     "acb_calc_integrate_line_batch_prec_jit",
+    "acb_calc_integrate",
+    "acb_calc_integrate_prec",
+    "acb_calc_integrate_gl_auto_deg",
+    "acb_calc_integrate_gl_auto_deg_prec",
+    "acb_calc_integrate_taylor",
+    "acb_calc_integrate_taylor_prec",
+    "acb_calc_integrate_opt_init",
+    "acb_calc_integrate_opt_init_prec",
+    "acb_calc_cauchy_bound",
+    "acb_calc_cauchy_bound_prec",
 ]

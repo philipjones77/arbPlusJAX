@@ -1,0 +1,10 @@
+acf_approx_div
+acf_approx_dot
+acf_approx_inv
+acf_approx_sqrt
+acf_imag_ptr
+acf_neg
+acf_neg_round
+acf_real_ptr
+acf_set
+acf_sub

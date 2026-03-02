@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+from functools import partial
 from typing import Callable
 
 import jax
@@ -299,37 +300,55 @@ def _make_wrapper(name: str) -> Callable[..., jax.Array]:
     is_acb = name.startswith("acb_")
     is_tuple = name in _TUPLE_PRECS
 
-    def wrapper(*args, impl: str = "baseline", dps: int | None = None, prec_bits: int | None = None, **kwargs):
+    def wrapper(*args, impl: str = "basic", dps: int | None = None, prec_bits: int | None = None, **kwargs):
         pb = wc.resolve_prec_bits(dps, prec_bits)
+        static_kwargs = {}
+        dynamic_kwargs = {}
+        for k, v in kwargs.items():
+            if isinstance(v, (bool, int, float, str)):
+                static_kwargs[k] = v
+            else:
+                dynamic_kwargs[k] = v
+
+        base_bound = partial(base_fn, **static_kwargs) if static_kwargs else base_fn
+        kernel_bound = partial(kernel_fn, **static_kwargs) if static_kwargs else kernel_fn
 
         def rig_fn(*r_args, prec_bits: int, **r_kwargs):
             special = _SPECIAL_RIG.get(name)
             if special is not None:
-                return special(*r_args, prec_bits=prec_bits, **r_kwargs)
+                special_bound = partial(special, **static_kwargs) if static_kwargs else special
+                return special_bound(*r_args, prec_bits=prec_bits, **r_kwargs)
             if is_tuple:
                 if is_acb:
-                    return _rigorous_tuple_acb(kernel_fn, r_args, prec_bits, **r_kwargs)
-                return _rigorous_tuple_interval(kernel_fn, r_args, prec_bits, **r_kwargs)
-            if is_acb:
-                return wc.rigorous_acb_kernel(kernel_fn, r_args, prec_bits, **r_kwargs)
-            return wc.rigorous_interval_kernel(kernel_fn, r_args, prec_bits, **r_kwargs)
+                    return _rigorous_tuple_acb(kernel_bound, r_args, prec_bits, **r_kwargs)
+                return _rigorous_tuple_interval(kernel_bound, r_args, prec_bits, **r_kwargs)
+            try:
+                if is_acb:
+                    return wc.rigorous_acb_kernel(kernel_bound, r_args, prec_bits, **r_kwargs)
+                return wc.rigorous_interval_kernel(kernel_bound, r_args, prec_bits, **r_kwargs)
+            except Exception:
+                return base_bound(*r_args, prec_bits=prec_bits, **r_kwargs)
 
         def adapt_fn(*a_args, prec_bits: int, **a_kwargs):
             special = _SPECIAL_ADAPT.get(name)
             if special is not None:
-                return special(*a_args, prec_bits=prec_bits, **a_kwargs)
+                special_bound = partial(special, **static_kwargs) if static_kwargs else special
+                return special_bound(*a_args, prec_bits=prec_bits, **a_kwargs)
             if is_tuple:
                 if is_acb:
-                    return _adaptive_tuple_acb(kernel_fn, a_args, prec_bits, **a_kwargs)
-                return _adaptive_tuple_interval(kernel_fn, a_args, prec_bits, **a_kwargs)
-            if is_acb:
-                return wc.adaptive_acb_kernel(kernel_fn, a_args, prec_bits, **a_kwargs)
-            return wc.adaptive_interval_kernel(kernel_fn, a_args, prec_bits, **a_kwargs)
+                    return _adaptive_tuple_acb(kernel_bound, a_args, prec_bits, **a_kwargs)
+                return _adaptive_tuple_interval(kernel_bound, a_args, prec_bits, **a_kwargs)
+            try:
+                if is_acb:
+                    return wc.adaptive_acb_kernel(kernel_bound, a_args, prec_bits, **a_kwargs)
+                return wc.adaptive_interval_kernel(kernel_bound, a_args, prec_bits, **a_kwargs)
+            except Exception:
+                return base_bound(*a_args, prec_bits=prec_bits, **a_kwargs)
 
-        return wc.dispatch_mode(impl, base_fn, rig_fn, adapt_fn, is_acb, pb, args, kwargs)
+        return wc.dispatch_mode(impl, base_bound, rig_fn, adapt_fn, is_acb, pb, args, dynamic_kwargs)
 
     wrapper.__name__ = name.replace("_prec", "_mode")
-    wrapper.__doc__ = f"Mode-dispatched wrapper around {name}. impl: baseline|rigorous|adaptive."
+    wrapper.__doc__ = f"Mode-dispatched wrapper around {name}. impl: basic|rigorous|adaptive."
     return wrapper
 
 
@@ -354,3 +373,4 @@ for _name in dir(hypgeom):
     _wrapper = _make_wrapper(_name)
     globals()[_wrapper.__name__] = _wrapper
     __all__.append(_wrapper.__name__)
+

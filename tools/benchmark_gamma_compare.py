@@ -72,7 +72,7 @@ def main() -> None:
 
     hyp = load_c_libs(Path(args.arb_repo))
 
-    # C baseline (truth)
+    # C basic (truth)
     c_boxes = np.zeros((args.iters, 2), dtype=np.float64)
     t0 = time.perf_counter()
     for i in range(args.iters):
@@ -102,7 +102,7 @@ def main() -> None:
     base_fn = vec_mid(hypgeom.arb_hypgeom_gamma)
     rig_fn = vec_mid(ball_wrappers.arb_ball_gamma)
     adapt_fn = vec_mid(ball_wrappers.arb_ball_gamma_adaptive)
-    mp_mode_fn = vec_mid(lambda x: baseline_wrappers.arb_gamma_mp(x, mode="baseline", dps=50))
+    mp_mode_fn = vec_mid(lambda x: baseline_wrappers.arb_gamma_mp(x, mode="basic", dps=50))
 
     # warmup
     base_fn(x_jax).block_until_ready()
@@ -144,7 +144,7 @@ def main() -> None:
     for name, vals, t in [
         ("C", c_mid, t_c),
         ("mpmath", mp_vals, t_mp),
-        ("jax_baseline", base_vals, t_base),
+        ("jax_basic", base_vals, t_base),
         ("jax_rigorous", rig_vals, t_rig),
         ("jax_adaptive", adapt_vals, t_adapt),
         ("jax_mp_mode", mp_mode_vals, t_mp_mode),

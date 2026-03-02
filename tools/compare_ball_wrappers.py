@@ -96,7 +96,7 @@ def main() -> None:
     log_x = sample_interval(log_range)
     gam_x = sample_interval(gamma_range)
 
-    # JAX baseline
+    # JAX basic
     def jax_eval(fn, xs):
         return np.array([fn(_interval(a, b)) for a, b in xs])
 

@@ -49,8 +49,10 @@ def dispatch_mode(
     args: tuple,
     kwargs: dict,
 ) -> jax.Array:
-    checks.check_in_set(impl, ("baseline", "rigorous", "adaptive"), "wrappers_common.impl")
     if impl == "baseline":
+        impl = "basic"
+    checks.check_in_set(impl, ("basic", "rigorous", "adaptive"), "wrappers_common.impl")
+    if impl == "basic":
         return base_fn(*args, prec_bits=prec_bits, **kwargs)
     if impl == "rigorous":
         if rig_fn is not None:
@@ -106,6 +108,13 @@ def _box_from_mid(mid: jax.Array) -> jax.Array:
     return acb_core.acb_box(di.interval(re, re), di.interval(im, im))
 
 
+def _jacobian_best(f, x: jax.Array, out_size: int) -> jax.Array:
+    # Use forward mode when inputs are fewer than outputs, else reverse mode.
+    if int(x.size) <= int(out_size):
+        return jax.jacfwd(f)(x)
+    return jax.jacrev(f)(x)
+
+
 def rigorous_interval_kernel(
     fn,
     interval_args: tuple[jax.Array, ...],
@@ -132,7 +141,7 @@ def rigorous_interval_kernel(
     if y0_flat.size == 0:
         return di.interval(y0, y0)
 
-    jac = jax.jacfwd(f_flat)(mid_vec)
+    jac = _jacobian_best(f_flat, mid_vec, int(y0_flat.size))
     jac_flat = jnp.reshape(jac, (y0_flat.size, mid_vec.size))
     bound = jnp.sum(jnp.abs(jac_flat) * rad_vec[None, :], axis=-1)
     eps = jnp.exp2(-jnp.float64(prec_bits))
@@ -223,7 +232,7 @@ def rigorous_acb_kernel(
         z = f_flat(vec)
         return jnp.stack([jnp.real(z), jnp.imag(z)], axis=-1)
 
-    jac = jax.jacfwd(f_stack)(mid_vec)
+    jac = _jacobian_best(f_stack, mid_vec, int(z0_re.size * 2))
     jac = jnp.reshape(jac, (z0_re.size, 2, mid_vec.size))
     bound_re = jnp.sum(jnp.abs(jac[:, 0, :]) * rad_vec[None, :], axis=-1)
     bound_im = jnp.sum(jnp.abs(jac[:, 1, :]) * rad_vec[None, :], axis=-1)

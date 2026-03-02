@@ -7,6 +7,7 @@ import jax.numpy as jnp
 
 from . import acb_core
 from . import double_interval as di
+from . import elementary as el
 from . import core_wrappers
 
 jax.config.update("jax_enable_x64", True)
@@ -43,7 +44,7 @@ def acb_elliptic_k(m: jax.Array) -> jax.Array:
     mm = acb_core.acb_midpoint(m)
     k = jnp.sqrt(1.0 - mm)
     agm = _agm(1.0 + 0.0j, k, iters=8)
-    v = 0.5 * jnp.pi / agm
+    v = el.HALF_PI / agm
     finite = jnp.isfinite(jnp.real(v)) & jnp.isfinite(jnp.imag(v))
     out = _acb_from_complex(v)
     return jnp.where(finite[..., None], out, _full_box_like(m))
@@ -54,7 +55,7 @@ def acb_elliptic_e(m: jax.Array) -> jax.Array:
     mm = acb_core.acb_midpoint(m)
     k = jnp.sqrt(1.0 - mm)
     agm = _agm(1.0 + 0.0j, k, iters=8)
-    v = 0.5 * jnp.pi * agm
+    v = el.HALF_PI * agm
     finite = jnp.isfinite(jnp.real(v)) & jnp.isfinite(jnp.imag(v))
     out = _acb_from_complex(v)
     return jnp.where(finite[..., None], out, _full_box_like(m))
@@ -71,7 +72,7 @@ def acb_elliptic_k_rigorous(m: jax.Array, iters: int = 8) -> jax.Array:
         b_next = core_wrappers.acb_sqrt_mode(acb_core.acb_mul(a, b), impl="rigorous", prec_bits=di.DEFAULT_PREC_BITS)
         a, b = a_next, b_next
     denom = a
-    num = acb_core.acb_box(di.interval(jnp.pi * 0.5, jnp.pi * 0.5), di.interval(0.0, 0.0))
+    num = acb_core.acb_box(di.interval(el.HALF_PI, el.HALF_PI), di.interval(0.0, 0.0))
     out = acb_core.acb_div(num, denom)
     finite = jnp.isfinite(acb_core.acb_real(out)[..., 0]) & jnp.isfinite(acb_core.acb_real(out)[..., 1])
     finite = finite & jnp.isfinite(acb_core.acb_imag(out)[..., 0]) & jnp.isfinite(acb_core.acb_imag(out)[..., 1])
@@ -88,7 +89,7 @@ def acb_elliptic_e_rigorous(m: jax.Array, iters: int = 8) -> jax.Array:
         a_next = acb_core.acb_mul(acb_core.acb_add(a, b), acb_core.acb_box(di.interval(0.5, 0.5), di.interval(0.0, 0.0)))
         b_next = core_wrappers.acb_sqrt_mode(acb_core.acb_mul(a, b), impl="rigorous", prec_bits=di.DEFAULT_PREC_BITS)
         a, b = a_next, b_next
-    num = acb_core.acb_box(di.interval(jnp.pi * 0.5, jnp.pi * 0.5), di.interval(0.0, 0.0))
+    num = acb_core.acb_box(di.interval(el.HALF_PI, el.HALF_PI), di.interval(0.0, 0.0))
     out = acb_core.acb_mul(num, a)
     finite = jnp.isfinite(acb_core.acb_real(out)[..., 0]) & jnp.isfinite(acb_core.acb_real(out)[..., 1])
     finite = finite & jnp.isfinite(acb_core.acb_imag(out)[..., 0]) & jnp.isfinite(acb_core.acb_imag(out)[..., 1])

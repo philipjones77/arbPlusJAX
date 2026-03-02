@@ -7,6 +7,7 @@ import jax.numpy as jnp
 
 from . import acb_core
 from . import double_interval as di
+from . import elementary as el
 from . import core_wrappers
 
 jax.config.update("jax_enable_x64", True)
@@ -30,7 +31,7 @@ def _acb_from_complex(z: jax.Array) -> jax.Array:
 def acb_modular_j(tau: jax.Array) -> jax.Array:
     tau = acb_core.as_acb_box(tau)
     t = acb_core.acb_midpoint(tau)
-    q = jnp.exp(2j * jnp.pi * t)
+    q = jnp.exp(2j * el.PI * t)
     qnorm = jnp.real(q) ** 2 + jnp.imag(q) ** 2
     v = 1.0 / q + 744.0 + 196884.0 * q + 21493760.0 * q * q
     finite = jnp.isfinite(jnp.real(v)) & jnp.isfinite(jnp.imag(v)) & (qnorm != 0.0)
@@ -40,7 +41,7 @@ def acb_modular_j(tau: jax.Array) -> jax.Array:
 
 def acb_modular_j_rigorous(tau: jax.Array) -> jax.Array:
     tau = acb_core.as_acb_box(tau)
-    coeff = acb_core.acb_box(di.interval(0.0, 0.0), di.interval(2.0 * jnp.pi, 2.0 * jnp.pi))
+    coeff = acb_core.acb_box(di.interval(0.0, 0.0), di.interval(el.TWO_PI, el.TWO_PI))
     q = core_wrappers.acb_exp_mode(acb_core.acb_mul(tau, coeff), impl="rigorous", prec_bits=di.DEFAULT_PREC_BITS)
     qinv = acb_core.acb_div(acb_core.acb_one(), q)
     term = acb_core.acb_add(acb_core.acb_add(qinv, acb_core.acb_box(di.interval(744.0, 744.0), di.interval(0.0, 0.0))),
