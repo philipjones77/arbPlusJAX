@@ -4,6 +4,7 @@ import argparse
 import ctypes
 import json
 import os
+import shlex
 import subprocess
 import sys
 import time
@@ -399,6 +400,54 @@ def _eval_jax_point_batch(name: str, *xs: np.ndarray):
     return api.eval_point_batch(name, *arrs)
 
 
+def _split_command(cmd: str) -> list[str]:
+    if not cmd.strip():
+        return []
+    return shlex.split(cmd, posix=(platform.system().lower() != "windows"))
+
+
+def _boost_eval(
+    boost_cmd: str,
+    fn_name: str,
+    x: np.ndarray,
+    nu: np.ndarray | None = None,
+    z: np.ndarray | None = None,
+) -> tuple[np.ndarray | None, str]:
+    argv = _split_command(boost_cmd)
+    if not argv:
+        return None, "boost_command_empty"
+    payload: dict[str, Any] = {"function": fn_name, "x": x.tolist()}
+    if nu is not None and z is not None:
+        payload["nu"] = nu.tolist()
+        payload["z"] = z.tolist()
+    try:
+        proc = subprocess.run(
+            argv,
+            input=json.dumps(payload),
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+    except Exception as exc:
+        return None, f"boost_launch_error: {exc}"
+    if proc.returncode != 0:
+        stderr = proc.stderr.strip()
+        return None, f"boost_nonzero_exit({proc.returncode}): {stderr[:240]}"
+    stdout = proc.stdout.strip()
+    if not stdout:
+        return None, "boost_empty_output"
+    try:
+        vals = json.loads(stdout)
+        arr = np.asarray(vals, dtype=np.float64)
+    except Exception as exc:
+        return None, f"boost_parse_error: {exc}"
+    if arr.ndim != 1:
+        return None, "boost_output_must_be_1d_array"
+    if arr.shape[0] != x.shape[0]:
+        return None, f"boost_length_mismatch: got {arr.shape[0]} expected {x.shape[0]}"
+    return arr, ""
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Cross-backend benchmark harness.")
     parser.add_argument("--samples", type=int, default=2000)
@@ -411,6 +460,12 @@ def main() -> int:
     parser.add_argument("--scipy-repo", type=str, default=os.getenv("SCIPY_REPO", ""))
     parser.add_argument("--jax-repo", type=str, default=os.getenv("JAX_REPO", ""))
     parser.add_argument("--mpmath-repo", type=str, default=os.getenv("MPMATH_REPO", ""))
+    parser.add_argument(
+        "--boost-ref-cmd",
+        type=str,
+        default=os.getenv("BOOST_REF_CMD", ""),
+        help="Optional command for Boost baseline. Reads JSON from stdin and prints JSON array to stdout.",
+    )
     parser.add_argument("--wolfram-cloud-url", type=str, default=os.getenv("WOLFRAM_CLOUD_URL", ""))
     parser.add_argument("--wolfram-windows-dir", type=str, default=os.getenv("WOLFRAM_WINDOWS_DIR", ""))
     parser.add_argument("--wolfram-linux-dir", type=str, default=os.getenv("WOLFRAM_LINUX_DIR", ""))
@@ -425,7 +480,7 @@ def main() -> int:
     _maybe_add_repo(args.jax_repo)
     _maybe_add_repo(args.mpmath_repo)
 
-    from tools.bench_registry import FUNCTIONS, by_name
+    from benchmarks.bench_registry import FUNCTIONS, by_name
 
     fn_filter = None
     if args.functions:
@@ -704,6 +759,47 @@ def main() -> int:
                             "notes": "",
                         })
 
+                if args.boost_ref_cmd:
+                    t0 = time.perf_counter()
+                    if is_bivariate:
+                        y, boost_note = _boost_eval(args.boost_ref_cmd, spec.name, x, nu=nu, z=z)
+                    else:
+                        y, boost_note = _boost_eval(args.boost_ref_cmd, spec.name, x)
+                    t1 = time.perf_counter()
+                    if y is not None:
+                        mean_abs_err = ""
+                        max_abs_err = ""
+                        containment_rate = ""
+                        if c_out is not None:
+                            c_mid = _interval_mid(c_out)
+                            err = np.abs(y - c_mid)
+                            mean_abs_err = float(np.mean(err))
+                            max_abs_err = float(np.max(err))
+                            containment_rate = float(np.mean(_contains(c_out, y)))
+                        results.append({
+                            "function": spec.name,
+                            "backend": "boost",
+                            "samples": samples,
+                            "mean_abs_err": mean_abs_err,
+                            "max_abs_err": max_abs_err,
+                            "containment_rate": containment_rate,
+                            "mean_width": "",
+                            "time_ms": (t1 - t0) * 1e3,
+                            "notes": "",
+                        })
+                    else:
+                        results.append({
+                            "function": spec.name,
+                            "backend": "boost",
+                            "samples": samples,
+                            "mean_abs_err": "",
+                            "max_abs_err": "",
+                            "containment_rate": "",
+                            "mean_width": "",
+                            "time_ms": "",
+                            "notes": boost_note,
+                        })
+
                 if wolfram_local is not None:
                     t0 = time.perf_counter()
                     log_path = run_outdir / f"mathematica_local_{spec.name}.log"
@@ -796,6 +892,7 @@ def main() -> int:
                 "dps": args.dps,
                 "prec_bits": args.prec_bits,
                 "c_ref_dir": str(c_ref_dir) if c_ref_dir else "",
+                "boost_ref_cmd": args.boost_ref_cmd,
                 "versions": _load_versions(),
             }
 
@@ -817,7 +914,7 @@ def main() -> int:
 
             (run_outdir / "README.md").write_text(
                 "# Benchmark Run\n\n"
-                "This folder contains benchmark outputs produced by tools/bench_harness.py.\n"
+                "This folder contains benchmark outputs produced by benchmarks/bench_harness.py.\n"
             )
 
             sweep_runs.append({"samples": samples, "seed": seed, "path": str(run_outdir)})
@@ -829,3 +926,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+

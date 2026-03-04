@@ -10,6 +10,7 @@ from pathlib import Path
 ALLOWED_DIRS = {
     "src",
     "docs",
+    "benchmarks",
     "examples",
     "notebooks",
     "tests",
@@ -87,7 +88,7 @@ def resolve_output_path(root: Path, output: str | None) -> Path:
     repo_name = root.name
     if output is None:
         stamp = dt.date.today().isoformat()
-        out = (root / "dist" / f"{repo_name}_source_{stamp}.zip").resolve()
+        out = (root / "_bundles" / f"{repo_name}_source_{stamp}.zip").resolve()
     else:
         out = (root / output).resolve()
     if not is_valid_source_zip_name(out.name, repo_name):

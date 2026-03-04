@@ -48,7 +48,7 @@ Last updated: 2026-02-25T03:51:38Z
 -- Coulomb and certain jet/series helpers still use midpoint Taylor coefficients with conservative coefficient inflation.
 ## Benchmarks
 
-- JAX-only benchmarks: `tools/benchmark_hypgeom_extra.py`
+- JAX-only benchmarks: `benchmarks/benchmark_hypgeom_extra.py`
 - This is not a full Arb replacement; it covers the hypergeometric subset in `hypgeom_ref` plus these extras.
 - Bessel functions are series-based; accuracy degrades for large order/argument.
 

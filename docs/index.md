@@ -17,6 +17,7 @@ Top-level docs:
 - `jax_setup.md`
 - `precision.md`
 - `benchmarks.md`
+- `benchmark_process.md`
 - `audit.md`
 - `todo.md`
 

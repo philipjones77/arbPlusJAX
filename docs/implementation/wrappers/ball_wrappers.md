@@ -51,7 +51,7 @@ For convenience, see `baseline_wrappers.*_mp` which lets you select:
 
 ## Comparison
 
-Use `tools/compare_ball_wrappers.py` to compare:
+Use `benchmarks/compare_ball_wrappers.py` to compare:
 
 - basic JAX interval wrappers
 - rigorous ball wrappers

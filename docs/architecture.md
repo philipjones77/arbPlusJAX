@@ -69,7 +69,7 @@ Mode dispatch is centralized in `wrappers_common.py` and used by `*_wrappers.py`
 
 - `results/`: benchmark logs and test runs, including timestamps.
 - `tools/`: scripts for comparisons and audits.
-- `tools/bench_harness.py`: uses `arbplusjax.api` to resolve interval/point modes for consistency.
+- `benchmarks/bench_harness.py`: uses `arbplusjax.api` to resolve interval/point modes for consistency.
 
 ## Function Registry
 
