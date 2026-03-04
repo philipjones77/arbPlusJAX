@@ -1,4 +1,4 @@
-Last updated: 2026-03-01T00:00:00Z
+Last updated: 2026-03-04T00:00:00Z
 
 # Arb C build plan (Windows + Ubuntu)
 
@@ -70,11 +70,55 @@ export ARB_LIB_DIR=~/path/to/arb/build
 export LD_LIBRARY_PATH=$ARB_LIB_DIR:$LD_LIBRARY_PATH
 ```
 
-## Running parity tests (any OS)
-From `arbPlusJAX`:
+## Running parity tests (Windows + Linux)
+From `arbPlusJAX`.
+
+Windows PowerShell:
+```powershell
+$env:ARB_C_REF_DIR = "C:\path\to\arbPlusJAX\stuff\migration\c_chassis\build"
+$env:ARBPLUSJAX_RUN_PARITY = "1"
+python -m pytest tests -q -m parity
+```
+
+Linux/macOS (bash/zsh):
+```bash
+export ARB_C_REF_DIR=/path/to/arbPlusJAX/stuff/migration/c_chassis/build
+export LD_LIBRARY_PATH="$ARB_C_REF_DIR:$LD_LIBRARY_PATH"
+export ARBPLUSJAX_RUN_PARITY=1
+python -m pytest tests -q -m parity
+```
+
+## Running benchmark smoke checks (optional, in CI)
+From `arbPlusJAX`.
+
+Windows PowerShell:
+```powershell
+$env:ARBPLUSJAX_RUN_BENCHMARKS = "1"
+python -m pytest benchmarks -q -m benchmark
+```
+
+Linux/macOS (bash/zsh):
+```bash
+export ARBPLUSJAX_RUN_BENCHMARKS=1
+python -m pytest benchmarks -q -m benchmark
+```
+
+For benchmark sweeps (speed/memory/accuracy):
 
 ```
-python -m pytest -q -m "parity"
+python tools/run_benchmarks.py --profile quick
+```
+
+Optional Boost baseline:
+
+```
+python tools/run_benchmarks.py --profile quick --with-boost --boost-ref-cmd "<command>"
+```
+
+Generate a markdown benchmark summary:
+
+```
+python tools/bench_report.py --run results/benchmarks/<run_dir> --out results/benchmarks/<run_dir>/report.md
 ```
 
 ## Notes
@@ -86,6 +130,7 @@ Use:
 ```
 python tools/package_repo.py
 ```
+The archive is written to `_bundles/` by default.
 The generated archive name is enforced as:
 `<repo>_source_YYYY-MM-DD.zip`
 Example: `arbPlusJAX_source_2026-03-01.zip`
@@ -95,3 +140,4 @@ Example: `arbPlusJAX_source_2026-03-01.zip`
 Use API names `CubesselK` or `cubesselk`:
 - point: `api.eval_point("CubesselK", nu, z)`
 - interval: `api.eval_interval("CubesselK", nu_iv, z_iv, mode="basic|rigorous|adaptive")`
+

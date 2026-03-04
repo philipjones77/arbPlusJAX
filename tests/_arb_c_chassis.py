@@ -14,5 +14,5 @@ def get_c_ref_build_dir() -> Path:
     env = os.environ.get("ARB_C_REF_DIR")
     if env:
         return Path(env)
-    # Default to archived migration build output in arbPlusJAX
-    return Path(r"C:\Users\phili\OneDrive\Documents\GitHub\arbPlusJAX\stuff\migration\c_chassis\build")
+    # Default to archived migration build output in this repo.
+    return Path(__file__).resolve().parents[1] / "stuff" / "migration" / "c_chassis" / "build"

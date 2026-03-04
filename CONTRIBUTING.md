@@ -15,7 +15,7 @@ python -m pytest tests -q -m "not parity"
 Parity tests (requires Arb C libs from the Arb workspace):
 
 ```powershell
-$env:arbplusjax_RUN_PARITY = "1"
+$env:ARBPLUSJAX_RUN_PARITY = "1"
 python -m pytest tests -q -m parity
 ```
 
