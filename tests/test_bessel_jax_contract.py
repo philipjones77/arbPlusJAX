@@ -9,6 +9,55 @@ from arbplusjax import hypgeom
 from tests._test_checks import _check
 
 
+_REAL_POINT_VARIANTS = {
+    "j": lambda nu, z: bk.real_bessel_eval_j(nu, z),
+    "i": lambda nu, z: bk.real_bessel_eval_i(nu, z),
+    "y": lambda nu, z: bk.real_bessel_eval_y(nu, z),
+    "k": lambda nu, z: bk.real_bessel_eval_k(nu, z),
+    "i_scaled": lambda nu, z: jnp.exp(-z) * bk.real_bessel_eval_i(nu, z),
+    "k_scaled": lambda nu, z: jnp.exp(z) * bk.real_bessel_eval_k(nu, z),
+}
+
+_COMPLEX_POINT_VARIANTS = {
+    "j": lambda nu, z: bk.complex_bessel_series(nu, z, -1.0),
+    "i": lambda nu, z: bk.complex_bessel_series(nu, z, 1.0),
+    "y": lambda nu, z: bk.complex_bessel_y(nu, z),
+    "k": lambda nu, z: bk.complex_bessel_k(nu, z),
+    "i_scaled": lambda nu, z: jnp.exp(-z) * bk.complex_bessel_series(nu, z, 1.0),
+    "k_scaled": lambda nu, z: jnp.exp(z) * bk.complex_bessel_k(nu, z),
+}
+
+_REAL_WRAPPER_VARIANTS = {
+    "j": lambda nu, z: ball_wrappers.arb_ball_bessel_j(nu, z, prec_bits=80),
+    "i": lambda nu, z: ball_wrappers.arb_ball_bessel_i(nu, z, prec_bits=80),
+    "y": lambda nu, z: ball_wrappers.arb_ball_bessel_y(nu, z, prec_bits=80),
+    "k": lambda nu, z: ball_wrappers.arb_ball_bessel_k(nu, z, prec_bits=80),
+    "i_scaled": lambda nu, z: ball_wrappers.arb_ball_bessel_i_scaled(nu, z, prec_bits=80),
+    "k_scaled": lambda nu, z: ball_wrappers.arb_ball_bessel_k_scaled(nu, z, prec_bits=80),
+    "j_adaptive": lambda nu, z: ball_wrappers.arb_ball_bessel_j_adaptive(nu, z, prec_bits=80, samples=5),
+    "i_adaptive": lambda nu, z: ball_wrappers.arb_ball_bessel_i_adaptive(nu, z, prec_bits=80, samples=5),
+    "y_adaptive": lambda nu, z: ball_wrappers.arb_ball_bessel_y_adaptive(nu, z, prec_bits=80, samples=5),
+    "k_adaptive": lambda nu, z: ball_wrappers.arb_ball_bessel_k_adaptive(nu, z, prec_bits=80, samples=5),
+    "i_scaled_adaptive": lambda nu, z: ball_wrappers.arb_ball_bessel_i_scaled_adaptive(nu, z, prec_bits=80, samples=5),
+    "k_scaled_adaptive": lambda nu, z: ball_wrappers.arb_ball_bessel_k_scaled_adaptive(nu, z, prec_bits=80, samples=5),
+}
+
+_COMPLEX_WRAPPER_VARIANTS = {
+    "j": lambda nu, z: ball_wrappers.acb_ball_bessel_j(nu, z, prec_bits=80),
+    "i": lambda nu, z: ball_wrappers.acb_ball_bessel_i(nu, z, prec_bits=80),
+    "y": lambda nu, z: ball_wrappers.acb_ball_bessel_y(nu, z, prec_bits=80),
+    "k": lambda nu, z: ball_wrappers.acb_ball_bessel_k(nu, z, prec_bits=80),
+    "i_scaled": lambda nu, z: ball_wrappers.acb_ball_bessel_i_scaled(nu, z, prec_bits=80),
+    "k_scaled": lambda nu, z: ball_wrappers.acb_ball_bessel_k_scaled(nu, z, prec_bits=80),
+    "j_adaptive": lambda nu, z: ball_wrappers.acb_ball_bessel_j_adaptive(nu, z, prec_bits=80, samples=5),
+    "i_adaptive": lambda nu, z: ball_wrappers.acb_ball_bessel_i_adaptive(nu, z, prec_bits=80, samples=5),
+    "y_adaptive": lambda nu, z: ball_wrappers.acb_ball_bessel_y_adaptive(nu, z, prec_bits=80, samples=5),
+    "k_adaptive": lambda nu, z: ball_wrappers.acb_ball_bessel_k_adaptive(nu, z, prec_bits=80, samples=5),
+    "i_scaled_adaptive": lambda nu, z: ball_wrappers.acb_ball_bessel_i_scaled_adaptive(nu, z, prec_bits=80, samples=5),
+    "k_scaled_adaptive": lambda nu, z: ball_wrappers.acb_ball_bessel_k_scaled_adaptive(nu, z, prec_bits=80, samples=5),
+}
+
+
 def test_bessel_kernels_preserve_float32_and_complex64():
     nu_r = jnp.asarray(0.5, dtype=jnp.float32)
     z_r = jnp.asarray(3.0, dtype=jnp.float32)
@@ -37,6 +86,31 @@ def test_bessel_point_kernels_are_jittable_and_differentiable():
     gi = jax.grad(lambda t: bk.real_bessel_eval_i(nu, t))(z)
     _check(jnp.isfinite(gj))
     _check(jnp.isfinite(gi))
+
+
+def test_bessel_point_kernels_have_universal_real_ad_audit():
+    nu = jnp.asarray(0.4, dtype=jnp.float32)
+    z = jnp.asarray(2.5, dtype=jnp.float32)
+    for name, fn in _REAL_POINT_VARIANTS.items():
+        jit_fn = jax.jit(lambda t, impl=fn: impl(nu, t))
+        y = jit_fn(z)
+        g = jax.grad(lambda t, impl=fn: impl(nu, t))(z)
+        _check(jnp.isfinite(y), f"{name} point value not finite")
+        _check(jnp.isfinite(g), f"{name} point grad not finite")
+
+
+def test_bessel_point_kernels_have_universal_complex_ad_audit():
+    nu = jnp.asarray(0.35 + 0.1j, dtype=jnp.complex64)
+    z0 = jnp.asarray([2.0, 0.3], dtype=jnp.float32)
+
+    for name, fn in _COMPLEX_POINT_VARIANTS.items():
+        def vec(v, impl=fn):
+            z = jnp.asarray(v[0] + 1j * v[1], dtype=jnp.complex64)
+            w = impl(nu, z)
+            return jnp.asarray([jnp.real(w), jnp.imag(w)], dtype=jnp.float32)
+
+        jac = jax.jacfwd(vec)(z0)
+        _check(jnp.all(jnp.isfinite(jac)), f"{name} complex point jacobian not finite")
 
 
 def test_bessel_batch_jit_paths_remain_callable():
@@ -107,41 +181,7 @@ def test_bessel_fixed_batch_matches_padded():
     _check(jnp.allclose(padded, fixed[: nu.shape[0]], equal_nan=True))
 
 
-def test_bessel_ad_audit_real_yk_and_scaled_variants():
-    nu = jnp.asarray(0.4, dtype=jnp.float32)
-    z = jnp.asarray(2.5, dtype=jnp.float32)
-
-    gy = jax.grad(lambda t: bk.real_bessel_eval_y(nu, t))(z)
-    gk = jax.grad(lambda t: bk.real_bessel_eval_k(nu, t))(z)
-    gis = jax.grad(lambda t: jnp.exp(-t) * bk.real_bessel_eval_i(nu, t))(z)
-    gks = jax.grad(lambda t: jnp.exp(t) * bk.real_bessel_eval_k(nu, t))(z)
-    _check(jnp.isfinite(gy))
-    _check(jnp.isfinite(gk))
-    _check(jnp.isfinite(gis))
-    _check(jnp.isfinite(gks))
-
-
-def test_bessel_ad_audit_complex_yk_and_scaled_variants():
-    nu = jnp.asarray(0.35 + 0.1j, dtype=jnp.complex64)
-    z0 = jnp.asarray([2.0, 0.3], dtype=jnp.float32)
-
-    def complex_k_vec(v):
-        z = jnp.asarray(v[0] + 1j * v[1], dtype=jnp.complex64)
-        w = bk.complex_bessel_k(nu, z)
-        return jnp.asarray([jnp.real(w), jnp.imag(w)], dtype=jnp.float32)
-
-    def complex_ks_vec(v):
-        z = jnp.asarray(v[0] + 1j * v[1], dtype=jnp.complex64)
-        w = jnp.exp(z) * bk.complex_bessel_k(nu, z)
-        return jnp.asarray([jnp.real(w), jnp.imag(w)], dtype=jnp.float32)
-
-    jk = jax.jacfwd(complex_k_vec)(z0)
-    jks = jax.jacfwd(complex_ks_vec)(z0)
-    _check(jnp.all(jnp.isfinite(jk)))
-    _check(jnp.all(jnp.isfinite(jks)))
-
-
-def test_bessel_wrapper_audit_real_yk_and_scaled_variants():
+def test_bessel_wrapper_audit_real_is_universal():
     radius = jnp.asarray(0.02, dtype=jnp.float32)
 
     def make_iv(mu):
@@ -153,27 +193,15 @@ def test_bessel_wrapper_audit_real_yk_and_scaled_variants():
     nu0 = jnp.asarray(0.4, dtype=jnp.float32)
     z0 = jnp.asarray(2.5, dtype=jnp.float32)
 
-    fy = jax.jit(lambda t: mid(ball_wrappers.arb_ball_bessel_y(make_iv(nu0), make_iv(t), prec_bits=80)))
-    fk = jax.jit(lambda t: mid(ball_wrappers.arb_ball_bessel_k(make_iv(nu0), make_iv(t), prec_bits=80)))
-    fys = jax.jit(lambda t: mid(ball_wrappers.arb_ball_bessel_y_adaptive(make_iv(nu0), make_iv(t), prec_bits=80, samples=5)))
-    fks = jax.jit(lambda t: mid(ball_wrappers.arb_ball_bessel_k_scaled_adaptive(make_iv(nu0), make_iv(t), prec_bits=80, samples=5)))
-
-    vy = fy(z0)
-    vk = fk(z0)
-    vys = fys(z0)
-    vks = fks(z0)
-    _check(jnp.isfinite(vy))
-    _check(jnp.isfinite(vk))
-    _check(jnp.isfinite(vys))
-    _check(jnp.isfinite(vks))
-
-    gy = jax.grad(lambda t: mid(ball_wrappers.arb_ball_bessel_y(make_iv(nu0), make_iv(t), prec_bits=80)))(z0)
-    gk = jax.grad(lambda t: mid(ball_wrappers.arb_ball_bessel_k(make_iv(nu0), make_iv(t), prec_bits=80)))(z0)
-    _check(jnp.isfinite(gy))
-    _check(jnp.isfinite(gk))
+    for name, fn in _REAL_WRAPPER_VARIANTS.items():
+        jit_fn = jax.jit(lambda t, impl=fn: mid(impl(make_iv(nu0), make_iv(t))))
+        val = jit_fn(z0)
+        grad = jax.grad(lambda t, impl=fn: mid(impl(make_iv(nu0), make_iv(t))))(z0)
+        _check(jnp.isfinite(val), f"{name} wrapper value not finite")
+        _check(jnp.isfinite(grad), f"{name} wrapper grad not finite")
 
 
-def test_bessel_wrapper_audit_complex_yk_and_scaled_variants():
+def test_bessel_wrapper_audit_complex_is_universal():
     r = jnp.asarray(0.02, dtype=jnp.float32)
 
     def make_box(v):
@@ -187,18 +215,9 @@ def test_bessel_wrapper_audit_complex_yk_and_scaled_variants():
     def mid_re_im(box):
         return jnp.asarray([0.5 * (box[0] + box[1]), 0.5 * (box[2] + box[3])], dtype=jnp.float32)
 
-    def ky(v):
-        return mid_re_im(ball_wrappers.acb_ball_bessel_y(nu, make_box(v), prec_bits=80))
+    for name, fn in _COMPLEX_WRAPPER_VARIANTS.items():
+        def vec(v, impl=fn):
+            return mid_re_im(impl(nu, make_box(v)))
 
-    def kk(v):
-        return mid_re_im(ball_wrappers.acb_ball_bessel_k(nu, make_box(v), prec_bits=80))
-
-    def kks(v):
-        return mid_re_im(ball_wrappers.acb_ball_bessel_k_scaled_adaptive(nu, make_box(v), prec_bits=80, samples=5))
-
-    jy = jax.jacfwd(ky)(z0)
-    jk = jax.jacfwd(kk)(z0)
-    jks = jax.jacfwd(kks)(z0)
-    _check(jnp.all(jnp.isfinite(jy)))
-    _check(jnp.all(jnp.isfinite(jk)))
-    _check(jnp.all(jnp.isfinite(jks)))
+        jac = jax.jacfwd(vec)(z0)
+        _check(jnp.all(jnp.isfinite(jac)), f"{name} complex wrapper jacobian not finite")

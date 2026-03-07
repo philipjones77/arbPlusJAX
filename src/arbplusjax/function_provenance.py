@@ -260,13 +260,10 @@ BESSEL_BASES = {
     "besselk_scaled",
 }
 
-BESSEL_POINT_AD_BASES = {
+BESSEL_UNIVERSAL_AD_BASES = {
     "besselj",
-    "besseli",
-}
-
-BESSEL_TARGETED_AD_BASES = {
     "bessely",
+    "besseli",
     "besselk",
     "besseli_scaled",
     "besselk_scaled",
@@ -621,10 +618,8 @@ def _engineering_ad(row: ImplementationEntry) -> str:
     base = row.base_name
     if name.startswith("bdg_"):
         return "partial"
-    if row.category == "arb_like" and base in BESSEL_POINT_AD_BASES:
-        return "point_audited"
-    if row.category == "arb_like" and base in BESSEL_TARGETED_AD_BASES:
-        return "targeted_audit"
+    if row.category == "arb_like" and base in BESSEL_UNIVERSAL_AD_BASES:
+        return "universal_audit"
     if name.startswith("cuda_") and base == "besselk":
         return "inherited"
     if name.startswith("cusf_") and base in BESSEL_BASES:
@@ -661,10 +656,8 @@ def _engineering_note(row: ImplementationEntry) -> str:
     base = row.base_name
     if name.startswith("bdg_"):
         return "Barnes/double-gamma family is dtype-cleaner and less Python-heavy than before, but batch/AD/hardening are still partial."
-    if row.category == "arb_like" and base in BESSEL_POINT_AD_BASES:
-        return "Canonical Bessel family uses shared JAX kernels, caller-side padded fixed-shape batch entry points, and point-path AD audit coverage."
-    if row.category == "arb_like" and base in BESSEL_TARGETED_AD_BASES:
-        return "Canonical Bessel family uses shared JAX kernels, caller-side padded fixed-shape batch entry points, and targeted AD audits away from singular regimes."
+    if row.category == "arb_like" and base in BESSEL_UNIVERSAL_AD_BASES:
+        return "Canonical Bessel family uses shared JAX kernels, caller-side padded fixed-shape batch entry points, and universal AD audits across point and wrapper paths in non-singular regimes."
     if name.startswith("cuda_"):
         return "Alternative path; interval tightening is inherited from canonical Bessel-K wrappers rather than a separate analytic kernel, and batch/AD guarantees come from the canonical family."
     if name.startswith("cusf_"):
