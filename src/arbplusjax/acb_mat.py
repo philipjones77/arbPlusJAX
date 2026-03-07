@@ -7,30 +7,12 @@ import jax.numpy as jnp
 
 from . import acb_core
 from . import double_interval as di
-from . import checks
+from . import mat_common
 
 jax.config.update("jax_enable_x64", True)
 
-
-def _full_box_like(x: jax.Array) -> jax.Array:
-    t = jnp.ones_like(x[..., 0], dtype=jnp.float64)
-    inf = jnp.inf * t
-    return acb_core.acb_box(di.interval(-inf, inf), di.interval(-inf, inf))
-
-
-def _acb_from_complex(z: jax.Array) -> jax.Array:
-    re = jnp.real(z)
-    im = jnp.imag(z)
-    return acb_core.acb_box(
-        di.interval(di._below(re), di._above(re)),
-        di.interval(di._below(im), di._above(im)),
-    )
-
-
 def _as_mat_2x2(x: jax.Array) -> jax.Array:
-    arr = acb_core.as_acb_box(x)
-    checks.check_tail_shape(arr, (2, 2, 4), "acb_mat._as_mat_2x2")
-    return arr
+    return mat_common.as_box_mat_2x2(x, "acb_mat._as_mat_2x2")
 
 
 def acb_mat_2x2_det(a: jax.Array) -> jax.Array:
@@ -40,9 +22,9 @@ def acb_mat_2x2_det(a: jax.Array) -> jax.Array:
     a10 = acb_core.acb_midpoint(a[..., 1, 0, :])
     a11 = acb_core.acb_midpoint(a[..., 1, 1, :])
     det = a00 * a11 - a01 * a10
-    finite = jnp.isfinite(jnp.real(det)) & jnp.isfinite(jnp.imag(det))
-    out = _acb_from_complex(det)
-    return jnp.where(finite[..., None], out, _full_box_like(a[..., 0, 0, :]))
+    finite = mat_common.complex_is_finite(det)
+    out = mat_common.box_from_point(det)
+    return jnp.where(finite[..., None], out, mat_common.full_box_like(a[..., 0, 0, :]))
 
 
 def acb_mat_2x2_trace(a: jax.Array) -> jax.Array:
@@ -50,9 +32,9 @@ def acb_mat_2x2_trace(a: jax.Array) -> jax.Array:
     a00 = acb_core.acb_midpoint(a[..., 0, 0, :])
     a11 = acb_core.acb_midpoint(a[..., 1, 1, :])
     tr = a00 + a11
-    finite = jnp.isfinite(jnp.real(tr)) & jnp.isfinite(jnp.imag(tr))
-    out = _acb_from_complex(tr)
-    return jnp.where(finite[..., None], out, _full_box_like(a[..., 0, 0, :]))
+    finite = mat_common.complex_is_finite(tr)
+    out = mat_common.box_from_point(tr)
+    return jnp.where(finite[..., None], out, mat_common.full_box_like(a[..., 0, 0, :]))
 
 
 def acb_mat_2x2_det_rigorous(a: jax.Array) -> jax.Array:
@@ -62,17 +44,15 @@ def acb_mat_2x2_det_rigorous(a: jax.Array) -> jax.Array:
     a10 = a[..., 1, 0, :]
     a11 = a[..., 1, 1, :]
     det = acb_core.acb_sub(acb_core.acb_mul(a00, a11), acb_core.acb_mul(a01, a10))
-    finite = jnp.isfinite(acb_core.acb_real(det)[..., 0]) & jnp.isfinite(acb_core.acb_real(det)[..., 1])
-    finite = finite & jnp.isfinite(acb_core.acb_imag(det)[..., 0]) & jnp.isfinite(acb_core.acb_imag(det)[..., 1])
-    return jnp.where(finite[..., None], det, _full_box_like(a[..., 0, 0, :]))
+    finite = mat_common.box_is_finite(det)
+    return jnp.where(finite[..., None], det, mat_common.full_box_like(a[..., 0, 0, :]))
 
 
 def acb_mat_2x2_trace_rigorous(a: jax.Array) -> jax.Array:
     a = _as_mat_2x2(a)
     tr = acb_core.acb_add(a[..., 0, 0, :], a[..., 1, 1, :])
-    finite = jnp.isfinite(acb_core.acb_real(tr)[..., 0]) & jnp.isfinite(acb_core.acb_real(tr)[..., 1])
-    finite = finite & jnp.isfinite(acb_core.acb_imag(tr)[..., 0]) & jnp.isfinite(acb_core.acb_imag(tr)[..., 1])
-    return jnp.where(finite[..., None], tr, _full_box_like(a[..., 0, 0, :]))
+    finite = mat_common.box_is_finite(tr)
+    return jnp.where(finite[..., None], tr, mat_common.full_box_like(a[..., 0, 0, :]))
 
 
 @partial(jax.jit, static_argnames=("prec_bits",))
