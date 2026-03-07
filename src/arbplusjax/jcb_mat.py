@@ -11,6 +11,8 @@ Current implemented substrate:
 - point/basic matmul
 - point/basic matvec
 - point/basic solve
+- point/basic triangular_solve
+- point/basic lu
 
 Planned scope beyond this substrate:
 - contour-integral matrix logarithm / roots
@@ -29,6 +31,7 @@ from functools import partial
 
 import jax
 import jax.numpy as jnp
+import jax.scipy.linalg as jsp_linalg
 
 from . import acb_core
 from . import checks
@@ -152,6 +155,42 @@ def jcb_mat_solve_basic(a: jax.Array, b: jax.Array) -> jax.Array:
     return jcb_mat_solve_point(a, b)
 
 
+def jcb_mat_triangular_solve_point(
+    a: jax.Array,
+    b: jax.Array,
+    *,
+    lower: bool,
+    unit_diagonal: bool = False,
+) -> jax.Array:
+    a = jcb_mat_as_box_matrix(a)
+    b = jcb_mat_as_box_vector(b)
+    checks.check_equal(a.shape[-2], b.shape[-2], "jcb_mat.triangular_solve.inner")
+    x = jsp_linalg.solve_triangular(_jcb_mid_matrix(a), _jcb_mid_vector(b), lower=lower, unit_diagonal=unit_diagonal)
+    out = _jcb_point_box(x)
+    finite = jnp.all(jnp.isfinite(jnp.real(x)) & jnp.isfinite(jnp.imag(x)), axis=-1)
+    return jnp.where(finite[..., None, None], out, _full_box_like(out))
+
+
+def jcb_mat_triangular_solve_basic(
+    a: jax.Array,
+    b: jax.Array,
+    *,
+    lower: bool,
+    unit_diagonal: bool = False,
+) -> jax.Array:
+    return jcb_mat_triangular_solve_point(a, b, lower=lower, unit_diagonal=unit_diagonal)
+
+
+def jcb_mat_lu_point(a: jax.Array) -> tuple[jax.Array, jax.Array, jax.Array]:
+    a = jcb_mat_as_box_matrix(a)
+    p, l, u = jsp_linalg.lu(_jcb_mid_matrix(a))
+    return _jcb_point_box(p), _jcb_point_box(l), _jcb_point_box(u)
+
+
+def jcb_mat_lu_basic(a: jax.Array) -> tuple[jax.Array, jax.Array, jax.Array]:
+    return jcb_mat_lu_point(a)
+
+
 @partial(jax.jit, static_argnames=("prec_bits",))
 def jcb_mat_matmul_basic_prec(a: jax.Array, b: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return acb_core.acb_box_round_prec(jcb_mat_matmul_basic(a, b), prec_bits)
@@ -167,9 +206,36 @@ def jcb_mat_solve_basic_prec(a: jax.Array, b: jax.Array, prec_bits: int = di.DEF
     return acb_core.acb_box_round_prec(jcb_mat_solve_basic(a, b), prec_bits)
 
 
+@partial(jax.jit, static_argnames=("prec_bits", "lower", "unit_diagonal"))
+def jcb_mat_triangular_solve_basic_prec(
+    a: jax.Array,
+    b: jax.Array,
+    *,
+    lower: bool,
+    unit_diagonal: bool = False,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return acb_core.acb_box_round_prec(
+        jcb_mat_triangular_solve_basic(a, b, lower=lower, unit_diagonal=unit_diagonal),
+        prec_bits,
+    )
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def jcb_mat_lu_basic_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> tuple[jax.Array, jax.Array, jax.Array]:
+    p, l, u = jcb_mat_lu_basic(a)
+    return (
+        acb_core.acb_box_round_prec(p, prec_bits),
+        acb_core.acb_box_round_prec(l, prec_bits),
+        acb_core.acb_box_round_prec(u, prec_bits),
+    )
+
+
 jcb_mat_matmul_basic_jit = jax.jit(jcb_mat_matmul_basic)
 jcb_mat_matvec_basic_jit = jax.jit(jcb_mat_matvec_basic)
 jcb_mat_solve_basic_jit = jax.jit(jcb_mat_solve_basic)
+jcb_mat_triangular_solve_basic_jit = jax.jit(jcb_mat_triangular_solve_basic, static_argnames=("lower", "unit_diagonal"))
+jcb_mat_lu_basic_jit = jax.jit(jcb_mat_lu_basic)
 
 
 def jcb_mat_logm(*args, **kwargs):
@@ -199,12 +265,20 @@ __all__ = [
     "jcb_mat_matvec_basic",
     "jcb_mat_solve_point",
     "jcb_mat_solve_basic",
+    "jcb_mat_triangular_solve_point",
+    "jcb_mat_triangular_solve_basic",
+    "jcb_mat_lu_point",
+    "jcb_mat_lu_basic",
     "jcb_mat_matmul_basic_prec",
     "jcb_mat_matvec_basic_prec",
     "jcb_mat_solve_basic_prec",
+    "jcb_mat_triangular_solve_basic_prec",
+    "jcb_mat_lu_basic_prec",
     "jcb_mat_matmul_basic_jit",
     "jcb_mat_matvec_basic_jit",
     "jcb_mat_solve_basic_jit",
+    "jcb_mat_triangular_solve_basic_jit",
+    "jcb_mat_lu_basic_jit",
     "jcb_mat_logm",
     "jcb_mat_sqrtm",
     "jcb_mat_rootm",

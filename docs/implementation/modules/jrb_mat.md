@@ -32,19 +32,27 @@ Point mode:
 - `jrb_mat_matmul_point(a, b)`
 - `jrb_mat_matvec_point(a, x)`
 - `jrb_mat_solve_point(a, b)`
+- `jrb_mat_triangular_solve_point(a, b, lower=...)`
+- `jrb_mat_lu_point(a)`
 
 Basic mode:
 - `jrb_mat_matmul_basic(a, b)`
 - `jrb_mat_matvec_basic(a, x)`
 - `jrb_mat_solve_basic(a, b)`
+- `jrb_mat_triangular_solve_basic(a, b, lower=...)`
+- `jrb_mat_lu_basic(a)`
 
 Precision/JIT entry points:
 - `jrb_mat_matmul_basic_prec`
 - `jrb_mat_matvec_basic_prec`
 - `jrb_mat_solve_basic_prec`
+- `jrb_mat_triangular_solve_basic_prec`
+- `jrb_mat_lu_basic_prec`
 - `jrb_mat_matmul_basic_jit`
 - `jrb_mat_matvec_basic_jit`
 - `jrb_mat_solve_basic_jit`
+- `jrb_mat_triangular_solve_basic_jit`
+- `jrb_mat_lu_basic_jit`
 
 ## Current Methodology
 
@@ -55,6 +63,8 @@ Point:
 Basic:
 - `matmul` / `matvec` use interval arithmetic on the canonical `(..., 2)` layout
 - `solve_basic` currently uses midpoint solve plus outward boxing
+- `triangular_solve_basic` currently uses midpoint triangular solve plus outward boxing
+- `lu_basic` currently uses midpoint LU plus outward boxing of `P`, `L`, `U`
 
 This means:
 - `matmul_basic` and `matvec_basic` are genuine interval substrate operations
@@ -69,8 +79,6 @@ Planned matrix-function families:
 - `jrb_mat_signm`
 
 Planned lower-level substrate:
-- `triangular_solve`
-- `lu`
 - `qr`
 - Hessenberg / Schur-compatible reductions
 

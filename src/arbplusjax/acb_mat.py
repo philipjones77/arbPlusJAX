@@ -6,13 +6,109 @@ import jax
 import jax.numpy as jnp
 
 from . import acb_core
+from . import checks
 from . import double_interval as di
 from . import mat_common
 
 jax.config.update("jax_enable_x64", True)
 
+
+def acb_mat_as_matrix(x: jax.Array) -> jax.Array:
+    return mat_common.as_box_matrix(x, "acb_mat.as_matrix")
+
+
+def acb_mat_as_vector(x: jax.Array) -> jax.Array:
+    return mat_common.as_box_vector(x, "acb_mat.as_vector")
+
+
+def acb_mat_shape(a: jax.Array) -> tuple[int, ...]:
+    arr = acb_mat_as_matrix(a)
+    return tuple(int(x) for x in arr.shape)
+
 def _as_mat_2x2(x: jax.Array) -> jax.Array:
     return mat_common.as_box_mat_2x2(x, "acb_mat._as_mat_2x2")
+
+
+def _mid_matrix(a: jax.Array) -> jax.Array:
+    return acb_core.acb_midpoint(acb_mat_as_matrix(a))
+
+
+def _mid_vector(x: jax.Array) -> jax.Array:
+    return acb_core.acb_midpoint(acb_mat_as_vector(x))
+
+
+def acb_mat_matmul(a: jax.Array, b: jax.Array) -> jax.Array:
+    a = acb_mat_as_matrix(a)
+    b = acb_mat_as_matrix(b)
+    checks.check_equal(a.shape[-2], b.shape[-3], "acb_mat.matmul.inner")
+    c = jnp.matmul(_mid_matrix(a), _mid_matrix(b))
+    out = mat_common.box_from_point(c)
+    finite = jnp.all(mat_common.complex_is_finite(c), axis=(-2, -1))
+    return jnp.where(finite[..., None, None, None], out, mat_common.full_box_like(out))
+
+
+def acb_mat_matmul_basic(a: jax.Array, b: jax.Array) -> jax.Array:
+    a = acb_mat_as_matrix(a)
+    b = acb_mat_as_matrix(b)
+    checks.check_equal(a.shape[-2], b.shape[-3], "acb_mat.matmul_basic.inner")
+    prods = acb_core.acb_mul(a[..., :, :, None, :], b[..., None, :, :, :])
+    out = mat_common.box_sum(prods, axis=-2)
+    finite = jnp.all(jnp.isfinite(out), axis=(-3, -2, -1))
+    return jnp.where(finite[..., None, None, None], out, mat_common.full_box_like(out))
+
+
+def acb_mat_matvec(a: jax.Array, x: jax.Array) -> jax.Array:
+    a = acb_mat_as_matrix(a)
+    x = acb_mat_as_vector(x)
+    checks.check_equal(a.shape[-2], x.shape[-2], "acb_mat.matvec.inner")
+    y = jnp.einsum("...ij,...j->...i", _mid_matrix(a), _mid_vector(x))
+    out = mat_common.box_from_point(y)
+    finite = jnp.all(mat_common.complex_is_finite(y), axis=-1)
+    return jnp.where(finite[..., None, None], out, mat_common.full_box_like(out))
+
+
+def acb_mat_matvec_basic(a: jax.Array, x: jax.Array) -> jax.Array:
+    a = acb_mat_as_matrix(a)
+    x = acb_mat_as_vector(x)
+    checks.check_equal(a.shape[-2], x.shape[-2], "acb_mat.matvec_basic.inner")
+    prods = acb_core.acb_mul(a, x[..., None, :, :])
+    out = mat_common.box_sum(prods, axis=-1)
+    finite = jnp.all(jnp.isfinite(out), axis=(-2, -1))
+    return jnp.where(finite[..., None, None], out, mat_common.full_box_like(out))
+
+
+def acb_mat_solve(a: jax.Array, b: jax.Array) -> jax.Array:
+    a = acb_mat_as_matrix(a)
+    b = acb_mat_as_vector(b)
+    checks.check_equal(a.shape[-2], b.shape[-2], "acb_mat.solve.inner")
+    x = jnp.linalg.solve(_mid_matrix(a), _mid_vector(b))
+    out = mat_common.box_from_point(x)
+    finite = jnp.all(mat_common.complex_is_finite(x), axis=-1)
+    return jnp.where(finite[..., None, None], out, mat_common.full_box_like(out))
+
+
+def acb_mat_solve_basic(a: jax.Array, b: jax.Array) -> jax.Array:
+    return acb_mat_solve(a, b)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def acb_mat_matmul_prec(a: jax.Array, b: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_mat_matmul(a, b), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def acb_mat_matvec_prec(a: jax.Array, x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_mat_matvec(a, x), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def acb_mat_solve_prec(a: jax.Array, b: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_mat_solve(a, b), prec_bits)
+
+
+acb_mat_matmul_jit = jax.jit(acb_mat_matmul)
+acb_mat_matvec_jit = jax.jit(acb_mat_matvec)
+acb_mat_solve_jit = jax.jit(acb_mat_solve)
 
 
 def acb_mat_2x2_det(a: jax.Array) -> jax.Array:
@@ -96,6 +192,21 @@ acb_mat_2x2_trace_batch_prec_jit = jax.jit(acb_mat_2x2_trace_batch_prec, static_
 
 
 __all__ = [
+    "acb_mat_as_matrix",
+    "acb_mat_as_vector",
+    "acb_mat_shape",
+    "acb_mat_matmul",
+    "acb_mat_matmul_basic",
+    "acb_mat_matvec",
+    "acb_mat_matvec_basic",
+    "acb_mat_solve",
+    "acb_mat_solve_basic",
+    "acb_mat_matmul_prec",
+    "acb_mat_matvec_prec",
+    "acb_mat_solve_prec",
+    "acb_mat_matmul_jit",
+    "acb_mat_matvec_jit",
+    "acb_mat_solve_jit",
     "acb_mat_2x2_det",
     "acb_mat_2x2_trace",
     "acb_mat_2x2_det_rigorous",

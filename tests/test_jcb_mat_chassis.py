@@ -97,3 +97,23 @@ def test_matvec_solve_jit_grad_and_precision():
 
     g = jax.grad(loss)(jnp.asarray(3.0, dtype=jnp.float64))
     _check(bool(jnp.isfinite(g)))
+
+
+def test_triangular_solve_and_lu_substrate():
+    a = _mat2(2.0 + 0.0j, 0.0 + 0.0j, 1.0 + 1.0j, 3.0 + 0.0j)
+    rhs = _vec2(4.0 + 0.0j, 10.0 + 2.0j)
+    sol = jcb_mat.jcb_mat_triangular_solve_basic_jit(a, rhs, lower=True)
+    _check(sol.shape == (2, 4))
+    expected = jnp.asarray([2.0 + 0.0j, (8.0 + 0.0j) / 3.0], dtype=jnp.complex128)
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(sol), expected)))
+
+    full = _mat2(2.0 + 0.0j, 1.0 + 0.0j, 4.0 + 0.0j, 3.0 + 1.0j)
+    p, l, u = jcb_mat.jcb_mat_lu_basic_jit(full)
+    p_mid = acb_core.acb_midpoint(p)
+    l_mid = acb_core.acb_midpoint(l)
+    u_mid = acb_core.acb_midpoint(u)
+    a_mid = acb_core.acb_midpoint(full)
+    _check(p.shape == (2, 2, 4))
+    _check(l.shape == (2, 2, 4))
+    _check(u.shape == (2, 2, 4))
+    _check(bool(jnp.allclose(p_mid @ a_mid, l_mid @ u_mid)))

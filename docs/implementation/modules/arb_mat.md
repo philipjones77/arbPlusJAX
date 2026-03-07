@@ -12,7 +12,12 @@ Implementation lives in the corresponding `*_wrappers.py` module and uses `impl=
 
 ## Scope
 
-- 2x2 determinant and trace on real interval matrices using midpoint evaluation.
+- canonical real interval matrix substrate for Arb-like matrix work
+- `n x n` layout contracts plus:
+  - `matmul`
+  - `matvec`
+  - `solve`
+- legacy/specialized `2x2` determinant and trace entry points remain present
 
 ## Intended API Surface
 
@@ -21,14 +26,21 @@ Implementation lives in the corresponding `*_wrappers.py` module and uses `impl=
   - `arb_mat_2x2_trace_ref(a)`
   - Batch variants
 - JAX module: `arbplusjax.arb_mat`
+  - `arb_mat_as_matrix(a)` for `(..., n, n, 2)`
+  - `arb_mat_as_vector(x)` for `(..., n, 2)`
+  - `arb_mat_matmul(a, b)` / `arb_mat_matmul_basic(a, b)`
+  - `arb_mat_matvec(a, x)` / `arb_mat_matvec_basic(a, x)`
+  - `arb_mat_solve(a, b)` / `arb_mat_solve_basic(a, b)`
   - `arb_mat_2x2_det(a)`
   - `arb_mat_2x2_trace(a)`
-  - Precision/batch/jit variants
+  - Precision/jit variants
 
 ## Accuracy/Precision Semantics
 
-- Matrix entries interpreted as intervals.
-- Computation uses midpoint matrix then outward rounds.
+- matrix entries are interpreted as intervals
+- `matmul_basic` / `matvec_basic` use interval arithmetic directly
+- `solve_basic` currently uses midpoint solve plus outward boxing
+- `2x2 det/trace` keep their existing midpoint/rigorous split
 
 ## Differentiability
 
@@ -36,10 +48,11 @@ Implementation lives in the corresponding `*_wrappers.py` module and uses `impl=
 
 ## Notes
 
-- Shape contract: `(..., 2, 2, 2)` for matrices.
+- general matrix contract: `(..., n, n, 2)`
+- general vector contract: `(..., n, 2)`
+- legacy 2x2 specialized contract: `(..., 2, 2, 2)`
 
 ## Formulas
 
 - det([[a,b],[c,d]])=ad-bc.
 - trace([[a,b],[c,d]])=a+d.
-

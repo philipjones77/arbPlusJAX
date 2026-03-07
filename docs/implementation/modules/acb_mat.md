@@ -12,7 +12,12 @@ Implementation lives in the corresponding `*_wrappers.py` module and uses `impl=
 
 ## Scope
 
-- 2x2 determinant and trace on complex interval matrices using midpoint evaluation.
+- canonical complex box matrix substrate for Arb-like matrix work
+- `n x n` layout contracts plus:
+  - `matmul`
+  - `matvec`
+  - `solve`
+- legacy/specialized `2x2` determinant and trace entry points remain present
 
 ## Intended API Surface
 
@@ -21,14 +26,21 @@ Implementation lives in the corresponding `*_wrappers.py` module and uses `impl=
   - `acb_mat_2x2_trace_ref(a)`
   - Batch variants
 - JAX module: `arbplusjax.acb_mat`
+  - `acb_mat_as_matrix(a)` for `(..., n, n, 4)`
+  - `acb_mat_as_vector(x)` for `(..., n, 4)`
+  - `acb_mat_matmul(a, b)` / `acb_mat_matmul_basic(a, b)`
+  - `acb_mat_matvec(a, x)` / `acb_mat_matvec_basic(a, x)`
+  - `acb_mat_solve(a, b)` / `acb_mat_solve_basic(a, b)`
   - `acb_mat_2x2_det(a)`
   - `acb_mat_2x2_trace(a)`
-  - Precision/batch/jit variants
+  - Precision/jit variants
 
 ## Accuracy/Precision Semantics
 
-- Matrix entries interpreted as `acb_box_t`.
-- Computation uses midpoint complex matrix then outward rounds.
+- matrix entries are interpreted as complex boxes
+- `matmul_basic` / `matvec_basic` use box arithmetic directly
+- `solve_basic` currently uses midpoint solve plus outward boxing
+- `2x2 det/trace` keep their existing midpoint/rigorous split
 
 ## Differentiability
 
@@ -36,7 +48,9 @@ Implementation lives in the corresponding `*_wrappers.py` module and uses `impl=
 
 ## Notes
 
-- Shape contract: `(..., 2, 2, 4)` for matrices.
+- general matrix contract: `(..., n, n, 4)`
+- general vector contract: `(..., n, 4)`
+- legacy 2x2 specialized contract: `(..., 2, 2, 4)`
 
 ## Formulas
 
@@ -46,4 +60,3 @@ Implementation lives in the corresponding `*_wrappers.py` module and uses `impl=
 ## Implementation Notes
 
 - Uses complex-box arithmetic on entries.
-

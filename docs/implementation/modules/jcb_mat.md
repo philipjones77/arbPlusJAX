@@ -32,19 +32,27 @@ Point mode:
 - `jcb_mat_matmul_point(a, b)`
 - `jcb_mat_matvec_point(a, x)`
 - `jcb_mat_solve_point(a, b)`
+- `jcb_mat_triangular_solve_point(a, b, lower=...)`
+- `jcb_mat_lu_point(a)`
 
 Basic mode:
 - `jcb_mat_matmul_basic(a, b)`
 - `jcb_mat_matvec_basic(a, x)`
 - `jcb_mat_solve_basic(a, b)`
+- `jcb_mat_triangular_solve_basic(a, b, lower=...)`
+- `jcb_mat_lu_basic(a)`
 
 Precision/JIT entry points:
 - `jcb_mat_matmul_basic_prec`
 - `jcb_mat_matvec_basic_prec`
 - `jcb_mat_solve_basic_prec`
+- `jcb_mat_triangular_solve_basic_prec`
+- `jcb_mat_lu_basic_prec`
 - `jcb_mat_matmul_basic_jit`
 - `jcb_mat_matvec_basic_jit`
 - `jcb_mat_solve_basic_jit`
+- `jcb_mat_triangular_solve_basic_jit`
+- `jcb_mat_lu_basic_jit`
 
 ## Current Methodology
 
@@ -55,6 +63,8 @@ Point:
 Basic:
 - `matmul` / `matvec` use box arithmetic in canonical `(..., 4)` layout
 - `solve_basic` currently uses midpoint solve plus outward boxing
+- `triangular_solve_basic` currently uses midpoint triangular solve plus outward boxing
+- `lu_basic` currently uses midpoint LU plus outward boxing of `P`, `L`, `U`
 
 This means:
 - `matmul_basic` and `matvec_basic` are genuine complex-box substrate operations
@@ -69,8 +79,6 @@ Planned matrix-function families:
 - `jcb_mat_signm`
 
 Planned lower-level substrate:
-- `triangular_solve`
-- `lu`
 - `qr`
 - Hessenberg / Schur-compatible reductions
 

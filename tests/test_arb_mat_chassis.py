@@ -47,3 +47,38 @@ def test_precision_semantics_wider_at_lower_precision():
     hi = arb_mat.arb_mat_2x2_det_prec(mat, prec_bits=53)
     lo = arb_mat.arb_mat_2x2_det_prec(mat, prec_bits=20)
     _check(bool(di.contains(lo, hi)))
+
+
+def test_nxn_matmul_matvec_solve():
+    a = jnp.array(
+        [
+            [[1.0, 1.0], [2.0, 2.0], [0.0, 0.0]],
+            [[0.0, 0.0], [3.0, 3.0], [1.0, 1.0]],
+            [[0.0, 0.0], [0.0, 0.0], [4.0, 4.0]],
+        ],
+        dtype=jnp.float64,
+    )
+    b = jnp.array(
+        [
+            [[2.0, 2.0], [0.0, 0.0], [1.0, 1.0]],
+            [[1.0, 1.0], [2.0, 2.0], [0.0, 0.0]],
+            [[0.0, 0.0], [1.0, 1.0], [3.0, 3.0]],
+        ],
+        dtype=jnp.float64,
+    )
+    x = jnp.array([[1.0, 1.0], [2.0, 2.0], [3.0, 3.0]], dtype=jnp.float64)
+
+    mm = arb_mat.arb_mat_matmul_basic(a, b)
+    mv = arb_mat.arb_mat_matvec_basic(a, x)
+    sol = arb_mat.arb_mat_solve_jit(a, mv)
+
+    a_mid = di.midpoint(a)
+    b_mid = di.midpoint(b)
+    x_mid = di.midpoint(x)
+
+    _check(mm.shape == (3, 3, 2))
+    _check(mv.shape == (3, 2))
+    _check(sol.shape == (3, 2))
+    _check(bool(jnp.allclose(di.midpoint(mm), a_mid @ b_mid)))
+    _check(bool(jnp.allclose(di.midpoint(mv), a_mid @ x_mid)))
+    _check(bool(jnp.allclose(di.midpoint(sol), x_mid)))

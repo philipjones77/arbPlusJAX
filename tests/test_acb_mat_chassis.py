@@ -60,3 +60,41 @@ def test_precision_semantics_wider_at_lower_precision():
     lo = acb_mat.acb_mat_2x2_det_prec(mat, prec_bits=20)
     _check(bool(di.contains(acb_core.acb_real(lo), acb_core.acb_real(hi))))
     _check(bool(di.contains(acb_core.acb_imag(lo), acb_core.acb_imag(hi))))
+
+
+def test_nxn_matmul_matvec_solve():
+    a = jnp.array(
+        [
+            [[1.0, 1.0, 0.0, 0.0], [2.0, 2.0, 1.0, 1.0], [0.0, 0.0, 0.0, 0.0]],
+            [[0.0, 0.0, 0.0, 0.0], [3.0, 3.0, 0.0, 0.0], [1.0, 1.0, -1.0, -1.0]],
+            [[0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0], [4.0, 4.0, 0.0, 0.0]],
+        ],
+        dtype=jnp.float64,
+    )
+    b = jnp.array(
+        [
+            [[2.0, 2.0, 0.0, 0.0], [0.0, 0.0, 1.0, 1.0], [1.0, 1.0, 0.0, 0.0]],
+            [[1.0, 1.0, -1.0, -1.0], [2.0, 2.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0]],
+            [[0.0, 0.0, 0.0, 0.0], [1.0, 1.0, 0.0, 0.0], [3.0, 3.0, 0.0, 0.0]],
+        ],
+        dtype=jnp.float64,
+    )
+    x = jnp.array(
+        [[1.0, 1.0, 0.0, 0.0], [2.0, 2.0, -1.0, -1.0], [3.0, 3.0, 1.0, 1.0]],
+        dtype=jnp.float64,
+    )
+
+    mm = acb_mat.acb_mat_matmul_basic(a, b)
+    mv = acb_mat.acb_mat_matvec_basic(a, x)
+    sol = acb_mat.acb_mat_solve_jit(a, mv)
+
+    a_mid = acb_core.acb_midpoint(a)
+    b_mid = acb_core.acb_midpoint(b)
+    x_mid = acb_core.acb_midpoint(x)
+
+    _check(mm.shape == (3, 3, 4))
+    _check(mv.shape == (3, 4))
+    _check(sol.shape == (3, 4))
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(mm), a_mid @ b_mid)))
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(mv), a_mid @ x_mid)))
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(sol), x_mid)))
