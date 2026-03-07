@@ -1,6 +1,18 @@
 from __future__ import annotations
 
-import math
+"""BarnesDoubleGamma.jl-lineage Barnes and double-gamma families.
+
+These functions were ported from `BarnesDoubleGamma.jl`. Under the current
+repo naming policy, non-Arb/FLINT implementation lineages must expose a short
+provider prefix in the public name, so this module exports the `bdg_*` family.
+
+Provenance:
+- classification: alternative
+- module lineage: Julia/BarnesDoubleGamma.jl-derived implementation family
+- naming policy: see docs/function_naming.md
+- registry report: see docs/reports/function_implementation_index.md
+"""
+
 from functools import partial
 
 import jax
@@ -17,94 +29,138 @@ from . import elementary as el
 
 jax.config.update("jax_enable_x64", True)
 
-
+PROVENANCE = {
+    "classification": "alternative",
+    "base_names": ("barnesdoublegamma", "barnesgamma2", "normalizeddoublegamma", "double_sine"),
+    "preferred_prefix": "bdg",
+    "module_lineage": "Julia/BarnesDoubleGamma.jl-derived implementation family",
+    "naming_policy": "docs/function_naming.md",
+    "registry_report": "docs/reports/function_implementation_index.md",
+}
 def _complex_loggamma(z: jax.Array) -> jax.Array:
     return barnesg._complex_loggamma(z)
 
 
 def _digamma(z: jax.Array) -> jax.Array:
-    h = jnp.complex128(1e-6 + 0.0j)
+    cdt = el.complex_dtype_from(z)
+    h = jnp.asarray(1e-6 + 0.0j, dtype=cdt)
     return (_complex_loggamma(z + h) - _complex_loggamma(z - h)) / (2.0 * h)
 
 
 def _trigamma(z: jax.Array) -> jax.Array:
-    h = jnp.complex128(1e-5 + 0.0j)
+    cdt = el.complex_dtype_from(z)
+    h = jnp.asarray(1e-5 + 0.0j, dtype=cdt)
     return (_digamma(z + h) - _digamma(z - h)) / (2.0 * h)
 
 
-def _integrate_trapz(fn, a: float, b: float, n: int) -> jax.Array:
-    xs = jnp.linspace(jnp.float64(a), jnp.float64(b), n)
+def _integrate_trapz(fn, a: jax.Array | float, b: jax.Array | float, n: int) -> jax.Array:
+    dt = jnp.result_type(jnp.asarray(a).dtype, jnp.asarray(b).dtype)
+    if not jnp.issubdtype(dt, jnp.floating):
+        dt = jnp.float32 if dt == jnp.complex64 else jnp.float64
+    xs = jnp.linspace(jnp.asarray(a, dtype=dt), jnp.asarray(b, dtype=dt), n)
     vals = fn(xs)
-    return jnp.trapz(vals, xs)
+    dx = xs[1:] - xs[:-1]
+    return jnp.sum(0.5 * (vals[1:] + vals[:-1]) * dx)
 
 
 def _integrandC(x: jax.Array, tau: jax.Array) -> jax.Array:
-    one_minus_tau = 1.0 - tau
+    rdt = jnp.result_type(jnp.asarray(x).dtype, jnp.asarray(jnp.real(tau)).dtype)
+    one = jnp.asarray(1.0, dtype=rdt)
+    two = jnp.asarray(2.0, dtype=rdt)
+    one_minus_tau = one - tau
     sinh_x = jnp.sinh(x)
     sinh_taux = jnp.sinh(tau * x)
     exp1 = jnp.exp(one_minus_tau * x)
-    exp2 = jnp.exp(-2.0 * x)
+    exp2 = jnp.exp(-two * x)
     exp3 = jnp.exp(x)
-    term1 = exp1 / (2.0 * sinh_x * sinh_taux)
-    term2 = exp2 / (tau * x) * (exp3 / (2.0 * sinh_x) + 1.0 - tau / 2.0)
+    term1 = exp1 / (two * sinh_x * sinh_taux)
+    term2 = exp2 / (tau * x) * (exp3 / (two * sinh_x) + one - tau / two)
     return term1 - term2
 
 
 def _integrandD(x: jax.Array, tau: jax.Array) -> jax.Array:
-    return x * jnp.exp((1.0 - tau) * x) / (jnp.sinh(x) * jnp.sinh(tau * x)) - jnp.exp(-2.0 * x) / (tau * x)
+    rdt = jnp.result_type(jnp.asarray(x).dtype, jnp.asarray(jnp.real(tau)).dtype)
+    one = jnp.asarray(1.0, dtype=rdt)
+    two = jnp.asarray(2.0, dtype=rdt)
+    return x * jnp.exp((one - tau) * x) / (jnp.sinh(x) * jnp.sinh(tau * x)) - jnp.exp(-two * x) / (tau * x)
 
 
 def _modularC(tau: jax.Array, prec_bits: int) -> jax.Array:
+    cdt = el.complex_dtype_from(tau)
+    rdt = el.real_dtype_from_complex_dtype(cdt)
     P = max(int(prec_bits // 2), 8)
-    cutoff = jnp.exp2(-jnp.float64(P) / 3.0)
-    upper = jnp.maximum(20.0, 5.0 * jnp.abs(tau))
+    one = jnp.asarray(1.0, dtype=rdt)
+    two = jnp.asarray(2.0, dtype=rdt)
+    three = jnp.asarray(3.0, dtype=rdt)
+    five = jnp.asarray(5.0, dtype=rdt)
+    six = jnp.asarray(6.0, dtype=rdt)
+    nine = jnp.asarray(9.0, dtype=rdt)
+    twelve = jnp.asarray(12.0, dtype=rdt)
+    twenty = jnp.asarray(20.0, dtype=rdt)
+    two_seventy = jnp.asarray(270.0, dtype=rdt)
+    cutoff = jnp.exp2(-jnp.asarray(P, dtype=rdt) / three)
+    upper = jnp.maximum(twenty, five * jnp.abs(tau))
 
     def fn(x):
         return _integrandC(x, tau)
 
-    val = _integrate_trapz(fn, float(cutoff), float(upper), 256)
-    c0 = (2.0 / tau - 1.5 + tau / 6.0) * cutoff + (5.0 / 12.0 - 1.0 / tau + tau / 12.0) * cutoff ** 2
-    c0 = c0 + (4.0 / (9.0 * tau) - 2.0 / 9.0 + tau / 54.0 - (tau ** 3) / 270.0) * cutoff ** 3
-    return (1.0 / (2.0 * tau)) * jnp.log(2.0 * el.PI) - val - c0
+    val = _integrate_trapz(fn, cutoff, upper, 256)
+    c0 = (two / tau - three / two + tau / six) * cutoff + (five / twelve - one / tau + tau / twelve) * cutoff ** 2
+    c0 = c0 + (jnp.asarray(4.0, dtype=rdt) / (nine * tau) - two / nine + tau / jnp.asarray(54.0, dtype=rdt) - (tau ** 3) / two_seventy) * cutoff ** 3
+    return (one / (two * tau)) * jnp.log(jnp.asarray(2.0 * el.PI, dtype=rdt)) - val - c0
 
 
 def _modularD(tau: jax.Array, prec_bits: int) -> jax.Array:
-    upper = jnp.maximum(20.0, 5.0 * jnp.abs(tau))
+    cdt = el.complex_dtype_from(tau)
+    rdt = el.real_dtype_from_complex_dtype(cdt)
+    upper = jnp.maximum(jnp.asarray(20.0, dtype=rdt), jnp.asarray(5.0, dtype=rdt) * jnp.abs(tau))
 
     def fn(x):
         return _integrandD(x, tau)
 
-    return _integrate_trapz(fn, 1e-8, float(upper), 256)
+    return _integrate_trapz(fn, jnp.asarray(1e-8, dtype=rdt), upper, 256)
 
 
 def _modularcoeff_a(tau: jax.Array, prec_bits: int) -> jax.Array:
+    cdt = el.complex_dtype_from(tau)
+    rdt = el.real_dtype_from_complex_dtype(cdt)
     modc = _modularC(tau, prec_bits)
-    return 0.5 * tau * jnp.log(2.0 * (el.PI * tau)) + 0.5 * jnp.log(tau) - tau * modc
+    half = jnp.asarray(0.5, dtype=rdt)
+    two_pi = jnp.asarray(2.0 * el.PI, dtype=cdt)
+    return half * tau * jnp.log(two_pi * tau) + half * jnp.log(tau) - tau * modc
 
 
 def _modularcoeff_b(tau: jax.Array, prec_bits: int) -> jax.Array:
+    cdt = el.complex_dtype_from(tau)
     modd = _modularD(tau, prec_bits)
+    tau = jnp.asarray(tau, dtype=cdt)
     return -tau * jnp.log(tau) - tau * tau * modd
 
 
 def _evalpoly(z: jax.Array, coeffs: jax.Array) -> jax.Array:
-    acc = jnp.zeros((), dtype=jnp.complex128)
-    for c in coeffs[::-1]:
-        acc = acc * z + c
-    return acc
+    cdt = el.complex_dtype_from(z, coeffs)
+    coeffs = jnp.asarray(coeffs, dtype=cdt)
+
+    def body(i, acc):
+        c = coeffs[coeffs.shape[0] - 1 - i]
+        return acc * z + c
+
+    return lax.fori_loop(0, coeffs.shape[0], body, jnp.zeros((), dtype=cdt))
 
 
 def _polynomial_Pns(M: int, tau_pows, taup1_pows, factorials):
-    coeffs = [jnp.zeros((n,), dtype=jnp.complex128) for n in range(1, M + 1)]
+    cdt = el.complex_dtype_from(tau_pows[0], taup1_pows[0])
+    rdt = el.real_dtype_from_complex_dtype(cdt)
+    coeffs = [jnp.zeros((n,), dtype=cdt) for n in range(1, M + 1)]
     tau_factors = []
     for k in range(1, M + 1):
-        tf = (taup1_pows[k + 1] - 1.0 - tau_pows[k + 1]) / factorials[k + 1] / tau_pows[0]
+        tf = (taup1_pows[k + 1] - jnp.asarray(1.0, dtype=rdt) - tau_pows[k + 1]) / factorials[k + 1] / tau_pows[0]
         tau_factors.append(tf)
     for n in range(1, M + 1):
         c = coeffs[n - 1]
-        c = c.at[n - 1].set(1.0 / factorials[n + 1])
+        c = c.at[n - 1].set(jnp.asarray(1.0, dtype=rdt) / factorials[n + 1])
         for j in range(0, n - 1):
-            acc = 0.0 + 0.0j
+            acc = jnp.asarray(0.0 + 0.0j, dtype=cdt)
             for k in range(1, n - j):
                 acc = acc + tau_factors[k - 1] * coeffs[n - k - 1][j]
             c = c.at[j].set(-acc)
@@ -113,103 +169,117 @@ def _polynomial_Pns(M: int, tau_pows, taup1_pows, factorials):
 
 
 def _rest_RMN(z: jax.Array, tau: jax.Array, M: int, N: int, tau_pows, taup1_pows, Nm_tau_pows, factorials, poly):
-    coeffs_sum = [jnp.zeros((), dtype=jnp.complex128) for _ in range(M + 1)]
-    coeffs_sum[1] = _evalpoly(z, poly[0])
-    for k in range(2, M + 1):
-        coeffs_sum[k] = factorials[k - 1] * _evalpoly(z, poly[k - 1])
+    cdt = el.complex_dtype_from(z, tau)
+    coeffs_sum = [jnp.zeros((), dtype=cdt)]
+    coeffs_sum.extend(factorials[k - 1] * _evalpoly(z, poly[k - 1]) for k in range(1, M + 1))
     m_tau = -tau
-    acc = 0.0 + 0.0j
-    for i in range(M + 1):
-        acc = acc + Nm_tau_pows[i] * coeffs_sum[i]
-    return acc / m_tau
+    coeffs_sum_arr = jnp.stack(coeffs_sum)
+    return jnp.sum(jnp.asarray(Nm_tau_pows, dtype=cdt) * coeffs_sum_arr) / m_tau
 
 
 def _log_barnesdoublegamma_mid(z: jax.Array, tau: jax.Array, prec_bits: int) -> jax.Array:
-    tau = jnp.asarray(tau, dtype=jnp.complex128)
-    z = jnp.asarray(z, dtype=jnp.complex128)
-    M = max(2, int(math.floor(0.5 / math.log(20.0) * max(prec_bits, 32))))
+    cdt = el.complex_dtype_from(z, tau)
+    rdt = el.real_dtype_from_complex_dtype(cdt)
+    tau = jnp.asarray(tau, dtype=cdt)
+    z = jnp.asarray(z, dtype=cdt)
+    M = max(2, int(jnp.floor(0.5 / jnp.log(jnp.float64(20.0)) * max(prec_bits, 32))))
     N = max(20, 50 * M)
 
     logtau = jnp.log(tau)
     moda = _modularcoeff_a(tau, prec_bits)
     modb = _modularcoeff_b(tau, prec_bits)
 
-    m = jnp.arange(1, N + 1, dtype=jnp.float64)
+    m = jnp.arange(1, N + 1, dtype=rdt)
     mt = m * tau
     loggammas = _complex_loggamma(mt)
     digammas = _digamma(mt)
     trigammas = _trigamma(mt)
 
-    zsq2 = 0.5 * z * z
+    zsq2 = jnp.asarray(0.5, dtype=rdt) * z * z
     res = -_complex_loggamma(z) - logtau
     res = res + moda * (z / tau)
     res = res + modb * (zsq2 / (tau * tau))
 
     res = res + jnp.sum(loggammas - _complex_loggamma(z + mt) + z * digammas + zsq2 * trigammas)
 
-    tau_pows = [(-tau) ** (k + 1) for k in range(M + 1)]
-    taup1_pows = [(-tau + 1.0) ** (k + 1) for k in range(M + 1)]
-    Nm_tau_pows = [jnp.ones((), dtype=jnp.complex128)]
-    for i in range(1, M + 1):
-        Nm_tau_pows.append(-(1.0 / (jnp.float64(N) * tau)) * Nm_tau_pows[i - 1])
-    factorials = [jnp.exp(lax.lgamma(jnp.float64(n + 1))) for n in range(M + 2)]
+    k_idx = jnp.arange(1, M + 3, dtype=rdt)
+    tau_pows = (-tau) ** k_idx
+    taup1_pows = (-tau + jnp.asarray(1.0, dtype=rdt)) ** k_idx
+    nm_base = -(jnp.asarray(1.0, dtype=rdt) / (jnp.asarray(N, dtype=rdt) * tau))
+    Nm_tau_pows = jnp.concatenate(
+        [jnp.ones((1,), dtype=cdt), jnp.cumprod(jnp.full((M,), nm_base, dtype=cdt))]
+    )
+    factorials = jnp.exp(lax.lgamma(jnp.arange(1, M + 3, dtype=rdt)))
     poly = _polynomial_Pns(M, tau_pows, taup1_pows, factorials)
     rest = _rest_RMN(z, tau, M, N, tau_pows, taup1_pows, Nm_tau_pows, factorials, poly)
     return res + (z ** 3) * rest
 
 
-def log_barnesdoublegamma(z: jax.Array, tau: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+def bdg_log_barnesdoublegamma(z: jax.Array, tau: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return _log_barnesdoublegamma_mid(z, tau, prec_bits)
 
 
-def barnesdoublegamma(z: jax.Array, tau: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
-    return jnp.exp(log_barnesdoublegamma(z, tau, prec_bits))
+def bdg_barnesdoublegamma(z: jax.Array, tau: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return jnp.exp(bdg_log_barnesdoublegamma(z, tau, prec_bits))
 
 
-def loggamma2(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
-    beta = jnp.asarray(beta, dtype=jnp.complex128)
-    w = jnp.asarray(w, dtype=jnp.complex128)
-    beta = jnp.where(jnp.real(beta - 1.0 / beta) < 0.0, 1.0 / beta, beta)
-    invb = 1.0 / beta
+def bdg_log_barnesgamma2(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    cdt = el.complex_dtype_from(w, beta)
+    rdt = el.real_dtype_from_complex_dtype(cdt)
+    beta = jnp.asarray(beta, dtype=cdt)
+    w = jnp.asarray(w, dtype=cdt)
+    one = jnp.asarray(1.0, dtype=rdt)
+    half = jnp.asarray(0.5, dtype=rdt)
+    beta = jnp.where(jnp.real(beta - one / beta) < 0.0, one / beta, beta)
+    invb = one / beta
     tau = invb * invb
     logb = jnp.log(beta)
-    c1 = 0.5 * invb * jnp.log(2.0 * el.PI)
+    c1 = half * invb * jnp.log(jnp.asarray(2.0 * el.PI, dtype=rdt))
     c2 = -beta - invb
-    l = log_barnesdoublegamma(w / beta, tau, prec_bits)
-    return w * c1 + (0.5 * w * (w + c2) + 1.0) * logb - l
+    l = bdg_log_barnesdoublegamma(w / beta, tau, prec_bits)
+    return w * c1 + (half * w * (w + c2) + one) * logb - l
 
 
-def gamma2(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
-    return jnp.exp(loggamma2(w, beta, prec_bits))
+def bdg_barnesgamma2(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return jnp.exp(bdg_log_barnesgamma2(w, beta, prec_bits))
 
 
-def logdoublegamma(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
-    return loggamma2(w, beta, prec_bits) - loggamma2((beta + 1.0 / beta) / 2.0, beta, prec_bits)
+def bdg_log_normalizeddoublegamma(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    cdt = el.complex_dtype_from(w, beta)
+    rdt = el.real_dtype_from_complex_dtype(cdt)
+    one = jnp.asarray(1.0, dtype=rdt)
+    half = jnp.asarray(0.5, dtype=rdt)
+    return bdg_log_barnesgamma2(w, beta, prec_bits) - bdg_log_barnesgamma2((beta + one / beta) * half, beta, prec_bits)
 
 
-def doublegamma(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
-    return jnp.exp(logdoublegamma(w, beta, prec_bits))
+def bdg_normalizeddoublegamma(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return jnp.exp(bdg_log_normalizeddoublegamma(w, beta, prec_bits))
 
 
-def double_sine(z: jax.Array, b: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
-    b = jnp.asarray(b, dtype=jnp.complex128)
-    z = jnp.asarray(z, dtype=jnp.complex128)
+def bdg_double_sine(z: jax.Array, b: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    cdt = el.complex_dtype_from(z, b)
+    rdt = el.real_dtype_from_complex_dtype(cdt)
+    b = jnp.asarray(b, dtype=cdt)
+    z = jnp.asarray(z, dtype=cdt)
     b2 = b * b
     Nmax = max(4, int(prec_bits // 4))
-    Q = b + 1.0 / b
-    minus_ipiover2 = -1.0j * el.PI / 2.0
-    sixth = (Q * Q + 1.0) / 6.0
-    twopii_binv = 2.0 * el.PI * 1.0j / b
-    twopii_b = 2.0 * el.PI * 1.0j * b
+    one = jnp.asarray(1.0, dtype=rdt)
+    two = jnp.asarray(2.0, dtype=rdt)
+    six = jnp.asarray(6.0, dtype=rdt)
+    Q = b + one / b
+    minus_ipiover2 = -jnp.asarray(1.0j * el.PI / 2.0, dtype=cdt)
+    sixth = (Q * Q + one) / six
+    twopii_binv = jnp.asarray(2.0 * el.PI * 1.0j, dtype=cdt) / b
+    twopii_b = jnp.asarray(2.0 * el.PI * 1.0j, dtype=cdt) * b
     twopii_m_bsq_inv = twopii_binv / b
     twopii_m_b2 = twopii_b * b
 
     res = jnp.exp(minus_ipiover2 * (z * z - Q * z + sixth))
-    res = res / (1.0 - jnp.exp(twopii_b * z))
+    res = res / (one - jnp.exp(twopii_b * z))
 
     def body(m, acc):
-        term_num = 1.0 - jnp.exp(twopii_binv * z - jnp.float64(m + 1) * twopii_m_bsq_inv)
-        term_den = 1.0 - jnp.exp(twopii_b * z + jnp.float64(m + 1) * twopii_m_b2)
+        term_num = one - jnp.exp(twopii_binv * z - jnp.asarray(m + 1, dtype=rdt) * twopii_m_bsq_inv)
+        term_den = one - jnp.exp(twopii_b * z + jnp.asarray(m + 1, dtype=rdt) * twopii_m_b2)
         return acc * (term_num / term_den)
 
     return lax.fori_loop(0, Nmax, body, res)
@@ -225,94 +295,77 @@ def _acb_from_complex(z: jax.Array) -> jax.Array:
     )
 
 
-def acb_log_barnesdoublegamma(z: jax.Array, tau: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
-    zb = acb_core.as_acb_box(z)
-    tb = acb_core.as_acb_box(tau)
-    zmid = acb_core.acb_midpoint(zb)
-    tmid = acb_core.acb_midpoint(tb)
-    return _acb_from_complex(log_barnesdoublegamma(zmid, tmid, prec_bits))
+def _acb_mid_eval2(x: jax.Array, y: jax.Array, fn, prec_bits: int) -> jax.Array:
+    xb = acb_core.as_acb_box(x)
+    yb = acb_core.as_acb_box(y)
+    xmid = acb_core.acb_midpoint(xb)
+    ymid = acb_core.acb_midpoint(yb)
+    return _acb_from_complex(fn(xmid, ymid, prec_bits))
 
 
-def acb_barnesdoublegamma(z: jax.Array, tau: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
-    zb = acb_core.as_acb_box(z)
-    tb = acb_core.as_acb_box(tau)
-    zmid = acb_core.acb_midpoint(zb)
-    tmid = acb_core.acb_midpoint(tb)
-    return _acb_from_complex(barnesdoublegamma(zmid, tmid, prec_bits))
+def bdg_complex_log_barnesdoublegamma(z: jax.Array, tau: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _acb_mid_eval2(z, tau, bdg_log_barnesdoublegamma, prec_bits)
 
 
-def acb_loggamma2(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
-    wb = acb_core.as_acb_box(w)
-    bb = acb_core.as_acb_box(beta)
-    wmid = acb_core.acb_midpoint(wb)
-    bmid = acb_core.acb_midpoint(bb)
-    return _acb_from_complex(loggamma2(wmid, bmid, prec_bits))
+def bdg_complex_barnesdoublegamma(z: jax.Array, tau: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _acb_mid_eval2(z, tau, bdg_barnesdoublegamma, prec_bits)
 
 
-def acb_gamma2(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
-    return _acb_from_complex(gamma2(acb_core.acb_midpoint(w), acb_core.acb_midpoint(beta), prec_bits))
+def bdg_complex_log_barnesgamma2(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _acb_mid_eval2(w, beta, bdg_log_barnesgamma2, prec_bits)
 
 
-def acb_logdoublegamma(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
-    return _acb_from_complex(logdoublegamma(acb_core.acb_midpoint(w), acb_core.acb_midpoint(beta), prec_bits))
+def bdg_complex_barnesgamma2(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _acb_mid_eval2(w, beta, bdg_barnesgamma2, prec_bits)
 
 
-def acb_doublegamma(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
-    return _acb_from_complex(doublegamma(acb_core.acb_midpoint(w), acb_core.acb_midpoint(beta), prec_bits))
+def bdg_complex_log_normalizeddoublegamma(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _acb_mid_eval2(w, beta, bdg_log_normalizeddoublegamma, prec_bits)
 
 
-def acb_double_sine(z: jax.Array, b: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
-    return _acb_from_complex(double_sine(acb_core.acb_midpoint(z), acb_core.acb_midpoint(b), prec_bits))
+def bdg_complex_normalizeddoublegamma(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _acb_mid_eval2(w, beta, bdg_normalizeddoublegamma, prec_bits)
+
+
+def bdg_complex_double_sine(z: jax.Array, b: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _acb_mid_eval2(z, b, bdg_double_sine, prec_bits)
 
 
 def _interval_from_mid(val: jax.Array) -> jax.Array:
     return di.interval(di._below(val), di._above(val))
 
 
-def arb_log_barnesdoublegamma(z: jax.Array, tau: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
-    zm = di.midpoint(di.as_interval(z))
-    tm = di.midpoint(di.as_interval(tau))
-    val = log_barnesdoublegamma(zm, tm, prec_bits)
-    return _interval_from_mid(jnp.real(val))
+def _interval_real_mid_eval2(x: jax.Array, y: jax.Array, fn, prec_bits: int) -> jax.Array:
+    xmid = di.midpoint(di.as_interval(x))
+    ymid = di.midpoint(di.as_interval(y))
+    return _interval_from_mid(jnp.real(fn(xmid, ymid, prec_bits)))
 
 
-def arb_barnesdoublegamma(z: jax.Array, tau: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
-    zm = di.midpoint(di.as_interval(z))
-    tm = di.midpoint(di.as_interval(tau))
-    val = barnesdoublegamma(zm, tm, prec_bits)
-    return _interval_from_mid(jnp.real(val))
+def bdg_interval_log_barnesdoublegamma(z: jax.Array, tau: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _interval_real_mid_eval2(z, tau, bdg_log_barnesdoublegamma, prec_bits)
 
 
-def arb_loggamma2(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
-    wm = di.midpoint(di.as_interval(w))
-    bm = di.midpoint(di.as_interval(beta))
-    val = loggamma2(wm, bm, prec_bits)
-    return _interval_from_mid(jnp.real(val))
+def bdg_interval_barnesdoublegamma(z: jax.Array, tau: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _interval_real_mid_eval2(z, tau, bdg_barnesdoublegamma, prec_bits)
 
 
-def arb_gamma2(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
-    wm = di.midpoint(di.as_interval(w))
-    bm = di.midpoint(di.as_interval(beta))
-    val = gamma2(wm, bm, prec_bits)
-    return _interval_from_mid(jnp.real(val))
+def bdg_interval_log_barnesgamma2(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _interval_real_mid_eval2(w, beta, bdg_log_barnesgamma2, prec_bits)
 
 
-def arb_logdoublegamma(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
-    wm = di.midpoint(di.as_interval(w))
-    bm = di.midpoint(di.as_interval(beta))
-    val = logdoublegamma(wm, bm, prec_bits)
-    return _interval_from_mid(jnp.real(val))
+def bdg_interval_barnesgamma2(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _interval_real_mid_eval2(w, beta, bdg_barnesgamma2, prec_bits)
 
 
-def arb_doublegamma(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
-    wm = di.midpoint(di.as_interval(w))
-    bm = di.midpoint(di.as_interval(beta))
-    val = doublegamma(wm, bm, prec_bits)
-    return _interval_from_mid(jnp.real(val))
+def bdg_interval_log_normalizeddoublegamma(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _interval_real_mid_eval2(w, beta, bdg_log_normalizeddoublegamma, prec_bits)
 
 
-@partial(jax.jit, static_argnames=("impl", "prec_bits", "dps"))
-def arb_log_barnesdoublegamma_mode(
+def bdg_interval_normalizeddoublegamma(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _interval_real_mid_eval2(w, beta, bdg_normalizeddoublegamma, prec_bits)
+
+
+def bdg_interval_log_barnesdoublegamma_mode(
     z: jax.Array,
     tau: jax.Array,
     impl: str = "basic",
@@ -323,9 +376,9 @@ def arb_log_barnesdoublegamma_mode(
     from . import ball_wrappers
     return wc.dispatch_mode(
         impl,
-        lambda zz, tt, prec_bits: arb_log_barnesdoublegamma(zz, tt, prec_bits=prec_bits),
-        lambda zz, tt, prec_bits: ball_wrappers.arb_ball_log_barnesdoublegamma(zz, tt, prec_bits=prec_bits),
-        lambda zz, tt, prec_bits: ball_wrappers.arb_ball_log_barnesdoublegamma_adaptive(zz, tt, prec_bits=prec_bits),
+        lambda zz, tt, prec_bits: bdg_interval_log_barnesdoublegamma(zz, tt, prec_bits=prec_bits),
+        lambda zz, tt, prec_bits: ball_wrappers.bdg_interval_log_barnesdoublegamma(zz, tt, prec_bits=prec_bits),
+        lambda zz, tt, prec_bits: ball_wrappers.bdg_interval_log_barnesdoublegamma_adaptive(zz, tt, prec_bits=prec_bits),
         False,
         pb,
         (z, tau),
@@ -333,8 +386,7 @@ def arb_log_barnesdoublegamma_mode(
     )
 
 
-@partial(jax.jit, static_argnames=("impl", "prec_bits", "dps"))
-def arb_barnesdoublegamma_mode(
+def bdg_interval_barnesdoublegamma_mode(
     z: jax.Array,
     tau: jax.Array,
     impl: str = "basic",
@@ -345,9 +397,9 @@ def arb_barnesdoublegamma_mode(
     from . import ball_wrappers
     return wc.dispatch_mode(
         impl,
-        lambda zz, tt, prec_bits: arb_barnesdoublegamma(zz, tt, prec_bits=prec_bits),
-        lambda zz, tt, prec_bits: ball_wrappers.arb_ball_barnesdoublegamma(zz, tt, prec_bits=prec_bits),
-        lambda zz, tt, prec_bits: ball_wrappers.arb_ball_barnesdoublegamma_adaptive(zz, tt, prec_bits=prec_bits),
+        lambda zz, tt, prec_bits: bdg_interval_barnesdoublegamma(zz, tt, prec_bits=prec_bits),
+        lambda zz, tt, prec_bits: ball_wrappers.bdg_interval_barnesdoublegamma(zz, tt, prec_bits=prec_bits),
+        lambda zz, tt, prec_bits: ball_wrappers.bdg_interval_barnesdoublegamma_adaptive(zz, tt, prec_bits=prec_bits),
         False,
         pb,
         (z, tau),
@@ -355,15 +407,14 @@ def arb_barnesdoublegamma_mode(
     )
 
 
-@partial(jax.jit, static_argnames=("impl", "prec_bits", "dps"))
-def arb_loggamma2_mode(w: jax.Array, beta: jax.Array, impl: str = "basic", prec_bits: int | None = None, dps: int | None = None) -> jax.Array:
+def bdg_interval_log_barnesgamma2_mode(w: jax.Array, beta: jax.Array, impl: str = "basic", prec_bits: int | None = None, dps: int | None = None) -> jax.Array:
     pb = precision.get_prec_bits() if prec_bits is None and dps is None else wc.resolve_prec_bits(dps, prec_bits)
     from . import ball_wrappers
     return wc.dispatch_mode(
         impl,
-        lambda ww, bb, prec_bits: arb_loggamma2(ww, bb, prec_bits=prec_bits),
-        lambda ww, bb, prec_bits: ball_wrappers.arb_ball_loggamma2(ww, bb, prec_bits=prec_bits),
-        lambda ww, bb, prec_bits: ball_wrappers.arb_ball_loggamma2_adaptive(ww, bb, prec_bits=prec_bits),
+        lambda ww, bb, prec_bits: bdg_interval_log_barnesgamma2(ww, bb, prec_bits=prec_bits),
+        lambda ww, bb, prec_bits: ball_wrappers.bdg_interval_log_barnesgamma2(ww, bb, prec_bits=prec_bits),
+        lambda ww, bb, prec_bits: ball_wrappers.bdg_interval_log_barnesgamma2_adaptive(ww, bb, prec_bits=prec_bits),
         False,
         pb,
         (w, beta),
@@ -371,15 +422,14 @@ def arb_loggamma2_mode(w: jax.Array, beta: jax.Array, impl: str = "basic", prec_
     )
 
 
-@partial(jax.jit, static_argnames=("impl", "prec_bits", "dps"))
-def arb_gamma2_mode(w: jax.Array, beta: jax.Array, impl: str = "basic", prec_bits: int | None = None, dps: int | None = None) -> jax.Array:
+def bdg_interval_barnesgamma2_mode(w: jax.Array, beta: jax.Array, impl: str = "basic", prec_bits: int | None = None, dps: int | None = None) -> jax.Array:
     pb = precision.get_prec_bits() if prec_bits is None and dps is None else wc.resolve_prec_bits(dps, prec_bits)
     from . import ball_wrappers
     return wc.dispatch_mode(
         impl,
-        lambda ww, bb, prec_bits: arb_gamma2(ww, bb, prec_bits=prec_bits),
-        lambda ww, bb, prec_bits: ball_wrappers.arb_ball_gamma2(ww, bb, prec_bits=prec_bits),
-        lambda ww, bb, prec_bits: ball_wrappers.arb_ball_gamma2_adaptive(ww, bb, prec_bits=prec_bits),
+        lambda ww, bb, prec_bits: bdg_interval_barnesgamma2(ww, bb, prec_bits=prec_bits),
+        lambda ww, bb, prec_bits: ball_wrappers.bdg_interval_barnesgamma2(ww, bb, prec_bits=prec_bits),
+        lambda ww, bb, prec_bits: ball_wrappers.bdg_interval_barnesgamma2_adaptive(ww, bb, prec_bits=prec_bits),
         False,
         pb,
         (w, beta),
@@ -387,15 +437,14 @@ def arb_gamma2_mode(w: jax.Array, beta: jax.Array, impl: str = "basic", prec_bit
     )
 
 
-@partial(jax.jit, static_argnames=("impl", "prec_bits", "dps"))
-def arb_logdoublegamma_mode(w: jax.Array, beta: jax.Array, impl: str = "basic", prec_bits: int | None = None, dps: int | None = None) -> jax.Array:
+def bdg_interval_log_normalizeddoublegamma_mode(w: jax.Array, beta: jax.Array, impl: str = "basic", prec_bits: int | None = None, dps: int | None = None) -> jax.Array:
     pb = precision.get_prec_bits() if prec_bits is None and dps is None else wc.resolve_prec_bits(dps, prec_bits)
     from . import ball_wrappers
     return wc.dispatch_mode(
         impl,
-        lambda ww, bb, prec_bits: arb_logdoublegamma(ww, bb, prec_bits=prec_bits),
-        lambda ww, bb, prec_bits: ball_wrappers.arb_ball_logdoublegamma(ww, bb, prec_bits=prec_bits),
-        lambda ww, bb, prec_bits: ball_wrappers.arb_ball_logdoublegamma_adaptive(ww, bb, prec_bits=prec_bits),
+        lambda ww, bb, prec_bits: bdg_interval_log_normalizeddoublegamma(ww, bb, prec_bits=prec_bits),
+        lambda ww, bb, prec_bits: ball_wrappers.bdg_interval_log_normalizeddoublegamma(ww, bb, prec_bits=prec_bits),
+        lambda ww, bb, prec_bits: ball_wrappers.bdg_interval_log_normalizeddoublegamma_adaptive(ww, bb, prec_bits=prec_bits),
         False,
         pb,
         (w, beta),
@@ -403,15 +452,14 @@ def arb_logdoublegamma_mode(w: jax.Array, beta: jax.Array, impl: str = "basic", 
     )
 
 
-@partial(jax.jit, static_argnames=("impl", "prec_bits", "dps"))
-def arb_doublegamma_mode(w: jax.Array, beta: jax.Array, impl: str = "basic", prec_bits: int | None = None, dps: int | None = None) -> jax.Array:
+def bdg_interval_normalizeddoublegamma_mode(w: jax.Array, beta: jax.Array, impl: str = "basic", prec_bits: int | None = None, dps: int | None = None) -> jax.Array:
     pb = precision.get_prec_bits() if prec_bits is None and dps is None else wc.resolve_prec_bits(dps, prec_bits)
     from . import ball_wrappers
     return wc.dispatch_mode(
         impl,
-        lambda ww, bb, prec_bits: arb_doublegamma(ww, bb, prec_bits=prec_bits),
-        lambda ww, bb, prec_bits: ball_wrappers.arb_ball_doublegamma(ww, bb, prec_bits=prec_bits),
-        lambda ww, bb, prec_bits: ball_wrappers.arb_ball_doublegamma_adaptive(ww, bb, prec_bits=prec_bits),
+        lambda ww, bb, prec_bits: bdg_interval_normalizeddoublegamma(ww, bb, prec_bits=prec_bits),
+        lambda ww, bb, prec_bits: ball_wrappers.bdg_interval_normalizeddoublegamma(ww, bb, prec_bits=prec_bits),
+        lambda ww, bb, prec_bits: ball_wrappers.bdg_interval_normalizeddoublegamma_adaptive(ww, bb, prec_bits=prec_bits),
         False,
         pb,
         (w, beta),
@@ -419,8 +467,7 @@ def arb_doublegamma_mode(w: jax.Array, beta: jax.Array, impl: str = "basic", pre
     )
 
 
-@partial(jax.jit, static_argnames=("impl", "prec_bits", "dps"))
-def acb_log_barnesdoublegamma_mode(
+def bdg_complex_log_barnesdoublegamma_mode(
     z: jax.Array,
     tau: jax.Array,
     impl: str = "basic",
@@ -431,9 +478,9 @@ def acb_log_barnesdoublegamma_mode(
     from . import ball_wrappers
     return wc.dispatch_mode(
         impl,
-        lambda zz, tt, prec_bits: acb_log_barnesdoublegamma(zz, tt, prec_bits=prec_bits),
-        lambda zz, tt, prec_bits: ball_wrappers.acb_ball_log_barnesdoublegamma(zz, tt, prec_bits=prec_bits),
-        lambda zz, tt, prec_bits: ball_wrappers.acb_ball_log_barnesdoublegamma_adaptive(zz, tt, prec_bits=prec_bits),
+        lambda zz, tt, prec_bits: bdg_complex_log_barnesdoublegamma(zz, tt, prec_bits=prec_bits),
+        lambda zz, tt, prec_bits: ball_wrappers.bdg_complex_log_barnesdoublegamma(zz, tt, prec_bits=prec_bits),
+        lambda zz, tt, prec_bits: ball_wrappers.bdg_complex_log_barnesdoublegamma_adaptive(zz, tt, prec_bits=prec_bits),
         True,
         pb,
         (z, tau),
@@ -441,15 +488,14 @@ def acb_log_barnesdoublegamma_mode(
     )
 
 
-@partial(jax.jit, static_argnames=("impl", "prec_bits", "dps"))
-def acb_barnesdoublegamma_mode(z: jax.Array, tau: jax.Array, impl: str = "basic", prec_bits: int | None = None, dps: int | None = None) -> jax.Array:
+def bdg_complex_barnesdoublegamma_mode(z: jax.Array, tau: jax.Array, impl: str = "basic", prec_bits: int | None = None, dps: int | None = None) -> jax.Array:
     pb = precision.get_prec_bits() if prec_bits is None and dps is None else wc.resolve_prec_bits(dps, prec_bits)
     from . import ball_wrappers
     return wc.dispatch_mode(
         impl,
-        lambda zz, tt, prec_bits: acb_barnesdoublegamma(zz, tt, prec_bits=prec_bits),
-        lambda zz, tt, prec_bits: ball_wrappers.acb_ball_barnesdoublegamma(zz, tt, prec_bits=prec_bits),
-        lambda zz, tt, prec_bits: ball_wrappers.acb_ball_barnesdoublegamma_adaptive(zz, tt, prec_bits=prec_bits),
+        lambda zz, tt, prec_bits: bdg_complex_barnesdoublegamma(zz, tt, prec_bits=prec_bits),
+        lambda zz, tt, prec_bits: ball_wrappers.bdg_complex_barnesdoublegamma(zz, tt, prec_bits=prec_bits),
+        lambda zz, tt, prec_bits: ball_wrappers.bdg_complex_barnesdoublegamma_adaptive(zz, tt, prec_bits=prec_bits),
         True,
         pb,
         (z, tau),
@@ -457,15 +503,14 @@ def acb_barnesdoublegamma_mode(z: jax.Array, tau: jax.Array, impl: str = "basic"
     )
 
 
-@partial(jax.jit, static_argnames=("impl", "prec_bits", "dps"))
-def acb_loggamma2_mode(w: jax.Array, beta: jax.Array, impl: str = "basic", prec_bits: int | None = None, dps: int | None = None) -> jax.Array:
+def bdg_complex_log_barnesgamma2_mode(w: jax.Array, beta: jax.Array, impl: str = "basic", prec_bits: int | None = None, dps: int | None = None) -> jax.Array:
     pb = precision.get_prec_bits() if prec_bits is None and dps is None else wc.resolve_prec_bits(dps, prec_bits)
     from . import ball_wrappers
     return wc.dispatch_mode(
         impl,
-        lambda ww, bb, prec_bits: acb_loggamma2(ww, bb, prec_bits=prec_bits),
-        lambda ww, bb, prec_bits: ball_wrappers.acb_ball_loggamma2(ww, bb, prec_bits=prec_bits),
-        lambda ww, bb, prec_bits: ball_wrappers.acb_ball_loggamma2_adaptive(ww, bb, prec_bits=prec_bits),
+        lambda ww, bb, prec_bits: bdg_complex_log_barnesgamma2(ww, bb, prec_bits=prec_bits),
+        lambda ww, bb, prec_bits: ball_wrappers.bdg_complex_log_barnesgamma2(ww, bb, prec_bits=prec_bits),
+        lambda ww, bb, prec_bits: ball_wrappers.bdg_complex_log_barnesgamma2_adaptive(ww, bb, prec_bits=prec_bits),
         True,
         pb,
         (w, beta),
@@ -473,15 +518,14 @@ def acb_loggamma2_mode(w: jax.Array, beta: jax.Array, impl: str = "basic", prec_
     )
 
 
-@partial(jax.jit, static_argnames=("impl", "prec_bits", "dps"))
-def acb_gamma2_mode(w: jax.Array, beta: jax.Array, impl: str = "basic", prec_bits: int | None = None, dps: int | None = None) -> jax.Array:
+def bdg_complex_barnesgamma2_mode(w: jax.Array, beta: jax.Array, impl: str = "basic", prec_bits: int | None = None, dps: int | None = None) -> jax.Array:
     pb = precision.get_prec_bits() if prec_bits is None and dps is None else wc.resolve_prec_bits(dps, prec_bits)
     from . import ball_wrappers
     return wc.dispatch_mode(
         impl,
-        lambda ww, bb, prec_bits: acb_gamma2(ww, bb, prec_bits=prec_bits),
-        lambda ww, bb, prec_bits: ball_wrappers.acb_ball_gamma2(ww, bb, prec_bits=prec_bits),
-        lambda ww, bb, prec_bits: ball_wrappers.acb_ball_gamma2_adaptive(ww, bb, prec_bits=prec_bits),
+        lambda ww, bb, prec_bits: bdg_complex_barnesgamma2(ww, bb, prec_bits=prec_bits),
+        lambda ww, bb, prec_bits: ball_wrappers.bdg_complex_barnesgamma2(ww, bb, prec_bits=prec_bits),
+        lambda ww, bb, prec_bits: ball_wrappers.bdg_complex_barnesgamma2_adaptive(ww, bb, prec_bits=prec_bits),
         True,
         pb,
         (w, beta),
@@ -489,15 +533,14 @@ def acb_gamma2_mode(w: jax.Array, beta: jax.Array, impl: str = "basic", prec_bit
     )
 
 
-@partial(jax.jit, static_argnames=("impl", "prec_bits", "dps"))
-def acb_logdoublegamma_mode(w: jax.Array, beta: jax.Array, impl: str = "basic", prec_bits: int | None = None, dps: int | None = None) -> jax.Array:
+def bdg_complex_log_normalizeddoublegamma_mode(w: jax.Array, beta: jax.Array, impl: str = "basic", prec_bits: int | None = None, dps: int | None = None) -> jax.Array:
     pb = precision.get_prec_bits() if prec_bits is None and dps is None else wc.resolve_prec_bits(dps, prec_bits)
     from . import ball_wrappers
     return wc.dispatch_mode(
         impl,
-        lambda ww, bb, prec_bits: acb_logdoublegamma(ww, bb, prec_bits=prec_bits),
-        lambda ww, bb, prec_bits: ball_wrappers.acb_ball_logdoublegamma(ww, bb, prec_bits=prec_bits),
-        lambda ww, bb, prec_bits: ball_wrappers.acb_ball_logdoublegamma_adaptive(ww, bb, prec_bits=prec_bits),
+        lambda ww, bb, prec_bits: bdg_complex_log_normalizeddoublegamma(ww, bb, prec_bits=prec_bits),
+        lambda ww, bb, prec_bits: ball_wrappers.bdg_complex_log_normalizeddoublegamma(ww, bb, prec_bits=prec_bits),
+        lambda ww, bb, prec_bits: ball_wrappers.bdg_complex_log_normalizeddoublegamma_adaptive(ww, bb, prec_bits=prec_bits),
         True,
         pb,
         (w, beta),
@@ -505,15 +548,14 @@ def acb_logdoublegamma_mode(w: jax.Array, beta: jax.Array, impl: str = "basic", 
     )
 
 
-@partial(jax.jit, static_argnames=("impl", "prec_bits", "dps"))
-def acb_doublegamma_mode(w: jax.Array, beta: jax.Array, impl: str = "basic", prec_bits: int | None = None, dps: int | None = None) -> jax.Array:
+def bdg_complex_normalizeddoublegamma_mode(w: jax.Array, beta: jax.Array, impl: str = "basic", prec_bits: int | None = None, dps: int | None = None) -> jax.Array:
     pb = precision.get_prec_bits() if prec_bits is None and dps is None else wc.resolve_prec_bits(dps, prec_bits)
     from . import ball_wrappers
     return wc.dispatch_mode(
         impl,
-        lambda ww, bb, prec_bits: acb_doublegamma(ww, bb, prec_bits=prec_bits),
-        lambda ww, bb, prec_bits: ball_wrappers.acb_ball_doublegamma(ww, bb, prec_bits=prec_bits),
-        lambda ww, bb, prec_bits: ball_wrappers.acb_ball_doublegamma_adaptive(ww, bb, prec_bits=prec_bits),
+        lambda ww, bb, prec_bits: bdg_complex_normalizeddoublegamma(ww, bb, prec_bits=prec_bits),
+        lambda ww, bb, prec_bits: ball_wrappers.bdg_complex_normalizeddoublegamma(ww, bb, prec_bits=prec_bits),
+        lambda ww, bb, prec_bits: ball_wrappers.bdg_complex_normalizeddoublegamma_adaptive(ww, bb, prec_bits=prec_bits),
         True,
         pb,
         (w, beta),
@@ -521,15 +563,14 @@ def acb_doublegamma_mode(w: jax.Array, beta: jax.Array, impl: str = "basic", pre
     )
 
 
-@partial(jax.jit, static_argnames=("impl", "prec_bits", "dps"))
-def acb_double_sine_mode(z: jax.Array, b: jax.Array, impl: str = "basic", prec_bits: int | None = None, dps: int | None = None) -> jax.Array:
+def bdg_complex_double_sine_mode(z: jax.Array, b: jax.Array, impl: str = "basic", prec_bits: int | None = None, dps: int | None = None) -> jax.Array:
     pb = precision.get_prec_bits() if prec_bits is None and dps is None else wc.resolve_prec_bits(dps, prec_bits)
     from . import ball_wrappers
     return wc.dispatch_mode(
         impl,
-        lambda zz, bb, prec_bits: acb_double_sine(zz, bb, prec_bits=prec_bits),
-        lambda zz, bb, prec_bits: ball_wrappers.acb_ball_double_sine(zz, bb, prec_bits=prec_bits),
-        lambda zz, bb, prec_bits: ball_wrappers.acb_ball_double_sine_adaptive(zz, bb, prec_bits=prec_bits),
+        lambda zz, bb, prec_bits: bdg_complex_double_sine(zz, bb, prec_bits=prec_bits),
+        lambda zz, bb, prec_bits: ball_wrappers.bdg_complex_double_sine(zz, bb, prec_bits=prec_bits),
+        lambda zz, bb, prec_bits: ball_wrappers.bdg_complex_double_sine_adaptive(zz, bb, prec_bits=prec_bits),
         True,
         pb,
         (z, b),
@@ -538,38 +579,37 @@ def acb_double_sine_mode(z: jax.Array, b: jax.Array, impl: str = "basic", prec_b
 
 
 __all__ = [
-    "log_barnesdoublegamma",
-    "barnesdoublegamma",
-    "loggamma2",
-    "gamma2",
-    "logdoublegamma",
-    "doublegamma",
-    "double_sine",
-    "acb_log_barnesdoublegamma",
-    "acb_barnesdoublegamma",
-    "acb_loggamma2",
-    "acb_gamma2",
-    "acb_logdoublegamma",
-    "acb_doublegamma",
-    "acb_double_sine",
-    "arb_log_barnesdoublegamma",
-    "arb_barnesdoublegamma",
-    "arb_loggamma2",
-    "arb_gamma2",
-    "arb_logdoublegamma",
-    "arb_doublegamma",
-    "arb_log_barnesdoublegamma_mode",
-    "arb_barnesdoublegamma_mode",
-    "arb_loggamma2_mode",
-    "arb_gamma2_mode",
-    "arb_logdoublegamma_mode",
-    "arb_doublegamma_mode",
-    "acb_log_barnesdoublegamma_mode",
-    "acb_barnesdoublegamma_mode",
-    "acb_loggamma2_mode",
-    "acb_gamma2_mode",
-    "acb_logdoublegamma_mode",
-    "acb_doublegamma_mode",
-    "acb_double_sine_mode",
+    "bdg_log_barnesdoublegamma",
+    "bdg_barnesdoublegamma",
+    "bdg_log_barnesgamma2",
+    "bdg_barnesgamma2",
+    "bdg_log_normalizeddoublegamma",
+    "bdg_normalizeddoublegamma",
+    "bdg_double_sine",
+    "bdg_complex_log_barnesdoublegamma",
+    "bdg_complex_barnesdoublegamma",
+    "bdg_complex_log_barnesgamma2",
+    "bdg_complex_barnesgamma2",
+    "bdg_complex_log_normalizeddoublegamma",
+    "bdg_complex_normalizeddoublegamma",
+    "bdg_complex_double_sine",
+    "bdg_interval_log_barnesdoublegamma",
+    "bdg_interval_barnesdoublegamma",
+    "bdg_interval_log_barnesgamma2",
+    "bdg_interval_barnesgamma2",
+    "bdg_interval_log_normalizeddoublegamma",
+    "bdg_interval_normalizeddoublegamma",
+    "bdg_interval_log_barnesdoublegamma_mode",
+    "bdg_interval_barnesdoublegamma_mode",
+    "bdg_interval_log_barnesgamma2_mode",
+    "bdg_interval_barnesgamma2_mode",
+    "bdg_interval_log_normalizeddoublegamma_mode",
+    "bdg_interval_normalizeddoublegamma_mode",
+    "bdg_complex_log_barnesdoublegamma_mode",
+    "bdg_complex_barnesdoublegamma_mode",
+    "bdg_complex_log_barnesgamma2_mode",
+    "bdg_complex_barnesgamma2_mode",
+    "bdg_complex_log_normalizeddoublegamma_mode",
+    "bdg_complex_normalizeddoublegamma_mode",
+    "bdg_complex_double_sine_mode",
 ]
-

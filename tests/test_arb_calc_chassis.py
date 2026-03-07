@@ -1,5 +1,6 @@
 import jax
 import jax.numpy as jnp
+import pytest
 
 from arbplusjax import arb_calc
 from arbplusjax import double_interval as di
@@ -32,3 +33,28 @@ def test_precision_semantics_wider_at_lower_precision():
     hi = arb_calc.arb_calc_integrate_line_prec(a, b, integrand="cos", n_steps=32, prec_bits=53)
     lo = arb_calc.arb_calc_integrate_line_prec(a, b, integrand="cos", n_steps=32, prec_bits=20)
     _check(bool(di.contains(lo, hi)))
+
+
+@pytest.mark.parametrize(
+    ("integrand", "a", "b"),
+    [
+        ("log", [0.2, 0.25], [0.8, 0.9]),
+        ("tan", [-0.4, -0.35], [0.4, 0.45]),
+        ("log1p", [-0.4, -0.35], [0.2, 0.25]),
+        ("asin", [-0.5, -0.45], [0.3, 0.35]),
+        ("gamma", [0.3, 0.35], [0.8, 0.85]),
+        ("erf", [-0.3, -0.25], [0.4, 0.45]),
+        ("barnesg", [1.1, 1.15], [1.8, 1.85]),
+    ],
+)
+def test_expanded_unary_integrands_produce_ordered_intervals(integrand, a, b):
+    a = jnp.asarray(a, dtype=jnp.float64)
+    b = jnp.asarray(b, dtype=jnp.float64)
+    out = arb_calc.arb_calc_integrate_line(a, b, integrand=integrand, n_steps=32)
+    rig = arb_calc.arb_calc_integrate_line_rigorous(a, b, integrand=integrand, n_steps=16)
+    _check(out.shape == (2,))
+    _check(rig.shape == (2,))
+    _check(bool(jnp.all(jnp.isfinite(out))))
+    _check(bool(jnp.all(jnp.isfinite(rig))))
+    _check(bool(out[0] <= out[1]))
+    _check(bool(rig[0] <= rig[1]))

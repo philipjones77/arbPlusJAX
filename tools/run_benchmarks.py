@@ -22,6 +22,22 @@ def _default_c_ref_dir(repo_root: Path) -> str:
     return ""
 
 
+def _default_boost_ref_cmd(repo_root: Path) -> str:
+    if os.name == "nt":
+        wrapper = repo_root / "tools" / "run_boost_ref_adapter.ps1"
+        if wrapper.exists():
+            return f'powershell -ExecutionPolicy Bypass -File "{wrapper}"'
+    else:
+        wrapper = repo_root / "tools" / "run_boost_ref_adapter.sh"
+        if wrapper.exists():
+            return str(wrapper)
+
+    adapter = repo_root / "benchmarks" / "boost_ref_adapter.py"
+    if adapter.exists():
+        return f'{sys.executable} "{adapter}"'
+    return ""
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Run arbPlusJAX benchmark sweeps with optional external baselines."
@@ -81,8 +97,9 @@ def main() -> int:
         if cloud:
             cmd.extend(["--wolfram-cloud-url", cloud])
     if args.with_boost:
-        if args.boost_ref_cmd:
-            cmd.extend(["--boost-ref-cmd", args.boost_ref_cmd])
+        boost_ref_cmd = args.boost_ref_cmd or _default_boost_ref_cmd(repo_root)
+        if boost_ref_cmd:
+            cmd.extend(["--boost-ref-cmd", boost_ref_cmd])
         else:
             print("Warning: --with-boost was set but no boost command was provided (set --boost-ref-cmd or BOOST_REF_CMD).")
 

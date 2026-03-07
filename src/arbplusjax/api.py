@@ -6,6 +6,7 @@ from functools import lru_cache
 from typing import Callable
 
 import jax
+from jax import lax
 import jax.numpy as jnp
 
 from . import baseline_wrappers
@@ -16,6 +17,150 @@ from . import point_wrappers
 # Public API for optimized calls.
 # - eval_point: point-only kernels (fastest, no bounds)
 # - eval_interval: interval kernels (basic/adaptive/rigorous) with optional batching
+
+_COMPLEX_BY_FLOAT_DTYPE = {
+    jnp.dtype(jnp.float32): jnp.dtype(jnp.complex64),
+    jnp.dtype(jnp.float64): jnp.dtype(jnp.complex128),
+}
+
+
+def _normalize_dtype(dtype: str | jnp.dtype | None) -> jnp.dtype | None:
+    if dtype is None:
+        return None
+    if isinstance(dtype, str):
+        key = dtype.strip().lower()
+        if key in ("float32", "f32", "fp32"):
+            return jnp.dtype(jnp.float32)
+        if key in ("float64", "f64", "fp64"):
+            return jnp.dtype(jnp.float64)
+        raise ValueError("dtype must be one of: float32, float64")
+    norm = jnp.dtype(dtype)
+    if norm == jnp.dtype(jnp.float32):
+        return norm
+    if norm == jnp.dtype(jnp.float64):
+        return norm
+    raise ValueError("dtype must be one of: float32, float64")
+
+
+def _float_dtype_for_arg(arg: object) -> jnp.dtype | None:
+    if hasattr(arg, "dtype"):
+        dt = jnp.dtype(getattr(arg, "dtype"))
+    elif isinstance(arg, float):
+        dt = jnp.asarray(arg).dtype
+    elif isinstance(arg, complex):
+        dt = jnp.asarray(arg).dtype
+    else:
+        return None
+    if jnp.issubdtype(dt, jnp.floating):
+        return jnp.dtype(dt)
+    if jnp.issubdtype(dt, jnp.complexfloating):
+        if dt == jnp.dtype(jnp.complex64):
+            return jnp.dtype(jnp.float32)
+        if dt == jnp.dtype(jnp.complex128):
+            return jnp.dtype(jnp.float64)
+    return None
+
+
+def _resolve_dtype_for_args(args: tuple[object, ...], dtype: str | jnp.dtype | None) -> jnp.dtype:
+    target = _normalize_dtype(dtype)
+    seen: set[jnp.dtype] = set()
+    for arg in args:
+        dt = _float_dtype_for_arg(arg)
+        if dt is not None:
+            seen.add(dt)
+    if target is not None:
+        return target
+    if len(seen) <= 1:
+        return next(iter(seen)) if seen else jnp.dtype(jnp.float64)
+    seen_str = ", ".join(sorted(str(x) for x in seen))
+    raise ValueError(f"Mixed floating dtypes in one call are not supported: {seen_str}. Pass dtype='float32' or dtype='float64'.")
+
+
+def _cast_arg_to_dtype(arg: object, float_dtype: jnp.dtype) -> object:
+    if hasattr(arg, "dtype"):
+        dt = jnp.dtype(getattr(arg, "dtype"))
+        if jnp.issubdtype(dt, jnp.floating):
+            if dt == float_dtype:
+                return arg
+            return lax.convert_element_type(jnp.asarray(arg), float_dtype)
+        if jnp.issubdtype(dt, jnp.complexfloating):
+            target = _COMPLEX_BY_FLOAT_DTYPE[float_dtype]
+            if dt == target:
+                return arg
+            return lax.convert_element_type(jnp.asarray(arg), target)
+        return arg
+    if isinstance(arg, float):
+        return jnp.asarray(arg, dtype=float_dtype)
+    if isinstance(arg, complex):
+        return jnp.asarray(arg, dtype=_COMPLEX_BY_FLOAT_DTYPE[float_dtype])
+    return arg
+
+
+def _cast_out_to_dtype(out: object, float_dtype: jnp.dtype):
+    if isinstance(out, tuple):
+        return tuple(_cast_out_to_dtype(item, float_dtype) for item in out)
+    if hasattr(out, "dtype"):
+        dt = jnp.dtype(getattr(out, "dtype"))
+        if jnp.issubdtype(dt, jnp.floating):
+            if dt == float_dtype:
+                return out
+            return lax.convert_element_type(jnp.asarray(out), float_dtype)
+        if jnp.issubdtype(dt, jnp.complexfloating):
+            target = _COMPLEX_BY_FLOAT_DTYPE[float_dtype]
+            if dt == target:
+                return out
+            return lax.convert_element_type(jnp.asarray(out), target)
+    return out
+
+
+def _batch_size(args: tuple[object, ...]) -> int:
+    if not args:
+        raise ValueError("batch call requires at least one argument array")
+    n: int | None = None
+    for arg in args:
+        if not hasattr(arg, "ndim") or not hasattr(arg, "shape"):
+            raise ValueError("batch call requires array arguments")
+        if arg.ndim == 0:
+            raise ValueError("batch call requires arrays with a leading batch dimension")
+        cur = int(arg.shape[0])
+        if n is None:
+            n = cur
+        elif cur != n:
+            raise ValueError("all batch arguments must share the same leading dimension")
+    assert n is not None
+    return n
+
+
+def _pad_batch_args(
+    args: tuple[object, ...],
+    *,
+    pad_to: int | None,
+    pad_value: float | complex = 0.0,
+) -> tuple[tuple[object, ...], int]:
+    n = _batch_size(args)
+    if pad_to is None:
+        return args, n
+    target = int(pad_to)
+    if target < n:
+        raise ValueError(f"pad_to must be >= batch size; got pad_to={target}, batch={n}")
+    if target == n:
+        return args, n
+
+    padded: list[object] = []
+    for arg in args:
+        arr = jnp.asarray(arg)
+        pad_shape = (target - n,) + tuple(arr.shape[1:])
+        pad_block = jnp.full(pad_shape, pad_value, dtype=arr.dtype)
+        padded.append(jnp.concatenate((arr, pad_block), axis=0))
+    return tuple(padded), n
+
+
+def _trim_batch_out(out: object, n: int):
+    if isinstance(out, tuple):
+        return tuple(_trim_batch_out(item, n) for item in out)
+    if hasattr(out, "ndim") and out.ndim > 0:
+        return out[:n]
+    return out
 
 
 _POINT_FUNCS = {
@@ -62,8 +207,7 @@ _POINT_FUNCS = {
     "bessely": point_wrappers.arb_bessel_y_point,
     "besseli": point_wrappers.arb_bessel_i_point,
     "besselk": point_wrappers.arb_bessel_k_point,
-    "cubesselk": cubesselk.cubesselk_point,
-    "CubesselK": cubesselk.cubesselk_point,
+    "cuda_besselk": cubesselk.cuda_besselk_point,
 }
 
 
@@ -96,8 +240,7 @@ _INTERVAL_FUNCS = {
     "bessely": baseline_wrappers.arb_bessel_y_mp,
     "besseli": baseline_wrappers.arb_bessel_i_mp,
     "besselk": baseline_wrappers.arb_bessel_k_mp,
-    "cubesselk": cubesselk.arb_cubesselk_mp,
-    "CubesselK": cubesselk.arb_cubesselk_mp,
+    "cuda_besselk": cubesselk.cuda_besselk,
 }
 
 
@@ -252,14 +395,34 @@ def _bound_interval_fn(name: str, mode: str, prec_bits: int | None, dps: int | N
     return fn
 
 
-def eval_point(name: str, *args: jax.Array, jit: bool = False) -> jax.Array:
+def eval_point(
+    name: str,
+    *args: jax.Array,
+    jit: bool = False,
+    dtype: str | jnp.dtype | None = None,
+) -> jax.Array:
     fn = _point_jit_fn(name) if jit else _resolve_point_fn(name)
-    return fn(*args)
+    target = _resolve_dtype_for_args(args, dtype)
+    out = fn(*tuple(_cast_arg_to_dtype(arg, target) for arg in args))
+    return _cast_out_to_dtype(out, target)
 
 
-def eval_point_batch(name: str, *args: jax.Array) -> jax.Array:
+def eval_point_batch(
+    name: str,
+    *args: jax.Array,
+    dtype: str | jnp.dtype | None = None,
+    pad_to: int | None = None,
+    pad_value: float | complex = 0.0,
+) -> jax.Array:
     batched = _point_batch_fn(name)
-    return batched(*args)
+    target = _resolve_dtype_for_args(args, dtype)
+    batch_args, n = _pad_batch_args(
+        tuple(_cast_arg_to_dtype(arg, target) for arg in args),
+        pad_to=pad_to,
+        pad_value=pad_value,
+    )
+    out = batched(*batch_args)
+    return _trim_batch_out(_cast_out_to_dtype(out, target), n)
 
 
 def eval_interval(
@@ -269,9 +432,12 @@ def eval_interval(
     prec_bits: int | None = None,
     dps: int | None = None,
     jit: bool = False,
+    dtype: str | jnp.dtype | None = None,
 ) -> jax.Array:
     fn = _interval_jit_fn(name, mode, prec_bits, dps) if jit else _bound_interval_fn(name, mode, prec_bits, dps)
-    return fn(*args)
+    target = _resolve_dtype_for_args(args, dtype)
+    out = fn(*tuple(_cast_arg_to_dtype(arg, target) for arg in args))
+    return _cast_out_to_dtype(out, target)
 
 
 def eval_interval_batch(
@@ -280,23 +446,25 @@ def eval_interval_batch(
     mode: str = "basic",
     prec_bits: int | None = None,
     dps: int | None = None,
+    dtype: str | jnp.dtype | None = None,
+    pad_to: int | None = None,
+    pad_value: float | complex = 0.0,
 ) -> jax.Array:
     batched = _interval_batch_fn(name, mode, prec_bits, dps)
-    return batched(*args)
+    target = _resolve_dtype_for_args(args, dtype)
+    batch_args, n = _pad_batch_args(
+        tuple(_cast_arg_to_dtype(arg, target) for arg in args),
+        pad_to=pad_to,
+        pad_value=pad_value,
+    )
+    out = batched(*batch_args)
+    return _trim_batch_out(_cast_out_to_dtype(out, target), n)
 
 
-def _chunked_apply(fn: Callable, args: tuple[jax.Array, ...], chunk_size: int) -> jax.Array:
+def _chunked_apply(fn: Callable, args: tuple[object, ...], chunk_size: int) -> jax.Array:
     if chunk_size <= 0:
         raise ValueError("chunk_size must be > 0")
-    if not args:
-        raise ValueError("chunked batch call requires at least one argument array")
-    for arr in args:
-        if arr.ndim == 0:
-            raise ValueError("chunked batch call requires arrays with a leading batch dimension")
-    n = int(args[0].shape[0])
-    for arr in args[1:]:
-        if int(arr.shape[0]) != n:
-            raise ValueError("all batch arguments must share the same leading dimension")
+    n = _batch_size(args)
     if n <= chunk_size:
         return fn(*args)
 
@@ -308,9 +476,23 @@ def _chunked_apply(fn: Callable, args: tuple[jax.Array, ...], chunk_size: int) -
     return jnp.concatenate(outs, axis=0)
 
 
-def eval_point_batch_chunked(name: str, *args: jax.Array, chunk_size: int = 1024) -> jax.Array:
+def eval_point_batch_chunked(
+    name: str,
+    *args: jax.Array,
+    chunk_size: int = 1024,
+    dtype: str | jnp.dtype | None = None,
+    pad_to: int | None = None,
+    pad_value: float | complex = 0.0,
+) -> jax.Array:
     batched = _point_batch_fn(name)
-    return _chunked_apply(batched, args, chunk_size)
+    target = _resolve_dtype_for_args(args, dtype)
+    batch_args, n = _pad_batch_args(
+        tuple(_cast_arg_to_dtype(arg, target) for arg in args),
+        pad_to=pad_to,
+        pad_value=pad_value,
+    )
+    out = _chunked_apply(batched, batch_args, chunk_size)
+    return _trim_batch_out(_cast_out_to_dtype(out, target), n)
 
 
 def eval_interval_batch_chunked(
@@ -320,13 +502,30 @@ def eval_interval_batch_chunked(
     prec_bits: int | None = None,
     dps: int | None = None,
     chunk_size: int = 1024,
+    dtype: str | jnp.dtype | None = None,
+    pad_to: int | None = None,
+    pad_value: float | complex = 0.0,
 ) -> jax.Array:
     batched = _interval_batch_fn(name, mode, prec_bits, dps)
-    return _chunked_apply(batched, args, chunk_size)
+    target = _resolve_dtype_for_args(args, dtype)
+    batch_args, n = _pad_batch_args(
+        tuple(_cast_arg_to_dtype(arg, target) for arg in args),
+        pad_to=pad_to,
+        pad_value=pad_value,
+    )
+    out = _chunked_apply(batched, batch_args, chunk_size)
+    return _trim_batch_out(_cast_out_to_dtype(out, target), n)
 
 
-def bind_point(name: str) -> Callable:
-    return _resolve_point_fn(name)
+def bind_point(name: str, dtype: str | jnp.dtype | None = None) -> Callable:
+    fn = _resolve_point_fn(name)
+
+    def wrapped(*args):
+        target = _resolve_dtype_for_args(args, dtype)
+        out = fn(*tuple(_cast_arg_to_dtype(arg, target) for arg in args))
+        return _cast_out_to_dtype(out, target)
+
+    return wrapped
 
 
 def bind_interval(
@@ -334,12 +533,27 @@ def bind_interval(
     mode: str = "basic",
     prec_bits: int | None = None,
     dps: int | None = None,
+    dtype: str | jnp.dtype | None = None,
 ) -> Callable:
-    return _bound_interval_fn(name, mode, prec_bits, dps)
+    fn = _bound_interval_fn(name, mode, prec_bits, dps)
+
+    def wrapped(*args):
+        target = _resolve_dtype_for_args(args, dtype)
+        out = fn(*tuple(_cast_arg_to_dtype(arg, target) for arg in args))
+        return _cast_out_to_dtype(out, target)
+
+    return wrapped
 
 
-def bind_point_jit(name: str) -> Callable:
-    return _point_jit_fn(name)
+def bind_point_jit(name: str, dtype: str | jnp.dtype | None = None) -> Callable:
+    fn = _point_jit_fn(name)
+
+    def wrapped(*args):
+        target = _resolve_dtype_for_args(args, dtype)
+        out = fn(*tuple(_cast_arg_to_dtype(arg, target) for arg in args))
+        return _cast_out_to_dtype(out, target)
+
+    return wrapped
 
 
 def bind_interval_jit(
@@ -347,16 +561,53 @@ def bind_interval_jit(
     mode: str = "basic",
     prec_bits: int | None = None,
     dps: int | None = None,
+    dtype: str | jnp.dtype | None = None,
 ) -> Callable:
-    return _interval_jit_fn(name, mode, prec_bits, dps)
+    fn = _interval_jit_fn(name, mode, prec_bits, dps)
+
+    def wrapped(*args):
+        target = _resolve_dtype_for_args(args, dtype)
+        out = fn(*tuple(_cast_arg_to_dtype(arg, target) for arg in args))
+        return _cast_out_to_dtype(out, target)
+
+    return wrapped
 
 
-def bind_point_ad(name: str, kind: str = "grad", argnums: int | tuple[int, ...] = 0) -> Callable:
-    return _point_ad_fn(name, kind, argnums)
+def bind_point_ad(
+    name: str,
+    kind: str = "grad",
+    argnums: int | tuple[int, ...] = 0,
+    dtype: str | jnp.dtype | None = None,
+) -> Callable:
+    fn = _point_ad_fn(name, kind, argnums)
+
+    def wrapped(*args):
+        target = _resolve_dtype_for_args(args, dtype)
+        out = fn(*tuple(_cast_arg_to_dtype(arg, target) for arg in args))
+        return _cast_out_to_dtype(out, target)
+
+    return wrapped
 
 
-def bind_point_batch(name: str) -> Callable:
-    return _point_batch_fn(name)
+def bind_point_batch(
+    name: str,
+    dtype: str | jnp.dtype | None = None,
+    pad_to: int | None = None,
+    pad_value: float | complex = 0.0,
+) -> Callable:
+    fn = _point_batch_fn(name)
+
+    def wrapped(*args):
+        target = _resolve_dtype_for_args(args, dtype)
+        batch_args, n = _pad_batch_args(
+            tuple(_cast_arg_to_dtype(arg, target) for arg in args),
+            pad_to=pad_to,
+            pad_value=pad_value,
+        )
+        out = fn(*batch_args)
+        return _trim_batch_out(_cast_out_to_dtype(out, target), n)
+
+    return wrapped
 
 
 def bind_interval_batch(
@@ -364,8 +615,23 @@ def bind_interval_batch(
     mode: str = "basic",
     prec_bits: int | None = None,
     dps: int | None = None,
+    dtype: str | jnp.dtype | None = None,
+    pad_to: int | None = None,
+    pad_value: float | complex = 0.0,
 ) -> Callable:
-    return _interval_batch_fn(name, mode, prec_bits, dps)
+    fn = _interval_batch_fn(name, mode, prec_bits, dps)
+
+    def wrapped(*args):
+        target = _resolve_dtype_for_args(args, dtype)
+        batch_args, n = _pad_batch_args(
+            tuple(_cast_arg_to_dtype(arg, target) for arg in args),
+            pad_to=pad_to,
+            pad_value=pad_value,
+        )
+        out = fn(*batch_args)
+        return _trim_batch_out(_cast_out_to_dtype(out, target), n)
+
+    return wrapped
 
 
 @lru_cache(maxsize=None)

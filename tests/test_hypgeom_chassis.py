@@ -124,6 +124,50 @@ def test_gamma_rgamma_grad_paths():
     _check(bool(jnp.all(jnp.isfinite(g4))))
 
 
+def test_gamma_family_float32_complex_path():
+    xc = jnp.array([1.1, 1.2, 0.2, 0.25], dtype=jnp.float32)
+    lg = hypgeom.acb_hypgeom_lgamma(xc)
+    gg = hypgeom.acb_hypgeom_gamma(xc)
+    rg = hypgeom.acb_hypgeom_rgamma(xc)
+    mid_lg = hypgeom.acb_midpoint(lg)
+    mid_gg = hypgeom.acb_midpoint(gg)
+    mid_rg = hypgeom.acb_midpoint(rg)
+    _check(lg.dtype == jnp.float32)
+    _check(gg.dtype == jnp.float32)
+    _check(rg.dtype == jnp.float32)
+    _check(mid_lg.dtype == jnp.complex64)
+    _check(mid_gg.dtype == jnp.complex64)
+    _check(mid_rg.dtype == jnp.complex64)
+
+
+def test_erf_family_float32_complex_path():
+    xc = jnp.array([0.1, 0.2, -0.25, 0.3], dtype=jnp.float32)
+    ef = hypgeom.acb_hypgeom_erf(xc)
+    ec = hypgeom.acb_hypgeom_erfc(xc)
+    ei = hypgeom.acb_hypgeom_erfi(xc)
+    _check(ef.dtype == jnp.float32)
+    _check(ec.dtype == jnp.float32)
+    _check(ei.dtype == jnp.float32)
+    _check(hypgeom.acb_midpoint(ef).dtype == jnp.complex64)
+    _check(hypgeom.acb_midpoint(ec).dtype == jnp.complex64)
+    _check(hypgeom.acb_midpoint(ei).dtype == jnp.complex64)
+
+
+def test_hypergeometric_float32_paths():
+    a = jnp.array([1.1, 1.2], dtype=jnp.float32)
+    b = jnp.array([2.1, 2.2], dtype=jnp.float32)
+    z = jnp.array([0.2, 0.25], dtype=jnp.float32)
+    ac = jnp.array([1.1, 1.2, 0.1, 0.15], dtype=jnp.float32)
+    zc = jnp.array([0.2, 0.25, -0.1, 0.1], dtype=jnp.float32)
+    out0 = hypgeom.arb_hypgeom_0f1(a, z)
+    out1 = hypgeom.arb_hypgeom_1f1(a, b, z)
+    out0c = hypgeom.acb_hypgeom_0f1(ac, zc)
+    _check(out0.dtype == jnp.float32)
+    _check(out1.dtype == jnp.float32)
+    _check(out0c.dtype == jnp.float32)
+    _check(hypgeom.acb_midpoint(out0c).dtype == jnp.complex64)
+
+
 def test_erf_family_jit_shapes():
     xr = jnp.array([-0.8, 0.9], dtype=jnp.float64)
     xc = jnp.array([-0.6, 0.7, -0.5, 0.6], dtype=jnp.float64)
@@ -203,6 +247,18 @@ def test_erfinv_erfcinv_shapes_and_grad_paths():
     g = jax.grad(loss)(xr)
     _check(g.shape == (2,))
     _check(bool(jnp.all(jnp.isfinite(g))))
+
+
+def test_erf_family_float32_real_path():
+    xr = jnp.array([-0.8, 0.9], dtype=jnp.float32)
+    er = hypgeom.arb_hypgeom_erf(xr)
+    cr = hypgeom.arb_hypgeom_erfc(xr)
+    ir = hypgeom.arb_hypgeom_erfi(xr)
+    inv = hypgeom.arb_hypgeom_erfinv(jnp.array([-0.6, 0.7], dtype=jnp.float32))
+    _check(er.dtype == jnp.float32)
+    _check(cr.dtype == jnp.float32)
+    _check(ir.dtype == jnp.float32)
+    _check(inv.dtype == jnp.float32)
 
 
 def test_1f1_2f1_jit_shapes():

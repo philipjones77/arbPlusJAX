@@ -36,6 +36,7 @@ __all__ = [
     "fmpr",
     "fmpz_extras",
     "fmpzi",
+    "function_provenance",
     "hypgeom",
     "double_gamma",
     "hypgeom_wrappers",

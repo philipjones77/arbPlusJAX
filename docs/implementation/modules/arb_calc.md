@@ -12,7 +12,33 @@ Implementation lives in the corresponding `*_wrappers.py` module and uses `impl=
 
 ## Scope
 
-- Midpoint-rule line integration for real intervals and integrands `exp`, `sin`, `cos`.
+- Straight-line real line integration for unary integrands.
+- Supported integrands include:
+  `exp`, `log`, `sqrt`, `sin`, `cos`, `tan`, `sinh`, `cosh`, `tanh`,
+  `log1p`, `expm1`, `sin_pi`, `cos_pi`, `tan_pi`, `sinc`, `sinc_pi`,
+  `asin`, `acos`, `atan`, `asinh`, `acosh`, `atanh`, `cbrt`,
+  `gamma`, `erf`, `erfc`, `erfi`, `barnesg`.
+
+## Method Families vs Mode Dispatch
+
+`arb_calc` primarily exposes a midpoint-rule line-integration family:
+
+- `arb_calc_integrate_line`
+- `arb_calc_integrate_line_rigorous`
+- batch / precision variants
+
+These are calc kernels, not the full four-mode dispatch surface by themselves.
+
+The standard arbPlusJAX modes are applied above this layer through `calc_wrappers` and `api`:
+
+- `point`
+- `basic`
+- `adaptive`
+- `rigorous`
+
+That distinction matters when comparing modules: calc function names such as
+`integrate_line`, `gl_auto_deg`, or `taylor` describe numerical method families,
+while mode names describe how arbPlusJAX dispatches and tightens those kernels.
 
 ## Intended API Surface
 
@@ -37,6 +63,7 @@ Implementation lives in the corresponding `*_wrappers.py` module and uses `impl=
 ## Notes
 
 - This is a chassis approximation; it does not replicate Arb's adaptive integration.
+- The C parity layer currently covers the legacy `exp/sin/cos` subset for `arb_calc_integrate_line_ref`.
 
 ## Formulas
 
@@ -45,4 +72,3 @@ Implementation lives in the corresponding `*_wrappers.py` module and uses `impl=
 ## Implementation Notes
 
 - Midpoint sampling and outward rounding.
-

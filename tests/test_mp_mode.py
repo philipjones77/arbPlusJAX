@@ -1,7 +1,6 @@
 import jax.numpy as jnp
 
 from arbplusjax import (
-from tests._test_checks import _check
     acb_core,
     arb_core,
     core_wrappers,
@@ -12,6 +11,7 @@ from tests._test_checks import _check
     mp_mode,
     precision,
 )
+from tests._test_checks import _check
 
 
 def test_mp_mode_uses_dps() -> None:

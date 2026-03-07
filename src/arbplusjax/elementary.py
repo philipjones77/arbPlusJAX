@@ -57,11 +57,21 @@ def log_sqrt_two_pi_like(*xs: jax.Array) -> jax.Array:
 
 
 def as_real(x: jax.Array) -> jax.Array:
-    return jnp.asarray(x, dtype=jnp.float64)
+    xx = jnp.asarray(x)
+    if jnp.issubdtype(xx.dtype, jnp.floating):
+        return xx
+    if jnp.issubdtype(xx.dtype, jnp.complexfloating):
+        return jnp.asarray(jnp.real(xx), dtype=jnp.float32 if xx.dtype == jnp.complex64 else jnp.float64)
+    return jnp.asarray(xx, dtype=jnp.float64)
 
 
 def as_complex(x: jax.Array) -> jax.Array:
-    return jnp.asarray(x, dtype=jnp.complex128)
+    xx = jnp.asarray(x)
+    if jnp.issubdtype(xx.dtype, jnp.complexfloating):
+        return xx
+    if jnp.issubdtype(xx.dtype, jnp.floating):
+        return xx.astype(jnp.complex64 if xx.dtype == jnp.float32 else jnp.complex128)
+    return jnp.asarray(xx, dtype=jnp.complex128)
 
 
 def promote_dtype(*xs: jax.Array):
@@ -73,7 +83,22 @@ def complex_promote(x: jax.Array) -> jax.Array:
     xx = jnp.asarray(x)
     if jnp.issubdtype(xx.dtype, jnp.complexfloating):
         return xx
+    if jnp.issubdtype(xx.dtype, jnp.floating):
+        return xx.astype(jnp.complex64 if xx.dtype == jnp.float32 else jnp.complex128)
     return xx.astype(jnp.complex128)
+
+
+def complex_dtype_from(*xs: jax.Array) -> jnp.dtype:
+    if not xs:
+        return jnp.dtype(jnp.complex128)
+    dt = jnp.result_type(*[jnp.asarray(x).dtype for x in xs])
+    if jnp.issubdtype(dt, jnp.complexfloating):
+        return jnp.dtype(jnp.complex64) if dt == jnp.dtype(jnp.complex64) else jnp.dtype(jnp.complex128)
+    return jnp.dtype(jnp.complex64) if dt == jnp.dtype(jnp.float32) else jnp.dtype(jnp.complex128)
+
+
+def real_dtype_from_complex_dtype(dt: jnp.dtype) -> jnp.dtype:
+    return jnp.dtype(jnp.float32) if jnp.dtype(dt) == jnp.dtype(jnp.complex64) else jnp.dtype(jnp.float64)
 
 
 def eps(dtype=jnp.float64) -> jax.Array:
@@ -199,6 +224,8 @@ __all__ = [
     "as_complex",
     "promote_dtype",
     "complex_promote",
+    "complex_dtype_from",
+    "real_dtype_from_complex_dtype",
     "eps",
     "tiny",
     "max_value",

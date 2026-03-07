@@ -70,11 +70,18 @@ Loggamma compare (real + complex + branch‑cut stress):
 python benchmarks/benchmark_loggamma_compare.py --arb-repo "C:\Users\phili\OneDrive\Documents\GitHub\arbPlusJAX\stuff" --iters 2000 --seed 0 --range-lo 0.1 --range-hi 8.0 --imag-range 6.0 --rad 0.05 --mp-dps 50
 ```
 
-Boost adapter template:
+Native Boost adapter:
 ```bash
-python benchmarks/boost_ref_adapter_template.py
+tools/run_boost_ref_adapter.sh
 ```
-Use this only as a contract example. Replace with a real Boost-backed implementation for production baselines.
+This wrapper builds and runs a native C++ Boost-based adapter on demand.
+You can pass it directly to `--boost-ref-cmd`, or just use `python tools/run_benchmarks.py --with-boost`.
+
+Fallback adapter:
+```bash
+python benchmarks/boost_ref_adapter.py
+```
+This remains available as a pure-Python contract implementation, but the default benchmark path now prefers the native C++ Boost adapter.
 
 ## Outputs
 Each sweep run writes:
@@ -135,4 +142,3 @@ Mathematica:
 - `--wolfram-cloud-url <url>`: cloud endpoint (or set `WOLFRAM_CLOUD_URL`).
 - `--wolfram-windows-dir <path>`: Windows install dir (or set `WOLFRAM_WINDOWS_DIR`).
 - `--wolfram-linux-dir <path>`: Linux install dir (or set `WOLFRAM_LINUX_DIR`).
-

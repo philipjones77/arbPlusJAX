@@ -23,5 +23,8 @@ results/*.json
 results/*.csv
 results/benchmarks/**
 !results/benchmarks/README.md
-notebooks/.ipynb_checkpoints/
+examples/.ipynb_checkpoints/
+examples/_input/
+examples/_output/
+stuff/migration/c_chassis/build_linux_wsl/
 _bundles/

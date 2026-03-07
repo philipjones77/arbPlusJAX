@@ -8,13 +8,23 @@ Last updated: 2026-03-01T00:00:00Z
 - Added loggamma comparison tool with real/complex + branch-cut stress tests; included jax.scipy (real-only).
 - Added explicit asymptotic remainder inflation for real bessel rigorous/adaptive interval bounds; added integer-crossing guards for `Y/K` interval APIs (real + complex box wrappers).
 - Enforced source zip filename format in `tools/package_repo.py`: `<repo>_source_YYYY-MM-DD.zip` with validation for custom output paths.
-- Added `CubesselK` backend with four-mode usage (point/basic/rigorous/adaptive) implemented in pure JAX (no CUDA dependency).
-- Added `CubesselK` to benchmark harness and ran characterization against existing `besselk` backends (`results/benchmarks/cubesselk_compare_purejax_20260301/samples_256_seed_7/summary.csv`).
-- Added `cusf_compat` module in this workspace with `Cusf_*` prefixed APIs (functions + helpers) and four-mode support (`point|basic|rigorous|adaptive`) for hypergeometric/Bessel/erf pathways.
+- Added `cuda_besselk` backend with four-mode usage (point/basic/rigorous/adaptive) implemented in pure JAX (no CUDA dependency).
+- Added `cuda_besselk` to benchmark harness and ran characterization against existing `besselk` backends (`results/benchmarks/cuda_besselk_compare_purejax_20260301/samples_256_seed_7/summary.csv`).
+- Added `cusf_compat` module in this workspace with `cusf_*` prefixed APIs (functions + helpers) and four-mode support (`point|basic|rigorous|adaptive`) for hypergeometric/Bessel/erf pathways.
 - Added `boost_hypgeom` module with Boost-prefixed hypergeometric APIs and helper aliases in four modes (`point|basic|rigorous|adaptive`), with docs and tests.
 
 ## Open items
 - Continue completing missing JAX implementations and tests for remaining Arb modules (see Missing C implementations section below).
+- Finish hardening and characterization of the `bdg_*` Barnes/double-gamma family:
+  - point path is implemented and dtype-cleaned, but still needs dedicated optimization/benchmark characterization
+  - basic path is implemented, but rigorous/adaptive enclosure paths remain expensive in Barnes containment tests
+  - remaining slow tests:
+    - `tests/test_gamma_hardening.py::test_bdg_interval_modes_contain_basic`
+    - `tests/test_gamma_hardening.py::test_bdg_complex_modes_contain_basic`
+  - next work:
+    - reduce runtime cost of `bdg_*` rigorous/adaptive samplers in `src/arbplusjax/ball_wrappers.py`
+    - add dedicated point/basic benchmark coverage for `bdg_*`
+    - extend dtype-compliance validation beyond the current `float32`/`complex64` point/basic checks
 
 ## Missing C implementations
 - Source: `docs/audit.md` (snapshot `2026-02-25T03:51:38Z`), grouped by function prefix/module.

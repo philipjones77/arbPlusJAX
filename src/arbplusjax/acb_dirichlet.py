@@ -1,5 +1,19 @@
 from __future__ import annotations
 
+"""Repo-original Dirichlet helper family.
+
+These functions are treated as new mathematical families in the provenance
+registry rather than as alternative implementations of canonical Arb-like
+`zeta` names.
+
+Provenance:
+- classification: new
+- base_names: dirichlet_zeta, dirichlet_eta
+- module lineage: repo-original Dirichlet helper family
+- naming policy: see docs/function_naming.md
+- registry report: see docs/reports/function_implementation_index.md
+"""
+
 from functools import partial
 
 import jax
@@ -9,6 +23,14 @@ from . import acb_core
 from . import double_interval as di
 
 jax.config.update("jax_enable_x64", True)
+
+PROVENANCE = {
+    "classification": "new",
+    "base_names": ("dirichlet_zeta", "dirichlet_eta"),
+    "module_lineage": "repo-original Dirichlet helper family",
+    "naming_policy": "docs/function_naming.md",
+    "registry_report": "docs/reports/function_implementation_index.md",
+}
 
 
 def _full_box_like(x: jax.Array) -> jax.Array:

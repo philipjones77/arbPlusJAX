@@ -198,6 +198,19 @@ def _contains_interval(outer: np.ndarray, inner: np.ndarray) -> np.ndarray:
     return (outer[:, 0] <= inner[:, 0]) & (outer[:, 1] >= inner[:, 1])
 
 
+def _pad_first_dim(x: np.ndarray, target: int) -> np.ndarray:
+    n = x.shape[0]
+    if target <= n:
+        return x
+    pad_shape = (target - n, *x.shape[1:])
+    pad = np.zeros(pad_shape, dtype=x.dtype)
+    return np.concatenate([x, pad], axis=0)
+
+
+def _trim_first_dim(x: np.ndarray, n: int) -> np.ndarray:
+    return x[:n]
+
+
 def _stats(x: np.ndarray) -> dict[str, float]:
     if x.size == 0:
         return {
@@ -473,6 +486,19 @@ def main() -> int:
     parser.add_argument("--jax-batch", action="store_true", help="JIT a single batched JAX call per function.")
     parser.add_argument("--jax-point-batch", action="store_true", help="JIT a batched point-evaluation JAX kernel per function.")
     parser.add_argument("--jax-warmup", action="store_true", help="Warm up JAX kernels before timing (excludes compile cost).")
+    parser.add_argument(
+        "--jax-dtype",
+        type=str,
+        choices=("float64", "float32"),
+        default="float64",
+        help="JAX input dtype for JAX backends.",
+    )
+    parser.add_argument(
+        "--jax-fixed-batch-size",
+        type=int,
+        default=0,
+        help="If > 0, pad JAX inputs to a fixed leading dimension to reduce recompiles across sweep sample sizes.",
+    )
     parser.add_argument("--outdir", type=str, default="")
     args = parser.parse_args()
 
@@ -517,6 +543,7 @@ def main() -> int:
 
     import jax
     import jax.numpy as jnp
+    jax_np_dtype = np.float32 if args.jax_dtype == "float32" else np.float64
 
     try:
         import mpmath as mp
@@ -555,6 +582,16 @@ def main() -> int:
                     z = np.clip(z, 1e-6, None)
                     z_intervals = np.stack([z - radius, z + radius], axis=-1)
 
+                # Use a stable leading shape for JAX runs so compiled kernels can be reused across sweep sizes.
+                jax_n = max(samples, args.jax_fixed_batch_size) if args.jax_fixed_batch_size > 0 else samples
+                x_jax = _pad_first_dim(x.astype(jax_np_dtype, copy=False), jax_n)
+                intervals_jax = _pad_first_dim(intervals.astype(jax_np_dtype, copy=False), jax_n)
+                if is_bivariate:
+                    nu_jax = _pad_first_dim(nu.astype(jax_np_dtype, copy=False), jax_n)
+                    z_jax = _pad_first_dim(z.astype(jax_np_dtype, copy=False), jax_n)
+                    nu_intervals_jax = _pad_first_dim(nu_intervals.astype(jax_np_dtype, copy=False), jax_n)
+                    z_intervals_jax = _pad_first_dim(z_intervals.astype(jax_np_dtype, copy=False), jax_n)
+
                 c_out = None
                 if spec.c_lib and spec.c_fn and spec.c_lib in c_libs:
                     t0 = time.perf_counter()
@@ -575,28 +612,39 @@ def main() -> int:
                         "notes": "",
                     })
 
+                jax_interval_out: dict[str, np.ndarray] = {}
                 for mode, label in (("basic", "jax_basic"), ("adaptive", "jax_adaptive"), ("rigorous", "jax_rigorous")):
                     fn_name = getattr(spec, f"jax_{mode}")
                     if not fn_name:
                         continue
                     if args.jax_batch and args.jax_warmup:
                         if is_bivariate:
-                            _ = _eval_jax_interval_batch(spec.name, nu_intervals, z_intervals, mode=mode, prec_bits=args.prec_bits)
+                            _ = _eval_jax_interval_batch(
+                                spec.name, nu_intervals_jax, z_intervals_jax, mode=mode, prec_bits=args.prec_bits
+                            )
                         else:
-                            _ = _eval_jax_interval_batch(spec.name, intervals, mode=mode, prec_bits=args.prec_bits)
+                            _ = _eval_jax_interval_batch(spec.name, intervals_jax, mode=mode, prec_bits=args.prec_bits)
                         jax.block_until_ready(_)
                     t0 = time.perf_counter()
                     if args.jax_batch:
                         if is_bivariate:
-                            out = np.asarray(_eval_jax_interval_batch(spec.name, nu_intervals, z_intervals, mode=mode, prec_bits=args.prec_bits))
+                            out = np.asarray(
+                                _eval_jax_interval_batch(
+                                    spec.name, nu_intervals_jax, z_intervals_jax, mode=mode, prec_bits=args.prec_bits
+                                )
+                            )
                         else:
-                            out = np.asarray(_eval_jax_interval_batch(spec.name, intervals, mode=mode, prec_bits=args.prec_bits))
+                            out = np.asarray(_eval_jax_interval_batch(spec.name, intervals_jax, mode=mode, prec_bits=args.prec_bits))
                     else:
                         if is_bivariate:
-                            out = np.asarray(_eval_jax_interval(spec.name, nu_intervals, z_intervals, mode=mode, prec_bits=args.prec_bits))
+                            out = np.asarray(
+                                _eval_jax_interval(spec.name, nu_intervals_jax, z_intervals_jax, mode=mode, prec_bits=args.prec_bits)
+                            )
                         else:
-                            out = np.asarray(_eval_jax_interval(spec.name, intervals, mode=mode, prec_bits=args.prec_bits))
+                            out = np.asarray(_eval_jax_interval(spec.name, intervals_jax, mode=mode, prec_bits=args.prec_bits))
                     t1 = time.perf_counter()
+                    out = _trim_first_dim(out, samples)
+                    jax_interval_out[label] = out
                     mean_width = float(np.mean(_interval_width(out)))
                     mean_abs_err = ""
                     max_abs_err = ""
@@ -652,10 +700,11 @@ def main() -> int:
                     if fn is not None:
                         t0 = time.perf_counter()
                         if is_bivariate:
-                            y = np.asarray(fn(jnp.asarray(nu), jnp.asarray(z)))
+                            y = np.asarray(fn(jnp.asarray(nu_jax), jnp.asarray(z_jax)))
                         else:
-                            y = np.asarray(fn(jnp.asarray(x)))
+                            y = np.asarray(fn(jnp.asarray(x_jax)))
                         t1 = time.perf_counter()
+                        y = _trim_first_dim(y, samples)
                         mean_abs_err = ""
                         max_abs_err = ""
                         containment_rate = ""
@@ -681,16 +730,17 @@ def main() -> int:
                         try:
                             if args.jax_warmup:
                                 if is_bivariate:
-                                    _ = _eval_jax_point_batch(spec.name, nu, z)
+                                    _ = _eval_jax_point_batch(spec.name, nu_jax, z_jax)
                                 else:
-                                    _ = _eval_jax_point_batch(spec.name, x)
+                                    _ = _eval_jax_point_batch(spec.name, x_jax)
                                 jax.block_until_ready(_)
                             t0 = time.perf_counter()
                             if is_bivariate:
-                                y = np.asarray(_eval_jax_point_batch(spec.name, nu, z))
+                                y = np.asarray(_eval_jax_point_batch(spec.name, nu_jax, z_jax))
                             else:
-                                y = np.asarray(_eval_jax_point_batch(spec.name, x))
+                                y = np.asarray(_eval_jax_point_batch(spec.name, x_jax))
                             t1 = time.perf_counter()
+                            y = _trim_first_dim(y, samples)
                         except Exception as exc:
                             results.append({
                                 "function": spec.name,
@@ -860,16 +910,9 @@ def main() -> int:
                         fn_name = getattr(spec, f"jax_{mode}")
                         if not fn_name:
                             continue
-                        if args.jax_batch:
-                            if is_bivariate:
-                                out = np.asarray(_eval_jax_interval_batch(spec.name, nu_intervals, z_intervals, mode=mode, prec_bits=args.prec_bits))
-                            else:
-                                out = np.asarray(_eval_jax_interval_batch(spec.name, intervals, mode=mode, prec_bits=args.prec_bits))
-                        else:
-                            if is_bivariate:
-                                out = np.asarray(_eval_jax_interval(spec.name, nu_intervals, z_intervals, mode=mode, prec_bits=args.prec_bits))
-                            else:
-                                out = np.asarray(_eval_jax_interval(spec.name, intervals, mode=mode, prec_bits=args.prec_bits))
+                        out = jax_interval_out.get(label)
+                        if out is None:
+                            continue
                         j_mid = _interval_mid(out)
                         err = np.abs(j_mid - c_mid)
                         stats = _stats(err)
@@ -891,6 +934,8 @@ def main() -> int:
                 "seed": seed,
                 "dps": args.dps,
                 "prec_bits": args.prec_bits,
+                "jax_dtype": args.jax_dtype,
+                "jax_fixed_batch_size": args.jax_fixed_batch_size,
                 "c_ref_dir": str(c_ref_dir) if c_ref_dir else "",
                 "boost_ref_cmd": args.boost_ref_cmd,
                 "versions": _load_versions(),
@@ -926,4 +971,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

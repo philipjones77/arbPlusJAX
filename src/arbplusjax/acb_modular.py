@@ -1,5 +1,19 @@
 from __future__ import annotations
 
+"""Repo-original modular-function family.
+
+These functions are treated as new mathematical families in the provenance
+registry rather than as alternative implementations of canonical Arb-like
+public names.
+
+Provenance:
+- classification: new
+- base_names: modular_j
+- module lineage: repo-original modular function family
+- naming policy: see docs/function_naming.md
+- registry report: see docs/reports/function_implementation_index.md
+"""
+
 from functools import partial
 
 import jax
@@ -11,6 +25,14 @@ from . import elementary as el
 from . import core_wrappers
 
 jax.config.update("jax_enable_x64", True)
+
+PROVENANCE = {
+    "classification": "new",
+    "base_names": ("modular_j",),
+    "module_lineage": "repo-original modular function family",
+    "naming_policy": "docs/function_naming.md",
+    "registry_report": "docs/reports/function_implementation_index.md",
+}
 
 
 def _full_box_like(x: jax.Array) -> jax.Array:

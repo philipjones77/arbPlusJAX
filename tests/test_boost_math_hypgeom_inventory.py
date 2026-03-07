@@ -10,6 +10,10 @@ def _boost_root() -> Path:
     env = os.getenv("BOOST_MATH_ROOT", "").strip()
     if env:
         return Path(env)
+    repo_root = Path(__file__).resolve().parents[1]
+    sibling = repo_root.parent / "math"
+    if sibling.exists():
+        return sibling
     return Path(r"C:\Users\phili\OneDrive\Documents\GitHub\math")
 
 

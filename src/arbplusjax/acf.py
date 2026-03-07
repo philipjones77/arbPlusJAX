@@ -7,11 +7,25 @@ jax.config.update("jax_enable_x64", True)
 
 
 def acf_add(a: jax.Array, b: jax.Array) -> jax.Array:
-    return jnp.asarray(a, dtype=jnp.complex128) + jnp.asarray(b, dtype=jnp.complex128)
+    aa = jnp.asarray(a)
+    bb = jnp.asarray(b)
+    dtype = jnp.result_type(aa, bb)
+    if jnp.issubdtype(dtype, jnp.floating):
+        dtype = jnp.complex64 if dtype == jnp.float32 else jnp.complex128
+    elif not jnp.issubdtype(dtype, jnp.complexfloating):
+        dtype = jnp.complex128
+    return jnp.asarray(aa, dtype=dtype) + jnp.asarray(bb, dtype=dtype)
 
 
 def acf_mul(a: jax.Array, b: jax.Array) -> jax.Array:
-    return jnp.asarray(a, dtype=jnp.complex128) * jnp.asarray(b, dtype=jnp.complex128)
+    aa = jnp.asarray(a)
+    bb = jnp.asarray(b)
+    dtype = jnp.result_type(aa, bb)
+    if jnp.issubdtype(dtype, jnp.floating):
+        dtype = jnp.complex64 if dtype == jnp.float32 else jnp.complex128
+    elif not jnp.issubdtype(dtype, jnp.complexfloating):
+        dtype = jnp.complex128
+    return jnp.asarray(aa, dtype=dtype) * jnp.asarray(bb, dtype=dtype)
 
 
 def acf_add_batch(a: jax.Array, b: jax.Array) -> jax.Array:

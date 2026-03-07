@@ -17,9 +17,25 @@ jax.config.update("jax_enable_x64", True)
 
 
 def as_acb_box(x: jax.Array) -> jax.Array:
-    arr = jnp.asarray(x, dtype=jnp.float64)
+    arr = jnp.asarray(x)
     checks.check_last_dim(arr, 4, "acb_core.as_acb_box")
     return arr
+
+
+def _real_dtype_for_box(x: jax.Array) -> jnp.dtype:
+    return jnp.asarray(x).dtype
+
+
+def _complex_dtype_for_box(x: jax.Array) -> jnp.dtype:
+    return jnp.dtype(jnp.complex64) if _real_dtype_for_box(x) == jnp.dtype(jnp.float32) else jnp.dtype(jnp.complex128)
+
+
+def _real_scalar_for_box(x: jax.Array, value: float) -> jax.Array:
+    return jnp.asarray(value, dtype=_real_dtype_for_box(x))
+
+
+def _complex_scalar_for_box(x: jax.Array, value: complex) -> jax.Array:
+    return jnp.asarray(value, dtype=_complex_dtype_for_box(x))
 
 
 def acb_box(real_interval: jax.Array, imag_interval: jax.Array) -> jax.Array:
@@ -46,24 +62,24 @@ def acb_midpoint(x: jax.Array) -> jax.Array:
 
 
 def acb_zero() -> jax.Array:
-    z = jnp.float64(0.0)
+    z = jnp.asarray(0.0, dtype=jnp.float64)
     return acb_box(di.interval(z, z), di.interval(z, z))
 
 
 def acb_one() -> jax.Array:
-    o = jnp.float64(1.0)
-    z = jnp.float64(0.0)
+    o = jnp.asarray(1.0, dtype=jnp.float64)
+    z = jnp.asarray(0.0, dtype=jnp.float64)
     return acb_box(di.interval(o, o), di.interval(z, z))
 
 
 def acb_onei() -> jax.Array:
-    o = jnp.float64(1.0)
-    z = jnp.float64(0.0)
+    o = jnp.asarray(1.0, dtype=jnp.float64)
+    z = jnp.asarray(0.0, dtype=jnp.float64)
     return acb_box(di.interval(z, z), di.interval(o, o))
 
 
 def _full_box_like(x: jax.Array) -> jax.Array:
-    t = jnp.ones_like(x[..., 0], dtype=jnp.float64)
+    t = jnp.ones_like(x[..., 0], dtype=x.dtype)
     inf = jnp.inf * t
     return acb_box(di.interval(-inf, inf), di.interval(-inf, inf))
 
@@ -98,8 +114,10 @@ def _acb_unary_pair_from_midpoint(x: jax.Array, fn) -> tuple[jax.Array, jax.Arra
 
 
 def _complex_loggamma_lanczos(z: jax.Array) -> jax.Array:
-    z = jnp.asarray(z, dtype=jnp.complex128)
-    z1 = z - jnp.complex128(1.0 + 0.0j)
+    z = el.as_complex(z)
+    complex_dtype = z.dtype
+    real_dtype = jnp.real(z).dtype
+    z1 = z - jnp.asarray(1.0 + 0.0j, dtype=complex_dtype)
     coeffs = jnp.asarray(
         [
             0.99999999999980993,
@@ -112,20 +130,21 @@ def _complex_loggamma_lanczos(z: jax.Array) -> jax.Array:
             9.9843695780195716e-6,
             1.5056327351493116e-7,
         ],
-        dtype=jnp.complex128,
+        dtype=complex_dtype,
     )
     x = coeffs[0]
     for k in range(1, coeffs.shape[0]):
-        x = x + coeffs[k] / (z1 + jnp.float64(k))
-    t = z1 + jnp.float64(7.5)
-    return el.LOG_SQRT_TWO_PI + (z1 + 0.5) * jnp.log(t) - t + jnp.log(x)
+        x = x + coeffs[k] / (z1 + jnp.asarray(k, dtype=real_dtype))
+    t = z1 + jnp.asarray(7.5, dtype=real_dtype)
+    return jnp.asarray(el.LOG_SQRT_TWO_PI, dtype=complex_dtype) + (z1 + jnp.asarray(0.5, dtype=real_dtype)) * jnp.log(t) - t + jnp.log(x)
 
 
 def _complex_loggamma(z: jax.Array) -> jax.Array:
-    z = jnp.asarray(z, dtype=jnp.complex128)
+    z = el.as_complex(z)
+    complex_dtype = z.dtype
 
     def reflection(w):
-        return el.LOG_PI - jnp.log(jnp.sin(el.PI * w)) - _complex_loggamma_lanczos(1.0 - w)
+        return jnp.asarray(el.LOG_PI, dtype=complex_dtype) - jnp.log(jnp.sin(jnp.asarray(el.PI, dtype=complex_dtype) * w)) - _complex_loggamma_lanczos(jnp.asarray(1.0, dtype=complex_dtype) - w)
 
     return lax.cond(jnp.real(z) < 0.5, reflection, _complex_loggamma_lanczos, z)
 
@@ -375,12 +394,18 @@ def acb_approx_dot(initial: jax.Array, subtract: int, x: jax.Array, y: jax.Array
 
 
 def acb_dot_ui(initial: jax.Array, subtract: int, x: jax.Array, y: jax.Array) -> jax.Array:
-    yb = acb_box(di.interval(jnp.asarray(y, dtype=jnp.float64), jnp.asarray(y, dtype=jnp.float64)), di.interval(0.0, 0.0))
+    xb = as_acb_box(x)
+    yy = jnp.asarray(y, dtype=xb.dtype)
+    zz = jnp.zeros_like(yy)
+    yb = acb_box(di.interval(yy, yy), di.interval(zz, zz))
     return acb_dot_simple(initial, subtract, x, yb)
 
 
 def acb_dot_si(initial: jax.Array, subtract: int, x: jax.Array, y: jax.Array) -> jax.Array:
-    yb = acb_box(di.interval(jnp.asarray(y, dtype=jnp.float64), jnp.asarray(y, dtype=jnp.float64)), di.interval(0.0, 0.0))
+    xb = as_acb_box(x)
+    yy = jnp.asarray(y, dtype=xb.dtype)
+    zz = jnp.zeros_like(yy)
+    yb = acb_box(di.interval(yy, yy), di.interval(zz, zz))
     return acb_dot_simple(initial, subtract, x, yb)
 
 
@@ -393,7 +418,10 @@ def acb_dot_siui(initial: jax.Array, subtract: int, x: jax.Array, y: jax.Array) 
 
 
 def acb_dot_fmpz(initial: jax.Array, subtract: int, x: jax.Array, y: jax.Array) -> jax.Array:
-    yb = acb_box(di.interval(jnp.asarray(y, dtype=jnp.float64), jnp.asarray(y, dtype=jnp.float64)), di.interval(0.0, 0.0))
+    xb = as_acb_box(x)
+    yy = jnp.asarray(y, dtype=xb.dtype)
+    zz = jnp.zeros_like(yy)
+    yb = acb_box(di.interval(yy, yy), di.interval(zz, zz))
     return acb_dot_simple(initial, subtract, x, yb)
 
 
@@ -404,13 +432,15 @@ def acb_add_error_arb(x: jax.Array, err: jax.Array) -> jax.Array:
 
 
 def acb_add_error_arf(x: jax.Array, err: jax.Array) -> jax.Array:
-    e = jnp.asarray(err, dtype=jnp.float64)
+    xb = as_acb_box(x)
+    e = jnp.asarray(err, dtype=xb.dtype)
     er = di.interval(e, e)
     return acb_add_error_arb(x, er)
 
 
 def acb_add_error_mag(x: jax.Array, err: jax.Array) -> jax.Array:
-    e = jnp.asarray(err, dtype=jnp.float64)
+    xb = as_acb_box(x)
+    e = jnp.asarray(err, dtype=xb.dtype)
     er = di.interval(e, e)
     return acb_add_error_arb(x, er)
 
@@ -620,7 +650,8 @@ def acb_pow(x: jax.Array, y: jax.Array) -> jax.Array:
 def acb_pow_arb(x: jax.Array, y: jax.Array) -> jax.Array:
     yb = di.as_interval(y)
     m = di.midpoint(yb)
-    return acb_pow(x, acb_box(di.interval(m, m), di.interval(jnp.float64(0.0), jnp.float64(0.0))))
+    zero = jnp.zeros_like(m)
+    return acb_pow(x, acb_box(di.interval(m, m), di.interval(zero, zero)))
 
 
 @jax.jit
@@ -646,7 +677,7 @@ def acb_sqr(x: jax.Array) -> jax.Array:
 
 @jax.jit
 def acb_root_ui(x: jax.Array, k: int) -> jax.Array:
-    return _acb_unary_from_midpoint(x, lambda z: jnp.power(z, 1.0 / jnp.float64(k)))
+    return _acb_unary_from_midpoint(x, lambda z: jnp.power(z, jnp.asarray(1.0, dtype=jnp.real(z).dtype) / jnp.asarray(k, dtype=jnp.real(z).dtype)))
 
 
 @jax.jit
@@ -673,8 +704,9 @@ def acb_log_sin_pi(x: jax.Array) -> jax.Array:
 def acb_digamma(x: jax.Array) -> jax.Array:
     box = as_acb_box(x)
     z = acb_midpoint(box)
-    h = jnp.complex128(1e-6 + 0.0j)
-    v = (_complex_loggamma(z + h) - _complex_loggamma(z - h)) / (2.0 * h)
+    h = _complex_scalar_for_box(box, 1e-6 + 0.0j)
+    two = _complex_scalar_for_box(box, 2.0 + 0.0j)
+    v = (_complex_loggamma(z + h) - _complex_loggamma(z - h)) / (two * h)
     finite = jnp.isfinite(jnp.real(v)) & jnp.isfinite(jnp.imag(v))
     out = _acb_from_complex(v)
     return jnp.where(finite[..., None], out, _full_box_like(box))
@@ -752,16 +784,18 @@ def acb_bernoulli_poly_ui(n: int, x: jax.Array) -> jax.Array:
     def fallback():
         return _full_box_like(xb)
 
+    complex_dtype = _complex_dtype_for_box(xb)
+    real_dtype = _real_dtype_for_box(xb)
     if n == 0:
-        v = jnp.complex128(1.0 + 0.0j)
+        v = jnp.asarray(1.0 + 0.0j, dtype=complex_dtype)
     elif n == 1:
-        v = z - 0.5
+        v = z - jnp.asarray(0.5, dtype=real_dtype)
     elif n == 2:
-        v = z * z - z + jnp.float64(1.0 / 6.0)
+        v = z * z - z + jnp.asarray(1.0 / 6.0, dtype=real_dtype)
     elif n == 3:
-        v = z * z * z - 1.5 * z * z + 0.5 * z
+        v = z * z * z - jnp.asarray(1.5, dtype=real_dtype) * z * z + jnp.asarray(0.5, dtype=real_dtype) * z
     elif n == 4:
-        v = z**4 - 2.0 * z**3 + z * z - jnp.float64(1.0 / 30.0)
+        v = z**4 - jnp.asarray(2.0, dtype=real_dtype) * z**3 + z * z - jnp.asarray(1.0 / 30.0, dtype=real_dtype)
     else:
         return fallback()
 
@@ -804,9 +838,12 @@ def acb_polylog_si(
     max_terms: int = 512,
     min_terms: int = 32,
 ) -> jax.Array:
+    zbox = as_acb_box(z)
+    zero = jnp.asarray(0.0, dtype=zbox.dtype)
+    sval = jnp.asarray(s, dtype=zbox.dtype)
     s_box = acb_box(
-        di.interval(jnp.float64(s), jnp.float64(s)),
-        di.interval(jnp.float64(0.0), jnp.float64(0.0)),
+        di.interval(sval, sval),
+        di.interval(zero, zero),
     )
     return acb_polylog(s_box, z, terms=terms, max_terms=max_terms, min_terms=min_terms)
 

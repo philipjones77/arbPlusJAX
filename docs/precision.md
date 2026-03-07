@@ -272,6 +272,13 @@ and return outward-rounded intervals for each output component.
 
 For complex boxes, we treat real and imaginary parts as separate variables and bound both components using the same Jacobian framework.
 
+For `calc`, keep the following distinction explicit:
+
+- calc names such as `integrate_line`, `gl_auto_deg`, and `taylor` refer to numerical method families
+- `point`, `basic`, `adaptive`, and `rigorous` are arbPlusJAX dispatch/tightening modes applied by `calc_wrappers` and `api`
+
+So `gl_auto_deg` and `taylor` are not additional modes; they are alternative calc kernels that can be exposed through the four-mode interface.
+
 ### Adaptive (sampling)
 
 We evaluate the midpoint kernel at a small fixed stencil:

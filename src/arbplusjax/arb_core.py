@@ -4,6 +4,7 @@ from functools import partial
 
 import jax
 import jax.numpy as jnp
+from jax import lax
 
 from . import double_interval as di
 from . import elementary as el
@@ -13,10 +14,15 @@ jax.config.update("jax_enable_x64", True)
 _PI = el.PI
 _HALF_PI = el.HALF_PI
 _TWO_PI = el.TWO_PI
+_DIGAMMA_ZERO = jnp.asarray(1.4616321449683623413, dtype=jnp.float64)
+
+
+def _scalar_like(x: jax.Array, value: float) -> jax.Array:
+    return jnp.asarray(value, dtype=jnp.asarray(x).dtype)
 
 
 def _full_interval_like(x: jax.Array) -> jax.Array:
-    t = jnp.ones_like(x[..., 0], dtype=jnp.float64)
+    t = jnp.ones_like(x[..., 0], dtype=x.dtype)
     return di.interval(-jnp.inf * t, jnp.inf * t)
 
 
@@ -449,6 +455,91 @@ def arb_cbrt(x: jax.Array) -> jax.Array:
     return di.interval(di._below(jnp.minimum(ra, rb)), di._above(jnp.maximum(ra, rb)))
 
 
+@jax.jit
+def arb_lgamma(x: jax.Array) -> jax.Array:
+    x = di.as_interval(x)
+    a = x[..., 0]
+    b = x[..., 1]
+    m = 0.5 * (a + b)
+    digamma_zero = jnp.asarray(_DIGAMMA_ZERO, dtype=x.dtype)
+    include_root = (a <= digamma_zero) & (digamma_zero <= b)
+
+    root_vals = jnp.full_like(a, digamma_zero)
+    vals = jnp.stack(
+        [
+            lax.lgamma(a),
+            lax.lgamma(b),
+            lax.lgamma(m),
+            lax.lgamma(root_vals),
+        ],
+        axis=-1,
+    )
+    mask = jnp.stack(
+        [
+            jnp.ones_like(include_root, dtype=bool),
+            jnp.ones_like(include_root, dtype=bool),
+            jnp.ones_like(include_root, dtype=bool),
+            include_root,
+        ],
+        axis=-1,
+    )
+    inf = _scalar_like(a, jnp.inf)
+    neg_inf = _scalar_like(a, -jnp.inf)
+    zero = _scalar_like(a, 0.0)
+    vmin = jnp.min(jnp.where(mask, vals, inf), axis=-1)
+    vmax = jnp.max(jnp.where(mask, vals, neg_inf), axis=-1)
+    finite = jnp.all(jnp.isfinite(jnp.where(mask, vals, zero)), axis=-1)
+    ok = (a > zero) & finite
+    out = di.interval(di._below(vmin), di._above(vmax))
+    return jnp.where(ok[..., None], out, _full_interval_like(x))
+
+
+@jax.jit
+def arb_gamma(x: jax.Array) -> jax.Array:
+    x = di.as_interval(x)
+    a = x[..., 0]
+    b = x[..., 1]
+    m = 0.5 * (a + b)
+    digamma_zero = jnp.asarray(_DIGAMMA_ZERO, dtype=x.dtype)
+    include_root = (a <= digamma_zero) & (digamma_zero <= b)
+
+    root_vals = jnp.full_like(a, digamma_zero)
+    vals = jnp.stack(
+        [
+            jnp.exp(lax.lgamma(a)),
+            jnp.exp(lax.lgamma(b)),
+            jnp.exp(lax.lgamma(m)),
+            jnp.exp(lax.lgamma(root_vals)),
+        ],
+        axis=-1,
+    )
+    mask = jnp.stack(
+        [
+            jnp.ones_like(include_root, dtype=bool),
+            jnp.ones_like(include_root, dtype=bool),
+            jnp.ones_like(include_root, dtype=bool),
+            include_root,
+        ],
+        axis=-1,
+    )
+    inf = _scalar_like(a, jnp.inf)
+    neg_inf = _scalar_like(a, -jnp.inf)
+    zero = _scalar_like(a, 0.0)
+    vmin = jnp.min(jnp.where(mask, vals, inf), axis=-1)
+    vmax = jnp.max(jnp.where(mask, vals, neg_inf), axis=-1)
+    finite = jnp.all(jnp.isfinite(jnp.where(mask, vals, zero)), axis=-1)
+    ok = (a > zero) & finite
+    out = di.interval(di._below(vmin), di._above(vmax))
+    return jnp.where(ok[..., None], out, _full_interval_like(x))
+
+
+@jax.jit
+def arb_rgamma(x: jax.Array) -> jax.Array:
+    x = di.as_interval(x)
+    one = jnp.ones_like(di.lower(x))
+    return di.fast_div(di.interval(one, one), arb_gamma(x))
+
+
 @partial(jax.jit, static_argnames=("prec_bits",))
 def arb_exp_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return di.round_interval_outward(arb_exp(x), prec_bits)
@@ -646,6 +737,21 @@ def arb_cbrt_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Ar
     return di.round_interval_outward(arb_cbrt(x), prec_bits)
 
 
+@partial(jax.jit, static_argnames=("prec_bits",))
+def arb_lgamma_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return di.round_interval_outward(arb_lgamma(x), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def arb_gamma_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return di.round_interval_outward(arb_gamma(x), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def arb_rgamma_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return di.round_interval_outward(arb_rgamma(x), prec_bits)
+
+
 def arb_exp_batch(x: jax.Array) -> jax.Array:
     return arb_exp(di.as_interval(x))
 
@@ -800,6 +906,18 @@ def arb_root_batch(x: jax.Array, k: int) -> jax.Array:
 
 def arb_cbrt_batch(x: jax.Array) -> jax.Array:
     return arb_cbrt(di.as_interval(x))
+
+
+def arb_lgamma_batch(x: jax.Array) -> jax.Array:
+    return arb_lgamma(di.as_interval(x))
+
+
+def arb_gamma_batch(x: jax.Array) -> jax.Array:
+    return arb_gamma(di.as_interval(x))
+
+
+def arb_rgamma_batch(x: jax.Array) -> jax.Array:
+    return arb_rgamma(di.as_interval(x))
 
 
 def arb_exp_batch_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
@@ -960,6 +1078,18 @@ def arb_cbrt_batch_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> 
     return di.round_interval_outward(arb_cbrt_batch(x), prec_bits)
 
 
+def arb_lgamma_batch_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return di.round_interval_outward(arb_lgamma_batch(x), prec_bits)
+
+
+def arb_gamma_batch_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return di.round_interval_outward(arb_gamma_batch(x), prec_bits)
+
+
+def arb_rgamma_batch_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return di.round_interval_outward(arb_rgamma_batch(x), prec_bits)
+
+
 arb_exp_batch_jit = jax.jit(arb_exp_batch)
 arb_log_batch_jit = jax.jit(arb_log_batch)
 arb_sqrt_batch_jit = jax.jit(arb_sqrt_batch)
@@ -999,6 +1129,9 @@ arb_pow_fmpq_batch_jit = jax.jit(arb_pow_fmpq_batch)
 arb_root_ui_batch_jit = jax.jit(arb_root_ui_batch, static_argnames=("k",))
 arb_root_batch_jit = jax.jit(arb_root_batch, static_argnames=("k",))
 arb_cbrt_batch_jit = jax.jit(arb_cbrt_batch)
+arb_lgamma_batch_jit = jax.jit(arb_lgamma_batch)
+arb_gamma_batch_jit = jax.jit(arb_gamma_batch)
+arb_rgamma_batch_jit = jax.jit(arb_rgamma_batch)
 
 arb_exp_batch_prec_jit = jax.jit(arb_exp_batch_prec, static_argnames=("prec_bits",))
 arb_log_batch_prec_jit = jax.jit(arb_log_batch_prec, static_argnames=("prec_bits",))
@@ -1039,6 +1172,9 @@ arb_pow_fmpq_batch_prec_jit = jax.jit(arb_pow_fmpq_batch_prec, static_argnames=(
 arb_root_ui_batch_prec_jit = jax.jit(arb_root_ui_batch_prec, static_argnames=("k", "prec_bits"))
 arb_root_batch_prec_jit = jax.jit(arb_root_batch_prec, static_argnames=("k", "prec_bits"))
 arb_cbrt_batch_prec_jit = jax.jit(arb_cbrt_batch_prec, static_argnames=("prec_bits",))
+arb_lgamma_batch_prec_jit = jax.jit(arb_lgamma_batch_prec, static_argnames=("prec_bits",))
+arb_gamma_batch_prec_jit = jax.jit(arb_gamma_batch_prec, static_argnames=("prec_bits",))
+arb_rgamma_batch_prec_jit = jax.jit(arb_rgamma_batch_prec, static_argnames=("prec_bits",))
 
 
 __all__ = [
@@ -1061,6 +1197,9 @@ __all__ = [
     "arb_log1p",
     "arb_expm1",
     "arb_sin_cos",
+    "arb_lgamma",
+    "arb_gamma",
+    "arb_rgamma",
     "arb_exp_prec",
     "arb_log_prec",
     "arb_sqrt_prec",
@@ -1080,6 +1219,9 @@ __all__ = [
     "arb_log1p_prec",
     "arb_expm1_prec",
     "arb_sin_cos_prec",
+    "arb_lgamma_prec",
+    "arb_gamma_prec",
+    "arb_rgamma_prec",
     "arb_exp_batch",
     "arb_log_batch",
     "arb_sqrt_batch",
@@ -1099,6 +1241,9 @@ __all__ = [
     "arb_log1p_batch",
     "arb_expm1_batch",
     "arb_sin_cos_batch",
+    "arb_lgamma_batch",
+    "arb_gamma_batch",
+    "arb_rgamma_batch",
     "arb_exp_batch_prec",
     "arb_log_batch_prec",
     "arb_sqrt_batch_prec",
@@ -1118,6 +1263,9 @@ __all__ = [
     "arb_log1p_batch_prec",
     "arb_expm1_batch_prec",
     "arb_sin_cos_batch_prec",
+    "arb_lgamma_batch_prec",
+    "arb_gamma_batch_prec",
+    "arb_rgamma_batch_prec",
     "arb_exp_batch_jit",
     "arb_log_batch_jit",
     "arb_sqrt_batch_jit",
@@ -1137,6 +1285,9 @@ __all__ = [
     "arb_log1p_batch_jit",
     "arb_expm1_batch_jit",
     "arb_sin_cos_batch_jit",
+    "arb_lgamma_batch_jit",
+    "arb_gamma_batch_jit",
+    "arb_rgamma_batch_jit",
     "arb_exp_batch_prec_jit",
     "arb_log_batch_prec_jit",
     "arb_sqrt_batch_prec_jit",
@@ -1156,6 +1307,9 @@ __all__ = [
     "arb_log1p_batch_prec_jit",
     "arb_expm1_batch_prec_jit",
     "arb_sin_cos_batch_prec_jit",
+    "arb_lgamma_batch_prec_jit",
+    "arb_gamma_batch_prec_jit",
+    "arb_rgamma_batch_prec_jit",
 ]
 
 __all__.extend(

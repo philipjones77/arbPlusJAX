@@ -7,6 +7,7 @@ from jax import lax
 import jax.numpy as jnp
 
 from . import double_interval as di
+from . import arb_core
 from . import checks
 from . import barnesg
 from . import coeffs
@@ -39,6 +40,15 @@ _LANCZOS = coeffs.LANCZOS
 _STIRLING_COEFFS = coeffs.STIRLING_COEFFS
 
 
+def _complex_dtype_for_real(real_dtype: jnp.dtype) -> jnp.dtype:
+    return jnp.dtype(jnp.complex64) if jnp.dtype(real_dtype) == jnp.dtype(jnp.float32) else jnp.dtype(jnp.complex128)
+
+
+def _complex_from_real(x: jax.Array) -> jax.Array:
+    xx = jnp.asarray(x)
+    return xx.astype(_complex_dtype_for_real(xx.dtype))
+
+
 def _validate_bessel_real_mode(mode: str) -> str:
     checks.check_in_set(mode, _BESSEL_REAL_MODES, "hypgeom.bessel_real_mode")
     return mode
@@ -49,7 +59,7 @@ def _interval_from_midpoint(val: jax.Array) -> jax.Array:
 
 
 def as_acb_box(x: jax.Array) -> jax.Array:
-    arr = jnp.asarray(x, dtype=jnp.float64)
+    arr = jnp.asarray(x)
     checks.check_last_dim(arr, 4, "hypgeom.as_acb_box")
     return arr
 
@@ -72,7 +82,8 @@ def acb_imag(x: jax.Array) -> jax.Array:
 
 def acb_box_add_ui(x: jax.Array, k: int) -> jax.Array:
     box = as_acb_box(x)
-    k_interval = di.interval(jnp.float64(k), jnp.float64(k))
+    kk = jnp.asarray(k, dtype=box.dtype)
+    k_interval = di.interval(kk, kk)
     return acb_box(di.fast_add(acb_real(box), k_interval), acb_imag(box))
 
 
@@ -164,6 +175,7 @@ def _acb_corners(x: jax.Array) -> jax.Array:
     xb = as_acb_box(x)
     re_lo, re_hi = xb[..., 0], xb[..., 1]
     im_lo, im_hi = xb[..., 2], xb[..., 3]
+    complex_dtype = _complex_dtype_for_real(xb.dtype)
     return jnp.asarray(
         [
             re_lo + 1j * im_lo,
@@ -172,7 +184,7 @@ def _acb_corners(x: jax.Array) -> jax.Array:
             re_hi + 1j * im_hi,
             0.5 * (re_lo + re_hi) + 1j * 0.5 * (im_lo + im_hi),
         ],
-        dtype=jnp.complex128,
+        dtype=complex_dtype,
     )
 
 
@@ -184,12 +196,12 @@ def _acb_from_samples(vals: jax.Array) -> jax.Array:
 
 
 def _ones_interval_like(x: jax.Array) -> jax.Array:
-    t = jnp.ones_like(x[..., 0], dtype=jnp.float64)
+    t = jnp.ones_like(x[..., 0], dtype=x.dtype)
     return di.interval(t, t)
 
 
 def _zeros_interval_like(x: jax.Array) -> jax.Array:
-    t = jnp.zeros_like(x[..., 0], dtype=jnp.float64)
+    t = jnp.zeros_like(x[..., 0], dtype=x.dtype)
     return di.interval(t, t)
 
 
@@ -223,41 +235,53 @@ def _contains_nonpositive_integer(lo: jax.Array, hi: jax.Array) -> jax.Array:
 
 
 def _complex_loggamma_lanczos(z: jax.Array) -> jax.Array:
-    z = jnp.asarray(z, dtype=jnp.complex128)
-    z1 = z - jnp.complex128(1.0 + 0.0j)
-    x = jnp.complex128(_LANCZOS[0] + 0.0j)
+    z = el.as_complex(z)
+    real_dtype = jnp.real(z).dtype
+    complex_dtype = z.dtype
+    one = jnp.asarray(1.0, dtype=real_dtype)
+    half = jnp.asarray(0.5, dtype=real_dtype)
+    z1 = z - jnp.asarray(1.0 + 0.0j, dtype=complex_dtype)
+    x = jnp.asarray(_LANCZOS[0] + 0.0j, dtype=complex_dtype)
 
     def body(i, acc):
-        return acc + _LANCZOS[i] / (z1 + jnp.float64(i))
+        return acc + jnp.asarray(_LANCZOS[i], dtype=complex_dtype) / (z1 + jnp.asarray(i, dtype=real_dtype))
 
     x = lax.fori_loop(1, 9, body, x)
-    t = z1 + jnp.float64(7.5)
-    return _LOG_SQRT_2PI + (z1 + 0.5) * jnp.log(t) - t + jnp.log(x)
+    t = z1 + jnp.asarray(7.5, dtype=real_dtype)
+    log_sqrt_2pi = jnp.asarray(_LOG_SQRT_2PI, dtype=real_dtype)
+    return log_sqrt_2pi + (z1 + half) * jnp.log(t) - t + jnp.log(x)
 
 
 def _complex_loggamma(z: jax.Array) -> jax.Array:
-    z = jnp.asarray(z, dtype=jnp.complex128)
+    z = el.as_complex(z)
+    complex_dtype = z.dtype
+    real_dtype = jnp.real(z).dtype
 
     def reflection(w):
-        return el.LOG_PI - jnp.log(jnp.sin(el.PI * w)) - _complex_loggamma_lanczos(1.0 - w)
+        log_pi = jnp.asarray(el.LOG_PI, dtype=real_dtype)
+        pi = jnp.asarray(el.PI, dtype=real_dtype)
+        one = jnp.asarray(1.0 + 0.0j, dtype=complex_dtype)
+        return log_pi - jnp.log(jnp.sin(pi * w)) - _complex_loggamma_lanczos(one - w)
 
-    return lax.cond(jnp.real(z) < 0.5, reflection, _complex_loggamma_lanczos, z)
+    return lax.cond(jnp.real(z) < jnp.asarray(0.5, dtype=real_dtype), reflection, _complex_loggamma_lanczos, z)
 
 
 def _complex_erf_series(z: jax.Array) -> jax.Array:
-    z = jnp.asarray(z, dtype=jnp.complex128)
+    z = el.as_complex(z)
+    real_dtype = jnp.real(z).dtype
     z2 = z * z
     term0 = z
     sum0 = z
 
     def body(k, state):
         term, s = state
-        den = jnp.float64(k + 1) * jnp.float64(2 * k + 3)
+        den = jnp.asarray((k + 1) * (2 * k + 3), dtype=real_dtype)
         term = term * (-z2) / den
         return term, s + term
 
     _, s = lax.fori_loop(0, _ERF_TERMS - 1, body, (term0, sum0))
-    return _TWO_OVER_SQRT_PI * s
+    scale = jnp.asarray(2.0, dtype=real_dtype) / jnp.asarray(el.SQRT_PI, dtype=real_dtype)
+    return scale * s
 
 
 def _complex_erfc_series(z: jax.Array) -> jax.Array:
@@ -269,55 +293,63 @@ def _complex_erfi_series(z: jax.Array) -> jax.Array:
 
 
 def _real_erf_series(x: jax.Array) -> jax.Array:
-    x = jnp.asarray(x, dtype=jnp.float64)
+    x = el.as_real(x)
+    real_dtype = x.dtype
     x2 = x * x
     term0 = x
     sum0 = x
 
     def body(k, state):
         term, s = state
-        den = jnp.float64(k + 1) * jnp.float64(2 * k + 3)
+        den = jnp.asarray((k + 1) * (2 * k + 3), dtype=real_dtype)
         term = term * (-x2) / den
         return term, s + term
 
     _, s = lax.fori_loop(0, _ERF_TERMS - 1, body, (term0, sum0))
-    return _TWO_OVER_SQRT_PI * s
+    scale = jnp.asarray(2.0, dtype=real_dtype) / jnp.asarray(el.SQRT_PI, dtype=real_dtype)
+    return scale * s
 
 
 def _real_erfi(x: jax.Array) -> jax.Array:
-    x = jnp.asarray(x, dtype=jnp.float64)
-    return jnp.real(_complex_erfi_series(jnp.complex128(x + 0.0j)))
+    x = el.as_real(x)
+    return jnp.real(_complex_erfi_series(_complex_from_real(x)))
 
 
 def _real_erfinv_scalar(y: jax.Array) -> jax.Array:
-    y = jnp.asarray(y, dtype=jnp.float64)
-    ln = jnp.log(1.0 - y * y)
-    t = 2.0 / (el.PI * _ERFINV_A) + 0.5 * ln
-    x0 = jnp.sqrt(jnp.maximum(0.0, jnp.sqrt(t * t - ln / _ERFINV_A) - t))
-    x0 = jnp.where(y < 0.0, -x0, x0)
+    y = el.as_real(y)
+    real_dtype = y.dtype
+    one = jnp.asarray(1.0, dtype=real_dtype)
+    zero = jnp.asarray(0.0, dtype=real_dtype)
+    half = jnp.asarray(0.5, dtype=real_dtype)
+    erfinv_a = jnp.asarray(_ERFINV_A, dtype=real_dtype)
+    ln = jnp.log(one - y * y)
+    t = jnp.asarray(2.0, dtype=real_dtype) / (jnp.asarray(el.PI, dtype=real_dtype) * erfinv_a) + half * ln
+    x0 = jnp.sqrt(jnp.maximum(zero, jnp.sqrt(t * t - ln / erfinv_a) - t))
+    x0 = jnp.where(y < zero, -x0, x0)
 
     def body(_, x):
         err = lax.erf(x) - y
-        der = _TWO_OVER_SQRT_PI * jnp.exp(-x * x)
+        der = (jnp.asarray(2.0, dtype=real_dtype) / jnp.asarray(el.SQRT_PI, dtype=real_dtype)) * jnp.exp(-x * x)
         return x - err / der
 
     x = lax.fori_loop(0, _ERFINV_ITERS, body, x0)
-    valid = jnp.isfinite(y) & (jnp.abs(y) < 1.0)
-    return jnp.where(valid, x, jnp.nan)
+    valid = jnp.isfinite(y) & (jnp.abs(y) < one)
+    return jnp.where(valid, x, jnp.asarray(jnp.nan, dtype=real_dtype))
 
 
 def _real_hyp1f1_scalar(a: jax.Array, b: jax.Array, z: jax.Array) -> jax.Array:
-    a = jnp.asarray(a, dtype=jnp.float64)
-    b = jnp.asarray(b, dtype=jnp.float64)
-    z = jnp.asarray(z, dtype=jnp.float64)
-    term0 = jnp.float64(1.0)
+    real_dtype = jnp.asarray(z).dtype
+    a = jnp.asarray(a, dtype=real_dtype)
+    b = jnp.asarray(b, dtype=real_dtype)
+    z = jnp.asarray(z, dtype=real_dtype)
+    term0 = jnp.asarray(1.0, dtype=real_dtype)
     sum0 = term0
 
     def body(k, state):
         term, s = state
-        kf = jnp.float64(k)
+        kf = jnp.asarray(k, dtype=real_dtype)
         term = term * (a + kf) / (b + kf)
-        term = term * (z / jnp.float64(k + 1))
+        term = term * (z / jnp.asarray(k + 1, dtype=real_dtype))
         return term, s + term
 
     _, s = lax.fori_loop(0, _HYP_TERMS - 1, body, (term0, sum0))
@@ -325,39 +357,42 @@ def _real_hyp1f1_scalar(a: jax.Array, b: jax.Array, z: jax.Array) -> jax.Array:
 
 
 def _real_hyp1f1_scalar_tail(a: jax.Array, b: jax.Array, z: jax.Array, n_terms: int) -> tuple[jax.Array, jax.Array]:
-    a = jnp.asarray(a, dtype=jnp.float64)
-    b = jnp.asarray(b, dtype=jnp.float64)
-    z = jnp.asarray(z, dtype=jnp.float64)
-    term0 = jnp.float64(1.0)
+    real_dtype = jnp.asarray(z).dtype
+    a = jnp.asarray(a, dtype=real_dtype)
+    b = jnp.asarray(b, dtype=real_dtype)
+    z = jnp.asarray(z, dtype=real_dtype)
+    term0 = jnp.asarray(1.0, dtype=real_dtype)
     sum0 = term0
 
     def body(k, state):
         term, s = state
-        kf = jnp.float64(k)
+        kf = jnp.asarray(k, dtype=real_dtype)
         step = (a + kf) / (b + kf)
-        step = step * (z / jnp.float64(k + 1))
+        step = step * (z / jnp.asarray(k + 1, dtype=real_dtype))
         term = term * step
         return term, s + term
 
     term, s = lax.fori_loop(0, n_terms - 1, body, (term0, sum0))
-    k_last = jnp.float64(n_terms - 1)
-    ratio = jnp.abs(z) * jnp.abs(a + k_last) / (jnp.abs(b + k_last) * (k_last + 1.0))
+    k_last = jnp.asarray(n_terms - 1, dtype=real_dtype)
+    ratio = jnp.abs(z) * jnp.abs(a + k_last) / (jnp.abs(b + k_last) * (k_last + jnp.asarray(1.0, dtype=real_dtype)))
     tail = _series_tail_bound_geom(jnp.abs(term), ratio)
     return s, tail
 
 
 def _complex_hyp1f1_scalar(a: jax.Array, b: jax.Array, z: jax.Array) -> jax.Array:
-    a = jnp.asarray(a, dtype=jnp.complex128)
-    b = jnp.asarray(b, dtype=jnp.complex128)
-    z = jnp.asarray(z, dtype=jnp.complex128)
-    term0 = jnp.complex128(1.0 + 0.0j)
+    complex_dtype = _complex_dtype_for_real(jnp.real(jnp.asarray(z)).dtype)
+    real_dtype = jnp.real(jnp.asarray(z)).dtype
+    a = jnp.asarray(a, dtype=complex_dtype)
+    b = jnp.asarray(b, dtype=complex_dtype)
+    z = jnp.asarray(z, dtype=complex_dtype)
+    term0 = jnp.asarray(1.0 + 0.0j, dtype=complex_dtype)
     sum0 = term0
 
     def body(k, state):
         term, s = state
-        kf = jnp.float64(k)
+        kf = jnp.asarray(k, dtype=real_dtype)
         term = term * (a + kf) / (b + kf)
-        term = term * (z / jnp.float64(k + 1))
+        term = term * (z / jnp.asarray(k + 1, dtype=real_dtype))
         return term, s + term
 
     _, s = lax.fori_loop(0, _HYP_TERMS - 1, body, (term0, sum0))
@@ -495,9 +530,10 @@ def _complex_bessel_k(nu: jax.Array, z: jax.Array) -> jax.Array:
 
 
 def _interval_from_samples(vals: jax.Array) -> jax.Array:
+    vals = jnp.asarray(vals)
     finite = jnp.all(jnp.isfinite(vals))
     out = di.interval(di._below(jnp.min(vals)), di._above(jnp.max(vals)))
-    full = di.interval(-jnp.inf, jnp.inf)
+    full = di.interval(jnp.asarray(-jnp.inf, dtype=vals.dtype), jnp.asarray(jnp.inf, dtype=vals.dtype))
     return jnp.where(finite, out, full)
 
 
@@ -525,7 +561,7 @@ def _select_tighter_interval(a: jax.Array, b: jax.Array) -> jax.Array:
     b_ok = jnp.isfinite(wb)
     pick_a = (a_ok & b_ok & (wa <= wb)) | (a_ok & ~b_ok)
     pick_b = b_ok & ~a_ok
-    full = _full_interval()
+    full = _full_interval_like(a)
     return jnp.where(pick_a, a, jnp.where(pick_b, b, full))
 
 
@@ -566,7 +602,8 @@ def _acb_midpoint(x: jax.Array) -> jax.Array:
     xb = as_acb_box(x)
     re = di.midpoint(acb_real(xb))
     im = di.midpoint(acb_imag(xb))
-    return re + 1j * im
+    complex_dtype = _complex_dtype_for_real(re.dtype)
+    return re.astype(complex_dtype) + jnp.asarray(1j, dtype=complex_dtype) * im.astype(complex_dtype)
 
 
 def _acb_radius(x: jax.Array) -> jax.Array:
@@ -582,8 +619,21 @@ def _full_interval() -> jax.Array:
     return di.interval(-jnp.inf, jnp.inf)
 
 
+def _full_interval_like(x: jax.Array) -> jax.Array:
+    xx = di.as_interval(x)
+    t = jnp.ones_like(xx[0], dtype=xx.dtype)
+    inf = jnp.inf * t
+    return di.interval(-inf, inf)
+
+
 def _full_box() -> jax.Array:
     return jnp.array([-jnp.inf, jnp.inf, -jnp.inf, jnp.inf], dtype=jnp.float64)
+
+
+def _full_box_like(x: jax.Array) -> jax.Array:
+    xx = as_acb_box(x)
+    inf = jnp.asarray(jnp.inf, dtype=xx.dtype)
+    return jnp.asarray([-inf, inf, -inf, inf], dtype=xx.dtype)
 
 
 def _acb_box_from_mid_tail(val: jax.Array, tail: jax.Array) -> jax.Array:
@@ -595,18 +645,21 @@ def _interval_abs_bounds(x: jax.Array) -> tuple[jax.Array, jax.Array]:
     x = di.as_interval(x)
     lo, hi = x[0], x[1]
     abs_max = jnp.maximum(jnp.abs(lo), jnp.abs(hi))
-    crosses = (lo <= 0.0) & (hi >= 0.0)
-    abs_min = jnp.where(crosses, 0.0, jnp.minimum(jnp.abs(lo), jnp.abs(hi)))
+    zero = jnp.asarray(0.0, dtype=x.dtype)
+    crosses = (lo <= zero) & (hi >= zero)
+    abs_min = jnp.where(crosses, zero, jnp.minimum(jnp.abs(lo), jnp.abs(hi)))
     return abs_min, abs_max
 
 
 def _interval_abs_bounds_shift(x: jax.Array, k: int) -> tuple[jax.Array, jax.Array]:
     x = di.as_interval(x)
-    lo = x[0] + jnp.float64(k)
-    hi = x[1] + jnp.float64(k)
+    kk = jnp.asarray(k, dtype=x.dtype)
+    lo = x[0] + kk
+    hi = x[1] + kk
     abs_max = jnp.maximum(jnp.abs(lo), jnp.abs(hi))
-    crosses = (lo <= 0.0) & (hi >= 0.0)
-    abs_min = jnp.where(crosses, 0.0, jnp.minimum(jnp.abs(lo), jnp.abs(hi)))
+    zero = jnp.asarray(0.0, dtype=x.dtype)
+    crosses = (lo <= zero) & (hi >= zero)
+    abs_min = jnp.where(crosses, zero, jnp.minimum(jnp.abs(lo), jnp.abs(hi)))
     return abs_min, abs_max
 
 
@@ -614,30 +667,35 @@ def _box_abs_bounds(x: jax.Array) -> tuple[jax.Array, jax.Array]:
     mid = _acb_midpoint(x)
     rad = _acb_radius(x)
     abs_mid = jnp.abs(mid)
-    abs_min = jnp.maximum(abs_mid - rad, 0.0)
+    zero = jnp.asarray(0.0, dtype=rad.dtype)
+    abs_min = jnp.maximum(abs_mid - rad, zero)
     abs_max = abs_mid + rad
     return abs_min, abs_max
 
 
 def _box_abs_bounds_shift(x: jax.Array, k: int) -> tuple[jax.Array, jax.Array]:
-    mid = _acb_midpoint(x) + jnp.float64(k)
+    xx = as_acb_box(x)
+    kk = jnp.asarray(k, dtype=xx.dtype)
+    mid = _acb_midpoint(x) + kk
     rad = _acb_radius(x)
     abs_mid = jnp.abs(mid)
-    abs_min = jnp.maximum(abs_mid - rad, 0.0)
+    zero = jnp.asarray(0.0, dtype=rad.dtype)
+    abs_min = jnp.maximum(abs_mid - rad, zero)
     abs_max = abs_mid + rad
     return abs_min, abs_max
 
 
 def _real_hyp0f1_scalar(a: jax.Array, z: jax.Array) -> jax.Array:
-    a = jnp.asarray(a, dtype=jnp.float64)
-    z = jnp.asarray(z, dtype=jnp.float64)
-    term0 = jnp.float64(1.0)
+    real_dtype = jnp.asarray(z).dtype
+    a = jnp.asarray(a, dtype=real_dtype)
+    z = jnp.asarray(z, dtype=real_dtype)
+    term0 = jnp.asarray(1.0, dtype=real_dtype)
     sum0 = term0
 
     def body(k, state):
         term, s = state
-        kf = jnp.float64(k)
-        term = term * z / ((a + kf) * jnp.float64(k + 1))
+        kf = jnp.asarray(k, dtype=real_dtype)
+        term = term * z / ((a + kf) * jnp.asarray(k + 1, dtype=real_dtype))
         return term, s + term
 
     _, s = lax.fori_loop(0, _HYP_TERMS - 1, body, (term0, sum0))
@@ -645,35 +703,38 @@ def _real_hyp0f1_scalar(a: jax.Array, z: jax.Array) -> jax.Array:
 
 
 def _real_hyp0f1_scalar_tail(a: jax.Array, z: jax.Array, n_terms: int) -> tuple[jax.Array, jax.Array]:
-    a = jnp.asarray(a, dtype=jnp.float64)
-    z = jnp.asarray(z, dtype=jnp.float64)
-    term0 = jnp.float64(1.0)
+    real_dtype = jnp.asarray(z).dtype
+    a = jnp.asarray(a, dtype=real_dtype)
+    z = jnp.asarray(z, dtype=real_dtype)
+    term0 = jnp.asarray(1.0, dtype=real_dtype)
     sum0 = term0
 
     def body(k, state):
         term, s = state
-        kf = jnp.float64(k)
-        step = z / ((a + kf) * jnp.float64(k + 1))
+        kf = jnp.asarray(k, dtype=real_dtype)
+        step = z / ((a + kf) * jnp.asarray(k + 1, dtype=real_dtype))
         term = term * step
         return term, s + term
 
     term, s = lax.fori_loop(0, n_terms - 1, body, (term0, sum0))
-    k_last = jnp.float64(n_terms - 1)
-    ratio = jnp.abs(z) / (jnp.abs(a + k_last) * (k_last + 1.0))
+    k_last = jnp.asarray(n_terms - 1, dtype=real_dtype)
+    ratio = jnp.abs(z) / (jnp.abs(a + k_last) * (k_last + jnp.asarray(1.0, dtype=real_dtype)))
     tail = _series_tail_bound_geom(jnp.abs(term), ratio)
     return s, tail
 
 
 def _complex_hyp0f1_scalar(a: jax.Array, z: jax.Array) -> jax.Array:
-    a = jnp.asarray(a, dtype=jnp.complex128)
-    z = jnp.asarray(z, dtype=jnp.complex128)
-    term0 = jnp.complex128(1.0 + 0.0j)
+    complex_dtype = _complex_dtype_for_real(jnp.real(jnp.asarray(z)).dtype)
+    real_dtype = jnp.real(jnp.asarray(z)).dtype
+    a = jnp.asarray(a, dtype=complex_dtype)
+    z = jnp.asarray(z, dtype=complex_dtype)
+    term0 = jnp.asarray(1.0 + 0.0j, dtype=complex_dtype)
     sum0 = term0
 
     def body(k, state):
         term, s = state
-        kf = jnp.float64(k)
-        term = term * z / ((a + kf) * jnp.float64(k + 1))
+        kf = jnp.asarray(k, dtype=real_dtype)
+        term = term * z / ((a + kf) * jnp.asarray(k + 1, dtype=real_dtype))
         return term, s + term
 
     _, s = lax.fori_loop(0, _HYP_TERMS - 1, body, (term0, sum0))
@@ -727,16 +788,18 @@ def _real_hyp2f1_scalar_tail(
 
 
 def _real_hyp1f1_regime(a: jax.Array, b: jax.Array, z: jax.Array) -> jax.Array:
-    z = jnp.asarray(z, dtype=jnp.float64)
-    use_kummer = z > 6.0
+    real_dtype = jnp.asarray(z).dtype
+    z = jnp.asarray(z, dtype=real_dtype)
+    use_kummer = z > jnp.asarray(6.0, dtype=real_dtype)
     transformed = jnp.exp(z) * _real_hyp1f1_scalar(b - a, b, -z)
     return jnp.where(use_kummer, transformed, _real_hyp1f1_scalar(a, b, z))
 
 
 def _real_hyp0f1_regime(a: jax.Array, z: jax.Array) -> jax.Array:
-    z = jnp.asarray(z, dtype=jnp.float64)
+    real_dtype = jnp.asarray(z).dtype
+    z = jnp.asarray(z, dtype=real_dtype)
     absz = jnp.abs(z)
-    use_bessel = absz > 9.0
+    use_bessel = absz > jnp.asarray(9.0, dtype=real_dtype)
     return _real_hyp0f1_scalar(a, z)
 
 
@@ -908,44 +971,46 @@ def _complex_hyp2f1_scalar(a: jax.Array, b: jax.Array, c: jax.Array, z: jax.Arra
 
 
 def _tail_bound_0f1_real(a: jax.Array, z: jax.Array, prec_bits: int) -> tuple[jax.Array, jax.Array]:
+    real_dtype = di.as_interval(z).dtype
     z_abs_max = _interval_abs_bounds(z)[1]
 
     def body(k, state):
         t, ok = state
         amin, _ = _interval_abs_bounds_shift(a, k)
-        denom = amin * jnp.float64(k + 1)
+        denom = amin * jnp.asarray(k + 1, dtype=real_dtype)
         ratio = jnp.where(denom > 0.0, z_abs_max / denom, jnp.inf)
         ok = ok & (denom > 0.0) & jnp.isfinite(ratio)
         return t * ratio, ok
 
-    t, ok = lax.fori_loop(0, _HYP_TERMS - 1, body, (jnp.float64(1.0), jnp.bool_(True)))
+    t, ok = lax.fori_loop(0, _HYP_TERMS - 1, body, (jnp.asarray(1.0, dtype=real_dtype), jnp.bool_(True)))
     amin, _ = _interval_abs_bounds_shift(a, _HYP_TERMS)
-    denom = amin * jnp.float64(_HYP_TERMS + 1)
+    denom = amin * jnp.asarray(_HYP_TERMS + 1, dtype=real_dtype)
     r = jnp.where(denom > 0.0, z_abs_max / denom, jnp.inf)
     ok = ok & (denom > 0.0) & (r < 1.0) & jnp.isfinite(r)
-    tail = jnp.where(ok, t * r / (1.0 - r) + jnp.exp2(-jnp.float64(prec_bits)), jnp.inf)
+    tail = jnp.where(ok, t * r / (jnp.asarray(1.0, dtype=real_dtype) - r) + jnp.exp2(-jnp.asarray(prec_bits, dtype=real_dtype)), jnp.inf)
     return tail, ok
 
 
 def _tail_bound_1f1_real(a: jax.Array, b: jax.Array, z: jax.Array, prec_bits: int) -> tuple[jax.Array, jax.Array]:
+    real_dtype = di.as_interval(z).dtype
     z_abs_max = _interval_abs_bounds(z)[1]
 
     def body(k, state):
         t, ok = state
         _, amax = _interval_abs_bounds_shift(a, k)
         bmin, _ = _interval_abs_bounds_shift(b, k)
-        denom = bmin * jnp.float64(k + 1)
+        denom = bmin * jnp.asarray(k + 1, dtype=real_dtype)
         ratio = jnp.where(denom > 0.0, z_abs_max * amax / denom, jnp.inf)
         ok = ok & (denom > 0.0) & jnp.isfinite(ratio)
         return t * ratio, ok
 
-    t, ok = lax.fori_loop(0, _HYP_TERMS - 1, body, (jnp.float64(1.0), jnp.bool_(True)))
+    t, ok = lax.fori_loop(0, _HYP_TERMS - 1, body, (jnp.asarray(1.0, dtype=real_dtype), jnp.bool_(True)))
     _, amax = _interval_abs_bounds_shift(a, _HYP_TERMS)
     bmin, _ = _interval_abs_bounds_shift(b, _HYP_TERMS)
-    denom = bmin * jnp.float64(_HYP_TERMS + 1)
+    denom = bmin * jnp.asarray(_HYP_TERMS + 1, dtype=real_dtype)
     r = jnp.where(denom > 0.0, z_abs_max * amax / denom, jnp.inf)
     ok = ok & (denom > 0.0) & (r < 1.0) & jnp.isfinite(r)
-    tail = jnp.where(ok, t * r / (1.0 - r) + jnp.exp2(-jnp.float64(prec_bits)), jnp.inf)
+    tail = jnp.where(ok, t * r / (jnp.asarray(1.0, dtype=real_dtype) - r) + jnp.exp2(-jnp.asarray(prec_bits, dtype=real_dtype)), jnp.inf)
     return tail, ok
 
 
@@ -974,68 +1039,74 @@ def _tail_bound_2f1_real(a: jax.Array, b: jax.Array, c: jax.Array, z: jax.Array,
 
 
 def _tail_bound_0f1_complex(a: jax.Array, z: jax.Array, prec_bits: int) -> tuple[jax.Array, jax.Array]:
+    real_dtype = as_acb_box(z).dtype
     z_abs_max = _box_abs_bounds(z)[1]
+    inf = jnp.asarray(jnp.inf, dtype=real_dtype)
 
     def body(k, state):
         t, ok = state
         amin, _ = _box_abs_bounds_shift(a, k)
-        denom = amin * jnp.float64(k + 1)
-        ratio = jnp.where(denom > 0.0, z_abs_max / denom, jnp.inf)
+        denom = amin * jnp.asarray(k + 1, dtype=real_dtype)
+        ratio = jnp.where(denom > 0.0, z_abs_max / denom, inf)
         ok = ok & (denom > 0.0) & jnp.isfinite(ratio)
         return t * ratio, ok
 
-    t, ok = lax.fori_loop(0, _HYP_TERMS - 1, body, (jnp.float64(1.0), jnp.bool_(True)))
+    t, ok = lax.fori_loop(0, _HYP_TERMS - 1, body, (jnp.asarray(1.0, dtype=real_dtype), jnp.bool_(True)))
     amin, _ = _box_abs_bounds_shift(a, _HYP_TERMS)
-    denom = amin * jnp.float64(_HYP_TERMS + 1)
-    r = jnp.where(denom > 0.0, z_abs_max / denom, jnp.inf)
+    denom = amin * jnp.asarray(_HYP_TERMS + 1, dtype=real_dtype)
+    r = jnp.where(denom > 0.0, z_abs_max / denom, inf)
     ok = ok & (denom > 0.0) & (r < 1.0) & jnp.isfinite(r)
-    tail = jnp.where(ok, t * r / (1.0 - r) + jnp.exp2(-jnp.float64(prec_bits)), jnp.inf)
+    tail = jnp.where(ok, t * r / (jnp.asarray(1.0, dtype=real_dtype) - r) + jnp.exp2(-jnp.asarray(prec_bits, dtype=real_dtype)), inf)
     return tail, ok
 
 
 def _tail_bound_1f1_complex(a: jax.Array, b: jax.Array, z: jax.Array, prec_bits: int) -> tuple[jax.Array, jax.Array]:
+    real_dtype = as_acb_box(z).dtype
     z_abs_max = _box_abs_bounds(z)[1]
+    inf = jnp.asarray(jnp.inf, dtype=real_dtype)
 
     def body(k, state):
         t, ok = state
         _, amax = _box_abs_bounds_shift(a, k)
         bmin, _ = _box_abs_bounds_shift(b, k)
-        denom = bmin * jnp.float64(k + 1)
-        ratio = jnp.where(denom > 0.0, z_abs_max * amax / denom, jnp.inf)
+        denom = bmin * jnp.asarray(k + 1, dtype=real_dtype)
+        ratio = jnp.where(denom > 0.0, z_abs_max * amax / denom, inf)
         ok = ok & (denom > 0.0) & jnp.isfinite(ratio)
         return t * ratio, ok
 
-    t, ok = lax.fori_loop(0, _HYP_TERMS - 1, body, (jnp.float64(1.0), jnp.bool_(True)))
+    t, ok = lax.fori_loop(0, _HYP_TERMS - 1, body, (jnp.asarray(1.0, dtype=real_dtype), jnp.bool_(True)))
     _, amax = _box_abs_bounds_shift(a, _HYP_TERMS)
     bmin, _ = _box_abs_bounds_shift(b, _HYP_TERMS)
-    denom = bmin * jnp.float64(_HYP_TERMS + 1)
-    r = jnp.where(denom > 0.0, z_abs_max * amax / denom, jnp.inf)
+    denom = bmin * jnp.asarray(_HYP_TERMS + 1, dtype=real_dtype)
+    r = jnp.where(denom > 0.0, z_abs_max * amax / denom, inf)
     ok = ok & (denom > 0.0) & (r < 1.0) & jnp.isfinite(r)
-    tail = jnp.where(ok, t * r / (1.0 - r) + jnp.exp2(-jnp.float64(prec_bits)), jnp.inf)
+    tail = jnp.where(ok, t * r / (jnp.asarray(1.0, dtype=real_dtype) - r) + jnp.exp2(-jnp.asarray(prec_bits, dtype=real_dtype)), inf)
     return tail, ok
 
 
 def _tail_bound_2f1_complex(a: jax.Array, b: jax.Array, c: jax.Array, z: jax.Array, prec_bits: int) -> tuple[jax.Array, jax.Array]:
+    real_dtype = as_acb_box(z).dtype
     z_abs_max = _box_abs_bounds(z)[1]
+    inf = jnp.asarray(jnp.inf, dtype=real_dtype)
 
     def body(k, state):
         t, ok = state
         _, amax = _box_abs_bounds_shift(a, k)
         _, bmax = _box_abs_bounds_shift(b, k)
         cmin, _ = _box_abs_bounds_shift(c, k)
-        denom = cmin * jnp.float64(k + 1)
-        ratio = jnp.where(denom > 0.0, z_abs_max * amax * bmax / denom, jnp.inf)
+        denom = cmin * jnp.asarray(k + 1, dtype=real_dtype)
+        ratio = jnp.where(denom > 0.0, z_abs_max * amax * bmax / denom, inf)
         ok = ok & (denom > 0.0) & jnp.isfinite(ratio)
         return t * ratio, ok
 
-    t, ok = lax.fori_loop(0, _HYP_TERMS - 1, body, (jnp.float64(1.0), jnp.bool_(True)))
+    t, ok = lax.fori_loop(0, _HYP_TERMS - 1, body, (jnp.asarray(1.0, dtype=real_dtype), jnp.bool_(True)))
     _, amax = _box_abs_bounds_shift(a, _HYP_TERMS)
     _, bmax = _box_abs_bounds_shift(b, _HYP_TERMS)
     cmin, _ = _box_abs_bounds_shift(c, _HYP_TERMS)
-    denom = cmin * jnp.float64(_HYP_TERMS + 1)
-    r = jnp.where(denom > 0.0, z_abs_max * amax * bmax / denom, jnp.inf)
+    denom = cmin * jnp.asarray(_HYP_TERMS + 1, dtype=real_dtype)
+    r = jnp.where(denom > 0.0, z_abs_max * amax * bmax / denom, inf)
     ok = ok & (denom > 0.0) & (r < 1.0) & jnp.isfinite(r)
-    tail = jnp.where(ok, t * r / (1.0 - r) + jnp.exp2(-jnp.float64(prec_bits)), jnp.inf)
+    tail = jnp.where(ok, t * r / (jnp.asarray(1.0, dtype=real_dtype) - r) + jnp.exp2(-jnp.asarray(prec_bits, dtype=real_dtype)), inf)
     return tail, ok
 def _taylor_series_unary(fn, x0: jax.Array, length: int) -> jax.Array:
     coeffs = []
@@ -1101,55 +1172,12 @@ def arb_hypgeom_rising_ui_prec(x: jax.Array, n: int, prec_bits: int = di.DEFAULT
 
 @jax.jit
 def arb_hypgeom_lgamma(x: jax.Array) -> jax.Array:
-    x = di.as_interval(x)
-    a = x[0]
-    b = x[1]
-    m = 0.5 * (a + b)
-    include_root = (a <= _DIGAMMA_ZERO) & (_DIGAMMA_ZERO <= b)
-
-    vals = jnp.asarray(
-        [
-            _gammaln_real(a),
-            _gammaln_real(b),
-            _gammaln_real(m),
-            _gammaln_real(_DIGAMMA_ZERO),
-        ],
-        dtype=jnp.float64,
-    )
-    mask = jnp.asarray([True, True, True, include_root], dtype=bool)
-    vmin = jnp.min(jnp.where(mask, vals, jnp.inf))
-    vmax = jnp.max(jnp.where(mask, vals, -jnp.inf))
-
-    ok = (a > 0.0) & jnp.all(jnp.isfinite(jnp.where(mask, vals, 0.0)))
-    out = di.interval(di._below(vmin), di._above(vmax))
-    full = di.interval(-jnp.inf, jnp.inf)
-    return jnp.where(ok, out, full)
+    return arb_core.arb_lgamma(x)
 
 
 @jax.jit
 def arb_hypgeom_gamma(x: jax.Array) -> jax.Array:
-    x = di.as_interval(x)
-    a = x[0]
-    b = x[1]
-    m = 0.5 * (a + b)
-    include_root = (a <= _DIGAMMA_ZERO) & (_DIGAMMA_ZERO <= b)
-
-    vals = jnp.asarray(
-        [
-            jnp.exp(_gammaln_real(a)),
-            jnp.exp(_gammaln_real(b)),
-            jnp.exp(_gammaln_real(m)),
-            jnp.exp(_gammaln_real(_DIGAMMA_ZERO)),
-        ],
-        dtype=jnp.float64,
-    )
-    mask = jnp.asarray([True, True, True, include_root], dtype=bool)
-    vmin = jnp.min(jnp.where(mask, vals, jnp.inf))
-    vmax = jnp.max(jnp.where(mask, vals, -jnp.inf))
-    ok = (a > 0.0) & jnp.all(jnp.isfinite(jnp.where(mask, vals, 0.0)))
-    out = di.interval(di._below(vmin), di._above(vmax))
-    full = di.interval(-jnp.inf, jnp.inf)
-    return jnp.where(ok, out, full)
+    return arb_core.arb_gamma(x)
 
 
 @jax.jit
@@ -1238,8 +1266,7 @@ def acb_hypgeom_barnesg_batch_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PRE
 
 
 def arb_hypgeom_rgamma(x: jax.Array) -> jax.Array:
-    g = arb_hypgeom_gamma(x)
-    return di.fast_div(di.interval(1.0, 1.0), g)
+    return arb_core.arb_rgamma(x)
 
 
 @jax.jit
@@ -1248,7 +1275,7 @@ def arb_hypgeom_erf(x: jax.Array) -> jax.Array:
     a = x[0]
     b = x[1]
     m = 0.5 * (a + b)
-    vals = jnp.asarray([_real_erf_series(a), _real_erf_series(b), _real_erf_series(m)], dtype=jnp.float64)
+    vals = jnp.asarray([_real_erf_series(a), _real_erf_series(b), _real_erf_series(m)], dtype=x.dtype)
     return di.interval(di._below(jnp.min(vals)), di._above(jnp.max(vals)))
 
 
@@ -1258,7 +1285,8 @@ def arb_hypgeom_erfc(x: jax.Array) -> jax.Array:
     a = x[0]
     b = x[1]
     m = 0.5 * (a + b)
-    vals = jnp.asarray([1.0 - _real_erf_series(a), 1.0 - _real_erf_series(b), 1.0 - _real_erf_series(m)], dtype=jnp.float64)
+    one = jnp.asarray(1.0, dtype=x.dtype)
+    vals = jnp.asarray([one - _real_erf_series(a), one - _real_erf_series(b), one - _real_erf_series(m)], dtype=x.dtype)
     return di.interval(di._below(jnp.min(vals)), di._above(jnp.max(vals)))
 
 
@@ -1268,14 +1296,7 @@ def arb_hypgeom_erfi(x: jax.Array) -> jax.Array:
     a = x[0]
     b = x[1]
     m = 0.5 * (a + b)
-    vals = jnp.asarray(
-        [
-            jnp.real(_complex_erfi_series(jnp.complex128(a + 0.0j))),
-            jnp.real(_complex_erfi_series(jnp.complex128(b + 0.0j))),
-            jnp.real(_complex_erfi_series(jnp.complex128(m + 0.0j))),
-        ],
-        dtype=jnp.float64,
-    )
+    vals = jnp.asarray([_real_erfi(a), _real_erfi(b), _real_erfi(m)], dtype=x.dtype)
     return di.interval(di._below(jnp.min(vals)), di._above(jnp.max(vals)))
 
 
@@ -1285,7 +1306,7 @@ def arb_hypgeom_erfinv(x: jax.Array) -> jax.Array:
     a = x[0]
     b = x[1]
     m = 0.5 * (a + b)
-    vals = jnp.asarray([_real_erfinv_scalar(a), _real_erfinv_scalar(b), _real_erfinv_scalar(m)], dtype=jnp.float64)
+    vals = jnp.asarray([_real_erfinv_scalar(a), _real_erfinv_scalar(b), _real_erfinv_scalar(m)], dtype=x.dtype)
     return _interval_from_samples(vals)
 
 
@@ -1300,14 +1321,16 @@ def arb_hypgeom_erfcinv(x: jax.Array) -> jax.Array:
 def arb_hypgeom_0f1(a: jax.Array, z: jax.Array, regularized: bool = False) -> jax.Array:
     a = di.as_interval(a)
     z = di.as_interval(z)
-    term0 = di.interval(1.0, 1.0)
-    sum0 = di.interval(1.0, 1.0)
+    one = jnp.asarray(1.0, dtype=a.dtype)
+    term0 = di.interval(one, one)
+    sum0 = di.interval(one, one)
 
     def body(k, state):
         term, s = state
-        kf = jnp.float64(k)
+        kf = jnp.asarray(k, dtype=a.dtype)
         ak = di.fast_add(a, di.interval(kf, kf))
-        inv_k1 = di.interval(1.0 / jnp.float64(k + 1), 1.0 / jnp.float64(k + 1))
+        inv = jnp.asarray(1.0, dtype=a.dtype) / jnp.asarray(k + 1, dtype=a.dtype)
+        inv_k1 = di.interval(inv, inv)
         step = di.fast_div(z, ak)
         step = di.fast_mul(step, inv_k1)
         term = di.fast_mul(term, step)
@@ -1318,12 +1341,12 @@ def arb_hypgeom_0f1(a: jax.Array, z: jax.Array, regularized: bool = False) -> ja
         s = di.fast_mul(s, arb_hypgeom_rgamma(a))
     a_m = _interval_midpoint(a)
     z_m = _interval_midpoint(z)
-    z_vals = jnp.asarray([z[0], z[1], z_m], dtype=jnp.float64)
-    sample_vals = jnp.asarray([_real_hyp0f1_regime(a_m, zi) for zi in z_vals], dtype=jnp.float64)
+    z_vals = jnp.asarray([z[0], z[1], z_m], dtype=z.dtype)
+    sample_vals = jnp.asarray([_real_hyp0f1_regime(a_m, zi) for zi in z_vals], dtype=z.dtype)
     s_samples = _interval_from_samples(sample_vals)
     tail, ok = _tail_bound_0f1_real(a, z, di.DEFAULT_PREC_BITS)
     s_tail = _series_interval_from_mid(_real_hyp0f1_scalar(a_m, z_m), tail)
-    s_tail = jnp.where(ok, s_tail, _full_interval())
+    s_tail = jnp.where(ok, s_tail, _full_interval_like(s_tail))
     if regularized:
         s_samples = di.fast_mul(s_samples, arb_hypgeom_rgamma(a))
         s_tail = di.fast_mul(s_tail, arb_hypgeom_rgamma(a))
@@ -1338,16 +1361,18 @@ def arb_hypgeom_1f1(a: jax.Array, b: jax.Array, z: jax.Array, regularized: bool 
     a = di.as_interval(a)
     b = di.as_interval(b)
     z = di.as_interval(z)
-    term0 = di.interval(1.0, 1.0)
-    sum0 = di.interval(1.0, 1.0)
+    one = jnp.asarray(1.0, dtype=a.dtype)
+    term0 = di.interval(one, one)
+    sum0 = di.interval(one, one)
 
     def body(k, state):
         term, s = state
-        kf = jnp.float64(k)
+        kf = jnp.asarray(k, dtype=a.dtype)
         ak = di.fast_add(a, di.interval(kf, kf))
         bk = di.fast_add(b, di.interval(kf, kf))
         step = di.fast_div(ak, bk)
-        inv_k1 = di.interval(1.0 / jnp.float64(k + 1), 1.0 / jnp.float64(k + 1))
+        inv = jnp.asarray(1.0, dtype=a.dtype) / jnp.asarray(k + 1, dtype=a.dtype)
+        inv_k1 = di.interval(inv, inv)
         term = di.fast_mul(term, step)
         term = di.fast_mul(term, z)
         term = di.fast_mul(term, inv_k1)
@@ -1359,12 +1384,12 @@ def arb_hypgeom_1f1(a: jax.Array, b: jax.Array, z: jax.Array, regularized: bool 
     a_m = _interval_midpoint(a)
     b_m = _interval_midpoint(b)
     z_m = _interval_midpoint(z)
-    z_vals = jnp.asarray([z[0], z[1], z_m], dtype=jnp.float64)
-    sample_vals = jnp.asarray([_real_hyp1f1_regime(a_m, b_m, zi) for zi in z_vals], dtype=jnp.float64)
+    z_vals = jnp.asarray([z[0], z[1], z_m], dtype=z.dtype)
+    sample_vals = jnp.asarray([_real_hyp1f1_regime(a_m, b_m, zi) for zi in z_vals], dtype=z.dtype)
     s_samples = _interval_from_samples(sample_vals)
     tail, ok = _tail_bound_1f1_real(a, b, z, di.DEFAULT_PREC_BITS)
     s_tail = _series_interval_from_mid(_real_hyp1f1_scalar(a_m, b_m, z_m), tail)
-    s_tail = jnp.where(ok, s_tail, _full_interval())
+    s_tail = jnp.where(ok, s_tail, _full_interval_like(s_tail))
     if regularized:
         s_samples = di.fast_mul(s_samples, arb_hypgeom_rgamma(b))
         s_tail = di.fast_mul(s_tail, arb_hypgeom_rgamma(b))
@@ -3000,6 +3025,7 @@ def acb_hypgeom_lgamma(x: jax.Array) -> jax.Array:
 
     cross_pole = (im_lo <= 0.0) & (im_hi >= 0.0) & _contains_nonpositive_integer(re_lo, re_hi)
 
+    complex_dtype = _complex_dtype_for_real(x.dtype)
     corners = jnp.asarray(
         [
             re_lo + 1j * im_lo,
@@ -3008,7 +3034,7 @@ def acb_hypgeom_lgamma(x: jax.Array) -> jax.Array:
             re_hi + 1j * im_hi,
             0.5 * (re_lo + re_hi) + 1j * (0.5 * (im_lo + im_hi)),
         ],
-        dtype=jnp.complex128,
+        dtype=complex_dtype,
     )
     vals = jax.vmap(_complex_loggamma)(corners)
     re_vals = jnp.real(vals)
@@ -3019,7 +3045,8 @@ def acb_hypgeom_lgamma(x: jax.Array) -> jax.Array:
         di.interval(di._below(jnp.min(re_vals)), di._above(jnp.max(re_vals))),
         di.interval(di._below(jnp.min(im_vals)), di._above(jnp.max(im_vals))),
     )
-    full = acb_box(di.interval(-jnp.inf, jnp.inf), di.interval(-jnp.inf, jnp.inf))
+    inf = jnp.asarray(jnp.inf, dtype=x.dtype)
+    full = acb_box(di.interval(-inf, inf), di.interval(-inf, inf))
     return jnp.where(cross_pole | (~finite), full, out)
 
 
@@ -3034,6 +3061,7 @@ def acb_hypgeom_gamma(x: jax.Array) -> jax.Array:
 
     cross_pole = (im_lo <= 0.0) & (im_hi >= 0.0) & _contains_nonpositive_integer(re_lo, re_hi)
 
+    complex_dtype = _complex_dtype_for_real(x.dtype)
     corners = jnp.asarray(
         [
             re_lo + 1j * im_lo,
@@ -3042,7 +3070,7 @@ def acb_hypgeom_gamma(x: jax.Array) -> jax.Array:
             re_hi + 1j * im_hi,
             0.5 * (re_lo + re_hi) + 1j * (0.5 * (im_lo + im_hi)),
         ],
-        dtype=jnp.complex128,
+        dtype=complex_dtype,
     )
     vals = jax.vmap(lambda z: jnp.exp(_complex_loggamma(z)))(corners)
     re_vals = jnp.real(vals)
@@ -3053,7 +3081,8 @@ def acb_hypgeom_gamma(x: jax.Array) -> jax.Array:
         di.interval(di._below(jnp.min(re_vals)), di._above(jnp.max(re_vals))),
         di.interval(di._below(jnp.min(im_vals)), di._above(jnp.max(im_vals))),
     )
-    full = acb_box(di.interval(-jnp.inf, jnp.inf), di.interval(-jnp.inf, jnp.inf))
+    inf = jnp.asarray(jnp.inf, dtype=x.dtype)
+    full = acb_box(di.interval(-inf, inf), di.interval(-inf, inf))
     return jnp.where(cross_pole | (~finite), full, out)
 
 
@@ -3070,6 +3099,7 @@ def acb_hypgeom_erf(x: jax.Array) -> jax.Array:
 
     re_lo, re_hi = re[0], re[1]
     im_lo, im_hi = im[0], im[1]
+    complex_dtype = _complex_dtype_for_real(x.dtype)
     corners = jnp.asarray(
         [
             re_lo + 1j * im_lo,
@@ -3078,7 +3108,7 @@ def acb_hypgeom_erf(x: jax.Array) -> jax.Array:
             re_hi + 1j * im_hi,
             0.5 * (re_lo + re_hi) + 1j * (0.5 * (im_lo + im_hi)),
         ],
-        dtype=jnp.complex128,
+        dtype=complex_dtype,
     )
     vals = jax.vmap(_complex_erf_series)(corners)
     return acb_box(
@@ -3095,6 +3125,7 @@ def acb_hypgeom_erfc(x: jax.Array) -> jax.Array:
 
     re_lo, re_hi = re[0], re[1]
     im_lo, im_hi = im[0], im[1]
+    complex_dtype = _complex_dtype_for_real(x.dtype)
     corners = jnp.asarray(
         [
             re_lo + 1j * im_lo,
@@ -3103,7 +3134,7 @@ def acb_hypgeom_erfc(x: jax.Array) -> jax.Array:
             re_hi + 1j * im_hi,
             0.5 * (re_lo + re_hi) + 1j * (0.5 * (im_lo + im_hi)),
         ],
-        dtype=jnp.complex128,
+        dtype=complex_dtype,
     )
     vals = jax.vmap(_complex_erfc_series)(corners)
     return acb_box(
@@ -3120,6 +3151,7 @@ def acb_hypgeom_erfi(x: jax.Array) -> jax.Array:
 
     re_lo, re_hi = re[0], re[1]
     im_lo, im_hi = im[0], im[1]
+    complex_dtype = _complex_dtype_for_real(x.dtype)
     corners = jnp.asarray(
         [
             re_lo + 1j * im_lo,
@@ -3128,7 +3160,7 @@ def acb_hypgeom_erfi(x: jax.Array) -> jax.Array:
             re_hi + 1j * im_hi,
             0.5 * (re_lo + re_hi) + 1j * (0.5 * (im_lo + im_hi)),
         ],
-        dtype=jnp.complex128,
+        dtype=complex_dtype,
     )
     vals = jax.vmap(_complex_erfi_series)(corners)
     return acb_box(
@@ -3141,13 +3173,16 @@ def acb_hypgeom_erfi(x: jax.Array) -> jax.Array:
 def acb_hypgeom_0f1(a: jax.Array, z: jax.Array, regularized: bool = False) -> jax.Array:
     a = as_acb_box(a)
     z = as_acb_box(z)
-    term0 = acb_box(di.interval(1.0, 1.0), di.interval(0.0, 0.0))
+    one = jnp.asarray(1.0, dtype=a.dtype)
+    zero = jnp.asarray(0.0, dtype=a.dtype)
+    term0 = acb_box(di.interval(one, one), di.interval(zero, zero))
     sum0 = term0
 
     def body(k, state):
         term, s = state
         ak = acb_box_add_ui(a, k)
-        inv_k1 = di.interval(1.0 / jnp.float64(k + 1), 1.0 / jnp.float64(k + 1))
+        inv = jnp.asarray(1.0, dtype=a.dtype) / jnp.asarray(k + 1, dtype=a.dtype)
+        inv_k1 = di.interval(inv, inv)
         step = acb_box_div(z, ak)
         step = acb_box_scale_real(step, inv_k1)
         term = acb_box_mul(term, step)
@@ -3159,7 +3194,7 @@ def acb_hypgeom_0f1(a: jax.Array, z: jax.Array, regularized: bool = False) -> ja
     val = _complex_hyp0f1_scalar(a_m, z_m)
     tail, ok = _tail_bound_0f1_complex(a, z, di.DEFAULT_PREC_BITS)
     s_tail = _acb_box_from_mid_tail(val, tail)
-    s_tail = jnp.where(ok, s_tail, _full_box())
+    s_tail = jnp.where(ok, s_tail, _full_box_like(a))
     z_vals = _acb_corners(z)
     sample_vals = jax.vmap(lambda zz: _complex_hyp0f1_scalar(a_m, zz))(z_vals)
     s_samples = _acb_from_samples(sample_vals)
@@ -4724,7 +4759,7 @@ def acb_midpoint(x: jax.Array) -> jax.Array:
     box = as_acb_box(x)
     re = di.midpoint(acb_real(box))
     im = di.midpoint(acb_imag(box))
-    return re + 1j * im
+    return re.astype(_complex_dtype_for_real(re.dtype)) + jnp.asarray(1j, dtype=_complex_dtype_for_real(re.dtype)) * im.astype(_complex_dtype_for_real(im.dtype))
 
 
 def _acb_corners(x: jax.Array) -> jax.Array:
@@ -4733,6 +4768,7 @@ def _acb_corners(x: jax.Array) -> jax.Array:
     im = acb_imag(xb)
     re_lo, re_hi = re[0], re[1]
     im_lo, im_hi = im[0], im[1]
+    complex_dtype = _complex_dtype_for_real(xb.dtype)
     return jnp.asarray(
         [
             re_lo + 1j * im_lo,
@@ -4741,7 +4777,7 @@ def _acb_corners(x: jax.Array) -> jax.Array:
             re_hi + 1j * im_hi,
             0.5 * (re_lo + re_hi) + 1j * (0.5 * (im_lo + im_hi)),
         ],
-        dtype=jnp.complex128,
+        dtype=complex_dtype,
     )
 
 
@@ -4768,12 +4804,14 @@ def _acb_param_array(params: jax.Array) -> jax.Array:
         return jnp.asarray([], dtype=jnp.complex128)
     if arr.ndim >= 1 and arr.shape[-1] == 4:
         return acb_midpoint(arr)
-    return jnp.asarray(arr, dtype=jnp.complex128)
+    if jnp.issubdtype(arr.dtype, jnp.floating):
+        return jnp.asarray(arr, dtype=_complex_dtype_for_real(arr.dtype))
+    return jnp.asarray(arr)
 
 
 def _acb_zero_like(x: jax.Array) -> jax.Array:
     xb = as_acb_box(x)
-    zeros = jnp.zeros_like(xb[..., 0], dtype=jnp.float64)
+    zeros = jnp.zeros_like(xb[..., 0], dtype=xb.dtype)
     return acb_box(di.interval(zeros, zeros), di.interval(zeros, zeros))
 
 

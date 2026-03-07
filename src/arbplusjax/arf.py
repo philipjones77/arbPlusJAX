@@ -7,11 +7,21 @@ jax.config.update("jax_enable_x64", True)
 
 
 def arf_add(a: jax.Array, b: jax.Array) -> jax.Array:
-    return jnp.asarray(a, dtype=jnp.float64) + jnp.asarray(b, dtype=jnp.float64)
+    aa = jnp.asarray(a)
+    bb = jnp.asarray(b)
+    dtype = jnp.result_type(aa, bb)
+    if not jnp.issubdtype(dtype, jnp.floating):
+        dtype = jnp.float64
+    return jnp.asarray(aa, dtype=dtype) + jnp.asarray(bb, dtype=dtype)
 
 
 def arf_mul(a: jax.Array, b: jax.Array) -> jax.Array:
-    return jnp.asarray(a, dtype=jnp.float64) * jnp.asarray(b, dtype=jnp.float64)
+    aa = jnp.asarray(a)
+    bb = jnp.asarray(b)
+    dtype = jnp.result_type(aa, bb)
+    if not jnp.issubdtype(dtype, jnp.floating):
+        dtype = jnp.float64
+    return jnp.asarray(aa, dtype=dtype) * jnp.asarray(bb, dtype=dtype)
 
 
 def arf_add_batch(a: jax.Array, b: jax.Array) -> jax.Array:

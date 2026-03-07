@@ -1,0 +1,23 @@
+{
+  "run_name": "example_suite_cpu",
+  "python": "/home/phili/miniforge3/envs/jax/bin/python",
+  "jax_mode": "cpu",
+  "jax_dtype": "float64",
+  "c_ref_dir": "/home/phili/projects/arbplusJAX/stuff/migration/c_chassis/build_linux_wsl",
+  "profiles": [
+    {
+      "name": "core",
+      "functions": "exp,log,sqrt,sin,cos,tan,sinh,cosh,tanh",
+      "samples": "300,600",
+      "seeds": "0,1",
+      "prec_bits": 200
+    },
+    {
+      "name": "hypgeom_robust",
+      "functions": "gamma,erf,erfc,besselj,bessely,besseli,besselk,CubesselK",
+      "samples": "240,480",
+      "seeds": "0,1",
+      "prec_bits": 256
+    }
+  ]
+}

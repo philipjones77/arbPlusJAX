@@ -20,3 +20,10 @@ def test_grad_path():
 
     g = jax.grad(loss)(jnp.float64(0.4))
     _check(bool(jnp.isfinite(g)))
+
+
+def test_float32_path():
+    a = jnp.array([0.2, 0.5, -0.1], dtype=jnp.float32)
+    b = jnp.array([1.2, -0.3, 0.4], dtype=jnp.float32)
+    out = fmpr.fmpr_add(a, b)
+    _check(out.dtype == jnp.float32)

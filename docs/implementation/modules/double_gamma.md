@@ -6,27 +6,28 @@ This module ports the BarnesDoubleGamma.jl algorithms into the JAX stack, follow
 
 ## Functions
 
-- `log_barnesdoublegamma(z, τ)` and `barnesdoublegamma(z, τ)` implement the logarithm and value of the Barnes double gamma / Barnes G with parameter `τ`.
-- `loggamma2(w, β)` and `gamma2(w, β)` implement the `Γ_2(w, β)` function.
-- `logdoublegamma(w, β)` and `doublegamma(w, β)` implement the normalized double gamma `Γ_β(w)`.
-- `double_sine(z, b)` implements the double sine `S_b(z)` (DSine in the Julia reference).
+- `bdg_log_barnesdoublegamma(z, τ)` and `bdg_barnesdoublegamma(z, τ)` implement the logarithm and value of the Barnes double gamma / Barnes G with parameter `τ`.
+- `bdg_log_barnesgamma2(w, β)` and `bdg_barnesgamma2(w, β)` implement the `Γ_2(w, β)` function.
+- `bdg_log_normalizeddoublegamma(w, β)` and `bdg_normalizeddoublegamma(w, β)` implement the normalized double gamma `Γ_β(w)`.
+- `bdg_double_sine(z, b)` implements the double sine `S_b(z)` (DSine in the Julia reference).
 
 Real interval versions:
 
-- `arb_log_barnesdoublegamma`, `arb_barnesdoublegamma`
-- `arb_loggamma2`, `arb_gamma2`
-- `arb_logdoublegamma`, `arb_doublegamma`
+- `bdg_interval_log_barnesdoublegamma`, `bdg_interval_barnesdoublegamma`
+- `bdg_interval_log_barnesgamma2`, `bdg_interval_barnesgamma2`
+- `bdg_interval_log_normalizeddoublegamma`, `bdg_interval_normalizeddoublegamma`
 
 Complex box versions:
 
-- `acb_log_barnesdoublegamma`, `acb_barnesdoublegamma`
-- `acb_loggamma2`, `acb_gamma2`
-- `acb_logdoublegamma`, `acb_doublegamma`
-- `acb_double_sine`
+- `bdg_complex_log_barnesdoublegamma`, `bdg_complex_barnesdoublegamma`
+- `bdg_complex_log_barnesgamma2`, `bdg_complex_barnesgamma2`
+- `bdg_complex_log_normalizeddoublegamma`, `bdg_complex_normalizeddoublegamma`
+- `bdg_complex_double_sine`
 
 Mode-dispatched wrappers (basic / rigorous / adaptive):
 
-- `acb_*_mode` and `arb_*_mode` variants for all functions above
+- `bdg_interval_*_mode` variants for the interval-valued real wrappers
+- `bdg_complex_*_mode` variants for the box-valued complex wrappers
 
 ## Core formulas
 

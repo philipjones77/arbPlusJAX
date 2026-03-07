@@ -1,5 +1,19 @@
 from __future__ import annotations
 
+"""Barnes G implementation family.
+
+This module provides the repo's Barnes G implementation family and is tracked
+explicitly for provenance so the implementation lineage can be located from the
+source itself.
+
+Provenance:
+- classification: arb_like
+- base_names: barnesg
+- module lineage: repo Barnes G implementation used by the Arb-like surface
+- naming policy: see docs/function_naming.md
+- registry report: see docs/reports/function_implementation_index.md
+"""
+
 from functools import partial
 
 import jax
@@ -10,6 +24,14 @@ from . import coeffs
 from . import elementary as el
 
 jax.config.update("jax_enable_x64", True)
+
+PROVENANCE = {
+    "classification": "arb_like",
+    "base_names": ("barnesg",),
+    "module_lineage": "repo Barnes G implementation used by the Arb-like surface",
+    "naming_policy": "docs/function_naming.md",
+    "registry_report": "docs/reports/function_implementation_index.md",
+}
 
 _LOG_A = jnp.float64(0.248754477)  # log Glaisher-Kinkelin constant
 _LOG_2PI = el.LOG_TWO_PI
@@ -33,38 +55,43 @@ _LANCZOS = coeffs.LANCZOS
 
 
 def _complex_loggamma_lanczos(z: jax.Array) -> jax.Array:
-    z = jnp.asarray(z, dtype=jnp.complex128)
-    z1 = z - jnp.complex128(1.0 + 0.0j)
-    x = jnp.complex128(_LANCZOS[0] + 0.0j)
+    cdt = el.complex_dtype_from(z)
+    rdt = el.real_dtype_from_complex_dtype(cdt)
+    z = jnp.asarray(z, dtype=cdt)
+    z1 = z - jnp.asarray(1.0 + 0.0j, dtype=cdt)
+    x = jnp.full_like(z, jnp.asarray(_LANCZOS[0] + 0.0j, dtype=cdt))
 
     def body(i, acc):
-        return acc + _LANCZOS[i] / (z1 + jnp.float64(i))
+        return acc + jnp.asarray(_LANCZOS[i], dtype=cdt) / (z1 + jnp.asarray(i, dtype=rdt))
 
     x = lax.fori_loop(1, 9, body, x)
-    t = z1 + jnp.float64(7.5)
-    return el.LOG_SQRT_TWO_PI + (z1 + 0.5) * jnp.log(t) - t + jnp.log(x)
+    t = z1 + jnp.asarray(7.5, dtype=rdt)
+    return jnp.asarray(el.LOG_SQRT_TWO_PI, dtype=cdt) + (z1 + jnp.asarray(0.5, dtype=rdt)) * jnp.log(t) - t + jnp.log(x)
 
 
 def _complex_loggamma(z: jax.Array) -> jax.Array:
-    z = jnp.asarray(z, dtype=jnp.complex128)
+    cdt = el.complex_dtype_from(z)
+    z = jnp.asarray(z, dtype=cdt)
 
     def reflection(w):
-        return el.LOG_PI - jnp.log(jnp.sin(el.PI * w)) - _complex_loggamma_lanczos(1.0 - w)
+        return jnp.asarray(el.LOG_PI, dtype=cdt) - jnp.log(jnp.sin(jnp.asarray(el.PI, dtype=cdt) * w)) - _complex_loggamma_lanczos(jnp.asarray(1.0, dtype=cdt) - w)
 
-    return lax.cond(jnp.real(z) < 0.5, reflection, _complex_loggamma_lanczos, z)
+    return jnp.where(jnp.real(z) < 0.5, reflection(z), _complex_loggamma_lanczos(z))
 
 
 def _log_barnesg_asymptotic(z: jax.Array) -> jax.Array:
+    cdt = el.complex_dtype_from(z)
+    rdt = el.real_dtype_from_complex_dtype(cdt)
     # Asymptotic expansion for log G(z), using formula for log G(w+1) with w = z-1
-    w = z - jnp.complex128(1.0 + 0.0j)
+    w = jnp.asarray(z, dtype=cdt) - jnp.asarray(1.0 + 0.0j, dtype=cdt)
     logw = jnp.log(w)
     w2 = w * w
-    term = (w2 / 2.0 - jnp.float64(1.0 / 12.0)) * logw - jnp.float64(0.75) * w2 + 0.5 * w * _LOG_2PI + _LOG_A
+    term = (w2 / jnp.asarray(2.0, dtype=rdt) - jnp.asarray(1.0 / 12.0, dtype=rdt)) * logw - jnp.asarray(0.75, dtype=rdt) * w2 + jnp.asarray(0.5, dtype=rdt) * w * jnp.asarray(_LOG_2PI, dtype=cdt) + jnp.asarray(_LOG_A, dtype=cdt)
 
     def body(i, acc):
-        k = jnp.float64(i + 1)
-        coeff = _BARNESG_B[i]
-        return acc + coeff / (4.0 * k * (k + 1.0) * (w ** (2.0 * k)))
+        k = jnp.asarray(i + 1, dtype=rdt)
+        coeff = jnp.asarray(_BARNESG_B[i], dtype=cdt)
+        return acc + coeff / (jnp.asarray(4.0, dtype=rdt) * k * (k + jnp.asarray(1.0, dtype=rdt)) * (w ** (jnp.asarray(2.0, dtype=rdt) * k)))
 
     return lax.fori_loop(0, _BARNESG_B.shape[0], body, term)
 
@@ -75,19 +102,21 @@ def _is_nonpositive_integer_real(x: jax.Array) -> jax.Array:
 
 @partial(jax.jit, static_argnames=("target",))
 def log_barnesg(z: jax.Array, target: float = 5.0) -> jax.Array:
-    z = jnp.asarray(z, dtype=jnp.complex128)
+    cdt = el.complex_dtype_from(z)
+    rdt = el.real_dtype_from_complex_dtype(cdt)
+    z = jnp.asarray(z, dtype=cdt)
     max_shift = 16
-    n = jnp.maximum(0.0, jnp.ceil(target - jnp.real(z)))
-    n = jnp.minimum(n, jnp.float64(max_shift))
+    n = jnp.maximum(jnp.asarray(0.0, dtype=rdt), jnp.ceil(jnp.asarray(target, dtype=rdt) - jnp.real(z)))
+    n = jnp.minimum(n, jnp.asarray(max_shift, dtype=rdt))
 
     def body(i, state):
         zc, acc = state
-        do = jnp.float64(i) < n
+        do = jnp.asarray(i, dtype=rdt) < n
         acc = jnp.where(do, acc - _complex_loggamma(zc), acc)
-        zc = jnp.where(do, zc + 1.0, zc)
+        zc = jnp.where(do, zc + jnp.asarray(1.0, dtype=rdt), zc)
         return zc, acc
 
-    z_shift, acc = lax.fori_loop(0, max_shift, body, (z, jnp.complex128(0.0 + 0.0j)))
+    z_shift, acc = lax.fori_loop(0, max_shift, body, (z, jnp.asarray(0.0 + 0.0j, dtype=cdt)))
     return _log_barnesg_asymptotic(z_shift) + acc
 
 
@@ -98,7 +127,7 @@ def barnesg(z: jax.Array, target: float = 5.0) -> jax.Array:
 
 @partial(jax.jit, static_argnames=("target",))
 def barnesg_real(x: jax.Array, target: float = 5.0) -> jax.Array:
-    x = jnp.asarray(x, dtype=jnp.float64)
+    x = el.as_real(x)
     pole = _is_nonpositive_integer_real(x)
     val = jnp.real(barnesg(x + 0.0j, target=target))
     return jnp.where(pole, jnp.nan, val)
@@ -106,7 +135,7 @@ def barnesg_real(x: jax.Array, target: float = 5.0) -> jax.Array:
 
 @partial(jax.jit, static_argnames=("target",))
 def barnesg_complex(z: jax.Array, target: float = 5.0) -> jax.Array:
-    z = jnp.asarray(z, dtype=jnp.complex128)
+    z = el.as_complex(z)
     pole = (jnp.imag(z) == 0.0) & _is_nonpositive_integer_real(jnp.real(z))
     val = barnesg(z, target=target)
     return jnp.where(pole, jnp.nan + 1j * jnp.nan, val)

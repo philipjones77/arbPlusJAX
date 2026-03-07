@@ -153,6 +153,13 @@ def _acb_passthrough_prec(fn: Callable[..., jax.Array]) -> Callable[..., jax.Arr
     return wrapped
 
 
+def _arb_passthrough_prec(fn: Callable[..., jax.Array]) -> Callable[..., jax.Array]:
+    def wrapped(*args, prec_bits: int, **kwargs):
+        return fn(*args, prec_bits=prec_bits, **kwargs)
+
+    return wrapped
+
+
 def _acb_rigorous_adapter(name: str) -> Callable[..., jax.Array] | None:
     if name in ("acb_exp_prec", "acb_exp_batch_prec"):
         return _acb_exp_rigorous
@@ -176,6 +183,44 @@ def _acb_rigorous_adapter(name: str) -> Callable[..., jax.Array] | None:
         return _acb_passthrough_prec(acb_core.acb_abs_prec)
     if name in ("acb_sin_cos_prec", "acb_sin_cos_batch_prec"):
         return _acb_passthrough_prec(acb_core.acb_sin_cos_prec)
+    if name in (
+        "acb_rsqrt_prec", "acb_rsqrt_batch_prec",
+        "acb_cot_prec", "acb_cot_batch_prec",
+        "acb_sech_prec", "acb_sech_batch_prec",
+        "acb_csch_prec", "acb_csch_batch_prec",
+        "acb_sin_pi_prec", "acb_sin_pi_batch_prec",
+        "acb_cos_pi_prec", "acb_cos_pi_batch_prec",
+        "acb_sin_cos_pi_prec", "acb_sin_cos_pi_batch_prec",
+        "acb_tan_pi_prec", "acb_tan_pi_batch_prec",
+        "acb_cot_pi_prec", "acb_cot_pi_batch_prec",
+        "acb_csc_pi_prec", "acb_csc_pi_batch_prec",
+        "acb_sinc_prec", "acb_sinc_batch_prec",
+        "acb_sinc_pi_prec", "acb_sinc_pi_batch_prec",
+        "acb_exp_pi_i_prec", "acb_exp_pi_i_batch_prec",
+        "acb_exp_invexp_prec", "acb_exp_invexp_batch_prec",
+        "acb_addmul_prec", "acb_addmul_batch_prec",
+        "acb_submul_prec", "acb_submul_batch_prec",
+        "acb_pow_arb_prec", "acb_pow_arb_batch_prec",
+        "acb_pow_si_prec", "acb_pow_si_batch_prec",
+        "acb_sqr_prec", "acb_sqr_batch_prec",
+        "acb_root_ui_prec", "acb_root_ui_batch_prec",
+        "acb_lgamma_prec", "acb_lgamma_batch_prec",
+        "acb_log_sin_pi_prec", "acb_log_sin_pi_batch_prec",
+        "acb_digamma_prec", "acb_digamma_batch_prec",
+        "acb_zeta_prec", "acb_zeta_batch_prec",
+        "acb_hurwitz_zeta_prec", "acb_hurwitz_zeta_batch_prec",
+        "acb_polygamma_prec", "acb_polygamma_batch_prec",
+        "acb_bernoulli_poly_ui_prec", "acb_bernoulli_poly_ui_batch_prec",
+        "acb_polylog_prec", "acb_polylog_batch_prec",
+        "acb_polylog_si_prec", "acb_polylog_si_batch_prec",
+        "acb_agm_prec", "acb_agm_batch_prec",
+        "acb_agm1_prec", "acb_agm1_batch_prec",
+        "acb_agm1_cpx_prec", "acb_agm1_cpx_batch_prec",
+    ):
+        kernel_name = name[:-11] + "_prec" if name.endswith("_batch_prec") else name
+        fn = getattr(acb_core, kernel_name, None)
+        if fn is not None:
+            return _acb_passthrough_prec(fn)
     return None
 
 
@@ -218,8 +263,51 @@ def _acb_generic_adaptive(name: str) -> Callable[..., jax.Array] | None:
 
 
 def _arb_rigorous_adapter(name: str) -> Callable[..., jax.Array] | None:
+    # Real arb_core kernels are interval kernels already, so the precision-aware
+    # base function is the rigorous path unless a stronger specialized adapter is
+    # added here later.
+    if name in ("arb_sin_cos_prec", "arb_sin_cos_batch_prec"):
+        return _arb_passthrough_prec(arb_core.arb_sin_cos_prec)
+    if name in ("arb_sinh_cosh_prec", "arb_sinh_cosh_batch_prec"):
+        return _arb_passthrough_prec(arb_core.arb_sinh_cosh_prec)
+    if name in ("arb_gamma_prec", "arb_gamma_batch_prec"):
+        return ball_wrappers.arb_ball_gamma
+    if name in ("arb_lgamma_prec", "arb_lgamma_batch_prec"):
+        return ball_wrappers.arb_ball_lgamma
+    if name in ("arb_rgamma_prec", "arb_rgamma_batch_prec"):
+        return ball_wrappers.arb_ball_rgamma
+    if name in ("arb_pow_prec", "arb_pow_batch_prec"):
+        return ball_wrappers.arb_ball_pow
+    if name in ("arb_pow_ui_prec", "arb_pow_ui_batch_prec"):
+        return ball_wrappers.arb_ball_pow_ui
+    if name in ("arb_pow_fmpq_prec", "arb_pow_fmpq_batch_prec"):
+        return ball_wrappers.arb_ball_pow_fmpq
+    if name in ("arb_root_ui_prec", "arb_root_ui_batch_prec"):
+        return ball_wrappers.arb_ball_root_ui
+    if name in ("arb_root_prec", "arb_root_batch_prec"):
+        return ball_wrappers.arb_ball_root
+    if name in (
+        "arb_sin_pi_prec", "arb_sin_pi_batch_prec",
+        "arb_cos_pi_prec", "arb_cos_pi_batch_prec",
+        "arb_tan_pi_prec", "arb_tan_pi_batch_prec",
+        "arb_sinc_prec", "arb_sinc_batch_prec",
+        "arb_sinc_pi_prec", "arb_sinc_pi_batch_prec",
+        "arb_sign_prec", "arb_sign_batch_prec",
+        "arb_pow_fmpq_prec", "arb_pow_fmpq_batch_prec",
+        "arb_root_prec", "arb_root_batch_prec",
+        "arb_cbrt_prec", "arb_cbrt_batch_prec",
+        "arb_lgamma_prec", "arb_lgamma_batch_prec",
+        "arb_rgamma_prec", "arb_rgamma_batch_prec",
+    ):
+        kernel_name = name[:-11] + "_prec" if name.endswith("_batch_prec") else name
+        fn = getattr(arb_core, kernel_name, None)
+        if fn is not None:
+            return _arb_passthrough_prec(fn)
     if name.startswith("arb_"):
-        return None
+        kernel_name = name[:-11] + "_prec" if name.endswith("_batch_prec") else name
+        fn = getattr(arb_core, kernel_name, None)
+        if fn is not None:
+            return _arb_passthrough_prec(fn)
     return None
 
 
@@ -230,6 +318,36 @@ def _arb_adaptive_adapter(name: str) -> Callable[..., jax.Array] | None:
         return ball_wrappers.arb_ball_log_adaptive
     if name in ("arb_sin_prec", "arb_sin_batch_prec"):
         return ball_wrappers.arb_ball_sin_adaptive
+    if name in ("arb_gamma_prec", "arb_gamma_batch_prec"):
+        return ball_wrappers.arb_ball_gamma_adaptive
+    if name in ("arb_lgamma_prec", "arb_lgamma_batch_prec"):
+        return ball_wrappers.arb_ball_lgamma_adaptive
+    if name in ("arb_rgamma_prec", "arb_rgamma_batch_prec"):
+        return ball_wrappers.arb_ball_rgamma_adaptive
+    if name in ("arb_pow_prec", "arb_pow_batch_prec"):
+        return ball_wrappers.arb_ball_pow_adaptive
+    if name in ("arb_pow_ui_prec", "arb_pow_ui_batch_prec"):
+        return ball_wrappers.arb_ball_pow_ui_adaptive
+    if name in ("arb_pow_fmpq_prec", "arb_pow_fmpq_batch_prec"):
+        return ball_wrappers.arb_ball_pow_fmpq_adaptive
+    if name in ("arb_root_ui_prec", "arb_root_ui_batch_prec"):
+        return ball_wrappers.arb_ball_root_ui_adaptive
+    if name in ("arb_root_prec", "arb_root_batch_prec"):
+        return ball_wrappers.arb_ball_root_adaptive
+    if name in ("arb_sin_cos_prec", "arb_sin_cos_batch_prec"):
+        return _arb_passthrough_prec(arb_core.arb_sin_cos_prec)
+    if name in ("arb_sinh_cosh_prec", "arb_sinh_cosh_batch_prec"):
+        return _arb_passthrough_prec(arb_core.arb_sinh_cosh_prec)
+    if name.startswith("arb_"):
+        kernel_name = name[:-5] if name.endswith("_prec") else name
+        kernel = getattr(arb_core, kernel_name, None)
+        if kernel is None:
+            return None
+
+        def adapt_fn(*args, prec_bits: int, **kwargs):
+            return wc.adaptive_interval_kernel(kernel, args, prec_bits, **kwargs)
+
+        return adapt_fn
     return None
 
 
@@ -294,4 +412,3 @@ for _mod in (arb_core, acb_core):
         _wrapper = _make_wrapper(_name, _fn)
         globals()[_wrapper.__name__] = _wrapper
         __all__.append(_wrapper.__name__)
-

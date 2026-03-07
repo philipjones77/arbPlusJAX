@@ -9,6 +9,7 @@ import jax.numpy as jnp
 from . import double_interval as di
 from . import precision
 from . import acb_core
+from . import arb_core
 from . import barnesg
 from . import coeffs
 from . import double_gamma
@@ -157,6 +158,20 @@ def _complex_deriv_bound(fn, z: jax.Array) -> jax.Array:
     return jnp.sqrt(jnp.sum(j * j))
 
 
+def _complex_partial_bounds_bivariate(fn, z: jax.Array, w: jax.Array) -> tuple[jax.Array, jax.Array]:
+    def f_xyzw(xyzw):
+        zc = xyzw[0] + 1j * xyzw[1]
+        wc = xyzw[2] + 1j * xyzw[3]
+        out = fn(zc, wc)
+        return jnp.array([jnp.real(out), jnp.imag(out)], dtype=jnp.float64)
+
+    xyzw = jnp.array([jnp.real(z), jnp.imag(z), jnp.real(w), jnp.imag(w)], dtype=jnp.float64)
+    j = jax.jacfwd(f_xyzw)(xyzw)
+    lz = jnp.sqrt(jnp.sum(j[:, 0:2] * j[:, 0:2]))
+    lw = jnp.sqrt(jnp.sum(j[:, 2:4] * j[:, 2:4]))
+    return lz, lw
+
+
 def _complex_loggamma_lanczos(z: jax.Array) -> jax.Array:
     z = jnp.asarray(z, dtype=jnp.complex128)
     z1 = z - jnp.complex128(1.0 + 0.0j)
@@ -216,6 +231,83 @@ def _adaptive_real(fn, x: jax.Array, eps: float, samples: int) -> jax.Array:
     return jnp.where(jnp.isfinite(v0), out, _full_interval())
 
 
+def _real_partial_bound(fn, x: jax.Array, y: jax.Array, argnum: int) -> jax.Array:
+    return jnp.abs(jax.grad(fn, argnums=argnum)(x, y))
+
+
+def _rigorous_real_bivariate(fn, x: jax.Array, y: jax.Array, eps: float) -> jax.Array:
+    mid_x, rad_x = _ball_from_interval(x)
+    mid_y, rad_y = _ball_from_interval(y)
+    val = fn(mid_x, mid_y)
+
+    ts = jnp.linspace(-1.0, 1.0, _LIP_SAMPLES)
+    xs = mid_x + rad_x * ts
+    ys = mid_y + rad_y * ts
+    gx, gy = jnp.meshgrid(xs, ys, indexing="ij")
+    pts_x = jnp.ravel(gx)
+    pts_y = jnp.ravel(gy)
+
+    lx = jnp.max(jax.vmap(lambda a, b: _real_partial_bound(fn, a, b, 0))(pts_x, pts_y))
+    ly = jnp.max(jax.vmap(lambda a, b: _real_partial_bound(fn, a, b, 1))(pts_x, pts_y))
+    rad_out = lx * rad_x + ly * rad_y + eps
+    out = di.interval(di._below(val - rad_out), di._above(val + rad_out))
+    return jnp.where(jnp.isfinite(val), out, _full_interval())
+
+
+def _adaptive_real_bivariate(fn, x: jax.Array, y: jax.Array, eps: float, samples: int) -> jax.Array:
+    mid_x, rad_x = _ball_from_interval(x)
+    mid_y, rad_y = _ball_from_interval(y)
+    v0 = fn(mid_x, mid_y)
+
+    ts = jnp.linspace(-1.0, 1.0, samples)
+    gx, gy = jnp.meshgrid(ts, ts, indexing="ij")
+    pts_x = mid_x + rad_x * jnp.ravel(gx)
+    pts_y = mid_y + rad_y * jnp.ravel(gy)
+    vals = jax.vmap(fn)(pts_x, pts_y)
+
+    rad_out = jnp.max(jnp.abs(vals - v0)) + eps
+    out = di.interval(di._below(v0 - rad_out), di._above(v0 + rad_out))
+    return jnp.where(jnp.isfinite(v0), out, _full_interval())
+
+
+def _rigorous_complex_bivariate(fn, x: jax.Array, y: jax.Array, eps: float) -> jax.Array:
+    mid_x, rad_x = _ball_from_box(x)
+    mid_y, rad_y = _ball_from_box(y)
+    val = fn(mid_x, mid_y)
+
+    angles = jnp.linspace(0.0, el.TWO_PI, _LIP_SAMPLES, endpoint=False)
+    zs = mid_x + rad_x * (jnp.cos(angles) + 1j * jnp.sin(angles))
+    ws = mid_y + rad_y * (jnp.cos(angles) + 1j * jnp.sin(angles))
+    gz, gw = jnp.meshgrid(zs, ws, indexing="ij")
+    pts_z = jnp.ravel(gz)
+    pts_w = jnp.ravel(gw)
+
+    partials = jax.vmap(lambda a, b: _complex_partial_bounds_bivariate(fn, a, b))(pts_z, pts_w)
+    lz = jnp.max(partials[0])
+    lw = jnp.max(partials[1])
+    rad_out = lz * rad_x + lw * rad_y + eps
+    finite = jnp.isfinite(jnp.real(val)) & jnp.isfinite(jnp.imag(val))
+    out = _box_from_ball(val, rad_out)
+    return jnp.where(finite, out, _full_box())
+
+
+def _adaptive_complex_bivariate(fn, x: jax.Array, y: jax.Array, eps: float, samples: int) -> jax.Array:
+    mid_x, rad_x = _ball_from_box(x)
+    mid_y, rad_y = _ball_from_box(y)
+    v0 = fn(mid_x, mid_y)
+
+    angles = jnp.linspace(0.0, el.TWO_PI, samples, endpoint=False)
+    zs = mid_x + rad_x * (jnp.cos(angles) + 1j * jnp.sin(angles))
+    ws = mid_y + rad_y * (jnp.cos(angles) + 1j * jnp.sin(angles))
+    gz, gw = jnp.meshgrid(zs, ws, indexing="ij")
+    vals = jax.vmap(fn)(jnp.ravel(gz), jnp.ravel(gw))
+
+    rad_out = jnp.max(jnp.abs(vals - v0)) + eps
+    finite = jnp.isfinite(jnp.real(v0)) & jnp.isfinite(jnp.imag(v0))
+    out = _box_from_ball(v0, rad_out)
+    return jnp.where(finite, out, _full_box())
+
+
 def _adaptive_complex(fn, x: jax.Array, eps: float, samples: int) -> jax.Array:
     mid, rad = _ball_from_box(x)
     angles = jnp.linspace(0.0, el.TWO_PI, samples, endpoint=False)
@@ -271,6 +363,46 @@ def _bivariate_sample_interval(fn, x: jax.Array, y: jax.Array) -> jax.Array:
     finite = jnp.all(jnp.isfinite(vals))
     out = di.interval(di._below(jnp.min(vals)), di._above(jnp.max(vals)))
     return jnp.where(finite, out, _full_interval())
+
+
+def _sample_interval_bivariate_grid(fn, x: jax.Array, y: jax.Array, samples: int = 3) -> jax.Array:
+    xs = jnp.linspace(x[0], x[1], samples)
+    ys = jnp.linspace(y[0], y[1], samples)
+    vals = jax.vmap(lambda a: jax.vmap(lambda b: fn(a, b))(ys))(xs).reshape(-1)
+    finite = jnp.all(jnp.isfinite(vals))
+    out = di.interval(di._below(jnp.min(vals)), di._above(jnp.max(vals)))
+    return jnp.where(finite, out, _full_interval())
+
+
+def _sample_box_bivariate_grid(fn, x: jax.Array, y: jax.Array, samples: int = 3) -> jax.Array:
+    xm, xr = _ball_from_box(x)
+    ym, yr = _ball_from_box(y)
+    angles = jnp.linspace(0.0, el.TWO_PI, samples, endpoint=False)
+    zs = xm + xr * (jnp.cos(angles) + 1j * jnp.sin(angles))
+    ws = ym + yr * (jnp.cos(angles) + 1j * jnp.sin(angles))
+    gz, gw = jnp.meshgrid(zs, ws, indexing="ij")
+    vals = jax.vmap(fn)(jnp.ravel(gz), jnp.ravel(gw))
+    finite = jnp.all(jnp.isfinite(jnp.real(vals)) & jnp.isfinite(jnp.imag(vals)))
+    re = di.interval(di._below(jnp.min(jnp.real(vals))), di._above(jnp.max(jnp.real(vals))))
+    im = di.interval(di._below(jnp.min(jnp.imag(vals))), di._above(jnp.max(jnp.imag(vals))))
+    out = acb_core.acb_box(re, im)
+    return jnp.where(finite, out, _full_box())
+
+
+def _sample_box_bivariate_candidates(fn, x: jax.Array, y: jax.Array) -> jax.Array:
+    xm, xr = _ball_from_box(x)
+    ym, yr = _ball_from_box(y)
+    z_offsets = jnp.asarray([0.0 + 0.0j, 1.0 + 0.0j, -1.0 + 0.0j, 0.0 + 1.0j, 0.0 - 1.0j], dtype=el.complex_dtype_from(xm, ym))
+    w_offsets = z_offsets
+    zs = xm + xr * z_offsets
+    ws = ym + yr * w_offsets
+    gz, gw = jnp.meshgrid(zs, ws, indexing="ij")
+    vals = jax.vmap(fn)(jnp.ravel(gz), jnp.ravel(gw))
+    finite = jnp.all(jnp.isfinite(jnp.real(vals)) & jnp.isfinite(jnp.imag(vals)))
+    re = di.interval(di._below(jnp.min(jnp.real(vals))), di._above(jnp.max(jnp.real(vals))))
+    im = di.interval(di._below(jnp.min(jnp.imag(vals))), di._above(jnp.max(jnp.imag(vals))))
+    out = acb_core.acb_box(re, im)
+    return jnp.where(finite, out, _full_box())
 
 
 def _bivariate_sample_interval_dense(fn, x: jax.Array, y: jax.Array) -> jax.Array:
@@ -550,242 +682,339 @@ def acb_ball_barnesg_adaptive(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BIT
     return lax.cond(cross_pole, lambda _: _full_box(), lambda _: _adaptive_complex(lambda z: barnesg.barnesg_complex(z), x, eps, samples=_LIP_SAMPLES), operand=None)
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
-def arb_ball_log_barnesdoublegamma(z: jax.Array, tau: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
-    z = di.as_interval(z)
-    tau = di.as_interval(tau)
-    eps = jnp.exp2(-jnp.float64(prec_bits))
-    tau_mid = di.midpoint(tau)
-    return _rigorous_real(lambda zz: jnp.real(double_gamma.log_barnesdoublegamma(zz, tau_mid, prec_bits)), z, eps)
+def bdg_interval_log_barnesdoublegamma(z: jax.Array, tau: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    valid = di.lower(di.as_interval(tau)) > 0.0
+    rig = _map_interval_bivariate(
+        lambda zz, tt: _bivariate_sample_interval(
+            lambda a, b: jnp.real(double_gamma.bdg_log_barnesdoublegamma(a, b, prec_bits)), zz, tt
+        ),
+        z,
+        tau,
+    )
+    return jnp.where(valid[..., None], rig, _full_interval())
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
-def arb_ball_log_barnesdoublegamma_adaptive(z: jax.Array, tau: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
-    z = di.as_interval(z)
-    tau = di.as_interval(tau)
-    eps = jnp.exp2(-jnp.float64(prec_bits))
-    tau_mid = di.midpoint(tau)
-    return _adaptive_real(lambda zz: jnp.real(double_gamma.log_barnesdoublegamma(zz, tau_mid, prec_bits)), z, eps, samples=_LIP_SAMPLES)
+def bdg_interval_log_barnesdoublegamma_adaptive(z: jax.Array, tau: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    valid = di.lower(di.as_interval(tau)) > 0.0
+    adp = _map_interval_bivariate(
+        lambda zz, tt: _sample_interval_bivariate_grid(
+            lambda a, b: jnp.real(double_gamma.bdg_log_barnesdoublegamma(a, b, prec_bits)), zz, tt, samples=_LIP_SAMPLES
+        ),
+        z,
+        tau,
+    )
+    return jnp.where(valid[..., None], adp, _full_interval())
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
-def arb_ball_barnesdoublegamma(z: jax.Array, tau: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
-    z = di.as_interval(z)
-    tau = di.as_interval(tau)
-    eps = jnp.exp2(-jnp.float64(prec_bits))
-    tau_mid = di.midpoint(tau)
-    return _rigorous_real(lambda zz: jnp.real(double_gamma.barnesdoublegamma(zz, tau_mid, prec_bits)), z, eps)
+def bdg_interval_barnesdoublegamma(z: jax.Array, tau: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    valid = di.lower(di.as_interval(tau)) > 0.0
+    rig = _map_interval_bivariate(
+        lambda zz, tt: _bivariate_sample_interval(
+            lambda a, b: jnp.real(double_gamma.bdg_barnesdoublegamma(a, b, prec_bits)), zz, tt
+        ),
+        z,
+        tau,
+    )
+    return jnp.where(valid[..., None], rig, _full_interval())
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
-def arb_ball_barnesdoublegamma_adaptive(z: jax.Array, tau: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
-    z = di.as_interval(z)
-    tau = di.as_interval(tau)
-    eps = jnp.exp2(-jnp.float64(prec_bits))
-    tau_mid = di.midpoint(tau)
-    return _adaptive_real(lambda zz: jnp.real(double_gamma.barnesdoublegamma(zz, tau_mid, prec_bits)), z, eps, samples=_LIP_SAMPLES)
+def bdg_interval_barnesdoublegamma_adaptive(z: jax.Array, tau: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    valid = di.lower(di.as_interval(tau)) > 0.0
+    adp = _map_interval_bivariate(
+        lambda zz, tt: _sample_interval_bivariate_grid(
+            lambda a, b: jnp.real(double_gamma.bdg_barnesdoublegamma(a, b, prec_bits)), zz, tt, samples=_LIP_SAMPLES
+        ),
+        z,
+        tau,
+    )
+    return jnp.where(valid[..., None], adp, _full_interval())
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
-def arb_ball_loggamma2(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
-    w = di.as_interval(w)
-    beta = di.as_interval(beta)
-    eps = jnp.exp2(-jnp.float64(prec_bits))
-    beta_mid = di.midpoint(beta)
-    return _rigorous_real(lambda ww: jnp.real(double_gamma.loggamma2(ww, beta_mid, prec_bits)), w, eps)
+def bdg_interval_log_barnesgamma2(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    valid = di.lower(di.as_interval(beta)) > 0.0
+    rig = _map_interval_bivariate(
+        lambda ww, bb: _bivariate_sample_interval(
+            lambda a, b: jnp.real(double_gamma.bdg_log_barnesgamma2(a, b, prec_bits)), ww, bb
+        ),
+        w,
+        beta,
+    )
+    return jnp.where(valid[..., None], rig, _full_interval())
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
-def arb_ball_loggamma2_adaptive(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
-    w = di.as_interval(w)
-    beta = di.as_interval(beta)
-    eps = jnp.exp2(-jnp.float64(prec_bits))
-    beta_mid = di.midpoint(beta)
-    return _adaptive_real(lambda ww: jnp.real(double_gamma.loggamma2(ww, beta_mid, prec_bits)), w, eps, samples=_LIP_SAMPLES)
+def bdg_interval_log_barnesgamma2_adaptive(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    valid = di.lower(di.as_interval(beta)) > 0.0
+    adp = _map_interval_bivariate(
+        lambda ww, bb: _sample_interval_bivariate_grid(
+            lambda a, b: jnp.real(double_gamma.bdg_log_barnesgamma2(a, b, prec_bits)), ww, bb, samples=_LIP_SAMPLES
+        ),
+        w,
+        beta,
+    )
+    return jnp.where(valid[..., None], adp, _full_interval())
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
-def arb_ball_gamma2(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
-    w = di.as_interval(w)
-    beta = di.as_interval(beta)
-    eps = jnp.exp2(-jnp.float64(prec_bits))
-    beta_mid = di.midpoint(beta)
-    return _rigorous_real(lambda ww: jnp.real(double_gamma.gamma2(ww, beta_mid, prec_bits)), w, eps)
+def bdg_interval_barnesgamma2(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    valid = di.lower(di.as_interval(beta)) > 0.0
+    rig = _map_interval_bivariate(
+        lambda ww, bb: _bivariate_sample_interval(
+            lambda a, b: jnp.real(double_gamma.bdg_barnesgamma2(a, b, prec_bits)), ww, bb
+        ),
+        w,
+        beta,
+    )
+    return jnp.where(valid[..., None], rig, _full_interval())
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
-def arb_ball_gamma2_adaptive(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
-    w = di.as_interval(w)
-    beta = di.as_interval(beta)
-    eps = jnp.exp2(-jnp.float64(prec_bits))
-    beta_mid = di.midpoint(beta)
-    return _adaptive_real(lambda ww: jnp.real(double_gamma.gamma2(ww, beta_mid, prec_bits)), w, eps, samples=_LIP_SAMPLES)
+def bdg_interval_barnesgamma2_adaptive(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    valid = di.lower(di.as_interval(beta)) > 0.0
+    adp = _map_interval_bivariate(
+        lambda ww, bb: _sample_interval_bivariate_grid(
+            lambda a, b: jnp.real(double_gamma.bdg_barnesgamma2(a, b, prec_bits)), ww, bb, samples=_LIP_SAMPLES
+        ),
+        w,
+        beta,
+    )
+    return jnp.where(valid[..., None], adp, _full_interval())
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
-def arb_ball_logdoublegamma(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
-    w = di.as_interval(w)
-    beta = di.as_interval(beta)
-    eps = jnp.exp2(-jnp.float64(prec_bits))
-    beta_mid = di.midpoint(beta)
-    return _rigorous_real(lambda ww: jnp.real(double_gamma.logdoublegamma(ww, beta_mid, prec_bits)), w, eps)
+def bdg_interval_log_normalizeddoublegamma(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    valid = di.lower(di.as_interval(beta)) > 0.0
+    rig = _map_interval_bivariate(
+        lambda ww, bb: _bivariate_sample_interval(
+            lambda a, b: jnp.real(double_gamma.bdg_log_normalizeddoublegamma(a, b, prec_bits)), ww, bb
+        ),
+        w,
+        beta,
+    )
+    return jnp.where(valid[..., None], rig, _full_interval())
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
-def arb_ball_logdoublegamma_adaptive(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
-    w = di.as_interval(w)
-    beta = di.as_interval(beta)
-    eps = jnp.exp2(-jnp.float64(prec_bits))
-    beta_mid = di.midpoint(beta)
-    return _adaptive_real(lambda ww: jnp.real(double_gamma.logdoublegamma(ww, beta_mid, prec_bits)), w, eps, samples=_LIP_SAMPLES)
+def bdg_interval_log_normalizeddoublegamma_adaptive(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    valid = di.lower(di.as_interval(beta)) > 0.0
+    adp = _map_interval_bivariate(
+        lambda ww, bb: _sample_interval_bivariate_grid(
+            lambda a, b: jnp.real(double_gamma.bdg_log_normalizeddoublegamma(a, b, prec_bits)), ww, bb, samples=_LIP_SAMPLES
+        ),
+        w,
+        beta,
+    )
+    return jnp.where(valid[..., None], adp, _full_interval())
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
-def arb_ball_doublegamma(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
-    w = di.as_interval(w)
-    beta = di.as_interval(beta)
-    eps = jnp.exp2(-jnp.float64(prec_bits))
-    beta_mid = di.midpoint(beta)
-    return _rigorous_real(lambda ww: jnp.real(double_gamma.doublegamma(ww, beta_mid, prec_bits)), w, eps)
+def bdg_interval_normalizeddoublegamma(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    valid = di.lower(di.as_interval(beta)) > 0.0
+    rig = _map_interval_bivariate(
+        lambda ww, bb: _bivariate_sample_interval(
+            lambda a, b: jnp.real(double_gamma.bdg_normalizeddoublegamma(a, b, prec_bits)), ww, bb
+        ),
+        w,
+        beta,
+    )
+    return jnp.where(valid[..., None], rig, _full_interval())
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
-def arb_ball_doublegamma_adaptive(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
-    w = di.as_interval(w)
-    beta = di.as_interval(beta)
-    eps = jnp.exp2(-jnp.float64(prec_bits))
-    beta_mid = di.midpoint(beta)
-    return _adaptive_real(lambda ww: jnp.real(double_gamma.doublegamma(ww, beta_mid, prec_bits)), w, eps, samples=_LIP_SAMPLES)
+def bdg_interval_normalizeddoublegamma_adaptive(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    valid = di.lower(di.as_interval(beta)) > 0.0
+    adp = _map_interval_bivariate(
+        lambda ww, bb: _sample_interval_bivariate_grid(
+            lambda a, b: jnp.real(double_gamma.bdg_normalizeddoublegamma(a, b, prec_bits)), ww, bb, samples=_LIP_SAMPLES
+        ),
+        w,
+        beta,
+    )
+    return jnp.where(valid[..., None], adp, _full_interval())
 
-@partial(jax.jit, static_argnames=("prec_bits",))
-def acb_ball_log_barnesdoublegamma(z: jax.Array, tau: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
-    z = acb_core.as_acb_box(z)
-    tau = acb_core.as_acb_box(tau)
-    eps = jnp.exp2(-jnp.float64(prec_bits))
-    tau_mid = acb_core.acb_midpoint(tau)
-    return _rigorous_complex(lambda zz: double_gamma.log_barnesdoublegamma(zz, tau_mid, prec_bits), z, eps)
-
-
-@partial(jax.jit, static_argnames=("prec_bits",))
-def acb_ball_log_barnesdoublegamma_adaptive(z: jax.Array, tau: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
-    z = acb_core.as_acb_box(z)
-    tau = acb_core.as_acb_box(tau)
-    eps = jnp.exp2(-jnp.float64(prec_bits))
-    tau_mid = acb_core.acb_midpoint(tau)
-    return _adaptive_complex(lambda zz: double_gamma.log_barnesdoublegamma(zz, tau_mid, prec_bits), z, eps, samples=_LIP_SAMPLES)
+def bdg_complex_log_barnesdoublegamma(z: jax.Array, tau: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _map_box_bivariate(
+        lambda zz, tt: _sample_box_bivariate_candidates(lambda a, b: double_gamma.bdg_log_barnesdoublegamma(a, b, prec_bits), zz, tt),
+        z,
+        tau,
+    )
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
-def acb_ball_barnesdoublegamma(z: jax.Array, tau: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
-    z = acb_core.as_acb_box(z)
-    tau = acb_core.as_acb_box(tau)
-    eps = jnp.exp2(-jnp.float64(prec_bits))
-    tau_mid = acb_core.acb_midpoint(tau)
-    return _rigorous_complex(lambda zz: double_gamma.barnesdoublegamma(zz, tau_mid, prec_bits), z, eps)
+def bdg_complex_log_barnesdoublegamma_adaptive(z: jax.Array, tau: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _map_box_bivariate(
+        lambda zz, tt: _sample_box_bivariate_grid(lambda a, b: double_gamma.bdg_log_barnesdoublegamma(a, b, prec_bits), zz, tt, samples=6),
+        z,
+        tau,
+    )
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
-def acb_ball_barnesdoublegamma_adaptive(z: jax.Array, tau: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
-    z = acb_core.as_acb_box(z)
-    tau = acb_core.as_acb_box(tau)
-    eps = jnp.exp2(-jnp.float64(prec_bits))
-    tau_mid = acb_core.acb_midpoint(tau)
-    return _adaptive_complex(lambda zz: double_gamma.barnesdoublegamma(zz, tau_mid, prec_bits), z, eps, samples=_LIP_SAMPLES)
+def bdg_complex_barnesdoublegamma(z: jax.Array, tau: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _map_box_bivariate(
+        lambda zz, tt: _sample_box_bivariate_candidates(lambda a, b: double_gamma.bdg_barnesdoublegamma(a, b, prec_bits), zz, tt),
+        z,
+        tau,
+    )
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
-def acb_ball_loggamma2(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
-    w = acb_core.as_acb_box(w)
-    beta = acb_core.as_acb_box(beta)
-    eps = jnp.exp2(-jnp.float64(prec_bits))
-    beta_mid = acb_core.acb_midpoint(beta)
-    return _rigorous_complex(lambda ww: double_gamma.loggamma2(ww, beta_mid, prec_bits), w, eps)
+def bdg_complex_barnesdoublegamma_adaptive(z: jax.Array, tau: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _map_box_bivariate(
+        lambda zz, tt: _sample_box_bivariate_grid(lambda a, b: double_gamma.bdg_barnesdoublegamma(a, b, prec_bits), zz, tt, samples=6),
+        z,
+        tau,
+    )
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
-def acb_ball_loggamma2_adaptive(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
-    w = acb_core.as_acb_box(w)
-    beta = acb_core.as_acb_box(beta)
-    eps = jnp.exp2(-jnp.float64(prec_bits))
-    beta_mid = acb_core.acb_midpoint(beta)
-    return _adaptive_complex(lambda ww: double_gamma.loggamma2(ww, beta_mid, prec_bits), w, eps, samples=_LIP_SAMPLES)
+def bdg_complex_log_barnesgamma2(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _map_box_bivariate(
+        lambda ww, bb: _sample_box_bivariate_candidates(lambda a, b: double_gamma.bdg_log_barnesgamma2(a, b, prec_bits), ww, bb),
+        w,
+        beta,
+    )
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
-def acb_ball_gamma2(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
-    w = acb_core.as_acb_box(w)
-    beta = acb_core.as_acb_box(beta)
-    eps = jnp.exp2(-jnp.float64(prec_bits))
-    beta_mid = acb_core.acb_midpoint(beta)
-    return _rigorous_complex(lambda ww: double_gamma.gamma2(ww, beta_mid, prec_bits), w, eps)
+def bdg_complex_log_barnesgamma2_adaptive(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _map_box_bivariate(
+        lambda ww, bb: _sample_box_bivariate_grid(lambda a, b: double_gamma.bdg_log_barnesgamma2(a, b, prec_bits), ww, bb, samples=6),
+        w,
+        beta,
+    )
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
-def acb_ball_gamma2_adaptive(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
-    w = acb_core.as_acb_box(w)
-    beta = acb_core.as_acb_box(beta)
-    eps = jnp.exp2(-jnp.float64(prec_bits))
-    beta_mid = acb_core.acb_midpoint(beta)
-    return _adaptive_complex(lambda ww: double_gamma.gamma2(ww, beta_mid, prec_bits), w, eps, samples=_LIP_SAMPLES)
+def bdg_complex_barnesgamma2(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _map_box_bivariate(
+        lambda ww, bb: _sample_box_bivariate_candidates(lambda a, b: double_gamma.bdg_barnesgamma2(a, b, prec_bits), ww, bb),
+        w,
+        beta,
+    )
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
-def acb_ball_logdoublegamma(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
-    w = acb_core.as_acb_box(w)
-    beta = acb_core.as_acb_box(beta)
-    eps = jnp.exp2(-jnp.float64(prec_bits))
-    beta_mid = acb_core.acb_midpoint(beta)
-    return _rigorous_complex(lambda ww: double_gamma.logdoublegamma(ww, beta_mid, prec_bits), w, eps)
+def bdg_complex_barnesgamma2_adaptive(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _map_box_bivariate(
+        lambda ww, bb: _sample_box_bivariate_grid(lambda a, b: double_gamma.bdg_barnesgamma2(a, b, prec_bits), ww, bb, samples=6),
+        w,
+        beta,
+    )
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
-def acb_ball_logdoublegamma_adaptive(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
-    w = acb_core.as_acb_box(w)
-    beta = acb_core.as_acb_box(beta)
-    eps = jnp.exp2(-jnp.float64(prec_bits))
-    beta_mid = acb_core.acb_midpoint(beta)
-    return _adaptive_complex(lambda ww: double_gamma.logdoublegamma(ww, beta_mid, prec_bits), w, eps, samples=_LIP_SAMPLES)
+def bdg_complex_log_normalizeddoublegamma(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _map_box_bivariate(
+        lambda ww, bb: _sample_box_bivariate_candidates(lambda a, b: double_gamma.bdg_log_normalizeddoublegamma(a, b, prec_bits), ww, bb),
+        w,
+        beta,
+    )
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
-def acb_ball_doublegamma(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
-    w = acb_core.as_acb_box(w)
-    beta = acb_core.as_acb_box(beta)
-    eps = jnp.exp2(-jnp.float64(prec_bits))
-    beta_mid = acb_core.acb_midpoint(beta)
-    return _rigorous_complex(lambda ww: double_gamma.doublegamma(ww, beta_mid, prec_bits), w, eps)
+def bdg_complex_log_normalizeddoublegamma_adaptive(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _map_box_bivariate(
+        lambda ww, bb: _sample_box_bivariate_grid(lambda a, b: double_gamma.bdg_log_normalizeddoublegamma(a, b, prec_bits), ww, bb, samples=6),
+        w,
+        beta,
+    )
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
-def acb_ball_doublegamma_adaptive(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
-    w = acb_core.as_acb_box(w)
-    beta = acb_core.as_acb_box(beta)
-    eps = jnp.exp2(-jnp.float64(prec_bits))
-    beta_mid = acb_core.acb_midpoint(beta)
-    return _adaptive_complex(lambda ww: double_gamma.doublegamma(ww, beta_mid, prec_bits), w, eps, samples=_LIP_SAMPLES)
+def bdg_complex_normalizeddoublegamma(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _map_box_bivariate(
+        lambda ww, bb: _sample_box_bivariate_candidates(lambda a, b: double_gamma.bdg_normalizeddoublegamma(a, b, prec_bits), ww, bb),
+        w,
+        beta,
+    )
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
-def acb_ball_double_sine(z: jax.Array, b: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
-    z = acb_core.as_acb_box(z)
-    b = acb_core.as_acb_box(b)
-    eps = jnp.exp2(-jnp.float64(prec_bits))
-    b_mid = acb_core.acb_midpoint(b)
-    return _rigorous_complex(lambda zz: double_gamma.double_sine(zz, b_mid, prec_bits), z, eps)
+def bdg_complex_normalizeddoublegamma_adaptive(w: jax.Array, beta: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _map_box_bivariate(
+        lambda ww, bb: _sample_box_bivariate_grid(lambda a, b: double_gamma.bdg_normalizeddoublegamma(a, b, prec_bits), ww, bb, samples=6),
+        w,
+        beta,
+    )
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
-def acb_ball_double_sine_adaptive(z: jax.Array, b: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
-    z = acb_core.as_acb_box(z)
-    b = acb_core.as_acb_box(b)
-    eps = jnp.exp2(-jnp.float64(prec_bits))
-    b_mid = acb_core.acb_midpoint(b)
-    return _adaptive_complex(lambda zz: double_gamma.double_sine(zz, b_mid, prec_bits), z, eps, samples=_LIP_SAMPLES)
+def bdg_complex_double_sine(z: jax.Array, b: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _map_box_bivariate(
+        lambda zz, bb: _sample_box_bivariate_candidates(lambda a, b0: double_gamma.bdg_double_sine(a, b0, prec_bits), zz, bb),
+        z,
+        b,
+    )
+
+
+def bdg_complex_double_sine_adaptive(z: jax.Array, b: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _map_box_bivariate(
+        lambda zz, bb: _sample_box_bivariate_grid(lambda a, b0: double_gamma.bdg_double_sine(a, b0, prec_bits), zz, bb, samples=6),
+        z,
+        b,
+    )
 
 
 def arb_ball_gamma(x: jax.Array, prec_bits: int = 53) -> jax.Array:
     eps = jnp.exp2(-jnp.float64(prec_bits))
-    return _rigorous_real(_gamma_real, x, eps)
+    return _map_interval(lambda t: _rigorous_real(_gamma_real, t, eps), x)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def arb_ball_lgamma(x: jax.Array, prec_bits: int = 53) -> jax.Array:
+    eps = jnp.exp2(-jnp.float64(prec_bits))
+    return _map_interval(lambda t: _rigorous_real(lax.lgamma, t, eps), x)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def arb_ball_rgamma(x: jax.Array, prec_bits: int = 53) -> jax.Array:
+    eps = jnp.exp2(-jnp.float64(prec_bits))
+    return _map_interval(lambda t: _rigorous_real(lambda v: jnp.exp(-lax.lgamma(v)), t, eps), x)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def arb_ball_pow(x: jax.Array, y: jax.Array, prec_bits: int = 53) -> jax.Array:
+    eps = jnp.exp2(-jnp.float64(prec_bits))
+
+    def fn(a, b):
+        return jnp.power(a, b)
+
+    def kernel(a, b):
+        valid = (di.lower(a) > 0.0) & jnp.isfinite(di.lower(a)) & jnp.isfinite(di.upper(a))
+        rig = _rigorous_real_bivariate(fn, a, b, eps)
+        fallback = arb_core.arb_pow_prec(a, b, prec_bits)
+        safe = _interval_hull(rig, fallback)
+        return jnp.where(valid[..., None], safe, fallback)
+
+    return _map_interval_bivariate(kernel, x, y)
+
+
+@partial(jax.jit, static_argnames=("n", "prec_bits"))
+def arb_ball_pow_ui(x: jax.Array, n: int, prec_bits: int = 53) -> jax.Array:
+    eps = jnp.exp2(-jnp.float64(prec_bits))
+
+    def fn(v):
+        return jnp.power(v, jnp.float64(n))
+
+    return _map_interval(lambda t: _rigorous_real(fn, t, eps), x)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def arb_ball_pow_fmpq(x: jax.Array, p: jax.Array, q: jax.Array, prec_bits: int = 53) -> jax.Array:
+    pp = jnp.asarray(p, dtype=jnp.float64)
+    qq = jnp.asarray(q, dtype=jnp.float64)
+    y = di.interval(pp / qq, pp / qq)
+    return arb_ball_pow(x, y, prec_bits=prec_bits)
+
+
+@partial(jax.jit, static_argnames=("k", "prec_bits"))
+def arb_ball_root_ui(x: jax.Array, k: int, prec_bits: int = 53) -> jax.Array:
+    eps = jnp.exp2(-jnp.float64(prec_bits))
+    kk = jnp.float64(k)
+    odd = (k % 2) == 1
+
+    def odd_fn(v):
+        return jnp.sign(v) * jnp.power(jnp.abs(v), 1.0 / kk)
+
+    def even_fn(v):
+        return jnp.power(v, 1.0 / kk)
+
+    def kernel(t):
+        if odd:
+            return _rigorous_real(odd_fn, t, eps)
+        valid = di.lower(t) > 0.0
+        rig = _rigorous_real(even_fn, t, eps)
+        fallback = arb_core.arb_root_ui_prec(t, k, prec_bits)
+        return jnp.where(valid[..., None], rig, fallback)
+
+    return _map_interval(kernel, x)
+
+
+@partial(jax.jit, static_argnames=("k", "prec_bits"))
+def arb_ball_root(x: jax.Array, k: int, prec_bits: int = 53) -> jax.Array:
+    return arb_ball_root_ui(x, k, prec_bits=prec_bits)
 
 
 @partial(jax.jit, static_argnames=("prec_bits",))
@@ -868,7 +1097,78 @@ def arb_ball_tanh_adaptive(x: jax.Array, prec_bits: int = 53, samples: int = 9) 
 @partial(jax.jit, static_argnames=("prec_bits", "samples"))
 def arb_ball_gamma_adaptive(x: jax.Array, prec_bits: int = 53, samples: int = 9) -> jax.Array:
     eps = jnp.exp2(-jnp.float64(prec_bits))
-    return _adaptive_real(_gamma_real, x, eps, samples)
+    return _map_interval(lambda t: _adaptive_real(_gamma_real, t, eps, samples), x)
+
+
+@partial(jax.jit, static_argnames=("prec_bits", "samples"))
+def arb_ball_lgamma_adaptive(x: jax.Array, prec_bits: int = 53, samples: int = 9) -> jax.Array:
+    eps = jnp.exp2(-jnp.float64(prec_bits))
+    return _map_interval(lambda t: _adaptive_real(lax.lgamma, t, eps, samples), x)
+
+
+@partial(jax.jit, static_argnames=("prec_bits", "samples"))
+def arb_ball_rgamma_adaptive(x: jax.Array, prec_bits: int = 53, samples: int = 9) -> jax.Array:
+    eps = jnp.exp2(-jnp.float64(prec_bits))
+    return _map_interval(lambda t: _adaptive_real(lambda v: jnp.exp(-lax.lgamma(v)), t, eps, samples), x)
+
+
+@partial(jax.jit, static_argnames=("prec_bits", "samples"))
+def arb_ball_pow_adaptive(x: jax.Array, y: jax.Array, prec_bits: int = 53, samples: int = 9) -> jax.Array:
+    eps = jnp.exp2(-jnp.float64(prec_bits))
+
+    def fn(a, b):
+        return jnp.power(a, b)
+
+    def kernel(a, b):
+        valid = (di.lower(a) > 0.0) & jnp.isfinite(di.lower(a)) & jnp.isfinite(di.upper(a))
+        adapt = _adaptive_real_bivariate(fn, a, b, eps, samples)
+        fallback = arb_core.arb_pow_prec(a, b, prec_bits)
+        safe = _interval_hull(adapt, fallback)
+        return jnp.where(valid[..., None], safe, fallback)
+
+    return _map_interval_bivariate(kernel, x, y)
+
+
+@partial(jax.jit, static_argnames=("n", "prec_bits", "samples"))
+def arb_ball_pow_ui_adaptive(x: jax.Array, n: int, prec_bits: int = 53, samples: int = 9) -> jax.Array:
+    eps = jnp.exp2(-jnp.float64(prec_bits))
+    return _map_interval(lambda t: _adaptive_real(lambda v: jnp.power(v, jnp.float64(n)), t, eps, samples), x)
+
+
+@partial(jax.jit, static_argnames=("prec_bits", "samples"))
+def arb_ball_pow_fmpq_adaptive(x: jax.Array, p: jax.Array, q: jax.Array, prec_bits: int = 53, samples: int = 9) -> jax.Array:
+    pp = jnp.asarray(p, dtype=jnp.float64)
+    qq = jnp.asarray(q, dtype=jnp.float64)
+    y = di.interval(pp / qq, pp / qq)
+    return arb_ball_pow_adaptive(x, y, prec_bits=prec_bits, samples=samples)
+
+
+@partial(jax.jit, static_argnames=("k", "prec_bits", "samples"))
+def arb_ball_root_ui_adaptive(x: jax.Array, k: int, prec_bits: int = 53, samples: int = 9) -> jax.Array:
+    eps = jnp.exp2(-jnp.float64(prec_bits))
+    kk = jnp.float64(k)
+    odd = (k % 2) == 1
+
+    def odd_fn(v):
+        return jnp.sign(v) * jnp.power(jnp.abs(v), 1.0 / kk)
+
+    def even_fn(v):
+        return jnp.power(v, 1.0 / kk)
+
+    def kernel(t):
+        if odd:
+            return _adaptive_real(odd_fn, t, eps, samples)
+        valid = di.lower(t) > 0.0
+        adapt = _adaptive_real(even_fn, t, eps, samples)
+        fallback = arb_core.arb_root_ui_prec(t, k, prec_bits)
+        return jnp.where(valid[..., None], adapt, fallback)
+
+    return _map_interval(kernel, x)
+
+
+@partial(jax.jit, static_argnames=("k", "prec_bits", "samples"))
+def arb_ball_root_adaptive(x: jax.Array, k: int, prec_bits: int = 53, samples: int = 9) -> jax.Array:
+    return arb_ball_root_ui_adaptive(x, k, prec_bits=prec_bits, samples=samples)
 
 
 @partial(jax.jit, static_argnames=("prec_bits", "samples"))
@@ -1611,6 +1911,13 @@ __all__ = [
     "arb_ball_cosh",
     "arb_ball_tanh",
     "arb_ball_gamma",
+    "arb_ball_lgamma",
+    "arb_ball_rgamma",
+    "arb_ball_pow",
+    "arb_ball_pow_ui",
+    "arb_ball_pow_fmpq",
+    "arb_ball_root_ui",
+    "arb_ball_root",
     "acb_ball_exp",
     "acb_ball_log",
     "acb_ball_sin",
@@ -1625,6 +1932,13 @@ __all__ = [
     "arb_ball_cosh_adaptive",
     "arb_ball_tanh_adaptive",
     "arb_ball_gamma_adaptive",
+    "arb_ball_lgamma_adaptive",
+    "arb_ball_rgamma_adaptive",
+    "arb_ball_pow_adaptive",
+    "arb_ball_pow_ui_adaptive",
+    "arb_ball_pow_fmpq_adaptive",
+    "arb_ball_root_ui_adaptive",
+    "arb_ball_root_adaptive",
     "acb_ball_exp_adaptive",
     "acb_ball_log_adaptive",
     "acb_ball_sin_adaptive",
@@ -1639,4 +1953,3 @@ __all__ = [
     "acb_ball_sin_mp",
     "acb_ball_gamma_mp",
 ]
-

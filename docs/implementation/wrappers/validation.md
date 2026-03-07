@@ -14,9 +14,9 @@ Validation compares arbPlusJAX against:
 - **C Arb (flint)**: interval containment and midpoint parity.
 - **SciPy / JAX NumPy**: point‑value parity only.
 - **mpmath / Mathematica**: high‑precision point comparisons (no interval semantics).
-- **CubesselK (pure JAX backend)**: Bessel-K backend with point/basic/rigorous/adaptive modes and no external CUDA/shared-library dependency.
+- **cuda_besselk (pure JAX backend)**: Bessel-K backend with point/basic/rigorous/adaptive modes and no external CUDA/shared-library dependency.
 
 ## Recent stress tests
 
 - loggamma: complex near the negative real axis; JAX basic matches C midpoint tightly, JAX point tracks mpmath.
-- bessel-k backend characterization run (pure JAX CubesselK): `results/benchmarks/cubesselk_compare_purejax_20260301/samples_256_seed_7/summary.csv`.
+- bessel-k backend characterization run (pure JAX cuda_besselk): `results/benchmarks/cuda_besselk_compare_purejax_20260301/samples_256_seed_7/summary.csv`.

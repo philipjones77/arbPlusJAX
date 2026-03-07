@@ -1,0 +1,1 @@
+/usr/bin/c++ -O3 -DNDEBUG CMakeFiles/boost_ref_adapter.dir/boost_ref_adapter.cpp.o -o boost_ref_adapter 

@@ -7,19 +7,39 @@ jax.config.update("jax_enable_x64", True)
 
 
 def arb_fpwrap_double_exp(x: jax.Array) -> jax.Array:
-    return jnp.exp(jnp.asarray(x, dtype=jnp.float64))
+    xx = jnp.asarray(x)
+    if not jnp.issubdtype(xx.dtype, jnp.floating):
+        xx = jnp.asarray(xx, dtype=jnp.float64)
+    return jnp.exp(xx)
 
 
 def arb_fpwrap_double_log(x: jax.Array) -> jax.Array:
-    return jnp.log(jnp.asarray(x, dtype=jnp.float64))
+    xx = jnp.asarray(x)
+    if not jnp.issubdtype(xx.dtype, jnp.floating):
+        xx = jnp.asarray(xx, dtype=jnp.float64)
+    return jnp.log(xx)
 
 
 def arb_fpwrap_cdouble_exp(x: jax.Array) -> jax.Array:
-    return jnp.exp(jnp.asarray(x, dtype=jnp.complex128))
+    xx = jnp.asarray(x)
+    if jnp.issubdtype(xx.dtype, jnp.complexfloating):
+        zz = xx
+    elif jnp.issubdtype(xx.dtype, jnp.floating):
+        zz = xx.astype(jnp.complex64 if xx.dtype == jnp.float32 else jnp.complex128)
+    else:
+        zz = jnp.asarray(xx, dtype=jnp.complex128)
+    return jnp.exp(zz)
 
 
 def arb_fpwrap_cdouble_log(x: jax.Array) -> jax.Array:
-    return jnp.log(jnp.asarray(x, dtype=jnp.complex128))
+    xx = jnp.asarray(x)
+    if jnp.issubdtype(xx.dtype, jnp.complexfloating):
+        zz = xx
+    elif jnp.issubdtype(xx.dtype, jnp.floating):
+        zz = xx.astype(jnp.complex64 if xx.dtype == jnp.float32 else jnp.complex128)
+    else:
+        zz = jnp.asarray(xx, dtype=jnp.complex128)
+    return jnp.log(zz)
 
 
 arb_fpwrap_double_exp_jit = jax.jit(arb_fpwrap_double_exp)

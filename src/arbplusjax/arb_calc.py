@@ -1,17 +1,102 @@
 from __future__ import annotations
 
+"""Arb-like real calc/integration surface.
+
+This module is part of the canonical Arb/FLINT-style public surface for this
+repo. The calc method names are Arb-like, while point/basic/adaptive/rigorous
+mode dispatch is handled one layer up by the wrapper/API surface.
+
+Provenance:
+- classification: arb_like
+- base_names: calc_integrate_line, calc_integrate, calc_integrate_gl_auto_deg, calc_integrate_taylor
+- module lineage: Arb/FLINT-style calc/integration surface
+- naming policy: see docs/function_naming.md
+- registry report: see docs/reports/function_implementation_index.md
+"""
+
 from functools import partial
 
 import jax
 import jax.numpy as jnp
 
 from . import arb_core
+from . import baseline_wrappers
 from . import double_interval as di
 from . import checks
 
 jax.config.update("jax_enable_x64", True)
 
-_INTEGRANDS = ("exp", "sin", "cos")
+PROVENANCE = {
+    "classification": "arb_like",
+    "base_names": (
+        "calc_integrate_line",
+        "calc_integrate",
+        "calc_integrate_gl_auto_deg",
+        "calc_integrate_taylor",
+    ),
+    "module_lineage": "Arb/FLINT-style calc/integration surface",
+    "naming_policy": "docs/function_naming.md",
+    "registry_report": "docs/reports/function_implementation_index.md",
+}
+
+_POINT_EVALS = {
+    "exp": jnp.exp,
+    "log": jnp.log,
+    "sqrt": jnp.sqrt,
+    "sin": jnp.sin,
+    "cos": jnp.cos,
+    "tan": jnp.tan,
+    "sinh": jnp.sinh,
+    "cosh": jnp.cosh,
+    "tanh": jnp.tanh,
+    "log1p": jnp.log1p,
+    "expm1": jnp.expm1,
+    "sin_pi": lambda x: jnp.sin(jnp.pi * x),
+    "cos_pi": lambda x: jnp.cos(jnp.pi * x),
+    "tan_pi": lambda x: jnp.tan(jnp.pi * x),
+    "sinc": lambda x: jnp.where(x == 0.0, 1.0, jnp.sin(x) / x),
+    "sinc_pi": lambda x: jnp.where(x == 0.0, 1.0, jnp.sin(jnp.pi * x) / (jnp.pi * x)),
+    "asin": jnp.arcsin,
+    "acos": jnp.arccos,
+    "atan": jnp.arctan,
+    "asinh": jnp.arcsinh,
+    "acosh": jnp.arccosh,
+    "atanh": jnp.arctanh,
+    "cbrt": lambda x: jnp.sign(x) * jnp.power(jnp.abs(x), 1.0 / 3.0),
+}
+
+_INTERVAL_EVALS = {
+    "exp": arb_core.arb_exp,
+    "log": arb_core.arb_log,
+    "sqrt": arb_core.arb_sqrt,
+    "sin": arb_core.arb_sin,
+    "cos": arb_core.arb_cos,
+    "tan": arb_core.arb_tan,
+    "sinh": arb_core.arb_sinh,
+    "cosh": arb_core.arb_cosh,
+    "tanh": arb_core.arb_tanh,
+    "log1p": arb_core.arb_log1p,
+    "expm1": arb_core.arb_expm1,
+    "sin_pi": arb_core.arb_sin_pi,
+    "cos_pi": arb_core.arb_cos_pi,
+    "tan_pi": arb_core.arb_tan_pi,
+    "sinc": arb_core.arb_sinc,
+    "sinc_pi": arb_core.arb_sinc_pi,
+    "asin": arb_core.arb_asin,
+    "acos": arb_core.arb_acos,
+    "atan": arb_core.arb_atan,
+    "asinh": arb_core.arb_asinh,
+    "acosh": arb_core.arb_acosh,
+    "atanh": arb_core.arb_atanh,
+    "cbrt": arb_core.arb_cbrt,
+    "gamma": lambda x: baseline_wrappers.arb_gamma_mp(x, mode="rigorous"),
+    "erf": lambda x: baseline_wrappers.arb_erf_mp(x, mode="rigorous"),
+    "erfc": lambda x: baseline_wrappers.arb_erfc_mp(x, mode="rigorous"),
+    "erfi": lambda x: baseline_wrappers.arb_erfi_mp(x, mode="rigorous"),
+    "barnesg": lambda x: baseline_wrappers.arb_barnesg_mp(x, mode="rigorous"),
+}
+
+_INTEGRANDS = tuple(_INTERVAL_EVALS)
 
 
 def _full_interval_like(x: jax.Array) -> jax.Array:
@@ -21,24 +106,17 @@ def _full_interval_like(x: jax.Array) -> jax.Array:
 
 def _eval_integrand(x: jax.Array, integrand: str) -> jax.Array:
     checks.check_in_set(integrand, _INTEGRANDS, "arb_calc._eval_integrand")
-    if integrand == "exp":
-        return jnp.exp(x)
-    if integrand == "sin":
-        return jnp.sin(x)
-    if integrand == "cos":
-        return jnp.cos(x)
-    return jnp.exp(x)
+    fn = _POINT_EVALS.get(integrand)
+    if fn is not None:
+        return fn(x)
+    flat_x = jnp.ravel(x)
+    flat_out = jax.vmap(lambda t: di.midpoint(_INTERVAL_EVALS[integrand](di.interval(t, t))))(flat_x)
+    return flat_out.reshape(jnp.shape(x))
 
 
 def _eval_integrand_interval(x: jax.Array, integrand: str) -> jax.Array:
     checks.check_in_set(integrand, _INTEGRANDS, "arb_calc._eval_integrand_interval")
-    if integrand == "exp":
-        return arb_core.arb_exp(x)
-    if integrand == "sin":
-        return arb_core.arb_sin(x)
-    if integrand == "cos":
-        return arb_core.arb_cos(x)
-    return arb_core.arb_exp(x)
+    return _INTERVAL_EVALS[integrand](x)
 
 
 def _integrate_line_midpoint(a: jax.Array, b: jax.Array, integrand: str, n_steps: int) -> jax.Array:

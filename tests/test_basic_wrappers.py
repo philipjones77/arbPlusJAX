@@ -81,3 +81,65 @@ def test_top10_wrappers_and_api_shapes():
     s_api, c_api = api.eval_interval("sin_cos", x, mode="basic", dps=50)
     _check(s_api.shape == (2,))
     _check(c_api.shape == (2,))
+
+
+def test_api_dtype_policy_rejects_mixed_float_dtypes():
+    x32 = jnp.array([1.0, 2.0], dtype=jnp.float32)
+    y64 = jnp.array([3.0, 4.0], dtype=jnp.float64)
+    try:
+        _ = api.eval_point("add", x32, y64)
+        _check(False)
+    except ValueError as exc:
+        _check("Mixed floating dtypes" in str(exc))
+
+
+def test_api_dtype_policy_allows_explicit_dtype_override():
+    x32 = jnp.array([1.0, 2.0], dtype=jnp.float32)
+    y64 = jnp.array([3.0, 4.0], dtype=jnp.float64)
+    out32 = api.eval_point("add", x32, y64, dtype="float32")
+    out64 = api.eval_point("add", x32, y64, dtype="float64")
+    _check(out32.dtype == jnp.float32)
+    _check(out64.dtype == jnp.float64)
+
+
+def test_api_bind_batch_respects_dtype_lock():
+    fn64 = api.bind_point_batch("add", dtype="float64")
+    x32 = jnp.array([1.0, 2.0], dtype=jnp.float32)
+    y32 = jnp.array([3.0, 4.0], dtype=jnp.float32)
+    out = fn64(x32, y32)
+    _check(out.dtype == jnp.float64)
+
+
+def test_api_interval_batch_float32_path():
+    x = jnp.array([[0.1, 0.2], [0.2, 0.3]], dtype=jnp.float32)
+    y = jnp.array([[0.3, 0.4], [0.4, 0.5]], dtype=jnp.float32)
+    out = api.eval_interval_batch("add", x, y, mode="basic", dtype="float32")
+    _check(out.dtype == jnp.float32)
+
+
+def test_api_point_batch_optional_padding_trims_output():
+    x = jnp.array([1.0, 2.0, 3.0], dtype=jnp.float32)
+    y = jnp.array([4.0, 5.0, 6.0], dtype=jnp.float32)
+    out = api.eval_point_batch("add", x, y, dtype="float32", pad_to=8)
+    _check(out.dtype == jnp.float32)
+    _check(out.shape == (3,))
+    _check(bool(jnp.allclose(out, jnp.array([5.0, 7.0, 9.0], dtype=jnp.float32))))
+
+
+def test_api_bind_interval_batch_optional_padding():
+    fn = api.bind_interval_batch("add", mode="basic", dtype="float32", pad_to=4)
+    x = jnp.array([[0.1, 0.2], [0.2, 0.3]], dtype=jnp.float32)
+    y = jnp.array([[0.3, 0.4], [0.4, 0.5]], dtype=jnp.float32)
+    out = fn(x, y)
+    _check(out.dtype == jnp.float32)
+    _check(out.shape == (2, 2))
+
+
+def test_api_padding_rejects_smaller_target():
+    x = jnp.array([1.0, 2.0, 3.0], dtype=jnp.float32)
+    y = jnp.array([4.0, 5.0, 6.0], dtype=jnp.float32)
+    try:
+        _ = api.eval_point_batch("add", x, y, dtype="float32", pad_to=2)
+        _check(False)
+    except ValueError as exc:
+        _check("pad_to must be >=" in str(exc))

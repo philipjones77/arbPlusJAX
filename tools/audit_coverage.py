@@ -2,17 +2,44 @@ from __future__ import annotations
 
 import ast
 import csv
+import os
 import re
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Set, Tuple
 
-ARB_ROOT = Path(r"C:/Users/phili/OneDrive/Documents/GitHub/arb")
-JAX_ROOT = Path(r"C:/Users/phili/OneDrive/Documents/GitHub/arbPlusJAX")
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+_LEGACY_WINDOWS_ROOT = Path(r"C:/Users/phili/OneDrive/Documents/GitHub")
+
+
+def _resolve_root(env_var: str, default: Path, extra_candidates: Tuple[Path, ...] = ()) -> Path:
+    env = os.getenv(env_var, "").strip()
+    if env:
+        return Path(env)
+    for cand in (default, *extra_candidates):
+        if cand.exists():
+            return cand
+    return default
+
+
+ARB_ROOT = _resolve_root(
+    "ARB_ROOT",
+    _REPO_ROOT.parent / "arb",
+    (_LEGACY_WINDOWS_ROOT / "arb",),
+)
+JAX_ROOT = _resolve_root(
+    "ARBPLUSJAX_ROOT",
+    _REPO_ROOT,
+    (_LEGACY_WINDOWS_ROOT / "arbPlusJAX",),
+)
 JAX_SRC = JAX_ROOT / "src" / "arbplusjax"
 TESTS_ROOT = JAX_ROOT / "tests"
-MPMATH_ROOT = Path(r"C:/Users/phili/OneDrive/Documents/GitHub/mpmath")
+MPMATH_ROOT = _resolve_root(
+    "MPMATH_ROOT",
+    _REPO_ROOT.parent / "mpmath",
+    (_LEGACY_WINDOWS_ROOT / "mpmath",),
+)
 
 PREFIXES = (
     "arb_",

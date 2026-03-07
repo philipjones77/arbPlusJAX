@@ -12,7 +12,6 @@ ALLOWED_DIRS = {
     "docs",
     "benchmarks",
     "examples",
-    "notebooks",
     "tests",
     "tools",
 }

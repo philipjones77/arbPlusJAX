@@ -59,3 +59,19 @@ def test_precision_semantics_wider_at_lower_precision():
     hi_tan = arb_core.arb_tan_prec(z, prec_bits=53)
     lo_tan = arb_core.arb_tan_prec(z, prec_bits=20)
     _check(bool(di.contains(lo_tan, hi_tan)))
+
+
+def test_gamma_family_core_float32_dtype_and_shapes():
+    x = jnp.array([[1.2, 1.3], [1.4, 1.6]], dtype=jnp.float32)
+    lg = arb_core.arb_lgamma_batch_jit(x)
+    gg = arb_core.arb_gamma_batch_jit(x)
+    rg = arb_core.arb_rgamma_batch_jit(x)
+    _check(lg.dtype == jnp.float32)
+    _check(gg.dtype == jnp.float32)
+    _check(rg.dtype == jnp.float32)
+    _check(lg.shape == (2, 2))
+    _check(gg.shape == (2, 2))
+    _check(rg.shape == (2, 2))
+    _check(bool(jnp.all(lg[:, 0] <= lg[:, 1])))
+    _check(bool(jnp.all(gg[:, 0] <= gg[:, 1])))
+    _check(bool(jnp.all(rg[:, 0] <= rg[:, 1])))

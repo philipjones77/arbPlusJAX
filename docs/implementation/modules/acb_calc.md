@@ -12,8 +12,33 @@ Implementation lives in the corresponding `*_wrappers.py` module and uses `impl=
 
 ## Scope
 
-- Midpoint-rule line integration for a small set of integrands (`exp`, `sin`, `cos`).
+- Straight-line complex line integration for unary integrands.
+- Supported integrands include elementary and selected special functions:
+  `exp`, `log`, `sqrt`, `sin`, `cos`, `tan`, `sinh`, `cosh`, `tanh`,
+  `log1p`, `expm1`, `sin_pi`, `cos_pi`, `tan_pi`, `sinc`, `sinc_pi`,
+  `asin`, `acos`, `atan`, `asinh`, `acosh`, `atanh`,
+  `gamma`, `erf`, `erfc`, `erfi`, `barnesg`.
 - Straight-line path from `a` to `b` using interval-box midpoints.
+
+## Method Families vs Mode Dispatch
+
+`acb_calc` contains several integration method families:
+
+- `acb_calc_integrate_line`: midpoint-rule line integration
+- `acb_calc_integrate_gl_auto_deg`: Gauss-Legendre line integration with automatic degree refinement
+- `acb_calc_integrate_taylor`: midpoint-centered Taylor-series line integration
+
+These are not themselves the four arbPlusJAX modes.
+
+The four modes are applied one layer above through `calc_wrappers` and the public API:
+
+- `point`: point-only evaluation path where available
+- `basic`: direct method result with outward rounding
+- `adaptive`: wrapper-level adaptive tightening around the kernel
+- `rigorous`: wrapper-level rigorous enclosure / method-specific rigorous kernel
+
+So `gl_auto_deg` and `taylor` are distinct calc methods, while `point|basic|adaptive|rigorous`
+are dispatch modes applied to those methods.
 
 ## Intended API Surface
 
@@ -40,10 +65,8 @@ Implementation lives in the corresponding `*_wrappers.py` module and uses `impl=
 ## Notes
 
 - This is a chassis-level approximation; it does not replicate Arb's adaptive integration.
-- Integrand IDs:
-  - `0`: exp
-  - `1`: sin
-  - `2`: cos
+- The C parity layer only covers the legacy `exp/sin/cos` subset for `acb_calc_integrate_line_ref`.
+- `gl_auto_deg` and `taylor` are method names, not mode names.
 
 ## Formulas
 
@@ -52,6 +75,7 @@ Implementation lives in the corresponding `*_wrappers.py` module and uses `impl=
 
 ## Implementation Notes
 
-- Uses midpoint sampling over N steps on the complex box midpoint.
+- `acb_calc_integrate_line` uses midpoint sampling over `N` steps on the complex box midpoint.
+- `acb_calc_integrate_gl_auto_deg` uses Gauss-Legendre nodes/weights with auto-selected degree refinement.
+- `acb_calc_integrate_taylor` uses a midpoint-centered Taylor expansion and truncation-based enclosure.
 - Returns full boxes on non-finite values.
-

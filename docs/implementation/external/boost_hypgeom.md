@@ -6,12 +6,12 @@ Boost-derived hypergeometric compatibility layer implemented in pure JAX with th
 
 Public APIs:
 
-- `boost_hypergeometric_1F0`
-- `boost_hypergeometric_0F1`
-- `boost_hypergeometric_2F0`
-- `boost_hypergeometric_1F1`
-- `boost_hypergeometric_pFq`
-- `boost_hypergeometric_pFq_precision`
+- `boost_hypergeometric_1f0`
+- `boost_hypergeometric_0f1`
+- `boost_hypergeometric_2f0`
+- `boost_hypergeometric_1f1`
+- `boost_hypergeometric_pfq`
+- `boost_hypergeometric_pfq_precision`
 
 Each API supports the four modes:
 

@@ -1,5 +1,17 @@
 from __future__ import annotations
 
+"""Boost-lineage hypergeometric alternatives.
+
+These functions provide provenance-prefixed alternatives to canonical
+hypergeometric families.
+
+Provenance:
+- classification: alternative
+- module lineage: Boost.Math-inspired hypergeometric implementation family
+- naming policy: see docs/function_naming.md
+- registry report: see docs/reports/function_implementation_index.md
+"""
+
 from functools import partial
 
 import jax
@@ -14,6 +26,14 @@ from . import precision
 from . import wrappers_common as wc
 
 jax.config.update("jax_enable_x64", True)
+
+PROVENANCE = {
+    "classification": "alternative",
+    "module_lineage": "Boost.Math-inspired hypergeometric implementation family",
+    "preferred_prefix": "boost",
+    "naming_policy": "docs/function_naming.md",
+    "registry_report": "docs/reports/function_implementation_index.md",
+}
 
 _MODES = ("point", "basic", "rigorous", "adaptive")
 
@@ -115,7 +135,7 @@ def _dispatch_acb_mode(mode: str, base_fn, mode_fn, args: tuple, pb: int):
     return mode_fn(*args, impl=mode, prec_bits=pb)
 
 
-def boost_hypergeometric_1F0(a: jax.Array, z: jax.Array, mode: str = "point", prec_bits: int | None = None, dps: int | None = None):
+def boost_hypergeometric_1f0(a: jax.Array, z: jax.Array, mode: str = "point", prec_bits: int | None = None, dps: int | None = None):
     checks.check_in_set(mode, _MODES, "boost_hypgeom.mode")
     pb = _prec_bits(dps, prec_bits)
     if _is_complex_like(a, z):
@@ -147,7 +167,7 @@ def boost_hypergeometric_1F0(a: jax.Array, z: jax.Array, mode: str = "point", pr
     )
 
 
-def boost_hypergeometric_0F1(
+def boost_hypergeometric_0f1(
     b: jax.Array,
     z: jax.Array,
     mode: str = "point",
@@ -175,7 +195,7 @@ def boost_hypergeometric_0F1(
     )
 
 
-def boost_hypergeometric_2F0(
+def boost_hypergeometric_2f0(
     a: jax.Array,
     b: jax.Array,
     z: jax.Array,
@@ -216,7 +236,7 @@ def boost_hypergeometric_2F0(
     )
 
 
-def boost_hypergeometric_1F1(
+def boost_hypergeometric_1f1(
     a: jax.Array,
     b: jax.Array,
     z: jax.Array,
@@ -245,7 +265,7 @@ def boost_hypergeometric_1F1(
     )
 
 
-def boost_hypergeometric_pFq(
+def boost_hypergeometric_pfq(
     a: jax.Array,
     b: jax.Array,
     z: jax.Array,
@@ -289,7 +309,7 @@ def boost_hypergeometric_pFq(
     return wc.inflate_interval(out, pb, adaptive=(mode == "adaptive"))
 
 
-def boost_hypergeometric_pFq_precision(
+def boost_hypergeometric_pfq_precision(
     a: jax.Array,
     b: jax.Array,
     z: jax.Array,
@@ -297,15 +317,15 @@ def boost_hypergeometric_pFq_precision(
     reciprocal: bool = False,
     n_terms: int = 32,
 ):
-    return boost_hypergeometric_pFq(a, b, z, mode="basic", prec_bits=prec_bits, reciprocal=reciprocal, n_terms=n_terms)
+    return boost_hypergeometric_pfq(a, b, z, mode="basic", prec_bits=prec_bits, reciprocal=reciprocal, n_terms=n_terms)
 
 
 def boost_hyp1f1_series(a: jax.Array, b: jax.Array, z: jax.Array, mode: str = "point", prec_bits: int | None = None, dps: int | None = None):
-    return boost_hypergeometric_1F1(a, b, z, mode=mode, prec_bits=prec_bits, dps=dps)
+    return boost_hypergeometric_1f1(a, b, z, mode=mode, prec_bits=prec_bits, dps=dps)
 
 
 def boost_hyp1f1_asym(a: jax.Array, b: jax.Array, z: jax.Array, mode: str = "point", prec_bits: int | None = None, dps: int | None = None):
-    return boost_hypergeometric_1F1(a, b, z, mode=mode, prec_bits=prec_bits, dps=dps)
+    return boost_hypergeometric_1f1(a, b, z, mode=mode, prec_bits=prec_bits, dps=dps)
 
 
 def boost_hyp2f1_series(a: jax.Array, b: jax.Array, c: jax.Array, z: jax.Array, mode: str = "point", prec_bits: int | None = None, dps: int | None = None):
@@ -344,16 +364,16 @@ def boost_hyp2f1_rational(a: jax.Array, b: jax.Array, c: jax.Array, z: jax.Array
 def boost_hyp1f2_series(a: jax.Array, b1: jax.Array, b2: jax.Array, z: jax.Array, mode: str = "point", prec_bits: int | None = None, dps: int | None = None):
     aa = jnp.asarray([a], dtype=jnp.float64)
     bb = jnp.asarray([b1, b2], dtype=jnp.float64)
-    return boost_hypergeometric_pFq(aa, bb, z, mode=mode, prec_bits=prec_bits, dps=dps)
+    return boost_hypergeometric_pfq(aa, bb, z, mode=mode, prec_bits=prec_bits, dps=dps)
 
 
 __all__ = [
-    "boost_hypergeometric_1F0",
-    "boost_hypergeometric_0F1",
-    "boost_hypergeometric_2F0",
-    "boost_hypergeometric_1F1",
-    "boost_hypergeometric_pFq",
-    "boost_hypergeometric_pFq_precision",
+    "boost_hypergeometric_1f0",
+    "boost_hypergeometric_0f1",
+    "boost_hypergeometric_2f0",
+    "boost_hypergeometric_1f1",
+    "boost_hypergeometric_pfq",
+    "boost_hypergeometric_pfq_precision",
     "boost_hyp1f1_series",
     "boost_hyp1f1_asym",
     "boost_hyp2f1_series",

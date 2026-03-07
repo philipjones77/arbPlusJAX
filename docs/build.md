@@ -135,9 +135,9 @@ The generated archive name is enforced as:
 `<repo>_source_YYYY-MM-DD.zip`
 Example: `arbPlusJAX_source_2026-03-01.zip`
 
-## CubesselK backend
-`CubesselK` is implemented in pure JAX (no CUDA/shared-library dependency).
-Use API names `CubesselK` or `cubesselk`:
-- point: `api.eval_point("CubesselK", nu, z)`
-- interval: `api.eval_interval("CubesselK", nu_iv, z_iv, mode="basic|rigorous|adaptive")`
+## cuda_besselk backend
+`cuda_besselk` is implemented in pure JAX (no CUDA/shared-library dependency).
+Use API names `cuda_besselk` or `cuda_besselk`:
+- point: `api.eval_point("cuda_besselk", nu, z)`
+- interval: `api.eval_interval("cuda_besselk", nu_iv, z_iv, mode="basic|rigorous|adaptive")`
 

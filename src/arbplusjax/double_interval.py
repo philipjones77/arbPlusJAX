@@ -9,21 +9,50 @@ from . import checks
 
 jax.config.update("jax_enable_x64", True)
 
-DI_ULP_FACTOR = jnp.float64(4.440892098500626e-16)
-DI_HUGE = jnp.float64(1e300)
-DI_TINY = jnp.float64(1e-300)
 DEFAULT_PREC_BITS = 53
 
 
+def _real_dtype_from(*xs: object) -> jnp.dtype:
+    dtypes: list[jnp.dtype] = []
+    for x in xs:
+        arr = jnp.asarray(x)
+        if jnp.issubdtype(arr.dtype, jnp.floating):
+            dtypes.append(jnp.dtype(arr.dtype))
+    if not dtypes:
+        return jnp.dtype(jnp.float64)
+    if any(dt == jnp.dtype(jnp.float64) for dt in dtypes):
+        return jnp.dtype(jnp.float64)
+    return jnp.dtype(jnp.float32)
+
+
+def _as_real_array(x: object, dtype: jnp.dtype | None = None) -> jax.Array:
+    out_dtype = _real_dtype_from(x) if dtype is None else jnp.dtype(dtype)
+    return jnp.asarray(x, dtype=out_dtype)
+
+
+def _ulp_factor(dtype: jnp.dtype) -> jax.Array:
+    return jnp.asarray(2.0 * jnp.finfo(dtype).eps, dtype=dtype)
+
+
+def _tiny(dtype: jnp.dtype) -> jax.Array:
+    return jnp.asarray(jnp.finfo(dtype).tiny, dtype=dtype)
+
+
+def _huge(dtype: jnp.dtype) -> jax.Array:
+    # Keep margin from overflow in branch computations.
+    return jnp.asarray(jnp.finfo(dtype).max / 16.0, dtype=dtype)
+
+
 def as_interval(x: jax.Array) -> jax.Array:
-    arr = jnp.asarray(x, dtype=jnp.float64)
+    arr = _as_real_array(x)
     checks.check_last_dim(arr, 2, "double_interval.as_interval")
     return arr
 
 
 def interval(lo: jax.Array, hi: jax.Array) -> jax.Array:
-    lo_arr = jnp.asarray(lo, dtype=jnp.float64)
-    hi_arr = jnp.asarray(hi, dtype=jnp.float64)
+    dtype = _real_dtype_from(lo, hi)
+    lo_arr = _as_real_array(lo, dtype=dtype)
+    hi_arr = _as_real_array(hi, dtype=dtype)
     return jnp.stack([lo_arr, hi_arr], axis=-1)
 
 
@@ -36,31 +65,39 @@ def upper(x: jax.Array) -> jax.Array:
 
 
 def _below(x: jax.Array) -> jax.Array:
-    x = jnp.asarray(x, dtype=jnp.float64)
-    t = jnp.abs(x) + DI_TINY
-    finite_branch = x - t * DI_ULP_FACTOR
-    overflow_branch = jnp.where(jnp.isnan(x), -jnp.inf, DI_HUGE)
-    return jnp.where(x <= DI_HUGE, finite_branch, overflow_branch)
+    x = _as_real_array(x)
+    dtype = jnp.dtype(x.dtype)
+    tiny = _tiny(dtype)
+    ulp = _ulp_factor(dtype)
+    huge = _huge(dtype)
+    t = jnp.abs(x) + tiny
+    finite_branch = x - t * ulp
+    overflow_branch = jnp.where(jnp.isnan(x), jnp.asarray(-jnp.inf, dtype=dtype), huge)
+    return jnp.where(x <= huge, finite_branch, overflow_branch)
 
 
 def _above(x: jax.Array) -> jax.Array:
-    x = jnp.asarray(x, dtype=jnp.float64)
-    t = jnp.abs(x) + DI_TINY
-    finite_branch = x + t * DI_ULP_FACTOR
-    overflow_branch = jnp.where(jnp.isnan(x), jnp.inf, -DI_HUGE)
-    return jnp.where(x >= -DI_HUGE, finite_branch, overflow_branch)
+    x = _as_real_array(x)
+    dtype = jnp.dtype(x.dtype)
+    tiny = _tiny(dtype)
+    ulp = _ulp_factor(dtype)
+    huge = _huge(dtype)
+    t = jnp.abs(x) + tiny
+    finite_branch = x + t * ulp
+    overflow_branch = jnp.where(jnp.isnan(x), jnp.asarray(jnp.inf, dtype=dtype), -huge)
+    return jnp.where(x >= -huge, finite_branch, overflow_branch)
 
 
 def _binary_step(x: jax.Array, prec_bits: int) -> jax.Array:
-    x = jnp.asarray(x, dtype=jnp.float64)
+    x = _as_real_array(x)
     p = max(int(prec_bits), 1)
     ax = jnp.abs(x)
     exp2 = jnp.floor(jnp.log2(ax))
-    return jnp.exp2(exp2 - jnp.float64(p - 1))
+    return jnp.exp2(exp2 - jnp.asarray(p - 1, dtype=x.dtype))
 
 
 def round_down_to_prec(x: jax.Array, prec_bits: int) -> jax.Array:
-    x = jnp.asarray(x, dtype=jnp.float64)
+    x = _as_real_array(x)
     step = _binary_step(x, prec_bits)
     safe = jnp.isfinite(x) & (step > 0.0)
     q = jnp.floor(x / step)
@@ -68,7 +105,7 @@ def round_down_to_prec(x: jax.Array, prec_bits: int) -> jax.Array:
 
 
 def round_up_to_prec(x: jax.Array, prec_bits: int) -> jax.Array:
-    x = jnp.asarray(x, dtype=jnp.float64)
+    x = _as_real_array(x)
     step = _binary_step(x, prec_bits)
     safe = jnp.isfinite(x) & (step > 0.0)
     q = jnp.ceil(x / step)

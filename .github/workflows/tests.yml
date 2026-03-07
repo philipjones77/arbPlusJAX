@@ -6,7 +6,10 @@ on:
 
 jobs:
   chassis:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -17,6 +20,7 @@ jobs:
       - name: Run chassis tests
         run: python -m pytest tests -q -m "not parity"
       - name: Run benchmark smoke tests
+        if: matrix.os == 'ubuntu-latest'
         env:
           ARBPLUSJAX_RUN_BENCHMARKS: "1"
         run: python -m pytest benchmarks -q -m benchmark

@@ -4,7 +4,7 @@ Last updated: 2026-02-25T03:51:38Z
 
 - Point functions: 16
 - Interval functions: 18
-- Public functions: 3000
+- Public functions: 3033
 
 ## Point Functions
 
@@ -3048,3 +3048,36 @@ Last updated: 2026-02-25T03:51:38Z
 - `round_up_to_prec`
 - `ubound_radius`
 - `upper`
+- `bdg_log_barnesdoublegamma`
+- `bdg_barnesdoublegamma`
+- `bdg_log_barnesgamma2`
+- `bdg_barnesgamma2`
+- `bdg_log_normalizeddoublegamma`
+- `bdg_normalizeddoublegamma`
+- `bdg_double_sine`
+- `bdg_interval_log_barnesdoublegamma`
+- `bdg_interval_barnesdoublegamma`
+- `bdg_interval_log_barnesgamma2`
+- `bdg_interval_barnesgamma2`
+- `bdg_interval_log_normalizeddoublegamma`
+- `bdg_interval_normalizeddoublegamma`
+- `bdg_complex_log_barnesdoublegamma`
+- `bdg_complex_barnesdoublegamma`
+- `bdg_complex_log_barnesgamma2`
+- `bdg_complex_barnesgamma2`
+- `bdg_complex_log_normalizeddoublegamma`
+- `bdg_complex_normalizeddoublegamma`
+- `bdg_complex_double_sine`
+- `bdg_interval_log_barnesdoublegamma_mode`
+- `bdg_interval_barnesdoublegamma_mode`
+- `bdg_interval_log_barnesgamma2_mode`
+- `bdg_interval_barnesgamma2_mode`
+- `bdg_interval_log_normalizeddoublegamma_mode`
+- `bdg_interval_normalizeddoublegamma_mode`
+- `bdg_complex_log_barnesdoublegamma_mode`
+- `bdg_complex_barnesdoublegamma_mode`
+- `bdg_complex_log_barnesgamma2_mode`
+- `bdg_complex_barnesgamma2_mode`
+- `bdg_complex_log_normalizeddoublegamma_mode`
+- `bdg_complex_normalizeddoublegamma_mode`
+- `bdg_complex_double_sine_mode`

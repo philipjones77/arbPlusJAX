@@ -1,18 +1,106 @@
 from __future__ import annotations
 
-from functools import partial
+"""Arb-like complex calc/integration surface.
+
+This module is part of the canonical Arb/FLINT-style public surface for this
+repo. The calc method names are Arb-like, while point/basic/adaptive/rigorous
+mode dispatch is handled one layer up by the wrapper/API surface.
+
+Provenance:
+- classification: arb_like
+- base_names: calc_integrate_line, calc_integrate, calc_integrate_gl_auto_deg, calc_integrate_taylor
+- module lineage: Arb/FLINT-style calc/integration surface
+- naming policy: see docs/function_naming.md
+- registry report: see docs/reports/function_implementation_index.md
+"""
+
+from functools import lru_cache, partial
 
 import jax
 import jax.numpy as jnp
+import numpy as np
 
 from . import acb_core
+from . import ball_wrappers
 from . import double_interval as di
-from . import core_wrappers
 from . import checks
+from . import series_utils
 
 jax.config.update("jax_enable_x64", True)
 
-_INTEGRANDS = ("exp", "sin", "cos")
+PROVENANCE = {
+    "classification": "arb_like",
+    "base_names": (
+        "calc_integrate_line",
+        "calc_integrate",
+        "calc_integrate_gl_auto_deg",
+        "calc_integrate_taylor",
+    ),
+    "module_lineage": "Arb/FLINT-style calc/integration surface",
+    "naming_policy": "docs/function_naming.md",
+    "registry_report": "docs/reports/function_implementation_index.md",
+}
+
+_POINT_EVALS = {
+    "exp": jnp.exp,
+    "log": jnp.log,
+    "sqrt": jnp.sqrt,
+    "sin": jnp.sin,
+    "cos": jnp.cos,
+    "tan": jnp.tan,
+    "sinh": jnp.sinh,
+    "cosh": jnp.cosh,
+    "tanh": jnp.tanh,
+    "log1p": jnp.log1p,
+    "expm1": jnp.expm1,
+    "sin_pi": lambda z: jnp.sin(jnp.pi * z),
+    "cos_pi": lambda z: jnp.cos(jnp.pi * z),
+    "tan_pi": lambda z: jnp.tan(jnp.pi * z),
+    "sinc": lambda z: jnp.where(z == 0.0, 1.0 + 0.0j, jnp.sin(z) / z),
+    "sinc_pi": lambda z: jnp.where(z == 0.0, 1.0 + 0.0j, jnp.sin(jnp.pi * z) / (jnp.pi * z)),
+    "asin": jnp.arcsin,
+    "acos": jnp.arccos,
+    "atan": jnp.arctan,
+    "asinh": jnp.arcsinh,
+    "acosh": jnp.arccosh,
+    "atanh": jnp.arctanh,
+}
+
+_BOX_EVALS = {
+    "exp": lambda z, prec_bits: acb_core.acb_exp(z),
+    "log": lambda z, prec_bits: acb_core.acb_log(z),
+    "sqrt": lambda z, prec_bits: acb_core.acb_sqrt(z),
+    "sin": lambda z, prec_bits: acb_core.acb_sin(z),
+    "cos": lambda z, prec_bits: acb_core.acb_cos(z),
+    "tan": lambda z, prec_bits: acb_core.acb_tan(z),
+    "sinh": lambda z, prec_bits: acb_core.acb_sinh(z),
+    "cosh": lambda z, prec_bits: acb_core.acb_cosh(z),
+    "tanh": lambda z, prec_bits: acb_core.acb_tanh(z),
+    "log1p": lambda z, prec_bits: acb_core.acb_log1p(z),
+    "expm1": lambda z, prec_bits: acb_core.acb_expm1(z),
+    "sin_pi": lambda z, prec_bits: acb_core.acb_sin_pi(z),
+    "cos_pi": lambda z, prec_bits: acb_core.acb_cos_pi(z),
+    "tan_pi": lambda z, prec_bits: acb_core.acb_tan_pi(z),
+    "sinc": lambda z, prec_bits: acb_core.acb_sinc(z),
+    "sinc_pi": lambda z, prec_bits: acb_core.acb_sinc_pi(z),
+    "asin": lambda z, prec_bits: acb_core.acb_asin(z),
+    "acos": lambda z, prec_bits: acb_core.acb_acos(z),
+    "atan": lambda z, prec_bits: acb_core.acb_atan(z),
+    "asinh": lambda z, prec_bits: acb_core.acb_asinh(z),
+    "acosh": lambda z, prec_bits: acb_core.acb_acosh(z),
+    "atanh": lambda z, prec_bits: acb_core.acb_atanh(z),
+}
+
+_RIGOROUS_BOX_EVALS = {
+    **_BOX_EVALS,
+    "gamma": lambda z, prec_bits: ball_wrappers.acb_ball_gamma(z, prec_bits=prec_bits),
+    "erf": lambda z, prec_bits: ball_wrappers.acb_ball_erf(z, prec_bits=prec_bits),
+    "erfc": lambda z, prec_bits: ball_wrappers.acb_ball_erfc(z, prec_bits=prec_bits),
+    "erfi": lambda z, prec_bits: ball_wrappers.acb_ball_erfi(z, prec_bits=prec_bits),
+    "barnesg": lambda z, prec_bits: ball_wrappers.acb_ball_barnesg(z, prec_bits=prec_bits),
+}
+
+_INTEGRANDS = tuple(_RIGOROUS_BOX_EVALS)
 
 
 def _full_box_like(x: jax.Array) -> jax.Array:
@@ -53,24 +141,19 @@ def _acb_from_complex(z: jax.Array) -> jax.Array:
 
 def _eval_integrand(z: jax.Array, integrand: str) -> jax.Array:
     checks.check_in_set(integrand, _INTEGRANDS, "acb_calc._eval_integrand")
-    if integrand == "exp":
-        return jnp.exp(z)
-    if integrand == "sin":
-        return jnp.sin(z)
-    if integrand == "cos":
-        return jnp.cos(z)
-    return jnp.exp(z)
+    fn = _POINT_EVALS.get(integrand)
+    if fn is not None:
+        return fn(z)
+    flat_z = jnp.ravel(z)
+    flat_out = jax.vmap(
+        lambda t: acb_core.acb_midpoint(_RIGOROUS_BOX_EVALS[integrand](_acb_from_complex(t), di.DEFAULT_PREC_BITS))
+    )(flat_z)
+    return flat_out.reshape(jnp.shape(z))
 
 
 def _eval_integrand_box(z: jax.Array, integrand: str, prec_bits: int) -> jax.Array:
     checks.check_in_set(integrand, _INTEGRANDS, "acb_calc._eval_integrand_box")
-    if integrand == "exp":
-        return core_wrappers.acb_exp_mode(z, impl="rigorous", prec_bits=prec_bits)
-    if integrand == "sin":
-        return core_wrappers.acb_sin_mode(z, impl="rigorous", prec_bits=prec_bits)
-    if integrand == "cos":
-        return core_wrappers.acb_cos_mode(z, impl="rigorous", prec_bits=prec_bits)
-    return core_wrappers.acb_exp_mode(z, impl="rigorous", prec_bits=prec_bits)
+    return _RIGOROUS_BOX_EVALS[integrand](z, prec_bits)
 
 
 def _integrate_line_midpoint(a: jax.Array, b: jax.Array, integrand: str, n_steps: int) -> jax.Array:
@@ -118,6 +201,89 @@ def _integrate_line_interval(a: jax.Array, b: jax.Array, integrand: str, n_steps
     finite = jnp.isfinite(acb_core.acb_real(out)[..., 0]) & jnp.isfinite(acb_core.acb_real(out)[..., 1])
     finite = finite & jnp.isfinite(acb_core.acb_imag(out)[..., 0]) & jnp.isfinite(acb_core.acb_imag(out)[..., 1])
     return jnp.where(finite[..., None], out, _full_box_like(a))
+
+
+@lru_cache(maxsize=32)
+def _gauss_legendre_nodes_weights(degree: int) -> tuple[jax.Array, jax.Array]:
+    nodes, weights = np.polynomial.legendre.leggauss(int(degree))
+    return jnp.asarray(nodes, dtype=jnp.float64), jnp.asarray(weights, dtype=jnp.float64)
+
+
+def _gauss_legendre_degree(n_steps: int, prec_bits: int) -> int:
+    base = max(8, int(n_steps))
+    extra = max(2, int(prec_bits) // 24)
+    return base + extra
+
+
+def _integrate_line_gauss_legendre(
+    a: jax.Array,
+    b: jax.Array,
+    integrand: str,
+    degree: int,
+    prec_bits: int,
+) -> jax.Array:
+    a = acb_core.as_acb_box(a)
+    b = acb_core.as_acb_box(b)
+    delta = acb_core.acb_sub(b, a)
+    nodes, weights = _gauss_legendre_nodes_weights(degree)
+    ts = 0.5 * (nodes + 1.0)
+    scale = acb_core.acb_box(di.interval(0.5, 0.5), di.interval(0.0, 0.0))
+
+    def sample(node_t, node_w):
+        t_box = acb_core.acb_box(di.interval(node_t, node_t), di.interval(0.0, 0.0))
+        w_box = acb_core.acb_box(di.interval(node_w, node_w), di.interval(0.0, 0.0))
+        zt = acb_core.acb_add(a, acb_core.acb_mul(delta, t_box))
+        return acb_core.acb_mul(_eval_integrand_box(zt, integrand, prec_bits), w_box)
+
+    vals = jax.vmap(sample)(ts, weights)
+    re = acb_core.acb_real(vals)
+    im = acb_core.acb_imag(vals)
+    sum_box = acb_core.acb_box(
+        di.interval(di._below(jnp.sum(re[..., 0], axis=0)), di._above(jnp.sum(re[..., 1], axis=0))),
+        di.interval(di._below(jnp.sum(im[..., 0], axis=0)), di._above(jnp.sum(im[..., 1], axis=0))),
+    )
+    out = acb_core.acb_mul(sum_box, acb_core.acb_mul(delta, scale))
+    finite = jnp.isfinite(acb_core.acb_real(out)[..., 0]) & jnp.isfinite(acb_core.acb_real(out)[..., 1])
+    finite = finite & jnp.isfinite(acb_core.acb_imag(out)[..., 0]) & jnp.isfinite(acb_core.acb_imag(out)[..., 1])
+    return jnp.where(finite[..., None], out, _full_box_like(a))
+
+
+def _integrate_line_taylor_series(
+    a: jax.Array,
+    b: jax.Array,
+    integrand: str,
+    degree: int,
+    prec_bits: int,
+) -> jax.Array:
+    a = acb_core.as_acb_box(a)
+    b = acb_core.as_acb_box(b)
+    z0 = acb_core.acb_midpoint(a)
+    z1 = acb_core.acb_midpoint(b)
+    center = 0.5 * (z0 + z1)
+    half_delta = 0.5 * (z1 - z0)
+    coeffs = series_utils.taylor_series_unary_complex(
+        lambda z: _eval_integrand(z, integrand),
+        center,
+        degree + 2,
+    )
+    orders = jnp.arange(coeffs.shape[0], dtype=jnp.float64)
+    moments = jnp.where(
+        (orders % 2) == 0,
+        2.0 / (orders + 1.0),
+        0.0,
+    )
+    powers = jnp.power(half_delta, orders + 1.0)
+    terms = coeffs * powers * moments
+    estimate = jnp.sum(terms[:-1])
+    tail = jnp.abs(terms[-1]) + jnp.abs(terms[-2])
+    eps = jnp.exp2(-jnp.float64(prec_bits)) * (1.0 + jnp.abs(estimate))
+    rad = tail + eps
+    re = jnp.real(estimate)
+    im = jnp.imag(estimate)
+    return acb_core.acb_box(
+        di.interval(di._below(re - rad), di._above(re + rad)),
+        di.interval(di._below(im - rad), di._above(im + rad)),
+    )
 
 
 @partial(jax.jit, static_argnames=("integrand", "n_steps"))
@@ -215,8 +381,10 @@ def acb_calc_integrate_gl_auto_deg(
     n_steps: int = 64,
     prec_bits: int = di.DEFAULT_PREC_BITS,
 ) -> jax.Array:
-    auto_steps = max(8, int(n_steps)) + max(1, int(prec_bits) // 32)
-    return acb_calc_integrate_prec(a, b, integrand=integrand, n_steps=auto_steps, prec_bits=prec_bits)
+    degree = _gauss_legendre_degree(n_steps, prec_bits)
+    coarse = _integrate_line_gauss_legendre(a, b, integrand, degree, prec_bits)
+    fine = _integrate_line_gauss_legendre(a, b, integrand, degree + max(4, degree // 2), prec_bits)
+    return _intersect_or_hull_box(coarse, fine)
 
 
 @partial(jax.jit, static_argnames=("integrand", "n_steps", "prec_bits"))
@@ -240,9 +408,8 @@ def acb_calc_integrate_taylor(
     n_steps: int = 64,
     prec_bits: int = di.DEFAULT_PREC_BITS,
 ) -> jax.Array:
-    # Lightweight Taylor-like proxy: tighter midpoint quadrature with fixed oversampling.
-    t_steps = max(8, int(n_steps)) * 2
-    return acb_calc_integrate_prec(a, b, integrand=integrand, n_steps=t_steps, prec_bits=prec_bits)
+    degree = max(8, int(n_steps)) + max(2, int(prec_bits) // 32)
+    return _integrate_line_taylor_series(a, b, integrand, degree, prec_bits)
 
 
 @partial(jax.jit, static_argnames=("integrand", "n_steps", "prec_bits"))

@@ -9,7 +9,7 @@ Implementation of arb for JAX.
 - `benchmarks/`: benchmark and cross-backend comparison scripts.
 - `tools/`: utility scripts (packaging, benchmark runner/report tools).
 - `docs/`: theory and implementation notes.
-- `examples/`, `notebooks/`: usage and experiments.
+- `examples/`: usage notebooks and experiments.
 - `results/`: benchmark outputs (what ran and when).
 
 ## Install (editable)
@@ -23,6 +23,51 @@ Linux/macOS (bash/zsh):
 ```bash
 python -m pip install -e .
 ```
+
+Run directly from source tree (no install):
+```bash
+PYTHONPATH=src python -m pytest tests -q -m "not parity"
+```
+
+## One-command Validation With Live Status
+
+Linux/macOS (bash/zsh):
+```bash
+bash tools/run_validation.sh
+```
+
+Windows PowerShell:
+```powershell
+.\tools\run_validation.ps1
+```
+
+This prints timestamped progress and heartbeat lines so long test/benchmark phases do not look stuck.
+By default it auto-detects and uses a `jax` conda env Python when present (for example `~/miniforge3/envs/jax/bin/python`).
+
+Force interpreter and backend mode:
+```bash
+python tools/run_validation.py --python /home/phili/miniforge3/envs/jax/bin/python --jax-mode cpu
+python tools/run_validation.py --python /home/phili/miniforge3/envs/jax/bin/python --jax-mode gpu
+```
+
+Windows PowerShell equivalents:
+```powershell
+python .\tools\run_validation.py --python C:\Users\phili\miniforge3\envs\jax\python.exe --jax-mode cpu
+python .\tools\run_validation.py --python C:\Users\phili\miniforge3\envs\jax\python.exe --jax-mode gpu
+```
+
+Backend self-checks:
+```bash
+/home/phili/miniforge3/envs/jax/bin/python tools/check_jax_runtime.py --expect-backend cpu
+JAX_PLATFORMS=cuda /home/phili/miniforge3/envs/jax/bin/python tools/check_jax_runtime.py --expect-backend gpu
+```
+
+For larger notebook sweeps with progress output:
+```bash
+python tools/run_notebook_sweeps.py --samples 2000,5000,10000 --seeds 0,1,2 --chunk-size 6 --jax-mode cpu
+python tools/run_notebook_sweeps.py --samples 2000,5000,10000 --seeds 0,1,2 --chunk-size 6 --jax-mode gpu
+```
+Notebook template: `examples/example_large_sweeps_progress.ipynb`
 
 ## Tests
 
