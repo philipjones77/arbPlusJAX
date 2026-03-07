@@ -202,8 +202,7 @@ def _pad_first_dim(x: np.ndarray, target: int) -> np.ndarray:
     n = x.shape[0]
     if target <= n:
         return x
-    pad_shape = (target - n, *x.shape[1:])
-    pad = np.zeros(pad_shape, dtype=x.dtype)
+    pad = np.repeat(x[-1:, ...], target - n, axis=0)
     return np.concatenate([x, pad], axis=0)
 
 
@@ -400,8 +399,18 @@ def _eval_jax_interval(name: str, *intervals: np.ndarray, mode: str, prec_bits: 
 def _eval_jax_interval_batch(name: str, *intervals: np.ndarray, mode: str, prec_bits: int):
     import jax.numpy as jnp
     from arbplusjax import api
+    from arbplusjax import hypgeom
 
     arrs = tuple(jnp.asarray(x) for x in intervals)
+    bessel_fixed_real = {
+        "besselj": hypgeom.arb_hypgeom_bessel_j_batch_fixed_prec,
+        "bessely": hypgeom.arb_hypgeom_bessel_y_batch_fixed_prec,
+        "besseli": hypgeom.arb_hypgeom_bessel_i_batch_fixed_prec,
+        "besselk": hypgeom.arb_hypgeom_bessel_k_batch_fixed_prec,
+    }
+    fn = bessel_fixed_real.get(name)
+    if fn is not None and len(arrs) == 2 and mode == "basic":
+        return fn(arrs[0], arrs[1], prec_bits=prec_bits, mode="sample")
     return api.eval_interval_batch(name, *arrs, mode=mode, prec_bits=prec_bits, dps=None)
 
 

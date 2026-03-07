@@ -21,8 +21,10 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 def test_function_provenance_reports_are_current():
     expected = {
         REPO_ROOT / "docs" / "function_naming.md": fpr.render_policy(),
+        REPO_ROOT / "docs" / "engineering_policy.md": fpr.render_engineering_policy(),
         REPO_ROOT / "docs" / "reports" / "function_provenance_registry.md": fpr.render_registry_summary(),
         REPO_ROOT / "docs" / "reports" / "function_implementation_index.md": fpr.render_implementation_index(),
+        REPO_ROOT / "docs" / "reports" / "function_engineering_status.md": fpr.render_engineering_status(),
         REPO_ROOT / "docs" / "reports" / "arb_like_functions.md": fpr.render_report("arb_like", "Arb-like Functions"),
         REPO_ROOT / "docs" / "reports" / "alternative_functions.md": fpr.render_report("alternative", "Alternative Functions"),
         REPO_ROOT / "docs" / "reports" / "new_functions.md": fpr.render_report("new", "New Functions"),
@@ -63,6 +65,15 @@ def test_known_alternative_overlays_are_present():
     assert ("gamma", "cusf_gamma") in rows
     assert ("hypergeometric_1f1", "boost_hypergeometric_1f1") in rows
     assert ("barnesgamma2", "bdg_barnesgamma2") in rows
+
+
+def test_engineering_status_reports_known_family_states():
+    text = fpr.render_engineering_status()
+    assert "pure_jax" in text
+    assert "bdg_barnesgamma2" in text
+    assert "Barnes/double-gamma family is dtype-cleaner" in text
+    assert "cuda_besselk" in text
+    assert "Alternative path; interval tightening is inherited from canonical Bessel-K wrappers" in text
 
 
 def test_noncanonical_modules_expose_provenance_metadata():

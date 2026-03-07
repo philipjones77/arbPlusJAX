@@ -10,6 +10,7 @@ from . import double_interval as di
 from . import arb_core
 from . import checks
 from . import barnesg
+from . import bessel_kernels as bk
 from . import coeffs
 from . import elementary as el
 
@@ -419,114 +420,20 @@ def _complex_hypu_scalar(a: jax.Array, b: jax.Array, z: jax.Array) -> jax.Array:
     return jnp.where(jnp.abs(s) < 1e-8, jnp.nan + 1j * jnp.nan, val)
 
 
-def _real_bessel_series(nu: jax.Array, z: jax.Array, sign: float) -> jax.Array:
-    nu = jnp.asarray(nu, dtype=jnp.float64)
-    z = jnp.asarray(z, dtype=jnp.float64)
-    half = 0.5 * z
-    term0 = jnp.power(half, nu) / jnp.exp(_gammaln_real(nu + 1.0))
-    sum0 = term0
-    z2 = z * z
-
-    def body(k, state):
-        term, s = state
-        k1 = jnp.float64(k + 1)
-        den = k1 * (k1 + nu)
-        num = 0.25 * sign * z2
-        term = term * (num / den)
-        return term, s + term
-
-    _, s = lax.fori_loop(0, _BESSEL_TERMS - 1, body, (term0, sum0))
-    return s
-
-
-def _real_bessel_asym_j(nu: jax.Array, z: jax.Array) -> jax.Array:
-    return jnp.sqrt(jnp.float64(2.0) / (el.PI * z)) * jnp.cos(z - el.HALF_PI * nu - jnp.float64(0.25) * el.PI)
-
-
-def _real_bessel_asym_y(nu: jax.Array, z: jax.Array) -> jax.Array:
-    return jnp.sqrt(jnp.float64(2.0) / (el.PI * z)) * jnp.sin(z - el.HALF_PI * nu - jnp.float64(0.25) * el.PI)
-
-
-def _real_bessel_asym_i(nu: jax.Array, z: jax.Array) -> jax.Array:
-    return jnp.exp(z) / jnp.sqrt(el.TWO_PI * z)
-
-
-def _real_bessel_asym_k(nu: jax.Array, z: jax.Array) -> jax.Array:
-    return jnp.sqrt(el.PI / (jnp.float64(2.0) * z)) * jnp.exp(-z)
-
-
-def _real_bessel_eval_j(nu: jax.Array, z: jax.Array) -> jax.Array:
-    use_asym = (jnp.abs(z) > 12.0) & (z > 0.0)
-    return jnp.where(use_asym, _real_bessel_asym_j(nu, z), _real_bessel_series(nu, z, -1.0))
-
-
-def _real_bessel_eval_i(nu: jax.Array, z: jax.Array) -> jax.Array:
-    use_asym = (jnp.abs(z) > 12.0) & (z > 0.0)
-    return jnp.where(use_asym, _real_bessel_asym_i(nu, z), _real_bessel_series(nu, z, 1.0))
-
-
-def _real_bessel_eval_y(nu: jax.Array, z: jax.Array) -> jax.Array:
-    use_asym = (jnp.abs(z) > 12.0) & (z > 0.0)
-    return jnp.where(use_asym, _real_bessel_asym_y(nu, z), _real_bessel_y(nu, z))
-
-
-def _real_bessel_eval_k(nu: jax.Array, z: jax.Array) -> jax.Array:
-    use_asym = (jnp.abs(z) > 12.0) & (z > 0.0)
-    return jnp.where(use_asym, _real_bessel_asym_k(nu, z), _real_bessel_k(nu, z))
-
-
-def _complex_bessel_series(nu: jax.Array, z: jax.Array, sign: float) -> jax.Array:
-    nu = jnp.asarray(nu, dtype=jnp.complex128)
-    z = jnp.asarray(z, dtype=jnp.complex128)
-    half = 0.5 * z
-    pow_half = jnp.exp(nu * jnp.log(half))
-    gamma = jnp.exp(_complex_loggamma(nu + 1.0))
-    term0 = pow_half / gamma
-    sum0 = term0
-    z2 = z * z
-
-    def body(k, state):
-        term, s = state
-        k1 = jnp.float64(k + 1)
-        den = k1 * (nu + k1)
-        num = (0.25 * sign) * z2
-        term = term * (num / den)
-        return term, s + term
-
-    _, s = lax.fori_loop(0, _BESSEL_TERMS - 1, body, (term0, sum0))
-    return s
-
-
-def _real_bessel_y(nu: jax.Array, z: jax.Array) -> jax.Array:
-    s = jnp.sin(el.PI * nu)
-    jnu = _real_bessel_series(nu, z, -1.0)
-    jneg = _real_bessel_series(-nu, z, -1.0)
-    val = (jnu * jnp.cos(el.PI * nu) - jneg) / s
-    return jnp.where(jnp.abs(s) < 1e-8, jnp.inf, val)
-
-
-def _real_bessel_k(nu: jax.Array, z: jax.Array) -> jax.Array:
-    s = jnp.sin(el.PI * nu)
-    inu = _real_bessel_series(nu, z, 1.0)
-    ineg = _real_bessel_series(-nu, z, 1.0)
-    val = el.HALF_PI * (ineg - inu) / s
-    return jnp.where(jnp.abs(s) < 1e-8, jnp.inf, val)
-
-
-def _complex_bessel_y(nu: jax.Array, z: jax.Array) -> jax.Array:
-    s = jnp.sin(el.PI * nu)
-    jnu = _complex_bessel_series(nu, z, -1.0)
-    jneg = _complex_bessel_series(-nu, z, -1.0)
-    val = (jnu * jnp.cos(el.PI * nu) - jneg) / s
-    return jnp.where(jnp.abs(s) < 1e-8, jnp.nan + 1j * jnp.nan, val)
-
-
-def _complex_bessel_k(nu: jax.Array, z: jax.Array) -> jax.Array:
-    s = jnp.sin(el.PI * nu)
-    inu = _complex_bessel_series(nu, z, 1.0)
-    ineg = _complex_bessel_series(-nu, z, 1.0)
-    val = el.HALF_PI * (ineg - inu) / s
-    return jnp.where(jnp.abs(s) < 1e-8, jnp.nan + 1j * jnp.nan, val)
+_real_bessel_series = bk.real_bessel_series
+_real_bessel_asym_j = bk.real_bessel_asym_j
+_real_bessel_asym_y = bk.real_bessel_asym_y
+_real_bessel_asym_i = bk.real_bessel_asym_i
+_real_bessel_asym_k = bk.real_bessel_asym_k
+_real_bessel_y = bk.real_bessel_y
+_real_bessel_k = bk.real_bessel_k
+_real_bessel_eval_j = bk.real_bessel_eval_j
+_real_bessel_eval_i = bk.real_bessel_eval_i
+_real_bessel_eval_y = bk.real_bessel_eval_y
+_real_bessel_eval_k = bk.real_bessel_eval_k
+_complex_bessel_series = bk.complex_bessel_series
+_complex_bessel_y = bk.complex_bessel_y
+_complex_bessel_k = bk.complex_bessel_k
 
 
 def _interval_from_samples(vals: jax.Array) -> jax.Array:
@@ -3665,48 +3572,66 @@ def arb_hypgeom_erfcinv_batch(x: jax.Array) -> jax.Array:
     x = di.as_interval(x)
     return jax.vmap(arb_hypgeom_erfcinv)(x)
 
+
+def _pad_rows_to(x: jax.Array, target: int) -> jax.Array:
+    arr = jnp.asarray(x)
+    n = arr.shape[0]
+    if n == target:
+        return arr
+    if n == 0:
+        pad_row = jnp.zeros((1, arr.shape[-1]), dtype=arr.dtype)
+    else:
+        pad_row = arr[-1:, ...]
+    pad_count = target - n
+    pad = jnp.repeat(pad_row, pad_count, axis=0)
+    return jnp.concatenate([arr, pad], axis=0)
+
+
+def _trim_rows(x: jax.Array, n: int) -> jax.Array:
+    return jax.lax.dynamic_slice_in_dim(jnp.asarray(x), 0, n, axis=0)
+
 def arb_hypgeom_bessel_j_batch(nu: jax.Array, z: jax.Array, mode: str = "sample") -> jax.Array:
     nu = di.as_interval(nu)
     z = di.as_interval(z)
-    return jax.vmap(lambda a, b: arb_hypgeom_bessel_j(a, b, mode=mode))(nu, z)
+    return jax.vmap(partial(arb_hypgeom_bessel_j, mode=mode))(nu, z)
 
 
 def arb_hypgeom_bessel_y_batch(nu: jax.Array, z: jax.Array, mode: str = "sample") -> jax.Array:
     nu = di.as_interval(nu)
     z = di.as_interval(z)
-    return jax.vmap(lambda a, b: arb_hypgeom_bessel_y(a, b, mode=mode))(nu, z)
+    return jax.vmap(partial(arb_hypgeom_bessel_y, mode=mode))(nu, z)
 
 
 def arb_hypgeom_bessel_jy_batch(nu: jax.Array, z: jax.Array, mode: str = "sample") -> tuple[jax.Array, jax.Array]:
     nu = di.as_interval(nu)
     z = di.as_interval(z)
-    j = jax.vmap(lambda a, b: arb_hypgeom_bessel_j(a, b, mode=mode))(nu, z)
-    y = jax.vmap(lambda a, b: arb_hypgeom_bessel_y(a, b, mode=mode))(nu, z)
+    j = jax.vmap(partial(arb_hypgeom_bessel_j, mode=mode))(nu, z)
+    y = jax.vmap(partial(arb_hypgeom_bessel_y, mode=mode))(nu, z)
     return j, y
 
 
 def arb_hypgeom_bessel_i_batch(nu: jax.Array, z: jax.Array, mode: str = "sample") -> jax.Array:
     nu = di.as_interval(nu)
     z = di.as_interval(z)
-    return jax.vmap(lambda a, b: arb_hypgeom_bessel_i(a, b, mode=mode))(nu, z)
+    return jax.vmap(partial(arb_hypgeom_bessel_i, mode=mode))(nu, z)
 
 
 def arb_hypgeom_bessel_k_batch(nu: jax.Array, z: jax.Array, mode: str = "sample") -> jax.Array:
     nu = di.as_interval(nu)
     z = di.as_interval(z)
-    return jax.vmap(lambda a, b: arb_hypgeom_bessel_k(a, b, mode=mode))(nu, z)
+    return jax.vmap(partial(arb_hypgeom_bessel_k, mode=mode))(nu, z)
 
 
 def arb_hypgeom_bessel_i_scaled_batch(nu: jax.Array, z: jax.Array, mode: str = "sample") -> jax.Array:
     nu = di.as_interval(nu)
     z = di.as_interval(z)
-    return jax.vmap(lambda a, b: arb_hypgeom_bessel_i_scaled(a, b, mode=mode))(nu, z)
+    return jax.vmap(partial(arb_hypgeom_bessel_i_scaled, mode=mode))(nu, z)
 
 
 def arb_hypgeom_bessel_k_scaled_batch(nu: jax.Array, z: jax.Array, mode: str = "sample") -> jax.Array:
     nu = di.as_interval(nu)
     z = di.as_interval(z)
-    return jax.vmap(lambda a, b: arb_hypgeom_bessel_k_scaled(a, b, mode=mode))(nu, z)
+    return jax.vmap(partial(arb_hypgeom_bessel_k_scaled, mode=mode))(nu, z)
 
 
 def arb_hypgeom_bessel_i_integration_batch(
@@ -3714,7 +3639,7 @@ def arb_hypgeom_bessel_i_integration_batch(
 ) -> jax.Array:
     nu = di.as_interval(nu)
     z = di.as_interval(z)
-    return jax.vmap(lambda a, b: arb_hypgeom_bessel_i_integration(a, b, scaled=scaled, mode=mode))(nu, z)
+    return jax.vmap(partial(arb_hypgeom_bessel_i_integration, scaled=scaled, mode=mode))(nu, z)
 
 
 def arb_hypgeom_bessel_k_integration_batch(
@@ -3722,7 +3647,75 @@ def arb_hypgeom_bessel_k_integration_batch(
 ) -> jax.Array:
     nu = di.as_interval(nu)
     z = di.as_interval(z)
-    return jax.vmap(lambda a, b: arb_hypgeom_bessel_k_integration(a, b, scaled=scaled, mode=mode))(nu, z)
+    return jax.vmap(partial(arb_hypgeom_bessel_k_integration, scaled=scaled, mode=mode))(nu, z)
+
+
+def arb_hypgeom_bessel_j_batch_padded(nu: jax.Array, z: jax.Array, pad_to: int, mode: str = "sample") -> jax.Array:
+    nu = di.as_interval(nu)
+    z = di.as_interval(z)
+    n = nu.shape[0]
+    out = arb_hypgeom_bessel_j_batch(_pad_rows_to(nu, pad_to), _pad_rows_to(z, pad_to), mode=mode)
+    return _trim_rows(out, n)
+
+
+def arb_hypgeom_bessel_y_batch_padded(nu: jax.Array, z: jax.Array, pad_to: int, mode: str = "sample") -> jax.Array:
+    nu = di.as_interval(nu)
+    z = di.as_interval(z)
+    n = nu.shape[0]
+    out = arb_hypgeom_bessel_y_batch(_pad_rows_to(nu, pad_to), _pad_rows_to(z, pad_to), mode=mode)
+    return _trim_rows(out, n)
+
+
+def arb_hypgeom_bessel_i_batch_padded(nu: jax.Array, z: jax.Array, pad_to: int, mode: str = "sample") -> jax.Array:
+    nu = di.as_interval(nu)
+    z = di.as_interval(z)
+    n = nu.shape[0]
+    out = arb_hypgeom_bessel_i_batch(_pad_rows_to(nu, pad_to), _pad_rows_to(z, pad_to), mode=mode)
+    return _trim_rows(out, n)
+
+
+def arb_hypgeom_bessel_k_batch_padded(nu: jax.Array, z: jax.Array, pad_to: int, mode: str = "sample") -> jax.Array:
+    nu = di.as_interval(nu)
+    z = di.as_interval(z)
+    n = nu.shape[0]
+    out = arb_hypgeom_bessel_k_batch(_pad_rows_to(nu, pad_to), _pad_rows_to(z, pad_to), mode=mode)
+    return _trim_rows(out, n)
+
+
+def arb_hypgeom_bessel_i_scaled_batch_padded(nu: jax.Array, z: jax.Array, pad_to: int, mode: str = "sample") -> jax.Array:
+    nu = di.as_interval(nu)
+    z = di.as_interval(z)
+    n = nu.shape[0]
+    out = arb_hypgeom_bessel_i_scaled_batch(_pad_rows_to(nu, pad_to), _pad_rows_to(z, pad_to), mode=mode)
+    return _trim_rows(out, n)
+
+
+def arb_hypgeom_bessel_k_scaled_batch_padded(nu: jax.Array, z: jax.Array, pad_to: int, mode: str = "sample") -> jax.Array:
+    nu = di.as_interval(nu)
+    z = di.as_interval(z)
+    n = nu.shape[0]
+    out = arb_hypgeom_bessel_k_scaled_batch(_pad_rows_to(nu, pad_to), _pad_rows_to(z, pad_to), mode=mode)
+    return _trim_rows(out, n)
+
+
+def arb_hypgeom_bessel_i_integration_batch_padded(
+    nu: jax.Array, z: jax.Array, pad_to: int, scaled: bool = False, mode: str = "sample"
+) -> jax.Array:
+    nu = di.as_interval(nu)
+    z = di.as_interval(z)
+    n = nu.shape[0]
+    out = arb_hypgeom_bessel_i_integration_batch(_pad_rows_to(nu, pad_to), _pad_rows_to(z, pad_to), scaled=scaled, mode=mode)
+    return _trim_rows(out, n)
+
+
+def arb_hypgeom_bessel_k_integration_batch_padded(
+    nu: jax.Array, z: jax.Array, pad_to: int, scaled: bool = False, mode: str = "sample"
+) -> jax.Array:
+    nu = di.as_interval(nu)
+    z = di.as_interval(z)
+    n = nu.shape[0]
+    out = arb_hypgeom_bessel_k_integration_batch(_pad_rows_to(nu, pad_to), _pad_rows_to(z, pad_to), scaled=scaled, mode=mode)
+    return _trim_rows(out, n)
 
 
 def arb_hypgeom_0f1_batch(a: jax.Array, z: jax.Array, regularized: bool = False) -> jax.Array:
@@ -4169,6 +4162,202 @@ def arb_hypgeom_bessel_jy_batch_prec(
     )
 
 
+def arb_hypgeom_bessel_j_batch_padded_prec(
+    nu: jax.Array, z: jax.Array, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS, mode: str = "sample"
+) -> jax.Array:
+    nu = di.as_interval(nu)
+    z = di.as_interval(z)
+    n = nu.shape[0]
+    out = _arb_hypgeom_bessel_j_batch_padded_prec_core_jit(
+        _pad_rows_to(nu, pad_to), _pad_rows_to(z, pad_to), prec_bits=prec_bits, mode=mode
+    )
+    return _trim_rows(out, n)
+
+
+def arb_hypgeom_bessel_j_batch_fixed_prec(
+    nu: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS, mode: str = "sample"
+) -> jax.Array:
+    return _arb_hypgeom_bessel_j_batch_padded_prec_core_jit(di.as_interval(nu), di.as_interval(z), prec_bits=prec_bits, mode=mode)
+
+
+def arb_hypgeom_bessel_y_batch_padded_prec(
+    nu: jax.Array, z: jax.Array, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS, mode: str = "sample"
+) -> jax.Array:
+    nu = di.as_interval(nu)
+    z = di.as_interval(z)
+    n = nu.shape[0]
+    out = _arb_hypgeom_bessel_y_batch_padded_prec_core_jit(
+        _pad_rows_to(nu, pad_to), _pad_rows_to(z, pad_to), prec_bits=prec_bits, mode=mode
+    )
+    return _trim_rows(out, n)
+
+
+def arb_hypgeom_bessel_y_batch_fixed_prec(
+    nu: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS, mode: str = "sample"
+) -> jax.Array:
+    return _arb_hypgeom_bessel_y_batch_padded_prec_core_jit(di.as_interval(nu), di.as_interval(z), prec_bits=prec_bits, mode=mode)
+
+
+def arb_hypgeom_bessel_i_batch_padded_prec(
+    nu: jax.Array, z: jax.Array, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS, mode: str = "sample"
+) -> jax.Array:
+    nu = di.as_interval(nu)
+    z = di.as_interval(z)
+    n = nu.shape[0]
+    out = _arb_hypgeom_bessel_i_batch_padded_prec_core_jit(
+        _pad_rows_to(nu, pad_to), _pad_rows_to(z, pad_to), prec_bits=prec_bits, mode=mode
+    )
+    return _trim_rows(out, n)
+
+
+def arb_hypgeom_bessel_i_batch_fixed_prec(
+    nu: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS, mode: str = "sample"
+) -> jax.Array:
+    return _arb_hypgeom_bessel_i_batch_padded_prec_core_jit(di.as_interval(nu), di.as_interval(z), prec_bits=prec_bits, mode=mode)
+
+
+def arb_hypgeom_bessel_k_batch_padded_prec(
+    nu: jax.Array, z: jax.Array, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS, mode: str = "sample"
+) -> jax.Array:
+    nu = di.as_interval(nu)
+    z = di.as_interval(z)
+    n = nu.shape[0]
+    out = _arb_hypgeom_bessel_k_batch_padded_prec_core_jit(
+        _pad_rows_to(nu, pad_to), _pad_rows_to(z, pad_to), prec_bits=prec_bits, mode=mode
+    )
+    return _trim_rows(out, n)
+
+
+def arb_hypgeom_bessel_k_batch_fixed_prec(
+    nu: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS, mode: str = "sample"
+) -> jax.Array:
+    return _arb_hypgeom_bessel_k_batch_padded_prec_core_jit(di.as_interval(nu), di.as_interval(z), prec_bits=prec_bits, mode=mode)
+
+
+def arb_hypgeom_bessel_i_scaled_batch_padded_prec(
+    nu: jax.Array, z: jax.Array, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS, mode: str = "sample"
+) -> jax.Array:
+    nu = di.as_interval(nu)
+    z = di.as_interval(z)
+    n = nu.shape[0]
+    out = _arb_hypgeom_bessel_i_scaled_batch_padded_prec_core_jit(
+        _pad_rows_to(nu, pad_to), _pad_rows_to(z, pad_to), prec_bits=prec_bits, mode=mode
+    )
+    return _trim_rows(out, n)
+
+
+def arb_hypgeom_bessel_i_scaled_batch_fixed_prec(
+    nu: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS, mode: str = "sample"
+) -> jax.Array:
+    return _arb_hypgeom_bessel_i_scaled_batch_padded_prec_core_jit(di.as_interval(nu), di.as_interval(z), prec_bits=prec_bits, mode=mode)
+
+
+def arb_hypgeom_bessel_k_scaled_batch_padded_prec(
+    nu: jax.Array, z: jax.Array, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS, mode: str = "sample"
+) -> jax.Array:
+    nu = di.as_interval(nu)
+    z = di.as_interval(z)
+    n = nu.shape[0]
+    out = _arb_hypgeom_bessel_k_scaled_batch_padded_prec_core_jit(
+        _pad_rows_to(nu, pad_to), _pad_rows_to(z, pad_to), prec_bits=prec_bits, mode=mode
+    )
+    return _trim_rows(out, n)
+
+
+def arb_hypgeom_bessel_k_scaled_batch_fixed_prec(
+    nu: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS, mode: str = "sample"
+) -> jax.Array:
+    return _arb_hypgeom_bessel_k_scaled_batch_padded_prec_core_jit(di.as_interval(nu), di.as_interval(z), prec_bits=prec_bits, mode=mode)
+
+
+def arb_hypgeom_bessel_i_integration_batch_padded_prec(
+    nu: jax.Array, z: jax.Array, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS, scaled: bool = False, mode: str = "sample"
+) -> jax.Array:
+    nu = di.as_interval(nu)
+    z = di.as_interval(z)
+    n = nu.shape[0]
+    out = _arb_hypgeom_bessel_i_integration_batch_padded_prec_core_jit(
+        _pad_rows_to(nu, pad_to), _pad_rows_to(z, pad_to), prec_bits=prec_bits, scaled=scaled, mode=mode
+    )
+    return _trim_rows(out, n)
+
+
+def arb_hypgeom_bessel_i_integration_batch_fixed_prec(
+    nu: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS, scaled: bool = False, mode: str = "sample"
+) -> jax.Array:
+    return _arb_hypgeom_bessel_i_integration_batch_padded_prec_core_jit(
+        di.as_interval(nu), di.as_interval(z), prec_bits=prec_bits, scaled=scaled, mode=mode
+    )
+
+
+def arb_hypgeom_bessel_k_integration_batch_padded_prec(
+    nu: jax.Array, z: jax.Array, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS, scaled: bool = False, mode: str = "sample"
+) -> jax.Array:
+    nu = di.as_interval(nu)
+    z = di.as_interval(z)
+    n = nu.shape[0]
+    out = _arb_hypgeom_bessel_k_integration_batch_padded_prec_core_jit(
+        _pad_rows_to(nu, pad_to), _pad_rows_to(z, pad_to), prec_bits=prec_bits, scaled=scaled, mode=mode
+    )
+    return _trim_rows(out, n)
+
+
+def arb_hypgeom_bessel_k_integration_batch_fixed_prec(
+    nu: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS, scaled: bool = False, mode: str = "sample"
+) -> jax.Array:
+    return _arb_hypgeom_bessel_k_integration_batch_padded_prec_core_jit(
+        di.as_interval(nu), di.as_interval(z), prec_bits=prec_bits, scaled=scaled, mode=mode
+    )
+
+
+def _arb_hypgeom_bessel_j_batch_padded_prec_core(
+    nu: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS, mode: str = "sample"
+) -> jax.Array:
+    return di.round_interval_outward(arb_hypgeom_bessel_j_batch(nu, z, mode=mode), prec_bits)
+
+
+def _arb_hypgeom_bessel_y_batch_padded_prec_core(
+    nu: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS, mode: str = "sample"
+) -> jax.Array:
+    return di.round_interval_outward(arb_hypgeom_bessel_y_batch(nu, z, mode=mode), prec_bits)
+
+
+def _arb_hypgeom_bessel_i_batch_padded_prec_core(
+    nu: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS, mode: str = "sample"
+) -> jax.Array:
+    return di.round_interval_outward(arb_hypgeom_bessel_i_batch(nu, z, mode=mode), prec_bits)
+
+
+def _arb_hypgeom_bessel_k_batch_padded_prec_core(
+    nu: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS, mode: str = "sample"
+) -> jax.Array:
+    return di.round_interval_outward(arb_hypgeom_bessel_k_batch(nu, z, mode=mode), prec_bits)
+
+
+def _arb_hypgeom_bessel_i_scaled_batch_padded_prec_core(
+    nu: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS, mode: str = "sample"
+) -> jax.Array:
+    return di.round_interval_outward(arb_hypgeom_bessel_i_scaled_batch(nu, z, mode=mode), prec_bits)
+
+
+def _arb_hypgeom_bessel_k_scaled_batch_padded_prec_core(
+    nu: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS, mode: str = "sample"
+) -> jax.Array:
+    return di.round_interval_outward(arb_hypgeom_bessel_k_scaled_batch(nu, z, mode=mode), prec_bits)
+
+
+def _arb_hypgeom_bessel_i_integration_batch_padded_prec_core(
+    nu: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS, scaled: bool = False, mode: str = "sample"
+) -> jax.Array:
+    return di.round_interval_outward(arb_hypgeom_bessel_i_integration_batch(nu, z, scaled=scaled, mode=mode), prec_bits)
+
+
+def _arb_hypgeom_bessel_k_integration_batch_padded_prec_core(
+    nu: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS, scaled: bool = False, mode: str = "sample"
+) -> jax.Array:
+    return di.round_interval_outward(arb_hypgeom_bessel_k_integration_batch(nu, z, scaled=scaled, mode=mode), prec_bits)
+
+
 def arb_hypgeom_0f1_batch_prec(a: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS, regularized: bool = False) -> jax.Array:
     a = di.as_interval(a)
     z = di.as_interval(z)
@@ -4317,6 +4506,54 @@ def acb_hypgeom_bessel_k_scaled_batch(nu: jax.Array, z: jax.Array) -> jax.Array:
     nu = as_acb_box(nu)
     z = as_acb_box(z)
     return jax.vmap(acb_hypgeom_bessel_k_scaled)(nu, z)
+
+
+def acb_hypgeom_bessel_j_batch_padded(nu: jax.Array, z: jax.Array, pad_to: int) -> jax.Array:
+    nu = as_acb_box(nu)
+    z = as_acb_box(z)
+    n = nu.shape[0]
+    out = acb_hypgeom_bessel_j_batch(_pad_rows_to(nu, pad_to), _pad_rows_to(z, pad_to))
+    return _trim_rows(out, n)
+
+
+def acb_hypgeom_bessel_y_batch_padded(nu: jax.Array, z: jax.Array, pad_to: int) -> jax.Array:
+    nu = as_acb_box(nu)
+    z = as_acb_box(z)
+    n = nu.shape[0]
+    out = acb_hypgeom_bessel_y_batch(_pad_rows_to(nu, pad_to), _pad_rows_to(z, pad_to))
+    return _trim_rows(out, n)
+
+
+def acb_hypgeom_bessel_i_batch_padded(nu: jax.Array, z: jax.Array, pad_to: int) -> jax.Array:
+    nu = as_acb_box(nu)
+    z = as_acb_box(z)
+    n = nu.shape[0]
+    out = acb_hypgeom_bessel_i_batch(_pad_rows_to(nu, pad_to), _pad_rows_to(z, pad_to))
+    return _trim_rows(out, n)
+
+
+def acb_hypgeom_bessel_k_batch_padded(nu: jax.Array, z: jax.Array, pad_to: int) -> jax.Array:
+    nu = as_acb_box(nu)
+    z = as_acb_box(z)
+    n = nu.shape[0]
+    out = acb_hypgeom_bessel_k_batch(_pad_rows_to(nu, pad_to), _pad_rows_to(z, pad_to))
+    return _trim_rows(out, n)
+
+
+def acb_hypgeom_bessel_i_scaled_batch_padded(nu: jax.Array, z: jax.Array, pad_to: int) -> jax.Array:
+    nu = as_acb_box(nu)
+    z = as_acb_box(z)
+    n = nu.shape[0]
+    out = acb_hypgeom_bessel_i_scaled_batch(_pad_rows_to(nu, pad_to), _pad_rows_to(z, pad_to))
+    return _trim_rows(out, n)
+
+
+def acb_hypgeom_bessel_k_scaled_batch_padded(nu: jax.Array, z: jax.Array, pad_to: int) -> jax.Array:
+    nu = as_acb_box(nu)
+    z = as_acb_box(z)
+    n = nu.shape[0]
+    out = acb_hypgeom_bessel_k_scaled_batch(_pad_rows_to(nu, pad_to), _pad_rows_to(z, pad_to))
+    return _trim_rows(out, n)
 
 
 def acb_hypgeom_0f1_batch(a: jax.Array, z: jax.Array, regularized: bool = False) -> jax.Array:
@@ -4490,6 +4727,150 @@ def acb_hypgeom_bessel_jy_batch_prec(
         acb_hypgeom_bessel_j_batch_prec(nu, z, prec_bits),
         acb_hypgeom_bessel_y_batch_prec(nu, z, prec_bits),
     )
+
+
+def acb_hypgeom_bessel_j_batch_padded_prec(
+    nu: jax.Array, z: jax.Array, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    nu = as_acb_box(nu)
+    z = as_acb_box(z)
+    n = nu.shape[0]
+    out = _acb_hypgeom_bessel_j_batch_padded_prec_core_jit(
+        _pad_rows_to(nu, pad_to), _pad_rows_to(z, pad_to), prec_bits=prec_bits
+    )
+    return _trim_rows(out, n)
+
+
+def acb_hypgeom_bessel_j_batch_fixed_prec(
+    nu: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    return _acb_hypgeom_bessel_j_batch_padded_prec_core_jit(as_acb_box(nu), as_acb_box(z), prec_bits=prec_bits)
+
+
+def acb_hypgeom_bessel_y_batch_padded_prec(
+    nu: jax.Array, z: jax.Array, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    nu = as_acb_box(nu)
+    z = as_acb_box(z)
+    n = nu.shape[0]
+    out = _acb_hypgeom_bessel_y_batch_padded_prec_core_jit(
+        _pad_rows_to(nu, pad_to), _pad_rows_to(z, pad_to), prec_bits=prec_bits
+    )
+    return _trim_rows(out, n)
+
+
+def acb_hypgeom_bessel_y_batch_fixed_prec(
+    nu: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    return _acb_hypgeom_bessel_y_batch_padded_prec_core_jit(as_acb_box(nu), as_acb_box(z), prec_bits=prec_bits)
+
+
+def acb_hypgeom_bessel_i_batch_padded_prec(
+    nu: jax.Array, z: jax.Array, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    nu = as_acb_box(nu)
+    z = as_acb_box(z)
+    n = nu.shape[0]
+    out = _acb_hypgeom_bessel_i_batch_padded_prec_core_jit(
+        _pad_rows_to(nu, pad_to), _pad_rows_to(z, pad_to), prec_bits=prec_bits
+    )
+    return _trim_rows(out, n)
+
+
+def acb_hypgeom_bessel_i_batch_fixed_prec(
+    nu: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    return _acb_hypgeom_bessel_i_batch_padded_prec_core_jit(as_acb_box(nu), as_acb_box(z), prec_bits=prec_bits)
+
+
+def acb_hypgeom_bessel_k_batch_padded_prec(
+    nu: jax.Array, z: jax.Array, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    nu = as_acb_box(nu)
+    z = as_acb_box(z)
+    n = nu.shape[0]
+    out = _acb_hypgeom_bessel_k_batch_padded_prec_core_jit(
+        _pad_rows_to(nu, pad_to), _pad_rows_to(z, pad_to), prec_bits=prec_bits
+    )
+    return _trim_rows(out, n)
+
+
+def acb_hypgeom_bessel_k_batch_fixed_prec(
+    nu: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    return _acb_hypgeom_bessel_k_batch_padded_prec_core_jit(as_acb_box(nu), as_acb_box(z), prec_bits=prec_bits)
+
+
+def acb_hypgeom_bessel_i_scaled_batch_padded_prec(
+    nu: jax.Array, z: jax.Array, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    nu = as_acb_box(nu)
+    z = as_acb_box(z)
+    n = nu.shape[0]
+    out = _acb_hypgeom_bessel_i_scaled_batch_padded_prec_core_jit(
+        _pad_rows_to(nu, pad_to), _pad_rows_to(z, pad_to), prec_bits=prec_bits
+    )
+    return _trim_rows(out, n)
+
+
+def acb_hypgeom_bessel_i_scaled_batch_fixed_prec(
+    nu: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    return _acb_hypgeom_bessel_i_scaled_batch_padded_prec_core_jit(as_acb_box(nu), as_acb_box(z), prec_bits=prec_bits)
+
+
+def acb_hypgeom_bessel_k_scaled_batch_padded_prec(
+    nu: jax.Array, z: jax.Array, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    nu = as_acb_box(nu)
+    z = as_acb_box(z)
+    n = nu.shape[0]
+    out = _acb_hypgeom_bessel_k_scaled_batch_padded_prec_core_jit(
+        _pad_rows_to(nu, pad_to), _pad_rows_to(z, pad_to), prec_bits=prec_bits
+    )
+    return _trim_rows(out, n)
+
+
+def acb_hypgeom_bessel_k_scaled_batch_fixed_prec(
+    nu: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    return _acb_hypgeom_bessel_k_scaled_batch_padded_prec_core_jit(as_acb_box(nu), as_acb_box(z), prec_bits=prec_bits)
+
+
+def _acb_hypgeom_bessel_j_batch_padded_prec_core(
+    nu: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    return acb_box_round_prec(acb_hypgeom_bessel_j_batch(nu, z), prec_bits)
+
+
+def _acb_hypgeom_bessel_y_batch_padded_prec_core(
+    nu: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    return acb_box_round_prec(acb_hypgeom_bessel_y_batch(nu, z), prec_bits)
+
+
+def _acb_hypgeom_bessel_i_batch_padded_prec_core(
+    nu: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    return acb_box_round_prec(acb_hypgeom_bessel_i_batch(nu, z), prec_bits)
+
+
+def _acb_hypgeom_bessel_k_batch_padded_prec_core(
+    nu: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    return acb_box_round_prec(acb_hypgeom_bessel_k_batch(nu, z), prec_bits)
+
+
+def _acb_hypgeom_bessel_i_scaled_batch_padded_prec_core(
+    nu: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    return acb_box_round_prec(acb_hypgeom_bessel_i_scaled_batch(nu, z), prec_bits)
+
+
+def _acb_hypgeom_bessel_k_scaled_batch_padded_prec_core(
+    nu: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    return acb_box_round_prec(acb_hypgeom_bessel_k_scaled_batch(nu, z), prec_bits)
 
 def acb_hypgeom_0f1_batch_prec(a: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS, regularized: bool = False) -> jax.Array:
     a = as_acb_box(a)
@@ -4667,6 +5048,38 @@ arb_hypgeom_bessel_i_scaled_batch_prec_jit = jax.jit(
 arb_hypgeom_bessel_k_scaled_batch_prec_jit = jax.jit(
     arb_hypgeom_bessel_k_scaled_batch_prec, static_argnames=("prec_bits", "mode")
 )
+_arb_hypgeom_bessel_j_batch_padded_prec_core_jit = jax.jit(
+    _arb_hypgeom_bessel_j_batch_padded_prec_core, static_argnames=("prec_bits", "mode")
+)
+_arb_hypgeom_bessel_y_batch_padded_prec_core_jit = jax.jit(
+    _arb_hypgeom_bessel_y_batch_padded_prec_core, static_argnames=("prec_bits", "mode")
+)
+_arb_hypgeom_bessel_i_batch_padded_prec_core_jit = jax.jit(
+    _arb_hypgeom_bessel_i_batch_padded_prec_core, static_argnames=("prec_bits", "mode")
+)
+_arb_hypgeom_bessel_k_batch_padded_prec_core_jit = jax.jit(
+    _arb_hypgeom_bessel_k_batch_padded_prec_core, static_argnames=("prec_bits", "mode")
+)
+_arb_hypgeom_bessel_i_scaled_batch_padded_prec_core_jit = jax.jit(
+    _arb_hypgeom_bessel_i_scaled_batch_padded_prec_core, static_argnames=("prec_bits", "mode")
+)
+_arb_hypgeom_bessel_k_scaled_batch_padded_prec_core_jit = jax.jit(
+    _arb_hypgeom_bessel_k_scaled_batch_padded_prec_core, static_argnames=("prec_bits", "mode")
+)
+_arb_hypgeom_bessel_i_integration_batch_padded_prec_core_jit = jax.jit(
+    _arb_hypgeom_bessel_i_integration_batch_padded_prec_core, static_argnames=("prec_bits", "scaled", "mode")
+)
+_arb_hypgeom_bessel_k_integration_batch_padded_prec_core_jit = jax.jit(
+    _arb_hypgeom_bessel_k_integration_batch_padded_prec_core, static_argnames=("prec_bits", "scaled", "mode")
+)
+arb_hypgeom_bessel_j_batch_padded_prec_jit = arb_hypgeom_bessel_j_batch_padded_prec
+arb_hypgeom_bessel_y_batch_padded_prec_jit = arb_hypgeom_bessel_y_batch_padded_prec
+arb_hypgeom_bessel_i_batch_padded_prec_jit = arb_hypgeom_bessel_i_batch_padded_prec
+arb_hypgeom_bessel_k_batch_padded_prec_jit = arb_hypgeom_bessel_k_batch_padded_prec
+arb_hypgeom_bessel_i_scaled_batch_padded_prec_jit = arb_hypgeom_bessel_i_scaled_batch_padded_prec
+arb_hypgeom_bessel_k_scaled_batch_padded_prec_jit = arb_hypgeom_bessel_k_scaled_batch_padded_prec
+arb_hypgeom_bessel_i_integration_batch_padded_prec_jit = arb_hypgeom_bessel_i_integration_batch_padded_prec
+arb_hypgeom_bessel_k_integration_batch_padded_prec_jit = arb_hypgeom_bessel_k_integration_batch_padded_prec
 arb_hypgeom_bessel_i_integration_batch_prec_jit = jax.jit(
     arb_hypgeom_bessel_i_integration_batch_prec, static_argnames=("prec_bits", "scaled", "mode")
 )
@@ -4737,6 +5150,18 @@ acb_hypgeom_bessel_k_batch_prec_jit = jax.jit(acb_hypgeom_bessel_k_batch_prec, s
 acb_hypgeom_bessel_i_scaled_batch_prec_jit = jax.jit(acb_hypgeom_bessel_i_scaled_batch_prec, static_argnames=("prec_bits",))
 acb_hypgeom_bessel_k_scaled_batch_prec_jit = jax.jit(acb_hypgeom_bessel_k_scaled_batch_prec, static_argnames=("prec_bits",))
 acb_hypgeom_bessel_jy_batch_prec_jit = jax.jit(acb_hypgeom_bessel_jy_batch_prec, static_argnames=("prec_bits",))
+_acb_hypgeom_bessel_j_batch_padded_prec_core_jit = jax.jit(_acb_hypgeom_bessel_j_batch_padded_prec_core, static_argnames=("prec_bits",))
+_acb_hypgeom_bessel_y_batch_padded_prec_core_jit = jax.jit(_acb_hypgeom_bessel_y_batch_padded_prec_core, static_argnames=("prec_bits",))
+_acb_hypgeom_bessel_i_batch_padded_prec_core_jit = jax.jit(_acb_hypgeom_bessel_i_batch_padded_prec_core, static_argnames=("prec_bits",))
+_acb_hypgeom_bessel_k_batch_padded_prec_core_jit = jax.jit(_acb_hypgeom_bessel_k_batch_padded_prec_core, static_argnames=("prec_bits",))
+_acb_hypgeom_bessel_i_scaled_batch_padded_prec_core_jit = jax.jit(_acb_hypgeom_bessel_i_scaled_batch_padded_prec_core, static_argnames=("prec_bits",))
+_acb_hypgeom_bessel_k_scaled_batch_padded_prec_core_jit = jax.jit(_acb_hypgeom_bessel_k_scaled_batch_padded_prec_core, static_argnames=("prec_bits",))
+acb_hypgeom_bessel_j_batch_padded_prec_jit = acb_hypgeom_bessel_j_batch_padded_prec
+acb_hypgeom_bessel_y_batch_padded_prec_jit = acb_hypgeom_bessel_y_batch_padded_prec
+acb_hypgeom_bessel_i_batch_padded_prec_jit = acb_hypgeom_bessel_i_batch_padded_prec
+acb_hypgeom_bessel_k_batch_padded_prec_jit = acb_hypgeom_bessel_k_batch_padded_prec
+acb_hypgeom_bessel_i_scaled_batch_padded_prec_jit = acb_hypgeom_bessel_i_scaled_batch_padded_prec
+acb_hypgeom_bessel_k_scaled_batch_padded_prec_jit = acb_hypgeom_bessel_k_scaled_batch_padded_prec
 acb_hypgeom_u_batch_prec_jit = jax.jit(acb_hypgeom_u_batch_prec, static_argnames=("prec_bits",))
 acb_hypgeom_u_integration_batch_prec_jit = jax.jit(acb_hypgeom_u_integration_batch_prec, static_argnames=("prec_bits",))
 acb_hypgeom_1f1_integration_batch_prec_jit = jax.jit(

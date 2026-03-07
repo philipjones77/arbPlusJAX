@@ -21,6 +21,7 @@ htmlcov/
 *.log
 results/*.json
 results/*.csv
+results/jax_compilation_cache/
 results/benchmarks/**
 !results/benchmarks/README.md
 examples/.ipynb_checkpoints/

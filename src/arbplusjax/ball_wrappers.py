@@ -11,6 +11,7 @@ from . import precision
 from . import acb_core
 from . import arb_core
 from . import barnesg
+from . import bessel_kernels as bk
 from . import coeffs
 from . import double_gamma
 from . import elementary as el
@@ -473,6 +474,60 @@ def _hull_with_real_bessel_asym(base: jax.Array, nu: jax.Array, z: jax.Array, ki
     return jnp.where(use_asym, _interval_hull(base, asym), base)
 
 
+def _box_hull(a: jax.Array, b: jax.Array) -> jax.Array:
+    ar = acb_core.acb_real(a)
+    ai = acb_core.acb_imag(a)
+    br = acb_core.acb_real(b)
+    bi = acb_core.acb_imag(b)
+    return acb_core.acb_box(_interval_hull(ar, br), _interval_hull(ai, bi))
+
+
+def _complex_bessel_asym(kind: str, nu: jax.Array, z: jax.Array) -> jax.Array:
+    quarter_pi = jnp.asarray(0.25, dtype=jnp.float64) * el.PI
+    if kind == "j":
+        return jnp.sqrt(jnp.asarray(2.0, dtype=jnp.complex128) / (jnp.asarray(el.PI, dtype=jnp.complex128) * z)) * jnp.cos(z - el.HALF_PI * nu - quarter_pi)
+    if kind == "y":
+        return jnp.sqrt(jnp.asarray(2.0, dtype=jnp.complex128) / (jnp.asarray(el.PI, dtype=jnp.complex128) * z)) * jnp.sin(z - el.HALF_PI * nu - quarter_pi)
+    if kind == "i":
+        return jnp.exp(z) / jnp.sqrt(jnp.asarray(el.TWO_PI, dtype=jnp.complex128) * z)
+    if kind == "k":
+        return jnp.sqrt(jnp.asarray(el.PI, dtype=jnp.complex128) / (jnp.asarray(2.0, dtype=jnp.complex128) * z)) * jnp.exp(-z)
+    if kind == "i_scaled":
+        return jnp.exp(-z) * _complex_bessel_asym("i", nu, z)
+    if kind == "k_scaled":
+        return jnp.exp(z) * _complex_bessel_asym("k", nu, z)
+    return jnp.asarray(jnp.nan + 1j * jnp.nan, dtype=jnp.complex128)
+
+
+def _bessel_complex_asym_box(kind: str, nu_mid: jax.Array, z_mid: jax.Array, z_abs_lower: jax.Array, eps: jax.Array) -> jax.Array:
+    z_abs = jnp.maximum(z_abs_lower, jnp.float64(1e-12))
+    tail = _bessel_asym_tail_abs(nu_mid, z_abs)
+    val = _complex_bessel_asym(kind, nu_mid, z_mid)
+    if kind in ("j", "y"):
+        amp = jnp.sqrt(jnp.float64(2.0) / (el.PI * z_abs))
+    elif kind == "i":
+        amp = jnp.exp(jnp.real(z_mid)) / jnp.sqrt(el.TWO_PI * z_abs)
+    elif kind == "k":
+        amp = jnp.sqrt(el.PI / (jnp.float64(2.0) * z_abs)) * jnp.exp(-jnp.real(z_mid))
+    elif kind == "i_scaled":
+        amp = jnp.float64(1.0) / jnp.sqrt(el.TWO_PI * z_abs)
+    elif kind == "k_scaled":
+        amp = jnp.sqrt(el.PI / (jnp.float64(2.0) * z_abs))
+    else:
+        return _full_box()
+    return _box_from_ball(val, amp * tail + eps)
+
+
+def _hull_with_complex_bessel_asym(base: jax.Array, nu: jax.Array, z: jax.Array, kind: str, eps: jax.Array) -> jax.Array:
+    nu_mid, _ = _ball_from_box(nu)
+    z_mid, z_rad = _ball_from_box(z)
+    z_abs_lower = jnp.maximum(jnp.abs(z_mid) - z_rad, jnp.float64(1e-12))
+    re = acb_core.acb_real(acb_core.as_acb_box(z))
+    asym = _bessel_complex_asym_box(kind, nu_mid, z_mid, z_abs_lower, eps)
+    use_asym = (re[0] > 0.0) & (z_abs_lower > 12.0)
+    return jnp.where(use_asym, _box_hull(base, asym), base)
+
+
 def _rigorous_complex_bivariate(fn, x: jax.Array, y: jax.Array, eps: float) -> jax.Array:
     x_mid, x_rad = _ball_from_box(x)
     y_mid, y_rad = _ball_from_box(y)
@@ -509,82 +564,16 @@ def _adaptive_complex_bivariate(fn, x: jax.Array, y: jax.Array, eps: float, samp
     return jnp.where(finite, out, _full_box())
 
 
-def _real_bessel_series(nu: jax.Array, z: jax.Array, sign: float) -> jax.Array:
-    nu = jnp.asarray(nu, dtype=jnp.float64)
-    z = jnp.asarray(z, dtype=jnp.float64)
-    half = 0.5 * z
-    term0 = jnp.power(half, nu) / jnp.exp(lax.lgamma(nu + 1.0))
-    sum0 = term0
-    z2 = z * z
-
-    def body(k, state):
-        term, s = state
-        k1 = jnp.float64(k + 1)
-        den = k1 * (k1 + nu)
-        num = 0.25 * sign * z2
-        term = term * (num / den)
-        return term, s + term
-
-    _, s = lax.fori_loop(0, 79, body, (term0, sum0))
-    return s
-
-
-def _real_bessel_asym_j(nu: jax.Array, z: jax.Array) -> jax.Array:
-    return jnp.sqrt(jnp.float64(2.0) / (el.PI * z)) * jnp.cos(z - el.HALF_PI * nu - jnp.float64(0.25) * el.PI)
-
-
-def _real_bessel_asym_y(nu: jax.Array, z: jax.Array) -> jax.Array:
-    return jnp.sqrt(jnp.float64(2.0) / (el.PI * z)) * jnp.sin(z - el.HALF_PI * nu - jnp.float64(0.25) * el.PI)
-
-
-def _real_bessel_asym_i(nu: jax.Array, z: jax.Array) -> jax.Array:
-    return jnp.exp(z) / jnp.sqrt(el.TWO_PI * z)
-
-
-def _real_bessel_asym_k(nu: jax.Array, z: jax.Array) -> jax.Array:
-    return jnp.sqrt(el.PI / (jnp.float64(2.0) * z)) * jnp.exp(-z)
-
-
-def _real_bessel_eval_j(nu: jax.Array, z: jax.Array) -> jax.Array:
-    use_asym = (jnp.abs(z) > 12.0) & (z > 0.0)
-    return jnp.where(use_asym, _real_bessel_asym_j(nu, z), _real_bessel_series(nu, z, -1.0))
-
-
-def _real_bessel_eval_i(nu: jax.Array, z: jax.Array) -> jax.Array:
-    use_asym = (jnp.abs(z) > 12.0) & (z > 0.0)
-    return jnp.where(use_asym, _real_bessel_asym_i(nu, z), _real_bessel_series(nu, z, 1.0))
-
-
-def _real_bessel_eval_y(nu: jax.Array, z: jax.Array) -> jax.Array:
-    use_asym = (jnp.abs(z) > 12.0) & (z > 0.0)
-    return jnp.where(use_asym, _real_bessel_asym_y(nu, z), _real_bessel_y(nu, z))
-
-
-def _real_bessel_eval_k(nu: jax.Array, z: jax.Array) -> jax.Array:
-    use_asym = (jnp.abs(z) > 12.0) & (z > 0.0)
-    return jnp.where(use_asym, _real_bessel_asym_k(nu, z), _real_bessel_k(nu, z))
-
-
-def _complex_bessel_series(nu: jax.Array, z: jax.Array, sign: float) -> jax.Array:
-    nu = jnp.asarray(nu, dtype=jnp.complex128)
-    z = jnp.asarray(z, dtype=jnp.complex128)
-    half = 0.5 * z
-    pow_half = jnp.exp(nu * jnp.log(half))
-    gamma = jnp.exp(_complex_loggamma(nu + 1.0))
-    term0 = pow_half / gamma
-    sum0 = term0
-    z2 = z * z
-
-    def body(k, state):
-        term, s = state
-        k1 = jnp.float64(k + 1)
-        den = k1 * (nu + k1)
-        num = (0.25 * sign) * z2
-        term = term * (num / den)
-        return term, s + term
-
-    _, s = lax.fori_loop(0, 59, body, (term0, sum0))
-    return s
+_real_bessel_series = bk.real_bessel_series
+_real_bessel_asym_j = bk.real_bessel_asym_j
+_real_bessel_asym_y = bk.real_bessel_asym_y
+_real_bessel_asym_i = bk.real_bessel_asym_i
+_real_bessel_asym_k = bk.real_bessel_asym_k
+_real_bessel_eval_j = bk.real_bessel_eval_j
+_real_bessel_eval_i = bk.real_bessel_eval_i
+_real_bessel_eval_y = bk.real_bessel_eval_y
+_real_bessel_eval_k = bk.real_bessel_eval_k
+_complex_bessel_series = bk.complex_bessel_series
 
 
 @partial(jax.jit, static_argnames=("prec_bits",))
@@ -1543,7 +1532,7 @@ def arb_ball_bessel_k_scaled(nu: jax.Array, z: jax.Array, prec_bits: int = 53) -
 
     def bound(a, b):
         base = _rigorous_real_bivariate(fn, a, b, eps)
-        samp = _bivariate_sample_interval(fn, a, b)
+        samp = _bivariate_sample_interval_dense(fn, a, b)
         return _hull_with_real_bessel_asym(_interval_hull(base, samp), a, b, "k_scaled", eps)
     return _map_interval_bivariate(
         lambda a, b: jnp.where(_nu_interval_crosses_integer(a), _full_interval(), bound(a, b)),
@@ -1696,13 +1685,33 @@ def arb_ball_bessel_k_scaled_adaptive(nu: jax.Array, z: jax.Array, prec_bits: in
 @partial(jax.jit, static_argnames=("prec_bits",))
 def acb_ball_bessel_j(nu: jax.Array, z: jax.Array, prec_bits: int = 53) -> jax.Array:
     eps = jnp.exp2(-jnp.float64(prec_bits))
-    return _map_box_bivariate(lambda a, b: _rigorous_complex_bivariate(lambda u, v: _complex_bessel_series(u, v, -1.0), a, b, eps), nu, z)
+    return _map_box_bivariate(
+        lambda a, b: _hull_with_complex_bessel_asym(
+            _rigorous_complex_bivariate(lambda u, v: _complex_bessel_series(u, v, -1.0), a, b, eps),
+            a,
+            b,
+            "j",
+            eps,
+        ),
+        nu,
+        z,
+    )
 
 
 @partial(jax.jit, static_argnames=("prec_bits",))
 def acb_ball_bessel_i(nu: jax.Array, z: jax.Array, prec_bits: int = 53) -> jax.Array:
     eps = jnp.exp2(-jnp.float64(prec_bits))
-    return _map_box_bivariate(lambda a, b: _rigorous_complex_bivariate(lambda u, v: _complex_bessel_series(u, v, 1.0), a, b, eps), nu, z)
+    return _map_box_bivariate(
+        lambda a, b: _hull_with_complex_bessel_asym(
+            _rigorous_complex_bivariate(lambda u, v: _complex_bessel_series(u, v, 1.0), a, b, eps),
+            a,
+            b,
+            "i",
+            eps,
+        ),
+        nu,
+        z,
+    )
 
 
 @partial(jax.jit, static_argnames=("prec_bits",))
@@ -1717,7 +1726,11 @@ def acb_ball_bessel_y(nu: jax.Array, z: jax.Array, prec_bits: int = 53) -> jax.A
         return jnp.where(jnp.abs(s) < 1e-8, jnp.nan + 1j * jnp.nan, val)
 
     return _map_box_bivariate(
-        lambda a, b: jnp.where(_nu_box_crosses_integer(a), _full_box(), _rigorous_complex_bivariate(fn, a, b, eps)),
+        lambda a, b: jnp.where(
+            _nu_box_crosses_integer(a),
+            _full_box(),
+            _hull_with_complex_bessel_asym(_rigorous_complex_bivariate(fn, a, b, eps), a, b, "y", eps),
+        ),
         nu,
         z,
     )
@@ -1735,7 +1748,11 @@ def acb_ball_bessel_k(nu: jax.Array, z: jax.Array, prec_bits: int = 53) -> jax.A
         return jnp.where(jnp.abs(s) < 1e-8, jnp.nan + 1j * jnp.nan, val)
 
     return _map_box_bivariate(
-        lambda a, b: jnp.where(_nu_box_crosses_integer(a), _full_box(), _rigorous_complex_bivariate(fn, a, b, eps)),
+        lambda a, b: jnp.where(
+            _nu_box_crosses_integer(a),
+            _full_box(),
+            _hull_with_complex_bessel_asym(_rigorous_complex_bivariate(fn, a, b, eps), a, b, "k", eps),
+        ),
         nu,
         z,
     )
@@ -1754,7 +1771,11 @@ def acb_ball_bessel_i_scaled(nu: jax.Array, z: jax.Array, prec_bits: int = 53) -
         return jnp.exp(-v) * _complex_bessel_series(u, v, 1.0)
 
     return _map_box_bivariate(
-        lambda a, b: jnp.where(_nu_box_crosses_integer(a), _full_box(), _rigorous_complex_bivariate(fn, a, b, eps)),
+        lambda a, b: jnp.where(
+            _nu_box_crosses_integer(a),
+            _full_box(),
+            _hull_with_complex_bessel_asym(_rigorous_complex_bivariate(fn, a, b, eps), a, b, "i_scaled", eps),
+        ),
         nu,
         z,
     )
@@ -1771,19 +1792,47 @@ def acb_ball_bessel_k_scaled(nu: jax.Array, z: jax.Array, prec_bits: int = 53) -
         k = 0.5 * el.PI * (ineg - inu) / s
         return jnp.exp(v) * k
 
-    return _map_box_bivariate(lambda a, b: _rigorous_complex_bivariate(fn, a, b, eps), nu, z)
+    return _map_box_bivariate(
+        lambda a, b: jnp.where(
+            _nu_box_crosses_integer(a),
+            _full_box(),
+            _hull_with_complex_bessel_asym(_rigorous_complex_bivariate(fn, a, b, eps), a, b, "k_scaled", eps),
+        ),
+        nu,
+        z,
+    )
 
 
 @partial(jax.jit, static_argnames=("prec_bits", "samples"))
 def acb_ball_bessel_j_adaptive(nu: jax.Array, z: jax.Array, prec_bits: int = 53, samples: int = 9) -> jax.Array:
     eps = jnp.exp2(-jnp.float64(prec_bits))
-    return _map_box_bivariate(lambda a, b: _adaptive_complex_bivariate(lambda u, v: _complex_bessel_series(u, v, -1.0), a, b, eps, samples), nu, z)
+    return _map_box_bivariate(
+        lambda a, b: _hull_with_complex_bessel_asym(
+            _adaptive_complex_bivariate(lambda u, v: _complex_bessel_series(u, v, -1.0), a, b, eps, samples),
+            a,
+            b,
+            "j",
+            eps,
+        ),
+        nu,
+        z,
+    )
 
 
 @partial(jax.jit, static_argnames=("prec_bits", "samples"))
 def acb_ball_bessel_i_adaptive(nu: jax.Array, z: jax.Array, prec_bits: int = 53, samples: int = 9) -> jax.Array:
     eps = jnp.exp2(-jnp.float64(prec_bits))
-    return _map_box_bivariate(lambda a, b: _adaptive_complex_bivariate(lambda u, v: _complex_bessel_series(u, v, 1.0), a, b, eps, samples), nu, z)
+    return _map_box_bivariate(
+        lambda a, b: _hull_with_complex_bessel_asym(
+            _adaptive_complex_bivariate(lambda u, v: _complex_bessel_series(u, v, 1.0), a, b, eps, samples),
+            a,
+            b,
+            "i",
+            eps,
+        ),
+        nu,
+        z,
+    )
 
 
 @partial(jax.jit, static_argnames=("prec_bits", "samples"))
@@ -1798,7 +1847,11 @@ def acb_ball_bessel_y_adaptive(nu: jax.Array, z: jax.Array, prec_bits: int = 53,
         return jnp.where(jnp.abs(s) < 1e-8, jnp.nan + 1j * jnp.nan, val)
 
     return _map_box_bivariate(
-        lambda a, b: jnp.where(_nu_box_crosses_integer(a), _full_box(), _adaptive_complex_bivariate(fn, a, b, eps, samples)),
+        lambda a, b: jnp.where(
+            _nu_box_crosses_integer(a),
+            _full_box(),
+            _hull_with_complex_bessel_asym(_adaptive_complex_bivariate(fn, a, b, eps, samples), a, b, "y", eps),
+        ),
         nu,
         z,
     )
@@ -1816,7 +1869,11 @@ def acb_ball_bessel_k_adaptive(nu: jax.Array, z: jax.Array, prec_bits: int = 53,
         return jnp.where(jnp.abs(s) < 1e-8, jnp.nan + 1j * jnp.nan, val)
 
     return _map_box_bivariate(
-        lambda a, b: jnp.where(_nu_box_crosses_integer(a), _full_box(), _adaptive_complex_bivariate(fn, a, b, eps, samples)),
+        lambda a, b: jnp.where(
+            _nu_box_crosses_integer(a),
+            _full_box(),
+            _hull_with_complex_bessel_asym(_adaptive_complex_bivariate(fn, a, b, eps, samples), a, b, "k", eps),
+        ),
         nu,
         z,
     )
@@ -1835,7 +1892,11 @@ def acb_ball_bessel_i_scaled_adaptive(nu: jax.Array, z: jax.Array, prec_bits: in
         return jnp.exp(-v) * _complex_bessel_series(u, v, 1.0)
 
     return _map_box_bivariate(
-        lambda a, b: jnp.where(_nu_box_crosses_integer(a), _full_box(), _adaptive_complex_bivariate(fn, a, b, eps, samples)),
+        lambda a, b: jnp.where(
+            _nu_box_crosses_integer(a),
+            _full_box(),
+            _hull_with_complex_bessel_asym(_adaptive_complex_bivariate(fn, a, b, eps, samples), a, b, "i_scaled", eps),
+        ),
         nu,
         z,
     )
@@ -1852,7 +1913,15 @@ def acb_ball_bessel_k_scaled_adaptive(nu: jax.Array, z: jax.Array, prec_bits: in
         k = 0.5 * el.PI * (ineg - inu) / s
         return jnp.exp(v) * k
 
-    return _map_box_bivariate(lambda a, b: _adaptive_complex_bivariate(fn, a, b, eps, samples), nu, z)
+    return _map_box_bivariate(
+        lambda a, b: jnp.where(
+            _nu_box_crosses_integer(a),
+            _full_box(),
+            _hull_with_complex_bessel_asym(_adaptive_complex_bivariate(fn, a, b, eps, samples), a, b, "k_scaled", eps),
+        ),
+        nu,
+        z,
+    )
 
 
 def arb_ball_exp_mp(x: jax.Array, dps: int | None = None) -> jax.Array:

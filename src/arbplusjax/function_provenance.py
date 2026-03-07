@@ -83,6 +83,41 @@ POLICY_TEXT = """Last updated: 2026-03-07T00:00:00Z
 """
 
 
+ENGINEERING_POLICY_TEXT = """Last updated: 2026-03-07T00:00:00Z
+
+# Engineering Policy
+
+## Scope
+
+This policy applies to canonical Arb-like functions, alternative implementations, and repo-defined mathematical families.
+
+## Engineering contract
+
+- Public functions should expose the expected mode surface for their family (`point`, `basic`, and where appropriate `adaptive` / `rigorous`).
+- Functions should obey the repo dtype rules. Family-specific algorithms do not get a separate dtype policy.
+- Batch execution should stay shape-stable where possible, and padding-friendly where practical.
+- Unnecessary Python-side value extraction and control flow should be removed from performance-sensitive paths.
+- Automatic differentiation compatibility is a target, but current status must be reported honestly per implementation family.
+- Tightening and hardening status should be tracked separately from provenance and naming.
+
+## Status interpretation
+
+- `pure_jax` is an aspiration-oriented field, not a binary admission rule.
+- `dtype` reports current conformance to repo dtype expectations.
+- `batch` reports current batch stability, not an idealized future state.
+- `ad` reports current compatibility expectations, not theoretical differentiability.
+- `hardening` reports the current numerical-hardening level of the implementation path.
+
+## Methodology
+
+- Engineering status is generated from `arbplusjax.function_provenance` using the same inventory/provenance source as the naming reports.
+- New public families inherit a conservative default status from their category and module lineage.
+- Known families with stronger or weaker guarantees use explicit overrides in `arbplusjax.function_provenance`.
+- Regenerate with `python tools/check_generated_reports.py`.
+- If a function family changes materially, update the engineering-status override logic before committing regenerated reports.
+"""
+
+
 SPECIAL_BASE_NAMES = {
     "cusf_besselj": "besselj",
     "cusf_bessely": "bessely",
@@ -173,6 +208,68 @@ CORE_TIGHTNESS: dict[str, str] = {
     "agm": "specialized rigorous dispatch complete",
     "agm1": "specialized rigorous dispatch complete",
     "agm1_cpx": "specialized rigorous dispatch complete",
+}
+
+HARDENED_CANONICAL_BASES = {
+    "gamma",
+    "lgamma",
+    "rgamma",
+    "pow",
+    "pow_ui",
+    "pow_fmpq",
+    "root",
+    "root_ui",
+    "erf",
+    "erfc",
+    "erfi",
+    "erfinv",
+    "erfcinv",
+    "ei",
+    "expint",
+    "li",
+    "dilog",
+    "si",
+    "ci",
+    "shi",
+    "chi",
+    "fresnel",
+    "airyai",
+    "airybi",
+    "besselj",
+    "bessely",
+    "besseli",
+    "besselk",
+    "besseli_scaled",
+    "besselk_scaled",
+    "hypgeom_0f1",
+    "hypgeom_1f1",
+    "hypgeom_2f1",
+    "hypgeom_u",
+    "legendre_p",
+    "legendre_q",
+    "jacobi_p",
+    "gegenbauer_c",
+}
+
+BESSEL_BASES = {
+    "besselj",
+    "bessely",
+    "besseli",
+    "besselk",
+    "besseli_scaled",
+    "besselk_scaled",
+}
+
+BESSEL_POINT_AD_BASES = {
+    "besselj",
+    "besseli",
+}
+
+BESSEL_TARGETED_AD_BASES = {
+    "bessely",
+    "besselk",
+    "besseli_scaled",
+    "besselk_scaled",
 }
 
 MANUAL_IMPLEMENTATIONS: tuple[ImplementationEntry, ...] = (
@@ -470,6 +567,121 @@ def _summarize_tightening(values: set[str]) -> str:
     return "; ".join(sorted(values))
 
 
+def _engineering_pure_jax(row: ImplementationEntry) -> str:
+    name = row.preferred_public_name
+    base = row.base_name
+    module = row.module.lower()
+    if name.startswith("bdg_"):
+        return "partial"
+    if row.category == "arb_like" and base in BESSEL_BASES:
+        return "mostly"
+    if name.startswith(("boost_", "cuda_")):
+        return "no"
+    if name.startswith("cusf_"):
+        return "mixed"
+    if "inventory-derived canonical surface" in module:
+        return "mostly"
+    return "mostly" if row.category == "arb_like" else "mixed"
+
+
+def _engineering_dtype(row: ImplementationEntry) -> str:
+    name = row.preferred_public_name
+    base = row.base_name
+    if name.startswith("bdg_"):
+        return "partial"
+    if row.category == "arb_like" and base in BESSEL_BASES:
+        return "current"
+    if name.startswith(("boost_", "cuda_", "cusf_")):
+        return "mixed"
+    if row.category == "arb_like":
+        return "current"
+    return "mixed"
+
+
+def _engineering_batch(row: ImplementationEntry) -> str:
+    name = row.preferred_public_name
+    base = row.base_name
+    if name.startswith("bdg_"):
+        return "partial"
+    if row.category == "arb_like" and base in BESSEL_BASES:
+        return "fixed_shape_batch_available"
+    if name.startswith("cuda_") and base == "besselk":
+        return "limited"
+    if name.startswith("cusf_") and base in BESSEL_BASES:
+        return "limited"
+    if name.startswith(("boost_", "cuda_", "cusf_")):
+        return "limited"
+    if "point" == row.four_modes:
+        return "not_targeted"
+    return "mixed"
+
+
+def _engineering_ad(row: ImplementationEntry) -> str:
+    name = row.preferred_public_name
+    base = row.base_name
+    if name.startswith("bdg_"):
+        return "partial"
+    if row.category == "arb_like" and base in BESSEL_POINT_AD_BASES:
+        return "point_audited"
+    if row.category == "arb_like" and base in BESSEL_TARGETED_AD_BASES:
+        return "targeted_audit"
+    if name.startswith("cuda_") and base == "besselk":
+        return "inherited"
+    if name.startswith("cusf_") and base in BESSEL_BASES:
+        return "inherited"
+    if name.startswith(("boost_", "cuda_")):
+        return "limited"
+    if name.startswith("cusf_"):
+        return "mixed"
+    return "mixed" if row.category == "arb_like" else "limited"
+
+
+def _engineering_hardening(row: ImplementationEntry) -> str:
+    base = row.base_name
+    name = row.preferred_public_name
+    if base in CORE_TIGHTNESS:
+        return "specialized"
+    if base in HARDENED_CANONICAL_BASES and row.category == "arb_like":
+        return "hardened"
+    if name.startswith("bdg_"):
+        if "rigorous" in row.four_modes or "adaptive" in row.four_modes:
+            return "partial"
+        return "point_basic_only"
+    if name.startswith(("cuda_", "cusf_", "boost_")):
+        if "rigorous" in row.four_modes or "adaptive" in row.four_modes:
+            return "inherited_or_family_specific"
+        return "point_or_basic_only"
+    if row.category == "arb_like" and ("rigorous" in row.four_modes or "adaptive" in row.four_modes):
+        return "generic_or_mixed"
+    return "minimal"
+
+
+def _engineering_note(row: ImplementationEntry) -> str:
+    name = row.preferred_public_name
+    base = row.base_name
+    if name.startswith("bdg_"):
+        return "Barnes/double-gamma family is dtype-cleaner and less Python-heavy than before, but batch/AD/hardening are still partial."
+    if row.category == "arb_like" and base in BESSEL_POINT_AD_BASES:
+        return "Canonical Bessel family uses shared JAX kernels, caller-side padded fixed-shape batch entry points, and point-path AD audit coverage."
+    if row.category == "arb_like" and base in BESSEL_TARGETED_AD_BASES:
+        return "Canonical Bessel family uses shared JAX kernels, caller-side padded fixed-shape batch entry points, and targeted AD audits away from singular regimes."
+    if name.startswith("cuda_"):
+        return "Alternative path; interval tightening is inherited from canonical Bessel-K wrappers rather than a separate analytic kernel, and batch/AD guarantees come from the canonical family."
+    if name.startswith("cusf_"):
+        if base in BESSEL_BASES:
+            return "Alternative Bessel path; point implementation is family-specific, while interval tightening and most engineering guarantees inherit the canonical family."
+        return "Alternative path; point implementation is family-specific, interval modes mostly inherit canonical wrappers."
+    if name.startswith("boost_"):
+        return "Alternative path; mode surface exists, but engineering guarantees remain weaker than the canonical Arb-like surface."
+    if base in HARDENED_CANONICAL_BASES:
+        return "Canonical family with explicit hardening beyond midpoint-only wrappers."
+    if base in CORE_TIGHTNESS:
+        return "Canonical/custom core family with specialized rigorous dispatch recorded in the core status reports."
+    if row.category == "arb_like":
+        return "Canonical Arb-like family; mode surface is present, but engineering characteristics still vary by implementation family."
+    return "Generated conservative default from lineage and mode surface."
+
+
 def build_implementation_entries() -> list[ImplementationEntry]:
     points = point_functions()
     intervals = interval_functions()
@@ -532,6 +744,10 @@ def build_implementation_entries() -> list[ImplementationEntry]:
 
 def render_policy() -> str:
     return POLICY_TEXT
+
+
+def render_engineering_policy() -> str:
+    return ENGINEERING_POLICY_TEXT
 
 
 def render_report(category: str, title: str) -> str:
@@ -606,6 +822,35 @@ def render_implementation_index() -> str:
     return "\n".join(lines) + "\n"
 
 
+def render_engineering_status() -> str:
+    rows = build_implementation_entries()
+    lines = [
+        "Last updated: 2026-03-07T00:00:00Z",
+        "",
+        "# Function Engineering Status",
+        "",
+        "Generated from `arbplusjax.function_provenance`.",
+        "",
+        "Methodology:",
+        "- Uses the same inventory/provenance source as the naming and implementation reports.",
+        "- `pure_jax` is an aspiration-oriented field; `partial` or `mixed` means the family is still being moved toward that target.",
+        "- Unknown families inherit conservative defaults from category and module lineage until a stronger override is added.",
+        "",
+        f"Summary: `implementations={len(rows)}`.",
+        "",
+        "| base_name | category | public_name | modes | tightening | pure_jax | dtype | batch | ad | hardening | note |",
+        "|---|---|---|---|---|---|---|---|---|---|---|",
+    ]
+    for row in rows:
+        lines.append(
+            f"| {row.base_name} | {row.category} | {row.preferred_public_name} | {row.four_modes} | "
+            f"{row.tightening} | {_engineering_pure_jax(row)} | {_engineering_dtype(row)} | "
+            f"{_engineering_batch(row)} | {_engineering_ad(row)} | {_engineering_hardening(row)} | "
+            f"{_engineering_note(row)} |"
+        )
+    return "\n".join(lines) + "\n"
+
+
 def render_lookup(base_name: str) -> str:
     key = base_name.strip().lower()
     matches = [row for row in build_implementation_entries() if row.base_name == key]
@@ -631,14 +876,17 @@ __all__ = [
     "FunctionEntry",
     "ImplementationEntry",
     "POLICY_TEXT",
+    "ENGINEERING_POLICY_TEXT",
     "build_entries",
     "build_implementation_entries",
     "public_functions",
     "point_functions",
     "interval_functions",
     "render_policy",
+    "render_engineering_policy",
     "render_report",
     "render_registry_summary",
     "render_implementation_index",
+    "render_engineering_status",
     "render_lookup",
 ]

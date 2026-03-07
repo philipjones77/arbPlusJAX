@@ -17,6 +17,7 @@ Top-level docs:
 - `jax_setup.md`
 - `precision.md`
 - `function_naming.md`
+- `engineering_policy.md`
 - `benchmarks.md`
 - `benchmark_process.md`
 - `audit.md`
@@ -41,6 +42,8 @@ Generated reports:
 - `reports/custom_core_status.md` for the generated custom core-complement status and tightening table
 - `reports/function_provenance_registry.md` for the generated naming/provenance summary
 - `reports/function_implementation_index.md` for base-name lookup across canonical and alternative implementations
+- `reports/function_engineering_status.md` for the generated current engineering-status matrix
+- `results/benchmarks/bessel_compile_probe_float32/bessel_compile_probe.md` for the current canonical Bessel compile-count probe and padded-core comparison
 - `reports/arb_like_functions.md` for canonical Arb-like public names
 - `reports/alternative_functions.md` for prefixed alternative implementations
 - `reports/new_functions.md` for new mathematical families without an Arb-like base name
