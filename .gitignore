@@ -28,3 +28,5 @@ examples/_input/
 examples/_output/
 stuff/migration/c_chassis/build_linux_wsl/
 _bundles/
+
+stuff/migration/boost_ref_adapter/build_linux_wsl/
