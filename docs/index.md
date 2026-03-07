@@ -26,6 +26,7 @@ Top-level docs:
 Implementation docs:
 
 - `implementation/modules/` for module families (`arb_*`, `acb_*`, `hypgeom`, etc.)
+- `implementation/modules/jrb_mat.md` and `implementation/modules/jcb_mat.md` for the Jones-labeled matrix-function subsystem scaffold
 - `implementation/wrappers/` for wrapper and mode-dispatch docs
 - `implementation/external/` for external-lineage implementations (`boost_*`, `cusf_*`)
 

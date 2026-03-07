@@ -25,6 +25,89 @@ Last updated: 2026-03-01T00:00:00Z
     - reduce runtime cost of `bdg_*` rigorous/adaptive samplers in `src/arbplusjax/ball_wrappers.py`
     - add dedicated point/basic benchmark coverage for `bdg_*`
     - extend dtype-compliance validation beyond the current `float32`/`complex64` point/basic checks
+- Matrix-function roadmap for the Jones matrix-function subsystem (`jrb_mat` / `jcb_mat`) layered alongside `arb_mat` / `acb_mat`:
+  - current state:
+    - `src/arbplusjax/arb_mat.py` and `src/arbplusjax/acb_mat.py` only cover 2x2 `det` / `trace`
+    - `arb_mat` / `acb_mat` should continue to exist and be expanded as the canonical Arb/FLINT-style JAX matrix extension surface
+    - new Jones-labeled subsystem should hold the contour-integral / Krylov matrix-function stack as a separate subsystem, not as a replacement for `arb_mat` / `acb_mat`
+    - there is no current matrix-log, matrix-root, matrix-sign, matrix exponential/inverse scaling path, Fréchet derivative, or rational-Krylov substrate
+  - implementation implication from recent matrix-function work:
+    - contour-integral + conformal-map methods are a good fit for dense/moderate-size matrix functions where we need AD-aware matrix log / roots and stable gradients
+    - block rational Krylov methods are a good fit for matrix-free `f(A)b` / trace-estimation style workloads and can supply principled residual/error control instead of heuristic pole/stopping rules
+    - this means `jrb_mat` / `jcb_mat` should not jump directly to `logm` / `sqrtm` wrappers; they first need reusable matrix linear-algebra kernels that obey repo JAX/dtype/batching/AD rules
+    - in parallel, `arb_mat` / `acb_mat` should continue to be filled out toward the missing Arb/FLINT matrix API surface
+  - phase 0: matrix substrate required before matrix functions
+    - add dense `jrb_mat` / `jcb_mat` primitives beyond 2x2:
+      - `matmul`
+      - `matvec`
+      - `solve`
+      - `triangular_solve`
+      - `lu`
+      - `qr`
+      - Hessenberg / Schur-compatible reductions where feasible
+    - define canonical real-interval and complex-box matrix layout conventions for batched `(..., n, n, 2)` and `(..., n, n, 4)` arrays
+    - make these kernels batch-stable, dtype-compliant, and JAX-transformable before layering matrix functions on top
+  - phase 1: canonical dense matrix functions
+    - implement midpoint `point` / `basic` dense matrix functions first under the Jones-labeled subsystem:
+      - `logm`
+      - `sqrtm`
+      - `invsqrtm`
+      - general matrix `rootm`
+      - `signm`
+    - first dense implementation path should be Schur-based or contour-based, not naive finite-difference or elementwise lifting
+    - expose Fréchet-derivative or equivalent VJP/JVP formulas for AD rather than relying on unstable autodiff through iterative decompositions
+  - phase 2: contour-integral mode family
+    - add contour-integral evaluators for `jrb_mat_*` / `jcb_mat_*` matrix logs and roots using quadrature nodes/weights that can be batched
+    - use conformal-map parameterization / contour shaping for better node efficiency in clustered spectra
+    - make the contour layer reusable across:
+      - `logm`
+      - `sqrtm`
+      - `rootm`
+      - trace-log style objectives
+    - for `basic` mode:
+      - midpoint matrix evaluation on a fixed contour/quadrature rule
+    - for `adaptive` mode:
+      - grow node count / contour resolution until residual and node-difference criteria stabilize
+    - for `rigorous` mode:
+      - combine interval/box perturbation inflation with residual-based enclosures and contour discretization error inflation
+  - phase 3: rational-Krylov / matrix-free path
+    - implement block rational Krylov infrastructure for `jrb_mat_*` / `jcb_mat_*` matrix-function actions `f(A)B`:
+      - block Arnoldi / rational Arnoldi basis growth
+      - shifted linear solves
+      - pole management
+      - projected small-matrix function evaluation
+    - use this path for larger matrices and trace-estimation workloads where dense Schur/contour is too expensive
+    - add residual-driven stopping criteria and pole/subspace heuristics informed by the April 2025 residual/error formulas rather than fixed iteration counts
+  - phase 4: AD and four-mode integration
+    - every public matrix-function family should follow the repo mode contract where mathematically appropriate:
+      - `point`
+      - `basic`
+      - `adaptive`
+      - `rigorous`
+    - AD should use explicit JVP/VJP rules or implicit differentiation for:
+      - dense contour solves
+      - rational-Krylov projected solves
+    - avoid differentiating through Python loops or opaque eigensolver control flow
+  - phase 5: accuracy and engineering validation
+    - compare against reference implementations for:
+      - matrix log
+      - matrix square root
+      - selected matrix roots
+    - benchmark:
+      - dense small/moderate matrices
+      - batched matrices
+      - matrix-free `f(A)b`
+      - gradient quality for trace-log / root objectives
+    - add engineering-status tracking for each matrix family:
+      - pure-JAX aspiration
+      - dtype compliance
+      - fixed-shape batch support
+      - AD audit status
+      - hardening level
+  - immediate next step for this repo:
+    - do not start with `logm` directly
+    - first add the reusable substrate and a single dense contour-based prototype for `jcb_mat_logm` / `jrb_mat_logm`
+    - after that, add a matching AD test and a small benchmark before expanding to roots/sign/Krylov
 
 ## Missing C implementations
 - Source: `docs/audit.md` (snapshot `2026-02-25T03:51:38Z`), grouped by function prefix/module.

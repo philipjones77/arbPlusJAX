@@ -40,6 +40,8 @@ __all__ = [
     "hypgeom",
     "double_gamma",
     "hypgeom_wrappers",
+    "jcb_mat",
+    "jrb_mat",
     "core_wrappers",
     "calc_wrappers",
     "mat_wrappers",

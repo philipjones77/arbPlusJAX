@@ -9,5 +9,6 @@ This folder is organized by purpose (similar to `docs_continuous` style): govern
 - See `engineering_policy.md` for the repo-wide implementation contract and engineering-status methodology.
 - See `results/benchmarks/bessel_compile_probe_float32/bessel_compile_probe.md` for the current canonical Bessel padded-core compile probe.
 - See `implementation/modules/hypgeom.md` for current hypergeometric scope and approximations.
+- See `implementation/modules/jrb_mat.md` and `implementation/modules/jcb_mat.md` for the Jones-labeled matrix-function subsystem scaffold.
 - See `implementation/external/cusf_compat.md` for the separate `cusf_*` compatibility implementation lineage and mapping.
 - Use these notes as the source of truth for accuracy and parity expectations.
