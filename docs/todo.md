@@ -38,9 +38,9 @@ Last updated: 2026-03-01T00:00:00Z
     - in parallel, `arb_mat` / `acb_mat` should continue to be filled out toward the missing Arb/FLINT matrix API surface
   - phase 0: matrix substrate required before matrix functions
     - add dense `jrb_mat` / `jcb_mat` primitives beyond 2x2:
-      - `matmul`
-      - `matvec`
-      - `solve`
+      - `matmul` (started in `jrb_mat.py` / `jcb_mat.py` with point/basic substrate)
+      - `matvec` (started in `jrb_mat.py` / `jcb_mat.py` with point/basic substrate)
+      - `solve` (started in `jrb_mat.py` / `jcb_mat.py`; current basic path is midpoint solve plus outward boxing)
       - `triangular_solve`
       - `lu`
       - `qr`

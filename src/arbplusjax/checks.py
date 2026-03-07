@@ -19,6 +19,10 @@ def _debug_check(cond, msg: str, *args) -> None:
         raise ValueError(msg.format(*args))
 
 
+def check(cond, label: str) -> None:
+    _debug_check(cond, "{} failed", label)
+
+
 def check_last_dim(arr: jax.Array, expected: int, label: str) -> None:
     _debug_check(arr.shape[-1] == expected, "{}: expected last dimension {}, got {}", label, expected, arr.shape)
 
@@ -41,4 +45,4 @@ def check_in_set(val: str, allowed: tuple[str, ...], label: str) -> None:
     _debug_check(val in allowed, "{}: expected one of {}, got {}", label, allowed, val)
 
 
-__all__ = ["check_last_dim", "check_tail_shape", "check_ndim", "check_equal", "check_in_set"]
+__all__ = ["check", "check_last_dim", "check_tail_shape", "check_ndim", "check_equal", "check_in_set"]
