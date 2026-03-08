@@ -21,8 +21,9 @@ import jax.numpy as jnp
 
 from . import arb_core
 from . import baseline_wrappers
-from . import double_interval as di
 from . import checks
+from . import double_interval as di
+from . import elementary as el
 
 jax.config.update("jax_enable_x64", True)
 
@@ -51,11 +52,11 @@ _POINT_EVALS = {
     "tanh": jnp.tanh,
     "log1p": jnp.log1p,
     "expm1": jnp.expm1,
-    "sin_pi": lambda x: jnp.sin(jnp.pi * x),
-    "cos_pi": lambda x: jnp.cos(jnp.pi * x),
-    "tan_pi": lambda x: jnp.tan(jnp.pi * x),
+    "sin_pi": el.sin_pi,
+    "cos_pi": el.cos_pi,
+    "tan_pi": el.tan_pi,
     "sinc": lambda x: jnp.where(x == 0.0, 1.0, jnp.sin(x) / x),
-    "sinc_pi": lambda x: jnp.where(x == 0.0, 1.0, jnp.sin(jnp.pi * x) / (jnp.pi * x)),
+    "sinc_pi": el.sinc_pi,
     "asin": jnp.arcsin,
     "acos": jnp.arccos,
     "atan": jnp.arctan,

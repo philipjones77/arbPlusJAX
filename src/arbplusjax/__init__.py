@@ -56,6 +56,7 @@ __all__ = [
     "partitions",
     "precision",
     "runtime",
+    "shahen_double_gamma",
     "validation",
 ]
 

@@ -22,8 +22,9 @@ import numpy as np
 
 from . import acb_core
 from . import ball_wrappers
-from . import double_interval as di
 from . import checks
+from . import double_interval as di
+from . import elementary as el
 from . import series_utils
 
 jax.config.update("jax_enable_x64", True)
@@ -53,11 +54,11 @@ _POINT_EVALS = {
     "tanh": jnp.tanh,
     "log1p": jnp.log1p,
     "expm1": jnp.expm1,
-    "sin_pi": lambda z: jnp.sin(jnp.pi * z),
-    "cos_pi": lambda z: jnp.cos(jnp.pi * z),
-    "tan_pi": lambda z: jnp.tan(jnp.pi * z),
+    "sin_pi": el.sin_pi,
+    "cos_pi": el.cos_pi,
+    "tan_pi": el.tan_pi,
     "sinc": lambda z: jnp.where(z == 0.0, 1.0 + 0.0j, jnp.sin(z) / z),
-    "sinc_pi": lambda z: jnp.where(z == 0.0, 1.0 + 0.0j, jnp.sin(jnp.pi * z) / (jnp.pi * z)),
+    "sinc_pi": el.sinc_pi,
     "asin": jnp.arcsin,
     "acos": jnp.arccos,
     "atan": jnp.arctan,

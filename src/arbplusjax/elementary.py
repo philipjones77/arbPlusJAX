@@ -14,6 +14,10 @@ SQRT_PI = jnp.sqrt(PI)
 LOG_TWO = jnp.log(jnp.float64(2.0))
 LOG_TWO_PI = jnp.log(TWO_PI)
 LOG_SQRT_TWO_PI = jnp.float64(0.5) * LOG_TWO_PI
+EULER_GAMMA = jnp.float64(0.577215664901532860606512090082402431)
+TWO_OVER_SQRT_PI = jnp.float64(2.0) / SQRT_PI
+SQRT_TWO_OVER_PI = jnp.sqrt(jnp.float64(2.0) / PI)
+SQRT_PI_OVER_TWO = jnp.sqrt(PI / jnp.float64(2.0))
 E = jnp.exp(jnp.float64(1.0))
 I = jnp.complex128(1j)
 
@@ -54,6 +58,22 @@ def log_two_pi_like(*xs: jax.Array) -> jax.Array:
 
 def log_sqrt_two_pi_like(*xs: jax.Array) -> jax.Array:
     return jnp.asarray(LOG_SQRT_TWO_PI, dtype=_dtype_from(*xs))
+
+
+def euler_gamma_like(*xs: jax.Array) -> jax.Array:
+    return jnp.asarray(EULER_GAMMA, dtype=_dtype_from(*xs))
+
+
+def two_over_sqrt_pi_like(*xs: jax.Array) -> jax.Array:
+    return jnp.asarray(TWO_OVER_SQRT_PI, dtype=_dtype_from(*xs))
+
+
+def sqrt_two_over_pi_like(*xs: jax.Array) -> jax.Array:
+    return jnp.asarray(SQRT_TWO_OVER_PI, dtype=_dtype_from(*xs))
+
+
+def sqrt_pi_over_two_like(*xs: jax.Array) -> jax.Array:
+    return jnp.asarray(SQRT_PI_OVER_TWO, dtype=_dtype_from(*xs))
 
 
 def as_real(x: jax.Array) -> jax.Array:
@@ -184,6 +204,31 @@ def sinc_pi(x: jax.Array) -> jax.Array:
     return jnp.where(jnp.abs(xx) < 1e-15, jnp.asarray(1, dtype=xx.dtype), jnp.sin(t) / t)
 
 
+def sin_pi(x: jax.Array) -> jax.Array:
+    xx = jnp.asarray(x)
+    return jnp.sin(pi_like(xx) * xx)
+
+
+def cos_pi(x: jax.Array) -> jax.Array:
+    xx = jnp.asarray(x)
+    return jnp.cos(pi_like(xx) * xx)
+
+
+def tan_pi(x: jax.Array) -> jax.Array:
+    xx = jnp.asarray(x)
+    return jnp.tan(pi_like(xx) * xx)
+
+
+def exp_pi_i(x: jax.Array) -> jax.Array:
+    xx = jnp.asarray(x)
+    return jnp.exp(1j * pi_like(xx) * xx)
+
+
+def log_sin_pi(x: jax.Array) -> jax.Array:
+    xx = jnp.asarray(x)
+    return jnp.log(sin_pi(xx))
+
+
 def clog(z: jax.Array) -> jax.Array:
     zz = complex_promote(z)
     return jnp.log(jnp.abs(zz)) + 1j * jnp.angle(zz)
@@ -210,6 +255,10 @@ __all__ = [
     "LOG_TWO",
     "LOG_TWO_PI",
     "LOG_SQRT_TWO_PI",
+    "EULER_GAMMA",
+    "TWO_OVER_SQRT_PI",
+    "SQRT_TWO_OVER_PI",
+    "SQRT_PI_OVER_TWO",
     "E",
     "I",
     "pi_like",
@@ -220,6 +269,10 @@ __all__ = [
     "log_two_like",
     "log_two_pi_like",
     "log_sqrt_two_pi_like",
+    "euler_gamma_like",
+    "two_over_sqrt_pi_like",
+    "sqrt_two_over_pi_like",
+    "sqrt_pi_over_two_like",
     "as_real",
     "as_complex",
     "promote_dtype",
@@ -241,6 +294,11 @@ __all__ = [
     "cis",
     "sinc",
     "sinc_pi",
+    "sin_pi",
+    "cos_pi",
+    "tan_pi",
+    "exp_pi_i",
+    "log_sin_pi",
     "clog",
     "cpow",
     "z_to_minus_s",

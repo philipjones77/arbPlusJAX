@@ -104,6 +104,104 @@ def box_sum(xs: jax.Array, axis: int = -1) -> jax.Array:
     return acb_core.acb_box(re_out, im_out)
 
 
+def interval_trace(a: jax.Array) -> jax.Array:
+    n = a.shape[-2]
+    idx = jnp.arange(n)
+    return interval_sum(a[..., idx, idx, :], axis=-1)
+
+
+def box_trace(a: jax.Array) -> jax.Array:
+    n = a.shape[-2]
+    idx = jnp.arange(n)
+    return box_sum(a[..., idx, idx, :], axis=-1)
+
+
+def interval_det_2x2(a: jax.Array) -> jax.Array:
+    a00 = a[..., 0, 0, :]
+    a01 = a[..., 0, 1, :]
+    a10 = a[..., 1, 0, :]
+    a11 = a[..., 1, 1, :]
+    return di.fast_sub(di.fast_mul(a00, a11), di.fast_mul(a01, a10))
+
+
+def box_det_2x2(a: jax.Array) -> jax.Array:
+    a00 = a[..., 0, 0, :]
+    a01 = a[..., 0, 1, :]
+    a10 = a[..., 1, 0, :]
+    a11 = a[..., 1, 1, :]
+    return acb_core.acb_sub(acb_core.acb_mul(a00, a11), acb_core.acb_mul(a01, a10))
+
+
+def interval_det_3x3(a: jax.Array) -> jax.Array:
+    a00 = a[..., 0, 0, :]
+    a01 = a[..., 0, 1, :]
+    a02 = a[..., 0, 2, :]
+    a10 = a[..., 1, 0, :]
+    a11 = a[..., 1, 1, :]
+    a12 = a[..., 1, 2, :]
+    a20 = a[..., 2, 0, :]
+    a21 = a[..., 2, 1, :]
+    a22 = a[..., 2, 2, :]
+    pos = interval_sum(
+        jnp.stack(
+            [
+                di.fast_mul(di.fast_mul(a00, a11), a22),
+                di.fast_mul(di.fast_mul(a01, a12), a20),
+                di.fast_mul(di.fast_mul(a02, a10), a21),
+            ],
+            axis=-2,
+        ),
+        axis=-1,
+    )
+    neg = interval_sum(
+        jnp.stack(
+            [
+                di.fast_mul(di.fast_mul(a02, a11), a20),
+                di.fast_mul(di.fast_mul(a01, a10), a22),
+                di.fast_mul(di.fast_mul(a00, a12), a21),
+            ],
+            axis=-2,
+        ),
+        axis=-1,
+    )
+    return di.fast_sub(pos, neg)
+
+
+def box_det_3x3(a: jax.Array) -> jax.Array:
+    a00 = a[..., 0, 0, :]
+    a01 = a[..., 0, 1, :]
+    a02 = a[..., 0, 2, :]
+    a10 = a[..., 1, 0, :]
+    a11 = a[..., 1, 1, :]
+    a12 = a[..., 1, 2, :]
+    a20 = a[..., 2, 0, :]
+    a21 = a[..., 2, 1, :]
+    a22 = a[..., 2, 2, :]
+    pos = box_sum(
+        jnp.stack(
+            [
+                acb_core.acb_mul(acb_core.acb_mul(a00, a11), a22),
+                acb_core.acb_mul(acb_core.acb_mul(a01, a12), a20),
+                acb_core.acb_mul(acb_core.acb_mul(a02, a10), a21),
+            ],
+            axis=-2,
+        ),
+        axis=-1,
+    )
+    neg = box_sum(
+        jnp.stack(
+            [
+                acb_core.acb_mul(acb_core.acb_mul(a02, a11), a20),
+                acb_core.acb_mul(acb_core.acb_mul(a01, a10), a22),
+                acb_core.acb_mul(acb_core.acb_mul(a00, a12), a21),
+            ],
+            axis=-2,
+        ),
+        axis=-1,
+    )
+    return acb_core.acb_sub(pos, neg)
+
+
 __all__ = [
     "as_interval_mat_2x2",
     "as_interval_matrix",
@@ -120,4 +218,10 @@ __all__ = [
     "complex_is_finite",
     "interval_sum",
     "box_sum",
+    "interval_trace",
+    "box_trace",
+    "interval_det_2x2",
+    "box_det_2x2",
+    "interval_det_3x3",
+    "box_det_3x3",
 ]

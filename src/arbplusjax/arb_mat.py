@@ -4,6 +4,7 @@ from functools import partial
 
 import jax
 import jax.numpy as jnp
+import jax.scipy.linalg as jsp_linalg
 
 from . import checks
 from . import double_interval as di
@@ -90,6 +91,76 @@ def arb_mat_solve_basic(a: jax.Array, b: jax.Array) -> jax.Array:
     return arb_mat_solve(a, b)
 
 
+def arb_mat_det(a: jax.Array) -> jax.Array:
+    a = arb_mat_as_matrix(a)
+    det = jnp.linalg.det(_mid_matrix(a))
+    out = mat_common.interval_from_point(det)
+    finite = jnp.isfinite(det)
+    return jnp.where(finite[..., None], out, mat_common.full_interval_like(out))
+
+
+def arb_mat_det_basic(a: jax.Array) -> jax.Array:
+    a = arb_mat_as_matrix(a)
+    n = a.shape[-2]
+    if n == 1:
+        out = a[..., 0, 0, :]
+    elif n == 2:
+        out = mat_common.interval_det_2x2(a)
+    elif n == 3:
+        out = mat_common.interval_det_3x3(a)
+    else:
+        out = arb_mat_det(a)
+    finite = mat_common.interval_is_finite(out)
+    return jnp.where(finite[..., None], out, mat_common.full_interval_like(out))
+
+
+def arb_mat_trace(a: jax.Array) -> jax.Array:
+    a = arb_mat_as_matrix(a)
+    tr = jnp.trace(_mid_matrix(a), axis1=-2, axis2=-1)
+    out = mat_common.interval_from_point(tr)
+    finite = jnp.isfinite(tr)
+    return jnp.where(finite[..., None], out, mat_common.full_interval_like(out))
+
+
+def arb_mat_trace_basic(a: jax.Array) -> jax.Array:
+    a = arb_mat_as_matrix(a)
+    out = mat_common.interval_trace(a)
+    finite = mat_common.interval_is_finite(out)
+    return jnp.where(finite[..., None], out, mat_common.full_interval_like(out))
+
+
+def arb_mat_det_rigorous(a: jax.Array) -> jax.Array:
+    return arb_mat_det_basic(a)
+
+
+def arb_mat_trace_rigorous(a: jax.Array) -> jax.Array:
+    return arb_mat_trace_basic(a)
+
+
+def arb_mat_triangular_solve(a: jax.Array, b: jax.Array, *, lower: bool, unit_diagonal: bool = False) -> jax.Array:
+    a = arb_mat_as_matrix(a)
+    b = arb_mat_as_vector(b)
+    checks.check_equal(a.shape[-2], b.shape[-2], "arb_mat.triangular_solve.inner")
+    x = jsp_linalg.solve_triangular(_mid_matrix(a), _mid_vector(b), lower=lower, unit_diagonal=unit_diagonal)
+    out = mat_common.interval_from_point(x)
+    finite = jnp.all(jnp.isfinite(x), axis=-1)
+    return jnp.where(finite[..., None, None], out, mat_common.full_interval_like(out))
+
+
+def arb_mat_triangular_solve_basic(a: jax.Array, b: jax.Array, *, lower: bool, unit_diagonal: bool = False) -> jax.Array:
+    return arb_mat_triangular_solve(a, b, lower=lower, unit_diagonal=unit_diagonal)
+
+
+def arb_mat_lu(a: jax.Array) -> tuple[jax.Array, jax.Array, jax.Array]:
+    a = arb_mat_as_matrix(a)
+    p, l, u = jsp_linalg.lu(_mid_matrix(a))
+    return mat_common.interval_from_point(p), mat_common.interval_from_point(l), mat_common.interval_from_point(u)
+
+
+def arb_mat_lu_basic(a: jax.Array) -> tuple[jax.Array, jax.Array, jax.Array]:
+    return arb_mat_lu(a)
+
+
 @partial(jax.jit, static_argnames=("prec_bits",))
 def arb_mat_matmul_prec(a: jax.Array, b: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return di.round_interval_outward(arb_mat_matmul(a, b), prec_bits)
@@ -105,9 +176,45 @@ def arb_mat_solve_prec(a: jax.Array, b: jax.Array, prec_bits: int = di.DEFAULT_P
     return di.round_interval_outward(arb_mat_solve(a, b), prec_bits)
 
 
+@partial(jax.jit, static_argnames=("prec_bits",))
+def arb_mat_det_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return di.round_interval_outward(arb_mat_det(a), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def arb_mat_trace_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return di.round_interval_outward(arb_mat_trace(a), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits", "lower", "unit_diagonal"))
+def arb_mat_triangular_solve_prec(
+    a: jax.Array,
+    b: jax.Array,
+    *,
+    lower: bool,
+    unit_diagonal: bool = False,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return di.round_interval_outward(arb_mat_triangular_solve(a, b, lower=lower, unit_diagonal=unit_diagonal), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def arb_mat_lu_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> tuple[jax.Array, jax.Array, jax.Array]:
+    p, l, u = arb_mat_lu(a)
+    return (
+        di.round_interval_outward(p, prec_bits),
+        di.round_interval_outward(l, prec_bits),
+        di.round_interval_outward(u, prec_bits),
+    )
+
+
 arb_mat_matmul_jit = jax.jit(arb_mat_matmul)
 arb_mat_matvec_jit = jax.jit(arb_mat_matvec)
 arb_mat_solve_jit = jax.jit(arb_mat_solve)
+arb_mat_det_jit = jax.jit(arb_mat_det)
+arb_mat_trace_jit = jax.jit(arb_mat_trace)
+arb_mat_triangular_solve_jit = jax.jit(arb_mat_triangular_solve, static_argnames=("lower", "unit_diagonal"))
+arb_mat_lu_jit = jax.jit(arb_mat_lu)
 
 
 def arb_mat_2x2_det(a: jax.Array) -> jax.Array:
@@ -200,12 +307,30 @@ __all__ = [
     "arb_mat_matvec_basic",
     "arb_mat_solve",
     "arb_mat_solve_basic",
+    "arb_mat_det",
+    "arb_mat_det_basic",
+    "arb_mat_trace",
+    "arb_mat_trace_basic",
+    "arb_mat_det_rigorous",
+    "arb_mat_trace_rigorous",
+    "arb_mat_triangular_solve",
+    "arb_mat_triangular_solve_basic",
+    "arb_mat_lu",
+    "arb_mat_lu_basic",
     "arb_mat_matmul_prec",
     "arb_mat_matvec_prec",
     "arb_mat_solve_prec",
+    "arb_mat_det_prec",
+    "arb_mat_trace_prec",
+    "arb_mat_triangular_solve_prec",
+    "arb_mat_lu_prec",
     "arb_mat_matmul_jit",
     "arb_mat_matvec_jit",
     "arb_mat_solve_jit",
+    "arb_mat_det_jit",
+    "arb_mat_trace_jit",
+    "arb_mat_triangular_solve_jit",
+    "arb_mat_lu_jit",
     "arb_mat_2x2_det",
     "arb_mat_2x2_trace",
     "arb_mat_2x2_det_rigorous",

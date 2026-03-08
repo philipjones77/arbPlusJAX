@@ -25,11 +25,19 @@ def _make_wrapper(name: str, base_fn: Callable[..., jax.Array], kernel_fn: Calla
 
     def rig_fn(*args, prec_bits: int, **kwargs):
         if is_acb:
+            if name.startswith("acb_mat_det"):
+                return acb_mat.acb_mat_det_rigorous(*args, **kwargs)
+            if name.startswith("acb_mat_trace"):
+                return acb_mat.acb_mat_trace_rigorous(*args, **kwargs)
             if name.startswith("acb_mat_2x2_det"):
                 return acb_mat.acb_mat_2x2_det_rigorous(*args, **kwargs)
             if name.startswith("acb_mat_2x2_trace"):
                 return acb_mat.acb_mat_2x2_trace_rigorous(*args, **kwargs)
             return wc.rigorous_acb_kernel(kernel_fn, args, prec_bits, **kwargs)
+        if name.startswith("arb_mat_det"):
+            return arb_mat.arb_mat_det_rigorous(*args, **kwargs)
+        if name.startswith("arb_mat_trace"):
+            return arb_mat.arb_mat_trace_rigorous(*args, **kwargs)
         if name.startswith("arb_mat_2x2_det"):
             return arb_mat.arb_mat_2x2_det_rigorous(*args, **kwargs)
         if name.startswith("arb_mat_2x2_trace"):
@@ -72,4 +80,3 @@ for _mod in (acb_mat, arb_mat):
         _wrapper = _make_wrapper(_name, _fn, kernel_fn)
         globals()[_wrapper.__name__] = _wrapper
         __all__.append(_wrapper.__name__)
-

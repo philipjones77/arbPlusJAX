@@ -98,3 +98,57 @@ def test_nxn_matmul_matvec_solve():
     _check(bool(jnp.allclose(acb_core.acb_midpoint(mm), a_mid @ b_mid)))
     _check(bool(jnp.allclose(acb_core.acb_midpoint(mv), a_mid @ x_mid)))
     _check(bool(jnp.allclose(acb_core.acb_midpoint(sol), x_mid)))
+
+
+def test_nxn_triangular_solve_and_lu():
+    a = jnp.array(
+        [
+            [[2.0, 2.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0]],
+            [[1.0, 1.0, 1.0, 1.0], [3.0, 3.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0]],
+            [[-1.0, -1.0, 0.5, 0.5], [2.0, 2.0, -1.0, -1.0], [4.0, 4.0, 0.0, 0.0]],
+        ],
+        dtype=jnp.float64,
+    )
+    b = jnp.array(
+        [[1.0, 1.0, 0.0, 0.0], [5.0, 5.0, 1.0, 1.0], [9.0, 9.0, -1.0, -1.0]],
+        dtype=jnp.float64,
+    )
+
+    sol = acb_mat.acb_mat_triangular_solve_jit(a, b, lower=True)
+    p, l, u = acb_mat.acb_mat_lu_jit(a)
+
+    a_mid = acb_core.acb_midpoint(a)
+    b_mid = acb_core.acb_midpoint(b)
+
+    _check(sol.shape == (3, 4))
+    _check(p.shape == (3, 3, 4))
+    _check(l.shape == (3, 3, 4))
+    _check(u.shape == (3, 3, 4))
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(sol), jax.scipy.linalg.solve_triangular(a_mid, b_mid, lower=True))))
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(p) @ a_mid, acb_core.acb_midpoint(l) @ acb_core.acb_midpoint(u))))
+
+
+def test_nxn_det_and_trace():
+    a = jnp.array(
+        [
+            [[2.0, 2.0, 0.0, 0.0], [1.0, 1.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0]],
+            [[0.0, 0.0, 1.0, 1.0], [3.0, 3.0, 0.0, 0.0], [1.0, 1.0, 0.0, 0.0]],
+            [[1.0, 1.0, -1.0, -1.0], [0.0, 0.0, 0.0, 0.0], [4.0, 4.0, 0.5, 0.5]],
+        ],
+        dtype=jnp.float64,
+    )
+    det_point = acb_mat.acb_mat_det_jit(a)
+    det_basic = acb_mat.acb_mat_det_basic(a)
+    tr_point = acb_mat.acb_mat_trace_jit(a)
+    tr_basic = acb_mat.acb_mat_trace_basic(a)
+
+    a_mid = acb_core.acb_midpoint(a)
+
+    _check(det_point.shape == (4,))
+    _check(det_basic.shape == (4,))
+    _check(tr_point.shape == (4,))
+    _check(tr_basic.shape == (4,))
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(det_point), jnp.linalg.det(a_mid))))
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(det_basic), jnp.linalg.det(a_mid))))
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(tr_point), jnp.trace(a_mid))))
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(tr_basic), jnp.trace(a_mid))))
