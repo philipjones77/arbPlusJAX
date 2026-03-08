@@ -26,6 +26,7 @@ from . import wrappers_common as wc
 from . import precision
 from . import checks
 from . import elementary as el
+from . import kernel_helpers as kh
 
 jax.config.update("jax_enable_x64", True)
 
@@ -283,6 +284,101 @@ def bdg_double_sine(z: jax.Array, b: jax.Array, prec_bits: int = di.DEFAULT_PREC
         return acc * (term_num / term_den)
 
     return lax.fori_loop(0, Nmax, body, res)
+
+
+def _pad_point_batch_last(args, pad_to: int):
+    return kh.pad_mixed_batch_args_repeat_last(args, pad_to=pad_to)
+
+
+def _vectorize_complex_point2(fn, x: jax.Array, y: jax.Array, *, prec_bits: int):
+    xx = el.as_complex(x)
+    yy = el.as_complex(y)
+    bx, by = jnp.broadcast_arrays(xx, yy)
+    flat_x = jnp.ravel(bx)
+    flat_y = jnp.ravel(by)
+    out = jax.vmap(lambda a, b: fn(a, b, prec_bits=prec_bits))(flat_x, flat_y)
+    return out.reshape(bx.shape)
+
+
+def bdg_log_barnesdoublegamma_batch_fixed_point(z: jax.Array, tau: jax.Array, *, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _vectorize_complex_point2(bdg_log_barnesdoublegamma, z, tau, prec_bits=prec_bits)
+
+
+def bdg_log_barnesdoublegamma_batch_padded_point(
+    z: jax.Array, tau: jax.Array, *, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    call_args, _ = _pad_point_batch_last((z, tau), pad_to)
+    return bdg_log_barnesdoublegamma_batch_fixed_point(*call_args, prec_bits=prec_bits)
+
+
+def bdg_barnesdoublegamma_batch_fixed_point(z: jax.Array, tau: jax.Array, *, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _vectorize_complex_point2(bdg_barnesdoublegamma, z, tau, prec_bits=prec_bits)
+
+
+def bdg_barnesdoublegamma_batch_padded_point(
+    z: jax.Array, tau: jax.Array, *, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    call_args, _ = _pad_point_batch_last((z, tau), pad_to)
+    return bdg_barnesdoublegamma_batch_fixed_point(*call_args, prec_bits=prec_bits)
+
+
+def bdg_log_barnesgamma2_batch_fixed_point(w: jax.Array, beta: jax.Array, *, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _vectorize_complex_point2(bdg_log_barnesgamma2, w, beta, prec_bits=prec_bits)
+
+
+def bdg_log_barnesgamma2_batch_padded_point(
+    w: jax.Array, beta: jax.Array, *, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    call_args, _ = _pad_point_batch_last((w, beta), pad_to)
+    return bdg_log_barnesgamma2_batch_fixed_point(*call_args, prec_bits=prec_bits)
+
+
+def bdg_barnesgamma2_batch_fixed_point(w: jax.Array, beta: jax.Array, *, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _vectorize_complex_point2(bdg_barnesgamma2, w, beta, prec_bits=prec_bits)
+
+
+def bdg_barnesgamma2_batch_padded_point(
+    w: jax.Array, beta: jax.Array, *, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    call_args, _ = _pad_point_batch_last((w, beta), pad_to)
+    return bdg_barnesgamma2_batch_fixed_point(*call_args, prec_bits=prec_bits)
+
+
+def bdg_log_normalizeddoublegamma_batch_fixed_point(
+    w: jax.Array, beta: jax.Array, *, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    return _vectorize_complex_point2(bdg_log_normalizeddoublegamma, w, beta, prec_bits=prec_bits)
+
+
+def bdg_log_normalizeddoublegamma_batch_padded_point(
+    w: jax.Array, beta: jax.Array, *, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    call_args, _ = _pad_point_batch_last((w, beta), pad_to)
+    return bdg_log_normalizeddoublegamma_batch_fixed_point(*call_args, prec_bits=prec_bits)
+
+
+def bdg_normalizeddoublegamma_batch_fixed_point(
+    w: jax.Array, beta: jax.Array, *, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    return _vectorize_complex_point2(bdg_normalizeddoublegamma, w, beta, prec_bits=prec_bits)
+
+
+def bdg_normalizeddoublegamma_batch_padded_point(
+    w: jax.Array, beta: jax.Array, *, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    call_args, _ = _pad_point_batch_last((w, beta), pad_to)
+    return bdg_normalizeddoublegamma_batch_fixed_point(*call_args, prec_bits=prec_bits)
+
+
+def bdg_double_sine_batch_fixed_point(z: jax.Array, b: jax.Array, *, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _vectorize_complex_point2(bdg_double_sine, z, b, prec_bits=prec_bits)
+
+
+def bdg_double_sine_batch_padded_point(
+    z: jax.Array, b: jax.Array, *, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    call_args, _ = _pad_point_batch_last((z, b), pad_to)
+    return bdg_double_sine_batch_fixed_point(*call_args, prec_bits=prec_bits)
 
 
 # Interval/box wrappers and mode dispatch

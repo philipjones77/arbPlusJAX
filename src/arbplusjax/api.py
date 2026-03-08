@@ -13,6 +13,7 @@ from . import acb_core
 from . import baseline_wrappers
 from . import boost_hypgeom
 from . import cubesselk
+from . import double_gamma
 from . import double_interval as di
 from . import hypgeom
 from . import hypgeom_wrappers
@@ -226,6 +227,20 @@ _DIRECT_POINT_BATCH_FASTPATHS = {
     "acb_modular_j": (point_wrappers.acb_modular_j_batch_fixed_point, point_wrappers.acb_modular_j_batch_padded_point),
     "acb_elliptic_k": (point_wrappers.acb_elliptic_k_batch_fixed_point, point_wrappers.acb_elliptic_k_batch_padded_point),
     "acb_elliptic_e": (point_wrappers.acb_elliptic_e_batch_fixed_point, point_wrappers.acb_elliptic_e_batch_padded_point),
+    "bdg_log_barnesdoublegamma": (double_gamma.bdg_log_barnesdoublegamma_batch_fixed_point, double_gamma.bdg_log_barnesdoublegamma_batch_padded_point),
+    "bdg_barnesdoublegamma": (double_gamma.bdg_barnesdoublegamma_batch_fixed_point, double_gamma.bdg_barnesdoublegamma_batch_padded_point),
+    "bdg_log_barnesgamma2": (double_gamma.bdg_log_barnesgamma2_batch_fixed_point, double_gamma.bdg_log_barnesgamma2_batch_padded_point),
+    "bdg_barnesgamma2": (double_gamma.bdg_barnesgamma2_batch_fixed_point, double_gamma.bdg_barnesgamma2_batch_padded_point),
+    "bdg_log_normalizeddoublegamma": (double_gamma.bdg_log_normalizeddoublegamma_batch_fixed_point, double_gamma.bdg_log_normalizeddoublegamma_batch_padded_point),
+    "bdg_normalizeddoublegamma": (double_gamma.bdg_normalizeddoublegamma_batch_fixed_point, double_gamma.bdg_normalizeddoublegamma_batch_padded_point),
+    "bdg_double_sine": (double_gamma.bdg_double_sine_batch_fixed_point, double_gamma.bdg_double_sine_batch_padded_point),
+    "shahen_log_barnesdoublegamma": (double_gamma.bdg_log_barnesdoublegamma_batch_fixed_point, double_gamma.bdg_log_barnesdoublegamma_batch_padded_point),
+    "shahen_barnesdoublegamma": (double_gamma.bdg_barnesdoublegamma_batch_fixed_point, double_gamma.bdg_barnesdoublegamma_batch_padded_point),
+    "shahen_log_barnesgamma2": (double_gamma.bdg_log_barnesgamma2_batch_fixed_point, double_gamma.bdg_log_barnesgamma2_batch_padded_point),
+    "shahen_barnesgamma2": (double_gamma.bdg_barnesgamma2_batch_fixed_point, double_gamma.bdg_barnesgamma2_batch_padded_point),
+    "shahen_log_normalizeddoublegamma": (double_gamma.bdg_log_normalizeddoublegamma_batch_fixed_point, double_gamma.bdg_log_normalizeddoublegamma_batch_padded_point),
+    "shahen_normalizeddoublegamma": (double_gamma.bdg_normalizeddoublegamma_batch_fixed_point, double_gamma.bdg_normalizeddoublegamma_batch_padded_point),
+    "shahen_double_sine": (double_gamma.bdg_double_sine_batch_fixed_point, double_gamma.bdg_double_sine_batch_padded_point),
 }
 
 
@@ -637,12 +652,14 @@ _MODULE_NAMES = (
     "boost_hypgeom",
     "cusf_compat",
     "double_interval",
+    "double_gamma",
     "fmpz_extras",
     "fmpzi",
     "fmpr",
     "hypgeom",
     "mag",
     "partitions",
+    "shahen_double_gamma",
 )
 
 

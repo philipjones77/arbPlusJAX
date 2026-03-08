@@ -4,6 +4,7 @@ import jax.numpy as jnp
 from arbplusjax import baseline_wrappers as bw
 from arbplusjax import double_interval as di
 from arbplusjax import api
+from arbplusjax import double_gamma as bdg
 from arbplusjax import point_wrappers as pw
 
 
@@ -214,6 +215,26 @@ def test_api_custom_complex_point_batch_uses_direct_point_kernels():
         kwargs = entry[2] if len(entry) > 2 else {}
         expected = getattr(pw, f"{name}_point")(*args, **kwargs)
         out = api.eval_point_batch(name, *args, dtype="float32", pad_to=8, **kwargs)
+        _check(out.dtype == jnp.asarray(expected).dtype)
+        _check(out.shape == jnp.asarray(expected).shape)
+        _check(bool(jnp.allclose(out, expected, rtol=1e-4, atol=1e-4, equal_nan=True)))
+
+
+def test_api_barnes_family_point_batch_uses_direct_point_kernels():
+    z = jnp.array([1.2 + 0.1j, 1.4 - 0.2j, 1.6 + 0.25j], dtype=jnp.complex64)
+    tau = jnp.array([0.9 + 0.0j, 1.1 + 0.1j, 1.3 - 0.1j], dtype=jnp.complex64)
+
+    cases = [
+        ("bdg_barnesdoublegamma", (z, tau)),
+        ("bdg_barnesgamma2", (z, tau)),
+        ("bdg_double_sine", (z, tau)),
+        ("shahen_barnesgamma2", (z, tau)),
+    ]
+
+    for name, args in cases:
+        fixed_name = name.replace("shahen_", "bdg_") + "_batch_fixed_point"
+        expected = getattr(bdg, fixed_name)(*args)
+        out = api.eval_point_batch(name, *args, dtype="float32", pad_to=8)
         _check(out.dtype == jnp.asarray(expected).dtype)
         _check(out.shape == jnp.asarray(expected).shape)
         _check(bool(jnp.allclose(out, expected, rtol=1e-4, atol=1e-4, equal_nan=True)))
