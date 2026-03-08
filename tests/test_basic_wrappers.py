@@ -126,6 +126,46 @@ def test_api_point_batch_optional_padding_trims_output():
     _check(bool(jnp.allclose(out, jnp.array([5.0, 7.0, 9.0], dtype=jnp.float32))))
 
 
+def test_api_core_point_batch_uses_family_point_kernels_cleanly():
+    x = jnp.array([0.2, 0.3, 0.4], dtype=jnp.float32)
+    y = jnp.array([1.1, 1.2, 1.3], dtype=jnp.float32)
+
+    cases = [
+        ("exp", (x,), api.eval_point("exp", x, dtype="float32")),
+        ("add", (x, y), api.eval_point("add", x, y, dtype="float32")),
+        ("sin_pi", (x,), api.eval_point("sin_pi", x, dtype="float32")),
+        ("gamma", (y,), api.eval_point("gamma", y, dtype="float32")),
+        ("besselj", (x, y), api.eval_point("besselj", x, y, dtype="float32")),
+    ]
+    for name, args, expected in cases:
+        out = api.eval_point_batch(name, *args, dtype="float32", pad_to=8)
+        _check(out.dtype == jnp.asarray(expected).dtype)
+        _check(out.shape == jnp.asarray(expected).shape)
+        _check(bool(jnp.allclose(out, expected, rtol=1e-5, atol=1e-5, equal_nan=True)))
+
+
+def test_api_canonical_arb_acb_point_batch_aliases_use_direct_point_kernels():
+    xr = jnp.array([0.2, 0.3, 0.4], dtype=jnp.float32)
+    xc = jnp.array([0.2 + 0.1j, 0.3 - 0.1j, 0.4 + 0.2j], dtype=jnp.complex64)
+
+    real_cases = [
+        ("arb_exp", (xr,), api.eval_point("arb_exp", xr, dtype="float32")),
+        ("arb_sin_pi", (xr,), api.eval_point("arb_sin_pi", xr, dtype="float32")),
+        ("arb_gamma", (xr + jnp.float32(1.0),), api.eval_point("arb_gamma", xr + jnp.float32(1.0), dtype="float32")),
+    ]
+    complex_cases = [
+        ("acb_exp", (xc,), api.eval_point("acb_exp", xc, dtype="float32")),
+        ("acb_sin_pi", (xc,), api.eval_point("acb_sin_pi", xc, dtype="float32")),
+        ("acb_gamma", (xc + jnp.complex64(1.0 + 0.0j),), api.eval_point("acb_gamma", xc + jnp.complex64(1.0 + 0.0j), dtype="float32")),
+    ]
+
+    for name, args, expected in real_cases + complex_cases:
+        out = api.eval_point_batch(name, *args, dtype="float32", pad_to=8)
+        _check(out.dtype == jnp.asarray(expected).dtype)
+        _check(out.shape == jnp.asarray(expected).shape)
+        _check(bool(jnp.allclose(out, expected, rtol=1e-4, atol=1e-4, equal_nan=True)))
+
+
 def test_api_bind_interval_batch_optional_padding():
     fn = api.bind_interval_batch("add", mode="basic", dtype="float32", pad_to=4)
     x = jnp.array([[0.1, 0.2], [0.2, 0.3]], dtype=jnp.float32)

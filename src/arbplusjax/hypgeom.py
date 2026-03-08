@@ -472,6 +472,127 @@ def _select_tighter_interval(a: jax.Array, b: jax.Array) -> jax.Array:
     return jnp.where(pick_a, a, jnp.where(pick_b, b, full))
 
 
+def _unit_interval_for_dtype(dtype: jnp.dtype) -> jax.Array:
+    one = jnp.asarray(1.0, dtype=dtype)
+    return di.interval(one, one)
+
+
+def _real_gamma_interval_from_midpoint(s_m: jax.Array, *, regularized: bool) -> jax.Array:
+    if regularized:
+        return _unit_interval_for_dtype(jnp.asarray(s_m).dtype)
+    gamma_s = _gamma_real(s_m)
+    return di.interval(gamma_s, gamma_s)
+
+
+def _real_incomplete_gamma_candidate(
+    s: jax.Array,
+    z: jax.Array,
+    *,
+    regularized: bool,
+    upper: bool,
+) -> tuple[jax.Array, jax.Array]:
+    s = di.as_interval(s)
+    z = di.as_interval(z)
+    s_m = 0.5 * (s[0] + s[1])
+    s_vals = jnp.asarray([s[0], s[1], s_m], dtype=s.dtype)
+    z_m = 0.5 * (z[0] + z[1])
+    z_vals = jnp.asarray([z[0], z[1], z_m], dtype=z.dtype)
+    direct_scalar = _gammaincc_real if upper else _gammainc_real
+    comp_scalar = _gammainc_real if upper else _gammaincc_real
+
+    def direct_eval(ss: jax.Array, zz: jax.Array) -> jax.Array:
+        v = direct_scalar(ss, zz)
+        return v if regularized else _gamma_real(s_m) * v
+
+    direct_vals = jax.vmap(lambda ss: jax.vmap(lambda zz: direct_eval(ss, zz))(z_vals))(s_vals).reshape(-1)
+    direct = _interval_from_samples(direct_vals)
+    comp_other = _interval_from_samples(jax.vmap(lambda zz: comp_scalar(s_m, zz))(z_vals))
+    gamma_interval = _real_gamma_interval_from_midpoint(s_m, regularized=regularized)
+    comp = di.fast_sub(gamma_interval, comp_other)
+    ok = (s[0] > 0.0) & (z[0] >= 0.0) & jnp.isfinite(_gamma_real(s_m))
+    return direct, jnp.where(ok, comp, direct)
+
+
+def _real_hyp1f1_candidates(a: jax.Array, b: jax.Array, z: jax.Array, *, regularized: bool) -> tuple[jax.Array, jax.Array, jax.Array, jax.Array]:
+    a_m = _interval_midpoint(a)
+    b_m = _interval_midpoint(b)
+    z_m = _interval_midpoint(z)
+    a_vals = jnp.asarray([a[0], a[1], a_m], dtype=a.dtype)
+    b_vals = jnp.asarray([b[0], b[1], b_m], dtype=b.dtype)
+    z_vals = jnp.asarray([z[0], z[1], z_m], dtype=z.dtype)
+    sample_vals = jax.vmap(lambda aa: jax.vmap(lambda bb: jax.vmap(lambda zi: _real_hyp1f1_regime(aa, bb, zi))(z_vals))(b_vals))(a_vals).reshape(-1)
+    s_samples = _interval_from_samples(sample_vals)
+    tail, ok = _tail_bound_1f1_real(a, b, z, di.DEFAULT_PREC_BITS)
+    base_mid = _real_hyp1f1_scalar(a_m, b_m, z_m)
+    regime_mid = _real_hyp1f1_regime(a_m, b_m, z_m)
+    s_tail = _series_interval_from_mid(base_mid, tail)
+    s_tail = jnp.where(ok, s_tail, _full_interval_like(s_tail))
+    s_regime = _interval_from_samples(jnp.asarray([base_mid, regime_mid], dtype=z.dtype))
+    if regularized:
+        rg = arb_hypgeom_rgamma(b)
+        s_samples = di.fast_mul(s_samples, rg)
+        s_tail = di.fast_mul(s_tail, rg)
+        s_regime = di.fast_mul(s_regime, rg)
+    param_ok = _interval_is_small(a) & _interval_is_small(b)
+    return s_tail, s_regime, s_samples, param_ok
+
+
+def _real_hyp2f1_candidates(
+    a: jax.Array,
+    b: jax.Array,
+    c: jax.Array,
+    z: jax.Array,
+    *,
+    regularized: bool,
+) -> tuple[jax.Array, jax.Array, jax.Array, jax.Array]:
+    a_m = _interval_midpoint(a)
+    b_m = _interval_midpoint(b)
+    c_m = _interval_midpoint(c)
+    z_m = _interval_midpoint(z)
+    a_vals = jnp.asarray([a[0], a[1], a_m], dtype=a.dtype)
+    b_vals = jnp.asarray([b[0], b[1], b_m], dtype=b.dtype)
+    c_vals = jnp.asarray([c[0], c[1], c_m], dtype=c.dtype)
+    z_vals = jnp.asarray([z[0], z[1], z_m], dtype=z.dtype)
+    sample_vals = jax.vmap(
+        lambda aa: jax.vmap(
+            lambda bb: jax.vmap(
+                lambda cc: jax.vmap(lambda zi: _real_hyp2f1_regime(aa, bb, cc, zi))(z_vals)
+            )(c_vals)
+        )(b_vals)
+    )(a_vals).reshape(-1)
+    s_samples = _interval_from_samples(sample_vals)
+    tail, ok = _tail_bound_2f1_real(a, b, c, z, di.DEFAULT_PREC_BITS)
+    base_mid = _real_hyp2f1_scalar(a_m, b_m, c_m, z_m)
+    regime_mid = _real_hyp2f1_regime(a_m, b_m, c_m, z_m)
+    s_tail = _series_interval_from_mid(base_mid, tail)
+    s_tail = jnp.where(ok, s_tail, _full_interval())
+    s_regime = _interval_from_samples(jnp.asarray([base_mid, regime_mid], dtype=z.dtype))
+    if regularized:
+        rg = arb_hypgeom_rgamma(c)
+        s_samples = di.fast_mul(s_samples, rg)
+        s_tail = di.fast_mul(s_tail, rg)
+        s_regime = di.fast_mul(s_regime, rg)
+    param_ok = _interval_is_small(a) & _interval_is_small(b) & _interval_is_small(c)
+    return s_tail, s_regime, s_samples, param_ok
+
+
+def _real_hypu_candidates(a: jax.Array, b: jax.Array, z: jax.Array) -> tuple[jax.Array, jax.Array, jax.Array]:
+    a_m = _interval_midpoint(a)
+    b_m = _interval_midpoint(b)
+    z_m = _interval_midpoint(z)
+    a_vals = jnp.asarray([a[0], a[1], a_m], dtype=jnp.float64)
+    b_vals = jnp.asarray([b[0], b[1], b_m], dtype=jnp.float64)
+    z_vals = jnp.asarray([z[0], z[1], z_m], dtype=jnp.float64)
+    sample_vals = jax.vmap(
+        lambda aa: jax.vmap(lambda bb: jax.vmap(lambda zz: _real_hypu_regime(aa, bb, zz))(z_vals))(b_vals)
+    )(a_vals).reshape(-1)
+    s_samples = _interval_from_samples(sample_vals)
+    s_mid = _interval_from_midpoint(_real_hypu_scalar(a_m, b_m, z_m))
+    s_regime = _interval_from_midpoint(_real_hypu_regime(a_m, b_m, z_m))
+    param_ok = _interval_is_small(a) & _interval_is_small(b) & _interval_is_small(z)
+    return s_mid, s_regime, jnp.where(param_ok, s_samples, s_mid)
+
+
 def _interval_is_small(x: jax.Array, tol: float = 1e-6) -> jax.Array:
     return _interval_width(x) <= tol
 
@@ -496,13 +617,15 @@ def _interval_midpoint(x: jax.Array) -> jax.Array:
 
 def _interval_pow(x: jax.Array, n: int) -> jax.Array:
     x = di.as_interval(x)
-    n = int(n)
-    if n <= 0:
-        return di.interval(1.0, 1.0)
-    acc = x
-    for _ in range(1, n):
-        acc = di.fast_mul(acc, x)
-    return acc
+    n_arr = jnp.asarray(n)
+    one = jnp.asarray(1.0, dtype=x.dtype)
+    init = di.interval(one, one)
+
+    def body(_, acc):
+        return di.fast_mul(acc, x)
+
+    out = lax.fori_loop(0, jnp.maximum(n_arr, 0), body, init)
+    return jnp.where((n_arr <= 0)[..., None], init, out)
 
 
 def _acb_midpoint(x: jax.Array) -> jax.Array:
@@ -697,9 +820,17 @@ def _real_hyp2f1_scalar_tail(
 def _real_hyp1f1_regime(a: jax.Array, b: jax.Array, z: jax.Array) -> jax.Array:
     real_dtype = jnp.asarray(z).dtype
     z = jnp.asarray(z, dtype=real_dtype)
-    use_kummer = z > jnp.asarray(6.0, dtype=real_dtype)
-    transformed = jnp.exp(z) * _real_hyp1f1_scalar(b - a, b, -z)
-    return jnp.where(use_kummer, transformed, _real_hyp1f1_scalar(a, b, z))
+    cutoff = jnp.asarray(6.0, dtype=real_dtype)
+
+    def base(args):
+        aa, bb, zz = args
+        return _real_hyp1f1_scalar(aa, bb, zz)
+
+    def kummer(args):
+        aa, bb, zz = args
+        return jnp.exp(zz) * _real_hyp1f1_scalar(bb - aa, bb, -zz)
+
+    return lax.cond(z > cutoff, kummer, base, (a, b, z))
 
 
 def _real_hyp0f1_regime(a: jax.Array, z: jax.Array) -> jax.Array:
@@ -712,23 +843,76 @@ def _real_hyp0f1_regime(a: jax.Array, z: jax.Array) -> jax.Array:
 
 def _real_hyp2f1_regime(a: jax.Array, b: jax.Array, c: jax.Array, z: jax.Array) -> jax.Array:
     z = jnp.asarray(z, dtype=jnp.float64)
-    absz = jnp.abs(z)
-    use_transform = absz > 0.75
-    zt = jnp.where(z == 1.0, jnp.nan, z / (z - 1.0))
-    transformed = jnp.power(1.0 - z, -a) * _real_hyp2f1_scalar(a, c - b, c, zt)
-    return jnp.where(use_transform, transformed, _real_hyp2f1_scalar(a, b, c, z))
+    cutoff = jnp.asarray(0.75, dtype=z.dtype)
+
+    def base(args):
+        aa, bb, cc, zz = args
+        return _real_hyp2f1_scalar(aa, bb, cc, zz)
+
+    def transformed(args):
+        aa, bb, cc, zz = args
+        zt = zz / (zz - jnp.asarray(1.0, dtype=zz.dtype))
+        return jnp.power(jnp.asarray(1.0, dtype=zz.dtype) - zz, -aa) * _real_hyp2f1_scalar(aa, cc - bb, cc, zt)
+
+    return lax.cond(jnp.abs(z) > cutoff, transformed, base, (a, b, c, z))
 
 
 def _real_hypu_regime(a: jax.Array, b: jax.Array, z: jax.Array) -> jax.Array:
     z = jnp.asarray(z, dtype=jnp.float64)
-    use_asymp = (z > 8.0) & (z > 0.0)
-    return _real_hypu_scalar(a, b, z)
+    cutoff = jnp.asarray(8.0, dtype=z.dtype)
+
+    def base(args):
+        aa, bb, zz = args
+        return _real_hypu_scalar(aa, bb, zz)
+
+    def asymp(args):
+        aa, bb, zz = args
+        return jnp.power(zz, -aa)
+
+    return lax.cond((z > 0.0) & (z > cutoff), asymp, base, (a, b, z))
 
 
 def _complex_hypu_regime(a: jax.Array, b: jax.Array, z: jax.Array) -> jax.Array:
     z = jnp.asarray(z, dtype=jnp.complex128)
-    use_asymp = (jnp.real(z) > 0.0) & (jnp.abs(z) > 8.0)
-    return _complex_hypu_scalar(a, b, z)
+
+    def base(args):
+        aa, bb, zz = args
+        return _complex_hypu_scalar(aa, bb, zz)
+
+    def asymp(args):
+        aa, bb, zz = args
+        return jnp.power(zz, -aa)
+
+    return lax.cond((jnp.real(z) > 0.0) & (jnp.abs(z) > 8.0), asymp, base, (a, b, z))
+
+
+def _complex_hyp1f1_regime(a: jax.Array, b: jax.Array, z: jax.Array) -> jax.Array:
+    z = jnp.asarray(z, dtype=jnp.complex128)
+
+    def base(args):
+        aa, bb, zz = args
+        return _complex_hyp1f1_scalar(aa, bb, zz)
+
+    def kummer(args):
+        aa, bb, zz = args
+        return jnp.exp(zz) * _complex_hyp1f1_scalar(bb - aa, bb, -zz)
+
+    return lax.cond(jnp.real(z) > 6.0, kummer, base, (a, b, z))
+
+
+def _complex_hyp2f1_regime(a: jax.Array, b: jax.Array, c: jax.Array, z: jax.Array) -> jax.Array:
+    z = jnp.asarray(z, dtype=jnp.complex128)
+
+    def base(args):
+        aa, bb, cc, zz = args
+        return _complex_hyp2f1_scalar(aa, bb, cc, zz)
+
+    def transformed(args):
+        aa, bb, cc, zz = args
+        zt = zz / (zz - 1.0)
+        return jnp.power(1.0 - zz, -aa) * _complex_hyp2f1_scalar(aa, cc - bb, cc, zt)
+
+    return lax.cond(jnp.abs(z) > 0.75, transformed, base, (a, b, c, z))
 
 
 def _real_legendre_p_scalar(n: int, x: jax.Array) -> jax.Array:
@@ -1249,7 +1433,7 @@ def arb_hypgeom_0f1(a: jax.Array, z: jax.Array, regularized: bool = False) -> ja
     a_m = _interval_midpoint(a)
     z_m = _interval_midpoint(z)
     z_vals = jnp.asarray([z[0], z[1], z_m], dtype=z.dtype)
-    sample_vals = jnp.asarray([_real_hyp0f1_regime(a_m, zi) for zi in z_vals], dtype=z.dtype)
+    sample_vals = jax.vmap(lambda zi: _real_hyp0f1_regime(a_m, zi))(z_vals)
     s_samples = _interval_from_samples(sample_vals)
     tail, ok = _tail_bound_0f1_real(a, z, di.DEFAULT_PREC_BITS)
     s_tail = _series_interval_from_mid(_real_hyp0f1_scalar(a_m, z_m), tail)
@@ -1288,20 +1472,9 @@ def arb_hypgeom_1f1(a: jax.Array, b: jax.Array, z: jax.Array, regularized: bool 
     _, s = lax.fori_loop(0, _HYP_TERMS - 1, body, (term0, sum0))
     if regularized:
         s = di.fast_mul(s, arb_hypgeom_rgamma(b))
-    a_m = _interval_midpoint(a)
-    b_m = _interval_midpoint(b)
-    z_m = _interval_midpoint(z)
-    z_vals = jnp.asarray([z[0], z[1], z_m], dtype=z.dtype)
-    sample_vals = jnp.asarray([_real_hyp1f1_regime(a_m, b_m, zi) for zi in z_vals], dtype=z.dtype)
-    s_samples = _interval_from_samples(sample_vals)
-    tail, ok = _tail_bound_1f1_real(a, b, z, di.DEFAULT_PREC_BITS)
-    s_tail = _series_interval_from_mid(_real_hyp1f1_scalar(a_m, b_m, z_m), tail)
-    s_tail = jnp.where(ok, s_tail, _full_interval_like(s_tail))
-    if regularized:
-        s_samples = di.fast_mul(s_samples, arb_hypgeom_rgamma(b))
-        s_tail = di.fast_mul(s_tail, arb_hypgeom_rgamma(b))
-    param_ok = _interval_is_small(a) & _interval_is_small(b)
+    s_tail, s_regime, s_samples, param_ok = _real_hyp1f1_candidates(a, b, z, regularized=regularized)
     candidate = _select_tighter_interval(s, s_tail)
+    candidate = _select_tighter_interval(candidate, s_regime)
     candidate = _select_tighter_interval(candidate, s_samples)
     return jnp.where(param_ok, candidate, s)
 
@@ -1423,11 +1596,12 @@ def arb_hypgeom_2f1(a: jax.Array, b: jax.Array, c: jax.Array, z: jax.Array, regu
 
         def body(k, state):
             term, s = state
-            kf = jnp.float64(k)
+            kf = jnp.asarray(k, dtype=a.dtype)
             ak = di.fast_add(a, di.interval(kf, kf))
             bk = di.fast_add(b, di.interval(kf, kf))
             ck = di.fast_add(c, di.interval(kf, kf))
-            k1 = di.interval(jnp.float64(k + 1), jnp.float64(k + 1))
+            k1f = jnp.asarray(k + 1, dtype=a.dtype)
+            k1 = di.interval(k1f, k1f)
             num = di.fast_mul(ak, bk)
             den = di.fast_mul(ck, k1)
             step = di.fast_div(num, den)
@@ -1441,21 +1615,9 @@ def arb_hypgeom_2f1(a: jax.Array, b: jax.Array, c: jax.Array, z: jax.Array, regu
     s = jax.checkpoint(_series)(a, b, c, z)
     if regularized:
         s = di.fast_mul(s, arb_hypgeom_rgamma(c))
-    a_m = _interval_midpoint(a)
-    b_m = _interval_midpoint(b)
-    c_m = _interval_midpoint(c)
-    z_m = _interval_midpoint(z)
-    z_vals = jnp.asarray([z[0], z[1], z_m], dtype=jnp.float64)
-    sample_vals = jnp.asarray([_real_hyp2f1_regime(a_m, b_m, c_m, zi) for zi in z_vals], dtype=jnp.float64)
-    s_samples = _interval_from_samples(sample_vals)
-    tail, ok = _tail_bound_2f1_real(a, b, c, z, di.DEFAULT_PREC_BITS)
-    s_tail = _series_interval_from_mid(_real_hyp2f1_scalar(a_m, b_m, c_m, z_m), tail)
-    s_tail = jnp.where(ok, s_tail, _full_interval())
-    if regularized:
-        s_samples = di.fast_mul(s_samples, arb_hypgeom_rgamma(c))
-        s_tail = di.fast_mul(s_tail, arb_hypgeom_rgamma(c))
-    param_ok = _interval_is_small(a) & _interval_is_small(b) & _interval_is_small(c)
+    s_tail, s_regime, s_samples, param_ok = _real_hyp2f1_candidates(a, b, c, z, regularized=regularized)
     candidate = _select_tighter_interval(s, s_tail)
+    candidate = _select_tighter_interval(candidate, s_regime)
     candidate = _select_tighter_interval(candidate, s_samples)
     return jnp.where(param_ok, candidate, s)
 
@@ -1470,22 +1632,11 @@ def arb_hypgeom_u(a: jax.Array, b: jax.Array, z: jax.Array) -> jax.Array:
     a = di.as_interval(a)
     b = di.as_interval(b)
     z = di.as_interval(z)
-    a_m = 0.5 * (a[0] + a[1])
-    b_m = 0.5 * (b[0] + b[1])
-    z_m = 0.5 * (z[0] + z[1])
-    a_vals = jnp.asarray([a[0], a[1], a_m], dtype=jnp.float64)
-    b_vals = jnp.asarray([b[0], b[1], b_m], dtype=jnp.float64)
-    z_vals = jnp.asarray([z[0], z[1], z_m], dtype=jnp.float64)
-
-    vals = jax.vmap(
-        lambda aa: jax.vmap(lambda bb: jax.vmap(lambda zz: _real_hypu_regime(aa, bb, zz))(z_vals))(b_vals)
-    )(a_vals)
-    vals = vals.reshape(-1)
-    s_samples = _interval_from_samples(vals)
-    s_mid = _interval_from_midpoint(_real_hypu_regime(a_m, b_m, z_m))
+    s_mid, s_regime, s_fallback = _real_hypu_candidates(a, b, z)
     param_ok = _interval_is_small(a) & _interval_is_small(b) & _interval_is_small(z)
-    candidate = _select_tighter_interval(s_mid, s_samples)
-    return jnp.where(param_ok, candidate, s_samples)
+    candidate = _select_tighter_interval(s_mid, s_regime)
+    candidate = _select_tighter_interval(candidate, s_fallback)
+    return jnp.where(param_ok, candidate, s_fallback)
 
 
 @jax.jit
@@ -1499,14 +1650,8 @@ def arb_hypgeom_fresnel(z: jax.Array, normalized: bool = False) -> tuple[jax.Arr
     a = z[0]
     b = z[1]
     m = 0.5 * (a + b)
-    s_vals = []
-    c_vals = []
-    for x in (a, b, m):
-        s, c = _fresnel_eval(x, normalized)
-        s_vals.append(s)
-        c_vals.append(c)
-    s_arr = jnp.asarray(s_vals, dtype=jnp.float64)
-    c_arr = jnp.asarray(c_vals, dtype=jnp.float64)
+    xs = jnp.asarray([a, b, m], dtype=z.dtype)
+    s_arr, c_arr = jax.vmap(lambda x: _real_fresnel_scalar(x, normalized))(xs)
     return _interval_from_samples(s_arr), _interval_from_samples(c_arr)
 
 
@@ -1516,7 +1661,7 @@ def arb_hypgeom_ei(z: jax.Array) -> jax.Array:
     a = z[0]
     b = z[1]
     m = 0.5 * (a + b)
-    vals = jnp.asarray([_expi_real(a), _expi_real(b), _expi_real(m)], dtype=jnp.float64)
+    vals = jnp.asarray([_real_ei_scalar(a), _real_ei_scalar(b), _real_ei_scalar(m)], dtype=jnp.float64)
     return _interval_from_samples(vals)
 
 
@@ -1543,7 +1688,7 @@ def _si_ci_from_series(x: jax.Array) -> tuple[jax.Array, jax.Array]:
         return term, acc
 
     term1 = -x2 / jnp.float64(2.0)
-    ci0 = jnp.euler_gamma + jnp.log(jnp.abs(x)) + term1 / jnp.float64(2.0)
+    ci0 = jnp.asarray(el.EULER_GAMMA, dtype=x.dtype) + jnp.log(jnp.abs(x)) + term1 / jnp.float64(2.0)
     _, ci = lax.fori_loop(2, _SI_CI_TERMS, ci_body, (term1, ci0))
     ci = jnp.where(x == 0.0, -jnp.inf, ci)
     return si, ci
@@ -1571,10 +1716,8 @@ def arb_hypgeom_si(z: jax.Array) -> jax.Array:
     b = z[1]
     m = 0.5 * (a + b)
     def eval_val(x: jax.Array) -> jax.Array:
-        use_series = jnp.abs(x) <= 4.0
-        v_series, _ = _si_ci_from_series(x)
-        v_asymp, _ = _si_ci_asymp(x)
-        return jnp.where(use_series, v_series, v_asymp)
+        v, _ = _real_si_ci_scalar(x)
+        return v
 
     vals = jnp.asarray([eval_val(a), eval_val(b), eval_val(m)], dtype=jnp.float64)
     return _interval_from_samples(vals)
@@ -1587,10 +1730,8 @@ def arb_hypgeom_ci(z: jax.Array) -> jax.Array:
     b = z[1]
     m = 0.5 * (a + b)
     def eval_val(x: jax.Array) -> jax.Array:
-        use_series = jnp.abs(x) <= 4.0
-        _, v_series = _si_ci_from_series(x)
-        _, v_asymp = _si_ci_asymp(x)
-        return jnp.where(use_series, v_series, v_asymp)
+        _, v = _real_si_ci_scalar(x)
+        return v
 
     vals = jnp.asarray([eval_val(a), eval_val(b), eval_val(m)], dtype=jnp.float64)
     return _interval_from_samples(vals)
@@ -1604,9 +1745,9 @@ def arb_hypgeom_shi(z: jax.Array) -> jax.Array:
     m = 0.5 * (a + b)
     vals = jnp.asarray(
         [
-            0.5 * (_expi_real(a) - _expi_real(-a)),
-            0.5 * (_expi_real(b) - _expi_real(-b)),
-            0.5 * (_expi_real(m) - _expi_real(-m)),
+            0.5 * (_real_ei_scalar(a) - _real_ei_scalar(-a)),
+            0.5 * (_real_ei_scalar(b) - _real_ei_scalar(-b)),
+            0.5 * (_real_ei_scalar(m) - _real_ei_scalar(-m)),
         ],
         dtype=jnp.float64,
     )
@@ -1621,9 +1762,9 @@ def arb_hypgeom_chi(z: jax.Array) -> jax.Array:
     m = 0.5 * (a + b)
     vals = jnp.asarray(
         [
-            0.5 * (_expi_real(a) + _expi_real(-a)),
-            0.5 * (_expi_real(b) + _expi_real(-b)),
-            0.5 * (_expi_real(m) + _expi_real(-m)),
+            0.5 * (_real_ei_scalar(a) + _real_ei_scalar(-a)),
+            0.5 * (_real_ei_scalar(b) + _real_ei_scalar(-b)),
+            0.5 * (_real_ei_scalar(m) + _real_ei_scalar(-m)),
         ],
         dtype=jnp.float64,
     )
@@ -1638,11 +1779,11 @@ def arb_hypgeom_li(z: jax.Array, offset: int = 0) -> jax.Array:
     m = 0.5 * (a + b)
     offset_term = jnp.float64(0.0)
     if offset > 0:
-        offset_term = _expi_real(jnp.log(jnp.float64(offset)))
+        offset_term = _real_ei_scalar(jnp.log(jnp.float64(offset)))
 
     def eval_val(x: jax.Array) -> jax.Array:
         valid = x > 0.0
-        v = _expi_real(jnp.log(x)) - offset_term
+        v = _real_ei_scalar(jnp.log(x)) - offset_term
         return jnp.where(valid, v, jnp.nan)
 
     vals = jnp.asarray([eval_val(a), eval_val(b), eval_val(m)], dtype=jnp.float64)
@@ -1657,9 +1798,9 @@ def arb_hypgeom_dilog(z: jax.Array) -> jax.Array:
     m = 0.5 * (a + b)
     vals = jnp.asarray(
         [
-            _dilog_real(a),
-            _dilog_real(b),
-            _dilog_real(m),
+            _real_dilog_scalar(a),
+            _real_dilog_scalar(b),
+            _real_dilog_scalar(m),
         ],
         dtype=jnp.float64,
     )
@@ -1698,6 +1839,13 @@ def _airy_series(z: jax.Array, sign: float) -> tuple[jax.Array, jax.Array]:
     ai = sum_a + z * sum_b
     aip = sum_da + sum_db
     return ai, aip
+
+
+def _real_airy_scalar(x: jax.Array) -> tuple[jax.Array, jax.Array, jax.Array, jax.Array]:
+    x = jnp.asarray(x, dtype=jnp.float64)
+    ai, aip = _airy_series(x, -1.0)
+    bi, bip = _airy_series(x, 1.0)
+    return ai, aip, bi, bip
 
 
 @jax.jit
@@ -1748,56 +1896,14 @@ def arb_hypgeom_expint(s: jax.Array, z: jax.Array) -> jax.Array:
 
 @partial(jax.jit, static_argnames=("regularized",))
 def arb_hypgeom_gamma_lower(s: jax.Array, z: jax.Array, regularized: bool = False) -> jax.Array:
-    s = di.as_interval(s)
-    z = di.as_interval(z)
-    s_m = 0.5 * (s[0] + s[1])
-    a = z[0]
-    b = z[1]
-    m = 0.5 * (a + b)
-
-    def eval_val(x: jax.Array) -> jax.Array:
-        v = _gammainc_real(s_m, x)
-        return v if regularized else _gamma_real(s_m) * v
-
-    vals = jnp.asarray([eval_val(a), eval_val(b), eval_val(m)], dtype=jnp.float64)
-    direct = _interval_from_samples(vals)
-    gamma_s = _gamma_real(s_m)
-    upper_vals = jnp.asarray([_gammaincc_real(s_m, a), _gammaincc_real(s_m, b), _gammaincc_real(s_m, m)], dtype=jnp.float64)
-    upper = _interval_from_samples(upper_vals)
-    if regularized:
-        comp = di.fast_sub(di.interval(1.0, 1.0), upper)
-    else:
-        comp = di.fast_sub(di.interval(gamma_s, gamma_s), upper)
-    ok = (s[0] > 0.0) & (z[0] >= 0.0) & jnp.isfinite(gamma_s)
-    candidate = _select_tighter_interval(direct, comp)
-    return jnp.where(ok, candidate, direct)
+    direct, comp = _real_incomplete_gamma_candidate(s, z, regularized=regularized, upper=False)
+    return _select_tighter_interval(direct, comp)
 
 
 @partial(jax.jit, static_argnames=("regularized",))
 def arb_hypgeom_gamma_upper(s: jax.Array, z: jax.Array, regularized: bool = False) -> jax.Array:
-    s = di.as_interval(s)
-    z = di.as_interval(z)
-    s_m = 0.5 * (s[0] + s[1])
-    a = z[0]
-    b = z[1]
-    m = 0.5 * (a + b)
-
-    def eval_val(x: jax.Array) -> jax.Array:
-        v = _gammaincc_real(s_m, x)
-        return v if regularized else _gamma_real(s_m) * v
-
-    vals = jnp.asarray([eval_val(a), eval_val(b), eval_val(m)], dtype=jnp.float64)
-    direct = _interval_from_samples(vals)
-    gamma_s = _gamma_real(s_m)
-    lower_vals = jnp.asarray([_gammainc_real(s_m, a), _gammainc_real(s_m, b), _gammainc_real(s_m, m)], dtype=jnp.float64)
-    lower = _interval_from_samples(lower_vals)
-    if regularized:
-        comp = di.fast_sub(di.interval(1.0, 1.0), lower)
-    else:
-        comp = di.fast_sub(di.interval(gamma_s, gamma_s), lower)
-    ok = (s[0] > 0.0) & (z[0] >= 0.0) & jnp.isfinite(gamma_s)
-    candidate = _select_tighter_interval(direct, comp)
-    return jnp.where(ok, candidate, direct)
+    direct, comp = _real_incomplete_gamma_candidate(s, z, regularized=regularized, upper=True)
+    return _select_tighter_interval(direct, comp)
 
 
 @jax.jit
@@ -1824,7 +1930,12 @@ def arb_hypgeom_chebyshev_t(n: int, z: jax.Array) -> jax.Array:
     z = di.as_interval(z)
     x = 0.5 * (z[0] + z[1])
     n = int(n)
-    val = jnp.where(jnp.abs(x) <= 1.0, jnp.cos(n * jnp.arccos(x)), jnp.cosh(n * jnp.arccosh(x)))
+    val = lax.cond(
+        jnp.abs(x) <= 1.0,
+        lambda t: jnp.cos(jnp.asarray(n, dtype=t.dtype) * jnp.arccos(t)),
+        lambda t: jnp.cosh(jnp.asarray(n, dtype=t.dtype) * jnp.arccosh(t)),
+        x,
+    )
     return _interval_from_midpoint(val)
 
 
@@ -1833,15 +1944,17 @@ def arb_hypgeom_chebyshev_u(n: int, z: jax.Array) -> jax.Array:
     z = di.as_interval(z)
     x = 0.5 * (z[0] + z[1])
     n = int(n)
-    def in_range():
-        t = jnp.arccos(x)
-        return jnp.sin((n + 1) * t) / jnp.sin(t)
+    def in_range(t):
+        ang = jnp.arccos(t)
+        nf = jnp.asarray(n + 1, dtype=t.dtype)
+        return jnp.sin(nf * ang) / jnp.sin(ang)
 
-    def out_range():
-        t = jnp.arccosh(jnp.abs(x))
-        return jnp.sinh((n + 1) * t) / jnp.sinh(t)
+    def out_range(t):
+        ach = jnp.arccosh(jnp.abs(t))
+        nf = jnp.asarray(n + 1, dtype=t.dtype)
+        return jnp.sinh(nf * ach) / jnp.sinh(ach)
 
-    val = jnp.where(jnp.abs(x) <= 1.0, in_range(), out_range())
+    val = lax.cond(jnp.abs(x) <= 1.0, in_range, out_range, x)
     return _interval_from_midpoint(val)
 
 
@@ -1851,37 +1964,49 @@ def arb_hypgeom_laguerre_l(n: int, m: jax.Array, z: jax.Array) -> jax.Array:
     m = di.as_interval(m)
     z = di.as_interval(z)
     m_m = 0.5 * (m[0] + m[1])
-    x = 0.5 * (z[0] + z[1])
+    x0, x1 = z[0], z[1]
+    xm = 0.5 * (x0 + x1)
 
-    def body(k, acc):
-        kf = jnp.float64(k)
-        coeff = jnp.exp(_gammaln_real(n + m_m + 1.0) - _gammaln_real(n - k + 1.0) - _gammaln_real(m_m + k + 1.0))
-        term = coeff * jnp.power(-x, kf) / jnp.exp(_gammaln_real(kf + 1.0))
-        return acc + term
+    def scalar(x):
+        def body(k, acc):
+            kf = jnp.float64(k)
+            coeff = jnp.exp(_gammaln_real(n + m_m + 1.0) - _gammaln_real(n - k + 1.0) - _gammaln_real(m_m + k + 1.0))
+            term = coeff * jnp.power(-x, kf) / jnp.exp(_gammaln_real(kf + 1.0))
+            return acc + term
 
-    val = lax.fori_loop(0, n + 1, body, jnp.float64(0.0))
-    return _interval_from_midpoint(val)
+        return lax.fori_loop(0, n + 1, body, jnp.float64(0.0))
+
+    mid = _interval_from_midpoint(scalar(xm))
+    samples = _interval_from_samples(jnp.asarray([scalar(x0), scalar(x1), scalar(xm)], dtype=jnp.float64))
+    return _select_tighter_interval(mid, samples)
 
 
 @partial(jax.jit, static_argnames=("n",))
 def arb_hypgeom_hermite_h(n: int, z: jax.Array) -> jax.Array:
     n = int(n)
     z = di.as_interval(z)
-    x = 0.5 * (z[0] + z[1])
-    if n == 0:
-        return _interval_from_midpoint(jnp.float64(1.0))
-    if n == 1:
-        return _interval_from_midpoint(2.0 * x)
-    h0 = jnp.float64(1.0)
-    h1 = 2.0 * x
+    x0, x1 = z[0], z[1]
+    xm = 0.5 * (x0 + x1)
 
-    def body(k, state):
-        h_prev, h_curr = state
-        h_next = 2.0 * x * h_curr - 2.0 * (k - 1) * h_prev
-        return h_curr, h_next
+    def scalar(x):
+        if n == 0:
+            return jnp.float64(1.0)
+        if n == 1:
+            return 2.0 * x
+        h0 = jnp.float64(1.0)
+        h1 = 2.0 * x
 
-    _, hn = lax.fori_loop(2, n + 1, body, (h0, h1))
-    return _interval_from_midpoint(hn)
+        def body(k, state):
+            h_prev, h_curr = state
+            h_next = 2.0 * x * h_curr - 2.0 * (k - 1) * h_prev
+            return h_curr, h_next
+
+        _, hn = lax.fori_loop(2, n + 1, body, (h0, h1))
+        return hn
+
+    mid = _interval_from_midpoint(scalar(xm))
+    samples = _interval_from_samples(jnp.asarray([scalar(x0), scalar(x1), scalar(xm)], dtype=jnp.float64))
+    return _select_tighter_interval(mid, samples)
 
 
 @partial(jax.jit, static_argnames=("n",))
@@ -2061,26 +2186,34 @@ def arb_hypgeom_jacobi_p_rigorous(n: int, a: jax.Array, b: jax.Array, z: jax.Arr
     t1 = di.fast_mul(di.fast_sub(z, di.interval(1.0, 1.0)), di.interval(0.5, 0.5))
     t2 = di.fast_mul(di.fast_add(z, di.interval(1.0, 1.0)), di.interval(0.5, 0.5))
 
-    def coeff1(k: int) -> jax.Array:
-        num = ball_wrappers.arb_ball_gamma(di.fast_add(di.interval(jnp.float64(n + 1), jnp.float64(n + 1)), a), 53)
-        den1 = ball_wrappers.arb_ball_gamma(di.interval(jnp.float64(n - k + 1), jnp.float64(n - k + 1)), 53)
-        den2 = ball_wrappers.arb_ball_gamma(di.fast_add(a, di.interval(jnp.float64(k + 1), jnp.float64(k + 1))), 53)
+    n_iv = di.interval(jnp.asarray(n + 1.0, dtype=a.dtype), jnp.asarray(n + 1.0, dtype=a.dtype))
+
+    def coeff1(k: jax.Array) -> jax.Array:
+        kf = jnp.asarray(k, dtype=a.dtype)
+        num = ball_wrappers.arb_ball_gamma(di.fast_add(n_iv, a), 53)
+        den1 = ball_wrappers.arb_ball_gamma(di.interval(jnp.asarray(n, dtype=a.dtype) - kf + 1.0, jnp.asarray(n, dtype=a.dtype) - kf + 1.0), 53)
+        den2 = ball_wrappers.arb_ball_gamma(di.fast_add(a, di.interval(kf + 1.0, kf + 1.0)), 53)
         return di.fast_div(num, di.fast_mul(den1, den2))
 
-    def coeff2(k: int) -> jax.Array:
-        num = ball_wrappers.arb_ball_gamma(di.fast_add(di.interval(jnp.float64(n + 1), jnp.float64(n + 1)), b), 53)
-        den1 = ball_wrappers.arb_ball_gamma(di.interval(jnp.float64(k + 1), jnp.float64(k + 1)), 53)
-        den2 = ball_wrappers.arb_ball_gamma(di.fast_add(b, di.interval(jnp.float64(n - k + 1), jnp.float64(n - k + 1))), 53)
+    def coeff2(k: jax.Array) -> jax.Array:
+        kf = jnp.asarray(k, dtype=b.dtype)
+        num = ball_wrappers.arb_ball_gamma(di.fast_add(n_iv, b), 53)
+        den1 = ball_wrappers.arb_ball_gamma(di.interval(kf + 1.0, kf + 1.0), 53)
+        den2 = ball_wrappers.arb_ball_gamma(
+            di.fast_add(b, di.interval(jnp.asarray(n, dtype=b.dtype) - kf + 1.0, jnp.asarray(n, dtype=b.dtype) - kf + 1.0)),
+            53,
+        )
         return di.fast_div(num, di.fast_mul(den1, den2))
 
-    acc = di.interval(0.0, 0.0)
-    for k in range(n + 1):
+    def body(k: int, acc: jax.Array) -> jax.Array:
         c1 = coeff1(k)
         c2 = coeff2(k)
         term = di.fast_mul(c1, c2)
         term = di.fast_mul(term, _interval_pow(t1, k))
         term = di.fast_mul(term, _interval_pow(t2, n - k))
-        acc = di.fast_add(acc, term)
+        return di.fast_add(acc, term)
+
+    acc = lax.fori_loop(0, n + 1, body, di.interval(0.0, 0.0))
     finite = jnp.isfinite(acc[..., 0]) & jnp.isfinite(acc[..., 1])
     return jnp.where(finite[..., None], acc, _full_interval())
 
@@ -2405,7 +2538,23 @@ def arb_hypgeom_pfq(a: jax.Array, b: jax.Array, z: jax.Array, reciprocal: bool =
     a = jnp.asarray(a, dtype=jnp.float64)
     b = jnp.asarray(b, dtype=jnp.float64)
     z = di.as_interval(z)
+    z0, z1 = z[0], z[1]
     z_m = _interval_midpoint(z)
+
+    def scalar(zs):
+        def body(k, state):
+            term, s = state
+            k1 = jnp.float64(k + 1)
+            num = jnp.prod(a + k) if a.size else 1.0
+            den = jnp.prod(b + k) if b.size else 1.0
+            step = (num / den) * (zs / k1)
+            term = term * step
+            return term, s + term
+
+        term0 = jnp.float64(1.0)
+        sum0 = term0
+        _term, s = lax.fori_loop(0, n_terms - 1, body, (term0, sum0))
+        return s
 
     def body(k, state):
         term, s = state
@@ -2428,8 +2577,9 @@ def arb_hypgeom_pfq(a: jax.Array, b: jax.Array, z: jax.Array, reciprocal: bool =
     tail = _series_tail_bound_geom(term_abs, ratio) + jnp.exp2(-jnp.float64(53))
     s_tail = _series_interval_from_mid(s, tail)
     s_tail = jnp.where(ok, s_tail, _full_interval())
-    s_mid = _interval_from_midpoint(s)
-    out = _select_tighter_interval(s_mid, s_tail)
+    s_mid = _interval_from_midpoint(scalar(z_m))
+    samples = _interval_from_samples(jnp.asarray([scalar(z0), scalar(z1), scalar(z_m)], dtype=jnp.float64))
+    out = _select_tighter_interval(_select_tighter_interval(s_mid, samples), s_tail)
     if reciprocal:
         out = di.fast_div(di.interval(1.0, 1.0), out)
     return out
@@ -3136,23 +3286,12 @@ def acb_hypgeom_1f1(a: jax.Array, b: jax.Array, z: jax.Array, regularized: bool 
         return term, acb_box_add(s, term)
 
     _, s = lax.fori_loop(0, _HYP_TERMS - 1, body, (term0, sum0))
-    a_m = _acb_midpoint(a)
-    b_m = _acb_midpoint(b)
-    z_m = _acb_midpoint(z)
-    val = _complex_hyp1f1_scalar(a_m, b_m, z_m)
-    tail, ok = _tail_bound_1f1_complex(a, b, z, di.DEFAULT_PREC_BITS)
-    s_tail = _acb_box_from_mid_tail(val, tail)
-    s_tail = jnp.where(ok, s_tail, _full_box())
-    z_vals = _acb_corners(z)
-    sample_vals = jax.vmap(lambda zz: _complex_hyp1f1_scalar(a_m, b_m, zz))(z_vals)
-    s_samples = _acb_from_samples(sample_vals)
     if regularized:
         rg = acb_hypgeom_rgamma(b)
         s = acb_box_mul(s, rg)
-        s_tail = acb_box_mul(s_tail, rg)
-        s_samples = acb_box_mul(s_samples, rg)
-    param_ok = _acb_is_small(a) & _acb_is_small(b) & _acb_is_small(z)
+    s_tail, s_regime, s_samples, param_ok = _complex_hyp1f1_candidates(a, b, z, regularized=regularized)
     candidate = _select_tighter_acb(s, s_tail)
+    candidate = _select_tighter_acb(candidate, s_regime)
     candidate = _select_tighter_acb(candidate, s_samples)
     return jnp.where(param_ok, candidate, s)
 
@@ -3195,24 +3334,12 @@ def acb_hypgeom_2f1(a: jax.Array, b: jax.Array, c: jax.Array, z: jax.Array, regu
         return s
 
     s = jax.checkpoint(_series)(a, b, c, z)
-    a_m = _acb_midpoint(a)
-    b_m = _acb_midpoint(b)
-    c_m = _acb_midpoint(c)
-    z_m = _acb_midpoint(z)
-    val = _complex_hyp2f1_scalar(a_m, b_m, c_m, z_m)
-    tail, ok = _tail_bound_2f1_complex(a, b, c, z, di.DEFAULT_PREC_BITS)
-    s_tail = _acb_box_from_mid_tail(val, tail)
-    s_tail = jnp.where(ok, s_tail, _full_box())
-    z_vals = _acb_corners(z)
-    sample_vals = jax.vmap(lambda zz: _complex_hyp2f1_scalar(a_m, b_m, c_m, zz))(z_vals)
-    s_samples = _acb_from_samples(sample_vals)
     if regularized:
         rg = acb_hypgeom_rgamma(c)
         s = acb_box_mul(s, rg)
-        s_tail = acb_box_mul(s_tail, rg)
-        s_samples = acb_box_mul(s_samples, rg)
-    param_ok = _acb_is_small(a) & _acb_is_small(b) & _acb_is_small(c) & _acb_is_small(z)
+    s_tail, s_regime, s_samples, param_ok = _complex_hyp2f1_candidates(a, b, c, z, regularized=regularized)
     candidate = _select_tighter_acb(s, s_tail)
+    candidate = _select_tighter_acb(candidate, s_regime)
     candidate = _select_tighter_acb(candidate, s_samples)
     return jnp.where(param_ok, candidate, s)
 
@@ -3231,16 +3358,9 @@ def _acb_from_complex(z: jax.Array) -> jax.Array:
 
 @jax.jit
 def acb_hypgeom_u(a: jax.Array, b: jax.Array, z: jax.Array) -> jax.Array:
-    a_m = acb_midpoint(a)
-    b_m = acb_midpoint(b)
-    z_m = acb_midpoint(z)
-    mid_val = _complex_hypu_regime(a_m, b_m, z_m)
-    mid_box = _acb_from_complex(mid_val)
-    z_vals = _acb_corners(z)
-    sample_vals = jax.vmap(lambda zz: _complex_hypu_regime(a_m, b_m, zz))(z_vals)
-    s_samples = _acb_from_samples(sample_vals)
-    param_ok = _acb_is_small(a) & _acb_is_small(b) & _acb_is_small(z)
-    candidate = _select_tighter_acb(mid_box, s_samples)
+    mid_box, regime_box, s_samples, param_ok = _complex_hypu_candidates(a, b, z)
+    candidate = _select_tighter_acb(mid_box, regime_box)
+    candidate = _select_tighter_acb(candidate, s_samples)
     return jnp.where(param_ok, candidate, mid_box)
 
 
@@ -3932,6 +4052,15 @@ def arb_hypgeom_gegenbauer_c_batch(n: int, m: jax.Array, z: jax.Array) -> jax.Ar
     return jax.vmap(lambda mi, zi: arb_hypgeom_gegenbauer_c(n, mi, zi))(m, z)
 
 
+def arb_hypgeom_pfq_batch(
+    a: jax.Array, b: jax.Array, z: jax.Array, reciprocal: bool = False, n_terms: int = 32
+) -> jax.Array:
+    a = jnp.asarray(a)
+    b = jnp.asarray(b)
+    z = di.as_interval(z)
+    return jax.vmap(lambda aa, bb, zz: arb_hypgeom_pfq(aa, bb, zz, reciprocal=reciprocal, n_terms=n_terms))(a, b, z)
+
+
 def arb_hypgeom_central_bin_ui_batch(n: jax.Array) -> jax.Array:
     n = jnp.asarray(n, dtype=jnp.int64)
     return jax.vmap(arb_hypgeom_central_bin_ui)(n)
@@ -4040,6 +4169,46 @@ def arb_hypgeom_gamma_upper_batch_prec(
     return di.round_interval_outward(arb_hypgeom_gamma_upper_batch(s, z, regularized=regularized), prec_bits)
 
 
+def arb_hypgeom_gamma_lower_batch_padded_prec(
+    s: jax.Array, z: jax.Array, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS, regularized: bool = False
+) -> jax.Array:
+    s = di.as_interval(s)
+    z = di.as_interval(z)
+    rows = s.shape[0]
+    out = _arb_hypgeom_gamma_lower_batch_padded_prec_core_jit(
+        _pad_rows_to(s, pad_to), _pad_rows_to(z, pad_to), prec_bits=prec_bits, regularized=regularized
+    )
+    return _trim_rows(out, rows)
+
+
+def arb_hypgeom_gamma_lower_batch_fixed_prec(
+    s: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS, regularized: bool = False
+) -> jax.Array:
+    return _arb_hypgeom_gamma_lower_batch_padded_prec_core_jit(
+        di.as_interval(s), di.as_interval(z), prec_bits=prec_bits, regularized=regularized
+    )
+
+
+def arb_hypgeom_gamma_upper_batch_padded_prec(
+    s: jax.Array, z: jax.Array, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS, regularized: bool = False
+) -> jax.Array:
+    s = di.as_interval(s)
+    z = di.as_interval(z)
+    rows = s.shape[0]
+    out = _arb_hypgeom_gamma_upper_batch_padded_prec_core_jit(
+        _pad_rows_to(s, pad_to), _pad_rows_to(z, pad_to), prec_bits=prec_bits, regularized=regularized
+    )
+    return _trim_rows(out, rows)
+
+
+def arb_hypgeom_gamma_upper_batch_fixed_prec(
+    s: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS, regularized: bool = False
+) -> jax.Array:
+    return _arb_hypgeom_gamma_upper_batch_padded_prec_core_jit(
+        di.as_interval(s), di.as_interval(z), prec_bits=prec_bits, regularized=regularized
+    )
+
+
 def arb_hypgeom_beta_lower_batch_prec(
     a: jax.Array, b: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS, regularized: bool = False
 ) -> jax.Array:
@@ -4092,6 +4261,12 @@ def arb_hypgeom_gegenbauer_c_batch_prec(
     n: int, m: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS
 ) -> jax.Array:
     return di.round_interval_outward(arb_hypgeom_gegenbauer_c_batch(n, m, z), prec_bits)
+
+
+def arb_hypgeom_pfq_batch_prec(
+    a: jax.Array, b: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS, reciprocal: bool = False, n_terms: int = 32
+) -> jax.Array:
+    return di.round_interval_outward(arb_hypgeom_pfq_batch(a, b, z, reciprocal=reciprocal, n_terms=n_terms), prec_bits)
 
 
 def arb_hypgeom_central_bin_ui_batch_prec(n: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
@@ -4416,6 +4591,384 @@ def arb_hypgeom_u_integration_batch_prec(a: jax.Array, b: jax.Array, z: jax.Arra
     return arb_hypgeom_u_batch_prec(a, b, z, prec_bits)
 
 
+def arb_hypgeom_0f1_batch_padded_prec(
+    a: jax.Array, z: jax.Array, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS, regularized: bool = False
+) -> jax.Array:
+    a = di.as_interval(a)
+    z = di.as_interval(z)
+    n = a.shape[0]
+    out = _arb_hypgeom_0f1_batch_padded_prec_core_jit(
+        _pad_rows_to(a, pad_to), _pad_rows_to(z, pad_to), prec_bits=prec_bits, regularized=regularized
+    )
+    return _trim_rows(out, n)
+
+
+def arb_hypgeom_0f1_batch_fixed_prec(
+    a: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS, regularized: bool = False
+) -> jax.Array:
+    return _arb_hypgeom_0f1_batch_padded_prec_core_jit(di.as_interval(a), di.as_interval(z), prec_bits=prec_bits, regularized=regularized)
+
+
+def arb_hypgeom_1f1_batch_padded_prec(
+    a: jax.Array, b: jax.Array, z: jax.Array, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS, regularized: bool = False
+) -> jax.Array:
+    a = di.as_interval(a)
+    b = di.as_interval(b)
+    z = di.as_interval(z)
+    n = a.shape[0]
+    out = _arb_hypgeom_1f1_batch_padded_prec_core_jit(
+        _pad_rows_to(a, pad_to), _pad_rows_to(b, pad_to), _pad_rows_to(z, pad_to), prec_bits=prec_bits, regularized=regularized
+    )
+    return _trim_rows(out, n)
+
+
+def arb_hypgeom_1f1_batch_fixed_prec(
+    a: jax.Array, b: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS, regularized: bool = False
+) -> jax.Array:
+    return _arb_hypgeom_1f1_batch_padded_prec_core_jit(
+        di.as_interval(a), di.as_interval(b), di.as_interval(z), prec_bits=prec_bits, regularized=regularized
+    )
+
+
+def arb_hypgeom_m_batch_padded_prec(
+    a: jax.Array, b: jax.Array, z: jax.Array, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS, regularized: bool = False
+) -> jax.Array:
+    return arb_hypgeom_1f1_batch_padded_prec(a, b, z, pad_to=pad_to, prec_bits=prec_bits, regularized=regularized)
+
+
+def arb_hypgeom_m_batch_fixed_prec(
+    a: jax.Array, b: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS, regularized: bool = False
+) -> jax.Array:
+    return arb_hypgeom_1f1_batch_fixed_prec(a, b, z, prec_bits=prec_bits, regularized=regularized)
+
+
+def arb_hypgeom_2f1_batch_padded_prec(
+    a: jax.Array,
+    b: jax.Array,
+    c: jax.Array,
+    z: jax.Array,
+    pad_to: int,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+    regularized: bool = False,
+) -> jax.Array:
+    a = di.as_interval(a)
+    b = di.as_interval(b)
+    c = di.as_interval(c)
+    z = di.as_interval(z)
+    n = a.shape[0]
+    out = _arb_hypgeom_2f1_batch_padded_prec_core_jit(
+        _pad_rows_to(a, pad_to),
+        _pad_rows_to(b, pad_to),
+        _pad_rows_to(c, pad_to),
+        _pad_rows_to(z, pad_to),
+        prec_bits=prec_bits,
+        regularized=regularized,
+    )
+    return _trim_rows(out, n)
+
+
+def arb_hypgeom_2f1_batch_fixed_prec(
+    a: jax.Array,
+    b: jax.Array,
+    c: jax.Array,
+    z: jax.Array,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+    regularized: bool = False,
+) -> jax.Array:
+    return _arb_hypgeom_2f1_batch_padded_prec_core_jit(
+        di.as_interval(a), di.as_interval(b), di.as_interval(c), di.as_interval(z), prec_bits=prec_bits, regularized=regularized
+    )
+
+
+def arb_hypgeom_u_batch_padded_prec(
+    a: jax.Array, b: jax.Array, z: jax.Array, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    a = di.as_interval(a)
+    b = di.as_interval(b)
+    z = di.as_interval(z)
+    n = a.shape[0]
+    out = _arb_hypgeom_u_batch_padded_prec_core_jit(
+        _pad_rows_to(a, pad_to), _pad_rows_to(b, pad_to), _pad_rows_to(z, pad_to), prec_bits=prec_bits
+    )
+    return _trim_rows(out, n)
+
+
+def arb_hypgeom_u_batch_fixed_prec(
+    a: jax.Array, b: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    return _arb_hypgeom_u_batch_padded_prec_core_jit(di.as_interval(a), di.as_interval(b), di.as_interval(z), prec_bits=prec_bits)
+
+
+def arb_hypgeom_legendre_p_batch_padded_prec(
+    n: int, m: jax.Array, z: jax.Array, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS, type: int = 0
+) -> jax.Array:
+    m = di.as_interval(m)
+    z = di.as_interval(z)
+    rows = m.shape[0]
+    out = _arb_hypgeom_legendre_p_batch_padded_prec_core_jit(
+        n, _pad_rows_to(m, pad_to), _pad_rows_to(z, pad_to), prec_bits=prec_bits, type=type
+    )
+    return _trim_rows(out, rows)
+
+
+def arb_hypgeom_legendre_p_batch_fixed_prec(
+    n: int, m: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS, type: int = 0
+) -> jax.Array:
+    return _arb_hypgeom_legendre_p_batch_padded_prec_core_jit(n, di.as_interval(m), di.as_interval(z), prec_bits=prec_bits, type=type)
+
+
+def arb_hypgeom_legendre_q_batch_padded_prec(
+    n: int, m: jax.Array, z: jax.Array, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS, type: int = 0
+) -> jax.Array:
+    m = di.as_interval(m)
+    z = di.as_interval(z)
+    rows = m.shape[0]
+    out = _arb_hypgeom_legendre_q_batch_padded_prec_core_jit(
+        n, _pad_rows_to(m, pad_to), _pad_rows_to(z, pad_to), prec_bits=prec_bits, type=type
+    )
+    return _trim_rows(out, rows)
+
+
+def arb_hypgeom_legendre_q_batch_fixed_prec(
+    n: int, m: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS, type: int = 0
+) -> jax.Array:
+    return _arb_hypgeom_legendre_q_batch_padded_prec_core_jit(n, di.as_interval(m), di.as_interval(z), prec_bits=prec_bits, type=type)
+
+
+def arb_hypgeom_jacobi_p_batch_padded_prec(
+    n: int, a: jax.Array, b: jax.Array, z: jax.Array, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    a = di.as_interval(a)
+    b = di.as_interval(b)
+    z = di.as_interval(z)
+    rows = a.shape[0]
+    out = _arb_hypgeom_jacobi_p_batch_padded_prec_core_jit(
+        n, _pad_rows_to(a, pad_to), _pad_rows_to(b, pad_to), _pad_rows_to(z, pad_to), prec_bits=prec_bits
+    )
+    return _trim_rows(out, rows)
+
+
+def arb_hypgeom_jacobi_p_batch_fixed_prec(
+    n: int, a: jax.Array, b: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    return _arb_hypgeom_jacobi_p_batch_padded_prec_core_jit(
+        n, di.as_interval(a), di.as_interval(b), di.as_interval(z), prec_bits=prec_bits
+    )
+
+
+def arb_hypgeom_gegenbauer_c_batch_padded_prec(
+    n: int, m: jax.Array, z: jax.Array, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    m = di.as_interval(m)
+    z = di.as_interval(z)
+    rows = m.shape[0]
+    out = _arb_hypgeom_gegenbauer_c_batch_padded_prec_core_jit(
+        n, _pad_rows_to(m, pad_to), _pad_rows_to(z, pad_to), prec_bits=prec_bits
+    )
+    return _trim_rows(out, rows)
+
+
+def arb_hypgeom_gegenbauer_c_batch_fixed_prec(
+    n: int, m: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    return _arb_hypgeom_gegenbauer_c_batch_padded_prec_core_jit(n, di.as_interval(m), di.as_interval(z), prec_bits=prec_bits)
+
+
+def arb_hypgeom_chebyshev_t_batch_padded_prec(
+    n: int, z: jax.Array, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    z = di.as_interval(z)
+    rows = z.shape[0]
+    out = _arb_hypgeom_chebyshev_t_batch_padded_prec_core_jit(n, _pad_rows_to(z, pad_to), prec_bits=prec_bits)
+    return _trim_rows(out, rows)
+
+
+def arb_hypgeom_chebyshev_t_batch_fixed_prec(
+    n: int, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    return _arb_hypgeom_chebyshev_t_batch_padded_prec_core_jit(n, di.as_interval(z), prec_bits=prec_bits)
+
+
+def arb_hypgeom_chebyshev_u_batch_padded_prec(
+    n: int, z: jax.Array, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    z = di.as_interval(z)
+    rows = z.shape[0]
+    out = _arb_hypgeom_chebyshev_u_batch_padded_prec_core_jit(n, _pad_rows_to(z, pad_to), prec_bits=prec_bits)
+    return _trim_rows(out, rows)
+
+
+def arb_hypgeom_chebyshev_u_batch_fixed_prec(
+    n: int, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    return _arb_hypgeom_chebyshev_u_batch_padded_prec_core_jit(n, di.as_interval(z), prec_bits=prec_bits)
+
+
+def arb_hypgeom_laguerre_l_batch_padded_prec(
+    n: int, m: jax.Array, z: jax.Array, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    m = di.as_interval(m)
+    z = di.as_interval(z)
+    rows = m.shape[0]
+    out = _arb_hypgeom_laguerre_l_batch_padded_prec_core_jit(
+        n, _pad_rows_to(m, pad_to), _pad_rows_to(z, pad_to), prec_bits=prec_bits
+    )
+    return _trim_rows(out, rows)
+
+
+def arb_hypgeom_laguerre_l_batch_fixed_prec(
+    n: int, m: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    return _arb_hypgeom_laguerre_l_batch_padded_prec_core_jit(n, di.as_interval(m), di.as_interval(z), prec_bits=prec_bits)
+
+
+def arb_hypgeom_hermite_h_batch_padded_prec(
+    n: int, z: jax.Array, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    z = di.as_interval(z)
+    rows = z.shape[0]
+    out = _arb_hypgeom_hermite_h_batch_padded_prec_core_jit(n, _pad_rows_to(z, pad_to), prec_bits=prec_bits)
+    return _trim_rows(out, rows)
+
+
+def arb_hypgeom_hermite_h_batch_fixed_prec(
+    n: int, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    return _arb_hypgeom_hermite_h_batch_padded_prec_core_jit(n, di.as_interval(z), prec_bits=prec_bits)
+
+
+def arb_hypgeom_pfq_batch_padded_prec(
+    a: jax.Array,
+    b: jax.Array,
+    z: jax.Array,
+    pad_to: int,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+    reciprocal: bool = False,
+    n_terms: int = 32,
+) -> jax.Array:
+    a = jnp.asarray(a)
+    b = jnp.asarray(b)
+    z = di.as_interval(z)
+    rows = z.shape[0]
+    out = _arb_hypgeom_pfq_batch_padded_prec_core_jit(
+        _pad_rows_to(a, pad_to),
+        _pad_rows_to(b, pad_to),
+        _pad_rows_to(z, pad_to),
+        prec_bits=prec_bits,
+        reciprocal=reciprocal,
+        n_terms=n_terms,
+    )
+    return _trim_rows(out, rows)
+
+
+def arb_hypgeom_pfq_batch_fixed_prec(
+    a: jax.Array,
+    b: jax.Array,
+    z: jax.Array,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+    reciprocal: bool = False,
+    n_terms: int = 32,
+) -> jax.Array:
+    return _arb_hypgeom_pfq_batch_padded_prec_core_jit(
+        jnp.asarray(a), jnp.asarray(b), di.as_interval(z), prec_bits=prec_bits, reciprocal=reciprocal, n_terms=n_terms
+    )
+
+
+def _arb_hypgeom_0f1_batch_padded_prec_core(
+    a: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS, regularized: bool = False
+) -> jax.Array:
+    return di.round_interval_outward(arb_hypgeom_0f1_batch(a, z, regularized=regularized), prec_bits)
+
+
+def _arb_hypgeom_1f1_batch_padded_prec_core(
+    a: jax.Array, b: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS, regularized: bool = False
+) -> jax.Array:
+    return di.round_interval_outward(arb_hypgeom_1f1_batch(a, b, z, regularized=regularized), prec_bits)
+
+
+def _arb_hypgeom_2f1_batch_padded_prec_core(
+    a: jax.Array, b: jax.Array, c: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS, regularized: bool = False
+) -> jax.Array:
+    return di.round_interval_outward(arb_hypgeom_2f1_batch(a, b, c, z, regularized=regularized), prec_bits)
+
+
+def _arb_hypgeom_u_batch_padded_prec_core(
+    a: jax.Array, b: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    return di.round_interval_outward(arb_hypgeom_u_batch(a, b, z), prec_bits)
+
+
+def _arb_hypgeom_gamma_lower_batch_padded_prec_core(
+    s: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS, regularized: bool = False
+) -> jax.Array:
+    return di.round_interval_outward(arb_hypgeom_gamma_lower_batch(s, z, regularized=regularized), prec_bits)
+
+
+def _arb_hypgeom_gamma_upper_batch_padded_prec_core(
+    s: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS, regularized: bool = False
+) -> jax.Array:
+    return di.round_interval_outward(arb_hypgeom_gamma_upper_batch(s, z, regularized=regularized), prec_bits)
+
+
+def _arb_hypgeom_legendre_p_batch_padded_prec_core(
+    n: int, m: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS, type: int = 0
+) -> jax.Array:
+    return di.round_interval_outward(arb_hypgeom_legendre_p_batch(n, m, z, type=type), prec_bits)
+
+
+def _arb_hypgeom_legendre_q_batch_padded_prec_core(
+    n: int, m: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS, type: int = 0
+) -> jax.Array:
+    return di.round_interval_outward(arb_hypgeom_legendre_q_batch(n, m, z, type=type), prec_bits)
+
+
+def _arb_hypgeom_jacobi_p_batch_padded_prec_core(
+    n: int, a: jax.Array, b: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    return di.round_interval_outward(arb_hypgeom_jacobi_p_batch(n, a, b, z), prec_bits)
+
+
+def _arb_hypgeom_gegenbauer_c_batch_padded_prec_core(
+    n: int, m: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    return di.round_interval_outward(arb_hypgeom_gegenbauer_c_batch(n, m, z), prec_bits)
+
+
+def _arb_hypgeom_chebyshev_t_batch_padded_prec_core(
+    n: int, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    return di.round_interval_outward(arb_hypgeom_chebyshev_t_batch(n, z), prec_bits)
+
+
+def _arb_hypgeom_chebyshev_u_batch_padded_prec_core(
+    n: int, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    return di.round_interval_outward(arb_hypgeom_chebyshev_u_batch(n, z), prec_bits)
+
+
+def _arb_hypgeom_laguerre_l_batch_padded_prec_core(
+    n: int, m: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    return di.round_interval_outward(arb_hypgeom_laguerre_l_batch(n, m, z), prec_bits)
+
+
+def _arb_hypgeom_hermite_h_batch_padded_prec_core(
+    n: int, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    return di.round_interval_outward(arb_hypgeom_hermite_h_batch(n, z), prec_bits)
+
+
+def _arb_hypgeom_pfq_batch_padded_prec_core(
+    a: jax.Array,
+    b: jax.Array,
+    z: jax.Array,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+    reciprocal: bool = False,
+    n_terms: int = 32,
+) -> jax.Array:
+    return di.round_interval_outward(arb_hypgeom_pfq_batch(a, b, z, reciprocal=reciprocal, n_terms=n_terms), prec_bits)
+
+
 def acb_hypgeom_lgamma_batch(x: jax.Array) -> jax.Array:
     x = as_acb_box(x)
     return jax.vmap(acb_hypgeom_lgamma)(x)
@@ -4424,6 +4977,36 @@ def acb_hypgeom_lgamma_batch(x: jax.Array) -> jax.Array:
 def acb_hypgeom_gamma_batch(x: jax.Array) -> jax.Array:
     x = as_acb_box(x)
     return jax.vmap(acb_hypgeom_gamma)(x)
+
+
+def acb_hypgeom_chebyshev_t_batch(n: int, z: jax.Array) -> jax.Array:
+    z = as_acb_box(z)
+    return jax.vmap(lambda zi: acb_hypgeom_chebyshev_t(n, zi))(z)
+
+
+def acb_hypgeom_chebyshev_u_batch(n: int, z: jax.Array) -> jax.Array:
+    z = as_acb_box(z)
+    return jax.vmap(lambda zi: acb_hypgeom_chebyshev_u(n, zi))(z)
+
+
+def acb_hypgeom_laguerre_l_batch(n: int, a: jax.Array, z: jax.Array) -> jax.Array:
+    a = as_acb_box(a)
+    z = as_acb_box(z)
+    return jax.vmap(lambda aa, zz: acb_hypgeom_laguerre_l(n, aa, zz))(a, z)
+
+
+def acb_hypgeom_hermite_h_batch(n: int, z: jax.Array) -> jax.Array:
+    z = as_acb_box(z)
+    return jax.vmap(lambda zi: acb_hypgeom_hermite_h(n, zi))(z)
+
+
+def acb_hypgeom_pfq_batch(
+    a: jax.Array, b: jax.Array, z: jax.Array, reciprocal: bool = False, n_terms: int = 32
+) -> jax.Array:
+    a = as_acb_box(a)
+    b = as_acb_box(b)
+    z = as_acb_box(z)
+    return jax.vmap(lambda aa, bb, zz: acb_hypgeom_pfq(aa, bb, zz, reciprocal=reciprocal, n_terms=n_terms))(a, b, z)
 
 
 def acb_hypgeom_rgamma_batch(x: jax.Array) -> jax.Array:
@@ -4566,7 +5149,8 @@ def acb_hypgeom_0f1_batch(a: jax.Array, z: jax.Array, regularized: bool = False)
     def body(k, state):
         term, s = state
         ak = acb_box_add_ui(a, k)
-        inv_k1 = di.interval(1.0 / jnp.float64(k + 1), 1.0 / jnp.float64(k + 1))
+        inv = jnp.asarray(1.0, dtype=acb_real(a).dtype) / jnp.asarray(k + 1, dtype=acb_real(a).dtype)
+        inv_k1 = di.interval(inv, inv)
         step = acb_box_div(z, ak)
         step = acb_box_scale_real(step, inv_k1)
         term = acb_box_mul(term, step)
@@ -4591,7 +5175,8 @@ def acb_hypgeom_1f1_batch(a: jax.Array, b: jax.Array, z: jax.Array, regularized:
         ak = acb_box_add_ui(a, k)
         bk = acb_box_add_ui(b, k)
         step = acb_box_div(ak, bk)
-        inv_k1 = di.interval(1.0 / jnp.float64(k + 1), 1.0 / jnp.float64(k + 1))
+        inv = jnp.asarray(1.0, dtype=acb_real(a).dtype) / jnp.asarray(k + 1, dtype=acb_real(a).dtype)
+        inv_k1 = di.interval(inv, inv)
         term = acb_box_mul(term, step)
         term = acb_box_mul(term, z)
         term = acb_box_scale_real(term, inv_k1)
@@ -4621,7 +5206,8 @@ def acb_hypgeom_2f1_batch(a: jax.Array, b: jax.Array, c: jax.Array, z: jax.Array
         ak = acb_box_add_ui(a, k)
         bk = acb_box_add_ui(b, k)
         ck = acb_box_add_ui(c, k)
-        k1 = di.interval(jnp.float64(k + 1), jnp.float64(k + 1))
+        k1f = jnp.asarray(k + 1, dtype=acb_real(a).dtype)
+        k1 = di.interval(k1f, k1f)
         num = acb_box_mul(ak, bk)
         den = acb_box_scale_real(ck, k1)
         step = acb_box_div(num, den)
@@ -4669,7 +5255,7 @@ def acb_hypgeom_u_batch_prec(a: jax.Array, b: jax.Array, z: jax.Array, prec_bits
     a = as_acb_box(a)
     b = as_acb_box(b)
     z = as_acb_box(z)
-    return acb_box_round_prec(acb_hypgeom_u_batch(a, b, z), prec_bits)
+    return lax.convert_element_type(acb_box_round_prec(acb_hypgeom_u_batch(a, b, z), prec_bits), a.dtype)
 
 
 def acb_hypgeom_u_integration_batch_prec(
@@ -4875,21 +5461,21 @@ def _acb_hypgeom_bessel_k_scaled_batch_padded_prec_core(
 def acb_hypgeom_0f1_batch_prec(a: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS, regularized: bool = False) -> jax.Array:
     a = as_acb_box(a)
     z = as_acb_box(z)
-    return acb_box_round_prec(acb_hypgeom_0f1_batch(a, z, regularized=regularized), prec_bits)
+    return lax.convert_element_type(acb_box_round_prec(acb_hypgeom_0f1_batch(a, z, regularized=regularized), prec_bits), a.dtype)
 
 
 def acb_hypgeom_1f1_batch_prec(a: jax.Array, b: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS, regularized: bool = False) -> jax.Array:
     a = as_acb_box(a)
     b = as_acb_box(b)
     z = as_acb_box(z)
-    return acb_box_round_prec(acb_hypgeom_1f1_batch(a, b, z, regularized=regularized), prec_bits)
+    return lax.convert_element_type(acb_box_round_prec(acb_hypgeom_1f1_batch(a, b, z, regularized=regularized), prec_bits), a.dtype)
 
 
 def acb_hypgeom_m_batch_prec(a: jax.Array, b: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS, regularized: bool = False) -> jax.Array:
     a = as_acb_box(a)
     b = as_acb_box(b)
     z = as_acb_box(z)
-    return acb_box_round_prec(acb_hypgeom_m_batch(a, b, z, regularized=regularized), prec_bits)
+    return lax.convert_element_type(acb_box_round_prec(acb_hypgeom_m_batch(a, b, z, regularized=regularized), prec_bits), a.dtype)
 
 
 def acb_hypgeom_2f1_batch_prec(a: jax.Array, b: jax.Array, c: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS, regularized: bool = False) -> jax.Array:
@@ -4897,7 +5483,324 @@ def acb_hypgeom_2f1_batch_prec(a: jax.Array, b: jax.Array, c: jax.Array, z: jax.
     b = as_acb_box(b)
     c = as_acb_box(c)
     z = as_acb_box(z)
-    return acb_box_round_prec(acb_hypgeom_2f1_batch(a, b, c, z, regularized=regularized), prec_bits)
+    return lax.convert_element_type(acb_box_round_prec(acb_hypgeom_2f1_batch(a, b, c, z, regularized=regularized), prec_bits), a.dtype)
+
+
+def acb_hypgeom_0f1_batch_padded_prec(
+    a: jax.Array, z: jax.Array, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS, regularized: bool = False
+) -> jax.Array:
+    a = as_acb_box(a)
+    z = as_acb_box(z)
+    n = a.shape[0]
+    out = _acb_hypgeom_0f1_batch_padded_prec_core_jit(
+        _pad_rows_to(a, pad_to), _pad_rows_to(z, pad_to), prec_bits=prec_bits, regularized=regularized
+    )
+    return _trim_rows(out, n)
+
+
+def acb_hypgeom_0f1_batch_fixed_prec(
+    a: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS, regularized: bool = False
+) -> jax.Array:
+    return _acb_hypgeom_0f1_batch_padded_prec_core_jit(as_acb_box(a), as_acb_box(z), prec_bits=prec_bits, regularized=regularized)
+
+
+def acb_hypgeom_1f1_batch_padded_prec(
+    a: jax.Array, b: jax.Array, z: jax.Array, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS, regularized: bool = False
+) -> jax.Array:
+    a = as_acb_box(a)
+    b = as_acb_box(b)
+    z = as_acb_box(z)
+    n = a.shape[0]
+    out = _acb_hypgeom_1f1_batch_padded_prec_core_jit(
+        _pad_rows_to(a, pad_to), _pad_rows_to(b, pad_to), _pad_rows_to(z, pad_to), prec_bits=prec_bits, regularized=regularized
+    )
+    return _trim_rows(out, n)
+
+
+def acb_hypgeom_1f1_batch_fixed_prec(
+    a: jax.Array, b: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS, regularized: bool = False
+) -> jax.Array:
+    return _acb_hypgeom_1f1_batch_padded_prec_core_jit(
+        as_acb_box(a), as_acb_box(b), as_acb_box(z), prec_bits=prec_bits, regularized=regularized
+    )
+
+
+def acb_hypgeom_m_batch_padded_prec(
+    a: jax.Array, b: jax.Array, z: jax.Array, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS, regularized: bool = False
+) -> jax.Array:
+    return acb_hypgeom_1f1_batch_padded_prec(a, b, z, pad_to=pad_to, prec_bits=prec_bits, regularized=regularized)
+
+
+def acb_hypgeom_m_batch_fixed_prec(
+    a: jax.Array, b: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS, regularized: bool = False
+) -> jax.Array:
+    return acb_hypgeom_1f1_batch_fixed_prec(a, b, z, prec_bits=prec_bits, regularized=regularized)
+
+
+def acb_hypgeom_2f1_batch_padded_prec(
+    a: jax.Array,
+    b: jax.Array,
+    c: jax.Array,
+    z: jax.Array,
+    pad_to: int,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+    regularized: bool = False,
+) -> jax.Array:
+    a = as_acb_box(a)
+    b = as_acb_box(b)
+    c = as_acb_box(c)
+    z = as_acb_box(z)
+    n = a.shape[0]
+    out = _acb_hypgeom_2f1_batch_padded_prec_core_jit(
+        _pad_rows_to(a, pad_to),
+        _pad_rows_to(b, pad_to),
+        _pad_rows_to(c, pad_to),
+        _pad_rows_to(z, pad_to),
+        prec_bits=prec_bits,
+        regularized=regularized,
+    )
+    return _trim_rows(out, n)
+
+
+def acb_hypgeom_2f1_batch_fixed_prec(
+    a: jax.Array,
+    b: jax.Array,
+    c: jax.Array,
+    z: jax.Array,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+    regularized: bool = False,
+) -> jax.Array:
+    return _acb_hypgeom_2f1_batch_padded_prec_core_jit(
+        as_acb_box(a), as_acb_box(b), as_acb_box(c), as_acb_box(z), prec_bits=prec_bits, regularized=regularized
+    )
+
+
+def acb_hypgeom_u_batch_padded_prec(
+    a: jax.Array, b: jax.Array, z: jax.Array, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    a = as_acb_box(a)
+    b = as_acb_box(b)
+    z = as_acb_box(z)
+    n = a.shape[0]
+    out = _acb_hypgeom_u_batch_padded_prec_core_jit(
+        _pad_rows_to(a, pad_to), _pad_rows_to(b, pad_to), _pad_rows_to(z, pad_to), prec_bits=prec_bits
+    )
+    return _trim_rows(out, n)
+
+
+def acb_hypgeom_u_batch_fixed_prec(
+    a: jax.Array, b: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    return _acb_hypgeom_u_batch_padded_prec_core_jit(as_acb_box(a), as_acb_box(b), as_acb_box(z), prec_bits=prec_bits)
+
+
+def _acb_hypgeom_0f1_batch_padded_prec_core(
+    a: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS, regularized: bool = False
+) -> jax.Array:
+    return lax.convert_element_type(acb_box_round_prec(acb_hypgeom_0f1_batch(a, z, regularized=regularized), prec_bits), a.dtype)
+
+
+def _acb_hypgeom_1f1_batch_padded_prec_core(
+    a: jax.Array, b: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS, regularized: bool = False
+) -> jax.Array:
+    return lax.convert_element_type(acb_box_round_prec(acb_hypgeom_1f1_batch(a, b, z, regularized=regularized), prec_bits), a.dtype)
+
+
+def _acb_hypgeom_2f1_batch_padded_prec_core(
+    a: jax.Array, b: jax.Array, c: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS, regularized: bool = False
+) -> jax.Array:
+    return lax.convert_element_type(acb_box_round_prec(acb_hypgeom_2f1_batch(a, b, c, z, regularized=regularized), prec_bits), a.dtype)
+
+
+def _acb_hypgeom_u_batch_padded_prec_core(
+    a: jax.Array, b: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    return lax.convert_element_type(acb_box_round_prec(acb_hypgeom_u_batch(a, b, z), prec_bits), a.dtype)
+
+
+def _acb_hypgeom_gamma_lower_batch_padded_prec_core(
+    s: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS, regularized: bool = False
+) -> jax.Array:
+    return lax.convert_element_type(acb_box_round_prec(acb_hypgeom_gamma_lower_batch(s, z, regularized=regularized), prec_bits), s.dtype)
+
+
+def _acb_hypgeom_gamma_upper_batch_padded_prec_core(
+    s: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS, regularized: bool = False
+) -> jax.Array:
+    return lax.convert_element_type(acb_box_round_prec(acb_hypgeom_gamma_upper_batch(s, z, regularized=regularized), prec_bits), s.dtype)
+
+
+def acb_hypgeom_chebyshev_t_batch_prec(
+    n: int, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    z = as_acb_box(z)
+    return lax.convert_element_type(acb_box_round_prec(acb_hypgeom_chebyshev_t_batch(n, z), prec_bits), z.dtype)
+
+
+def acb_hypgeom_chebyshev_u_batch_prec(
+    n: int, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    z = as_acb_box(z)
+    return lax.convert_element_type(acb_box_round_prec(acb_hypgeom_chebyshev_u_batch(n, z), prec_bits), z.dtype)
+
+
+def acb_hypgeom_laguerre_l_batch_prec(
+    n: int, a: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    a = as_acb_box(a)
+    z = as_acb_box(z)
+    return lax.convert_element_type(acb_box_round_prec(acb_hypgeom_laguerre_l_batch(n, a, z), prec_bits), a.dtype)
+
+
+def acb_hypgeom_hermite_h_batch_prec(
+    n: int, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    z = as_acb_box(z)
+    return lax.convert_element_type(acb_box_round_prec(acb_hypgeom_hermite_h_batch(n, z), prec_bits), z.dtype)
+
+
+def acb_hypgeom_pfq_batch_prec(
+    a: jax.Array, b: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS, reciprocal: bool = False, n_terms: int = 32
+) -> jax.Array:
+    a = as_acb_box(a)
+    b = as_acb_box(b)
+    z = as_acb_box(z)
+    return lax.convert_element_type(acb_box_round_prec(acb_hypgeom_pfq_batch(a, b, z, reciprocal=reciprocal, n_terms=n_terms), prec_bits), a.dtype)
+
+
+def acb_hypgeom_chebyshev_t_batch_padded_prec(
+    n: int, z: jax.Array, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    z = as_acb_box(z)
+    rows = z.shape[0]
+    out = _acb_hypgeom_chebyshev_t_batch_padded_prec_core_jit(n, _pad_rows_to(z, pad_to), prec_bits=prec_bits)
+    return _trim_rows(out, rows)
+
+
+def acb_hypgeom_chebyshev_t_batch_fixed_prec(
+    n: int, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    return _acb_hypgeom_chebyshev_t_batch_padded_prec_core_jit(n, as_acb_box(z), prec_bits=prec_bits)
+
+
+def acb_hypgeom_chebyshev_u_batch_padded_prec(
+    n: int, z: jax.Array, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    z = as_acb_box(z)
+    rows = z.shape[0]
+    out = _acb_hypgeom_chebyshev_u_batch_padded_prec_core_jit(n, _pad_rows_to(z, pad_to), prec_bits=prec_bits)
+    return _trim_rows(out, rows)
+
+
+def acb_hypgeom_chebyshev_u_batch_fixed_prec(
+    n: int, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    return _acb_hypgeom_chebyshev_u_batch_padded_prec_core_jit(n, as_acb_box(z), prec_bits=prec_bits)
+
+
+def acb_hypgeom_laguerre_l_batch_padded_prec(
+    n: int, a: jax.Array, z: jax.Array, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    a = as_acb_box(a)
+    z = as_acb_box(z)
+    rows = a.shape[0]
+    out = _acb_hypgeom_laguerre_l_batch_padded_prec_core_jit(
+        n, _pad_rows_to(a, pad_to), _pad_rows_to(z, pad_to), prec_bits=prec_bits
+    )
+    return _trim_rows(out, rows)
+
+
+def acb_hypgeom_laguerre_l_batch_fixed_prec(
+    n: int, a: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    return _acb_hypgeom_laguerre_l_batch_padded_prec_core_jit(n, as_acb_box(a), as_acb_box(z), prec_bits=prec_bits)
+
+
+def acb_hypgeom_hermite_h_batch_padded_prec(
+    n: int, z: jax.Array, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    z = as_acb_box(z)
+    rows = z.shape[0]
+    out = _acb_hypgeom_hermite_h_batch_padded_prec_core_jit(n, _pad_rows_to(z, pad_to), prec_bits=prec_bits)
+    return _trim_rows(out, rows)
+
+
+def acb_hypgeom_hermite_h_batch_fixed_prec(
+    n: int, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    return _acb_hypgeom_hermite_h_batch_padded_prec_core_jit(n, as_acb_box(z), prec_bits=prec_bits)
+
+
+def acb_hypgeom_pfq_batch_padded_prec(
+    a: jax.Array,
+    b: jax.Array,
+    z: jax.Array,
+    pad_to: int,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+    reciprocal: bool = False,
+    n_terms: int = 32,
+) -> jax.Array:
+    a = as_acb_box(a)
+    b = as_acb_box(b)
+    z = as_acb_box(z)
+    rows = z.shape[0]
+    out = _acb_hypgeom_pfq_batch_padded_prec_core_jit(
+        _pad_rows_to(a, pad_to),
+        _pad_rows_to(b, pad_to),
+        _pad_rows_to(z, pad_to),
+        prec_bits=prec_bits,
+        reciprocal=reciprocal,
+        n_terms=n_terms,
+    )
+    return _trim_rows(out, rows)
+
+
+def acb_hypgeom_pfq_batch_fixed_prec(
+    a: jax.Array,
+    b: jax.Array,
+    z: jax.Array,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+    reciprocal: bool = False,
+    n_terms: int = 32,
+) -> jax.Array:
+    return _acb_hypgeom_pfq_batch_padded_prec_core_jit(
+        as_acb_box(a), as_acb_box(b), as_acb_box(z), prec_bits=prec_bits, reciprocal=reciprocal, n_terms=n_terms
+    )
+
+
+def _acb_hypgeom_chebyshev_t_batch_padded_prec_core(
+    n: int, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    return lax.convert_element_type(acb_box_round_prec(acb_hypgeom_chebyshev_t_batch(n, z), prec_bits), z.dtype)
+
+
+def _acb_hypgeom_chebyshev_u_batch_padded_prec_core(
+    n: int, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    return lax.convert_element_type(acb_box_round_prec(acb_hypgeom_chebyshev_u_batch(n, z), prec_bits), z.dtype)
+
+
+def _acb_hypgeom_laguerre_l_batch_padded_prec_core(
+    n: int, a: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    return lax.convert_element_type(acb_box_round_prec(acb_hypgeom_laguerre_l_batch(n, a, z), prec_bits), a.dtype)
+
+
+def _acb_hypgeom_hermite_h_batch_padded_prec_core(
+    n: int, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS
+) -> jax.Array:
+    return lax.convert_element_type(acb_box_round_prec(acb_hypgeom_hermite_h_batch(n, z), prec_bits), z.dtype)
+
+
+def _acb_hypgeom_pfq_batch_padded_prec_core(
+    a: jax.Array,
+    b: jax.Array,
+    z: jax.Array,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+    reciprocal: bool = False,
+    n_terms: int = 32,
+) -> jax.Array:
+    return lax.convert_element_type(acb_box_round_prec(acb_hypgeom_pfq_batch(a, b, z, reciprocal=reciprocal, n_terms=n_terms), prec_bits), a.dtype)
 
 
 arb_hypgeom_rising_ui_batch_jit = jax.jit(arb_hypgeom_rising_ui_batch, static_argnames=("n",))
@@ -5156,12 +6059,76 @@ _acb_hypgeom_bessel_i_batch_padded_prec_core_jit = jax.jit(_acb_hypgeom_bessel_i
 _acb_hypgeom_bessel_k_batch_padded_prec_core_jit = jax.jit(_acb_hypgeom_bessel_k_batch_padded_prec_core, static_argnames=("prec_bits",))
 _acb_hypgeom_bessel_i_scaled_batch_padded_prec_core_jit = jax.jit(_acb_hypgeom_bessel_i_scaled_batch_padded_prec_core, static_argnames=("prec_bits",))
 _acb_hypgeom_bessel_k_scaled_batch_padded_prec_core_jit = jax.jit(_acb_hypgeom_bessel_k_scaled_batch_padded_prec_core, static_argnames=("prec_bits",))
+_arb_hypgeom_0f1_batch_padded_prec_core_jit = jax.jit(_arb_hypgeom_0f1_batch_padded_prec_core, static_argnames=("prec_bits", "regularized"))
+_arb_hypgeom_1f1_batch_padded_prec_core_jit = jax.jit(_arb_hypgeom_1f1_batch_padded_prec_core, static_argnames=("prec_bits", "regularized"))
+_arb_hypgeom_2f1_batch_padded_prec_core_jit = jax.jit(_arb_hypgeom_2f1_batch_padded_prec_core, static_argnames=("prec_bits", "regularized"))
+_arb_hypgeom_u_batch_padded_prec_core_jit = jax.jit(_arb_hypgeom_u_batch_padded_prec_core, static_argnames=("prec_bits",))
+_arb_hypgeom_gamma_lower_batch_padded_prec_core_jit = jax.jit(_arb_hypgeom_gamma_lower_batch_padded_prec_core, static_argnames=("prec_bits", "regularized"))
+_arb_hypgeom_gamma_upper_batch_padded_prec_core_jit = jax.jit(_arb_hypgeom_gamma_upper_batch_padded_prec_core, static_argnames=("prec_bits", "regularized"))
+_arb_hypgeom_legendre_p_batch_padded_prec_core_jit = jax.jit(
+    _arb_hypgeom_legendre_p_batch_padded_prec_core, static_argnames=("n", "prec_bits", "type")
+)
+_arb_hypgeom_legendre_q_batch_padded_prec_core_jit = jax.jit(
+    _arb_hypgeom_legendre_q_batch_padded_prec_core, static_argnames=("n", "prec_bits", "type")
+)
+_arb_hypgeom_jacobi_p_batch_padded_prec_core_jit = jax.jit(
+    _arb_hypgeom_jacobi_p_batch_padded_prec_core, static_argnames=("n", "prec_bits")
+)
+_arb_hypgeom_gegenbauer_c_batch_padded_prec_core_jit = jax.jit(
+    _arb_hypgeom_gegenbauer_c_batch_padded_prec_core, static_argnames=("n", "prec_bits")
+)
+_arb_hypgeom_chebyshev_t_batch_padded_prec_core_jit = jax.jit(
+    _arb_hypgeom_chebyshev_t_batch_padded_prec_core, static_argnames=("n", "prec_bits")
+)
+_arb_hypgeom_chebyshev_u_batch_padded_prec_core_jit = jax.jit(
+    _arb_hypgeom_chebyshev_u_batch_padded_prec_core, static_argnames=("n", "prec_bits")
+)
+_arb_hypgeom_laguerre_l_batch_padded_prec_core_jit = jax.jit(
+    _arb_hypgeom_laguerre_l_batch_padded_prec_core, static_argnames=("n", "prec_bits")
+)
+_arb_hypgeom_hermite_h_batch_padded_prec_core_jit = jax.jit(
+    _arb_hypgeom_hermite_h_batch_padded_prec_core, static_argnames=("n", "prec_bits")
+)
+_arb_hypgeom_pfq_batch_padded_prec_core_jit = jax.jit(
+    _arb_hypgeom_pfq_batch_padded_prec_core, static_argnames=("prec_bits", "reciprocal", "n_terms")
+)
+_acb_hypgeom_0f1_batch_padded_prec_core_jit = jax.jit(_acb_hypgeom_0f1_batch_padded_prec_core, static_argnames=("prec_bits", "regularized"))
+_acb_hypgeom_1f1_batch_padded_prec_core_jit = jax.jit(_acb_hypgeom_1f1_batch_padded_prec_core, static_argnames=("prec_bits", "regularized"))
+_acb_hypgeom_2f1_batch_padded_prec_core_jit = jax.jit(_acb_hypgeom_2f1_batch_padded_prec_core, static_argnames=("prec_bits", "regularized"))
+_acb_hypgeom_u_batch_padded_prec_core_jit = jax.jit(_acb_hypgeom_u_batch_padded_prec_core, static_argnames=("prec_bits",))
+_acb_hypgeom_gamma_lower_batch_padded_prec_core_jit = jax.jit(_acb_hypgeom_gamma_lower_batch_padded_prec_core, static_argnames=("prec_bits", "regularized"))
+_acb_hypgeom_gamma_upper_batch_padded_prec_core_jit = jax.jit(_acb_hypgeom_gamma_upper_batch_padded_prec_core, static_argnames=("prec_bits", "regularized"))
+_acb_hypgeom_chebyshev_t_batch_padded_prec_core_jit = jax.jit(
+    _acb_hypgeom_chebyshev_t_batch_padded_prec_core, static_argnames=("n", "prec_bits")
+)
+_acb_hypgeom_chebyshev_u_batch_padded_prec_core_jit = jax.jit(
+    _acb_hypgeom_chebyshev_u_batch_padded_prec_core, static_argnames=("n", "prec_bits")
+)
+_acb_hypgeom_laguerre_l_batch_padded_prec_core_jit = jax.jit(
+    _acb_hypgeom_laguerre_l_batch_padded_prec_core, static_argnames=("n", "prec_bits")
+)
+_acb_hypgeom_hermite_h_batch_padded_prec_core_jit = jax.jit(
+    _acb_hypgeom_hermite_h_batch_padded_prec_core, static_argnames=("n", "prec_bits")
+)
+_acb_hypgeom_pfq_batch_padded_prec_core_jit = jax.jit(
+    _acb_hypgeom_pfq_batch_padded_prec_core, static_argnames=("prec_bits", "reciprocal", "n_terms")
+)
 acb_hypgeom_bessel_j_batch_padded_prec_jit = acb_hypgeom_bessel_j_batch_padded_prec
 acb_hypgeom_bessel_y_batch_padded_prec_jit = acb_hypgeom_bessel_y_batch_padded_prec
 acb_hypgeom_bessel_i_batch_padded_prec_jit = acb_hypgeom_bessel_i_batch_padded_prec
 acb_hypgeom_bessel_k_batch_padded_prec_jit = acb_hypgeom_bessel_k_batch_padded_prec
 acb_hypgeom_bessel_i_scaled_batch_padded_prec_jit = acb_hypgeom_bessel_i_scaled_batch_padded_prec
 acb_hypgeom_bessel_k_scaled_batch_padded_prec_jit = acb_hypgeom_bessel_k_scaled_batch_padded_prec
+arb_hypgeom_chebyshev_t_batch_padded_prec_jit = arb_hypgeom_chebyshev_t_batch_padded_prec
+arb_hypgeom_chebyshev_u_batch_padded_prec_jit = arb_hypgeom_chebyshev_u_batch_padded_prec
+arb_hypgeom_laguerre_l_batch_padded_prec_jit = arb_hypgeom_laguerre_l_batch_padded_prec
+arb_hypgeom_hermite_h_batch_padded_prec_jit = arb_hypgeom_hermite_h_batch_padded_prec
+arb_hypgeom_pfq_batch_padded_prec_jit = arb_hypgeom_pfq_batch_padded_prec
+acb_hypgeom_chebyshev_t_batch_padded_prec_jit = acb_hypgeom_chebyshev_t_batch_padded_prec
+acb_hypgeom_chebyshev_u_batch_padded_prec_jit = acb_hypgeom_chebyshev_u_batch_padded_prec
+acb_hypgeom_laguerre_l_batch_padded_prec_jit = acb_hypgeom_laguerre_l_batch_padded_prec
+acb_hypgeom_hermite_h_batch_padded_prec_jit = acb_hypgeom_hermite_h_batch_padded_prec
+acb_hypgeom_pfq_batch_padded_prec_jit = acb_hypgeom_pfq_batch_padded_prec
 acb_hypgeom_u_batch_prec_jit = jax.jit(acb_hypgeom_u_batch_prec, static_argnames=("prec_bits",))
 acb_hypgeom_u_integration_batch_prec_jit = jax.jit(acb_hypgeom_u_integration_batch_prec, static_argnames=("prec_bits",))
 acb_hypgeom_1f1_integration_batch_prec_jit = jax.jit(
@@ -5257,7 +6224,7 @@ def _complex_ei_series(z: jax.Array) -> jax.Array:
         return term, s
 
     _, acc = lax.fori_loop(2, _HYP_TERMS + 1, body, (term, acc))
-    return jnp.euler_gamma + jnp.log(z) + acc
+    return jnp.asarray(el.EULER_GAMMA, dtype=z.dtype) + jnp.log(z) + acc
 
 
 def _complex_si_ci_series(z: jax.Array) -> tuple[jax.Array, jax.Array]:
@@ -5277,7 +6244,7 @@ def _complex_si_ci_series(z: jax.Array) -> tuple[jax.Array, jax.Array]:
 
     term_si, si = lax.fori_loop(0, _SI_CI_TERMS - 1, body_si, (term_si, si))
 
-    ci = jnp.euler_gamma + jnp.log(z)
+    ci = jnp.asarray(el.EULER_GAMMA, dtype=z.dtype) + jnp.log(z)
     term_ci = -0.25 * z2
     ci = ci + term_ci
 
@@ -5318,6 +6285,34 @@ def _complex_dilog_series(z: jax.Array) -> jax.Array:
     return acc
 
 
+def _real_ei_scalar(x: jax.Array) -> jax.Array:
+    x = jnp.asarray(x, dtype=jnp.float64)
+    return jnp.real(_complex_ei_series(jnp.asarray(x, dtype=jnp.complex128)))
+
+
+def _real_dilog_scalar(x: jax.Array) -> jax.Array:
+    x = jnp.asarray(x, dtype=jnp.float64)
+    return jnp.real(_complex_dilog_series(jnp.asarray(x, dtype=jnp.complex128)))
+
+
+def _real_erfi_scalar(x: jax.Array) -> jax.Array:
+    x = jnp.asarray(x, dtype=jnp.float64)
+    return jnp.real(_complex_erfi_series(jnp.asarray(x, dtype=jnp.complex128)))
+
+
+_SI_CI_SERIES_CUTOFF = jnp.float64(4.0)
+
+
+def _real_si_ci_scalar(x: jax.Array) -> tuple[jax.Array, jax.Array]:
+    x = jnp.asarray(x, dtype=jnp.float64)
+    use_series = jnp.abs(x) <= _SI_CI_SERIES_CUTOFF
+    s_series, c_series = _si_ci_from_series(x)
+    s_asymp, c_asymp = _si_ci_asymp(x)
+    s = jnp.where(use_series, s_series, s_asymp)
+    c = jnp.where(use_series, c_series, c_asymp)
+    return s, c
+
+
 def _complex_gamma_lower_scalar(s: jax.Array, z: jax.Array) -> jax.Array:
     s = jnp.asarray(s, dtype=jnp.complex128)
     z = jnp.asarray(z, dtype=jnp.complex128)
@@ -5336,6 +6331,115 @@ def _complex_gamma_lower_scalar(s: jax.Array, z: jax.Array) -> jax.Array:
 
 def _complex_gamma_upper_scalar(s: jax.Array, z: jax.Array) -> jax.Array:
     return jnp.exp(_complex_loggamma(s)) - _complex_gamma_lower_scalar(s, z)
+
+
+def _complex_unit_box(dtype: jnp.dtype) -> jax.Array:
+    one = jnp.asarray(1.0, dtype=dtype)
+    zero = jnp.asarray(0.0, dtype=dtype)
+    return acb_box(di.interval(one, one), di.interval(zero, zero))
+
+
+def _complex_gamma_box_from_midpoint(s_m: jax.Array, *, regularized: bool) -> jax.Array:
+    if regularized:
+        return _complex_unit_box(jnp.real(s_m).dtype)
+    return _acb_from_complex(jnp.exp(_complex_loggamma(s_m)))
+
+
+def _complex_incomplete_gamma_candidate(
+    s: jax.Array,
+    z: jax.Array,
+    *,
+    regularized: bool,
+    upper: bool,
+) -> tuple[jax.Array, jax.Array, jax.Array]:
+    s_box = as_acb_box(s)
+    z_box = as_acb_box(z)
+    s_m = acb_midpoint(s_box)
+    z_m = acb_midpoint(z_box)
+    direct_scalar = _complex_gamma_upper_scalar if upper else _complex_gamma_lower_scalar
+    comp_scalar = _complex_gamma_lower_scalar if upper else _complex_gamma_upper_scalar
+
+    direct_mid = direct_scalar(s_m, z_m)
+    if regularized:
+        direct_mid = direct_mid / jnp.exp(_complex_loggamma(s_m))
+    direct = _acb_from_complex(direct_mid)
+
+    corners_s = _acb_corners(s_box)
+    corners_z = _acb_corners(z_box)
+    vals = jax.vmap(lambda ss: jax.vmap(lambda zz: direct_scalar(ss, zz))(corners_z))(corners_s).reshape(-1)
+    if regularized:
+        denom = jax.vmap(lambda ss: jnp.exp(_complex_loggamma(ss)))(jnp.repeat(corners_s, corners_z.shape[0]))
+        vals = vals / denom
+    samples = _acb_from_samples(vals)
+
+    comp_vals = jax.vmap(lambda zz: comp_scalar(s_m, zz))(corners_z)
+    if regularized:
+        comp_vals = comp_vals / jnp.exp(_complex_loggamma(s_m))
+    comp_other = _acb_from_samples(comp_vals)
+    comp = acb_box_sub(_complex_gamma_box_from_midpoint(s_m, regularized=regularized), comp_other)
+    return direct, samples, comp
+
+
+def _complex_hyp1f1_candidates(a: jax.Array, b: jax.Array, z: jax.Array, *, regularized: bool) -> tuple[jax.Array, jax.Array, jax.Array, jax.Array]:
+    a_m = _acb_midpoint(a)
+    b_m = _acb_midpoint(b)
+    z_m = _acb_midpoint(z)
+    val = _complex_hyp1f1_scalar(a_m, b_m, z_m)
+    regime_val = _complex_hyp1f1_regime(a_m, b_m, z_m)
+    tail, ok = _tail_bound_1f1_complex(a, b, z, di.DEFAULT_PREC_BITS)
+    s_tail = _acb_box_from_mid_tail(val, tail)
+    s_tail = jnp.where(ok, s_tail, _full_box())
+    z_vals = _acb_corners(z)
+    s_samples = _acb_from_samples(jax.vmap(lambda zz: _complex_hyp1f1_regime(a_m, b_m, zz))(z_vals))
+    s_regime = _acb_from_samples(jnp.asarray([val, regime_val], dtype=z_m.dtype))
+    if regularized:
+        rg = acb_hypgeom_rgamma(b)
+        s_tail = acb_box_mul(s_tail, rg)
+        s_samples = acb_box_mul(s_samples, rg)
+        s_regime = acb_box_mul(s_regime, rg)
+    param_ok = _acb_is_small(a) & _acb_is_small(b) & _acb_is_small(z)
+    return s_tail, s_regime, s_samples, param_ok
+
+
+def _complex_hyp2f1_candidates(
+    a: jax.Array,
+    b: jax.Array,
+    c: jax.Array,
+    z: jax.Array,
+    *,
+    regularized: bool,
+) -> tuple[jax.Array, jax.Array, jax.Array, jax.Array]:
+    a_m = _acb_midpoint(a)
+    b_m = _acb_midpoint(b)
+    c_m = _acb_midpoint(c)
+    z_m = _acb_midpoint(z)
+    val = _complex_hyp2f1_scalar(a_m, b_m, c_m, z_m)
+    regime_val = _complex_hyp2f1_regime(a_m, b_m, c_m, z_m)
+    tail, ok = _tail_bound_2f1_complex(a, b, c, z, di.DEFAULT_PREC_BITS)
+    s_tail = _acb_box_from_mid_tail(val, tail)
+    s_tail = jnp.where(ok, s_tail, _full_box())
+    z_vals = _acb_corners(z)
+    s_samples = _acb_from_samples(jax.vmap(lambda zz: _complex_hyp2f1_regime(a_m, b_m, c_m, zz))(z_vals))
+    s_regime = _acb_from_samples(jnp.asarray([val, regime_val], dtype=z_m.dtype))
+    if regularized:
+        rg = acb_hypgeom_rgamma(c)
+        s_tail = acb_box_mul(s_tail, rg)
+        s_samples = acb_box_mul(s_samples, rg)
+        s_regime = acb_box_mul(s_regime, rg)
+    param_ok = _acb_is_small(a) & _acb_is_small(b) & _acb_is_small(c) & _acb_is_small(z)
+    return s_tail, s_regime, s_samples, param_ok
+
+
+def _complex_hypu_candidates(a: jax.Array, b: jax.Array, z: jax.Array) -> tuple[jax.Array, jax.Array, jax.Array, jax.Array]:
+    a_m = acb_midpoint(a)
+    b_m = acb_midpoint(b)
+    z_m = acb_midpoint(z)
+    mid_box = _acb_from_complex(_complex_hypu_scalar(a_m, b_m, z_m))
+    regime_box = _acb_from_complex(_complex_hypu_regime(a_m, b_m, z_m))
+    z_vals = _acb_corners(z)
+    s_samples = _acb_from_samples(jax.vmap(lambda zz: _complex_hypu_regime(a_m, b_m, zz))(z_vals))
+    param_ok = _acb_is_small(a) & _acb_is_small(b) & _acb_is_small(z)
+    return mid_box, regime_box, s_samples, param_ok
 
 
 def _complex_log_rising_ui_scalar(x: jax.Array, n: int) -> jax.Array:
@@ -5388,6 +6492,11 @@ def _complex_fresnel(z: jax.Array, normalized: bool) -> tuple[jax.Array, jax.Arr
         s = _SQRT_PI_OVER_2 * s
         c = _SQRT_PI_OVER_2 * c
     return s, c
+
+
+def _real_fresnel_scalar(x: jax.Array, normalized: bool) -> tuple[jax.Array, jax.Array]:
+    x = jnp.asarray(x, dtype=jnp.float64)
+    return _complex_fresnel(jnp.asarray(x, dtype=jnp.complex128), normalized)
 
 
 @jax.jit
@@ -5544,7 +6653,8 @@ def acb_hypgeom_beta_lower(a: jax.Array, b: jax.Array, z: jax.Array, regularized
 @partial(jax.jit, static_argnames=("n",))
 def acb_hypgeom_chebyshev_t(n: int, z: jax.Array) -> jax.Array:
     z_m = acb_midpoint(z)
-    val = jnp.cos(jnp.float64(n) * jnp.arccos(z_m))
+    nf = jnp.asarray(n, dtype=z_m.real.dtype)
+    val = jnp.cos(nf * jnp.arccos(z_m))
     return _acb_from_complex(val)
 
 
@@ -5552,7 +6662,8 @@ def acb_hypgeom_chebyshev_t(n: int, z: jax.Array) -> jax.Array:
 def acb_hypgeom_chebyshev_u(n: int, z: jax.Array) -> jax.Array:
     z_m = acb_midpoint(z)
     theta = jnp.arccos(z_m)
-    val = jnp.sin(jnp.float64(n + 1) * theta) / jnp.sin(theta)
+    nf = jnp.asarray(n + 1, dtype=z_m.real.dtype)
+    val = jnp.sin(nf * theta) / jnp.sin(theta)
     return _acb_from_complex(val)
 
 
@@ -5700,22 +6811,90 @@ def acb_hypgeom_fresnel(z: jax.Array, normalized: bool = False) -> tuple[jax.Arr
 
 @partial(jax.jit, static_argnames=("regularized",))
 def acb_hypgeom_gamma_lower(s: jax.Array, z: jax.Array, regularized: bool = False) -> jax.Array:
-    s_m = acb_midpoint(s)
-    z_m = acb_midpoint(z)
-    val = _complex_gamma_lower_scalar(s_m, z_m)
-    if regularized:
-        val = val / jnp.exp(_complex_loggamma(s_m))
-    return _acb_from_complex(val)
+    direct, samples, comp = _complex_incomplete_gamma_candidate(s, z, regularized=regularized, upper=False)
+    return _select_tighter_acb(_select_tighter_acb(direct, samples), comp)
 
 
 @partial(jax.jit, static_argnames=("regularized",))
 def acb_hypgeom_gamma_upper(s: jax.Array, z: jax.Array, regularized: bool = False) -> jax.Array:
-    s_m = acb_midpoint(s)
-    z_m = acb_midpoint(z)
-    val = _complex_gamma_upper_scalar(s_m, z_m)
-    if regularized:
-        val = val / jnp.exp(_complex_loggamma(s_m))
-    return _acb_from_complex(val)
+    direct, samples, comp = _complex_incomplete_gamma_candidate(s, z, regularized=regularized, upper=True)
+    return _select_tighter_acb(_select_tighter_acb(direct, samples), comp)
+
+
+def acb_hypgeom_gamma_lower_batch(s: jax.Array, z: jax.Array, regularized: bool = False) -> jax.Array:
+    s = as_acb_box(s)
+    z = as_acb_box(z)
+    return jax.vmap(lambda ss, zz: acb_hypgeom_gamma_lower(ss, zz, regularized=regularized))(s, z)
+
+
+def acb_hypgeom_gamma_upper_batch(s: jax.Array, z: jax.Array, regularized: bool = False) -> jax.Array:
+    s = as_acb_box(s)
+    z = as_acb_box(z)
+    return jax.vmap(lambda ss, zz: acb_hypgeom_gamma_upper(ss, zz, regularized=regularized))(s, z)
+
+
+def acb_hypgeom_gamma_lower_prec(
+    s: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS, regularized: bool = False
+) -> jax.Array:
+    return acb_box_round_prec(acb_hypgeom_gamma_lower(s, z, regularized=regularized), prec_bits)
+
+
+def acb_hypgeom_gamma_upper_prec(
+    s: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS, regularized: bool = False
+) -> jax.Array:
+    return acb_box_round_prec(acb_hypgeom_gamma_upper(s, z, regularized=regularized), prec_bits)
+
+
+def acb_hypgeom_gamma_lower_batch_prec(
+    s: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS, regularized: bool = False
+) -> jax.Array:
+    return lax.convert_element_type(acb_box_round_prec(acb_hypgeom_gamma_lower_batch(s, z, regularized=regularized), prec_bits), as_acb_box(s).dtype)
+
+
+def acb_hypgeom_gamma_upper_batch_prec(
+    s: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS, regularized: bool = False
+) -> jax.Array:
+    return lax.convert_element_type(acb_box_round_prec(acb_hypgeom_gamma_upper_batch(s, z, regularized=regularized), prec_bits), as_acb_box(s).dtype)
+
+
+def acb_hypgeom_gamma_lower_batch_padded_prec(
+    s: jax.Array, z: jax.Array, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS, regularized: bool = False
+) -> jax.Array:
+    s = as_acb_box(s)
+    z = as_acb_box(z)
+    rows = s.shape[0]
+    out = _acb_hypgeom_gamma_lower_batch_padded_prec_core_jit(
+        _pad_rows_to(s, pad_to), _pad_rows_to(z, pad_to), prec_bits=prec_bits, regularized=regularized
+    )
+    return _trim_rows(out, rows)
+
+
+def acb_hypgeom_gamma_lower_batch_fixed_prec(
+    s: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS, regularized: bool = False
+) -> jax.Array:
+    return _acb_hypgeom_gamma_lower_batch_padded_prec_core_jit(
+        as_acb_box(s), as_acb_box(z), prec_bits=prec_bits, regularized=regularized
+    )
+
+
+def acb_hypgeom_gamma_upper_batch_padded_prec(
+    s: jax.Array, z: jax.Array, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS, regularized: bool = False
+) -> jax.Array:
+    s = as_acb_box(s)
+    z = as_acb_box(z)
+    rows = s.shape[0]
+    out = _acb_hypgeom_gamma_upper_batch_padded_prec_core_jit(
+        _pad_rows_to(s, pad_to), _pad_rows_to(z, pad_to), prec_bits=prec_bits, regularized=regularized
+    )
+    return _trim_rows(out, rows)
+
+
+def acb_hypgeom_gamma_upper_batch_fixed_prec(
+    s: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS, regularized: bool = False
+) -> jax.Array:
+    return _acb_hypgeom_gamma_upper_batch_padded_prec_core_jit(
+        as_acb_box(s), as_acb_box(z), prec_bits=prec_bits, regularized=regularized
+    )
 
 
 @partial(jax.jit, static_argnames=("regularized",))
@@ -5791,20 +6970,32 @@ def acb_hypgeom_gegenbauer_c(n: int, lam: jax.Array, z: jax.Array) -> jax.Array:
 def acb_hypgeom_hermite_h(n: int, z: jax.Array) -> jax.Array:
     n = int(n)
     z_m = acb_midpoint(z)
+    c_dtype = z_m.dtype
+    r_dtype = z_m.real.dtype
+
+    def scalar(w):
+        if n == 0:
+            return jnp.asarray(1.0 + 0.0j, dtype=c_dtype)
+        if n == 1:
+            return 2.0 * w
+        h0 = jnp.asarray(1.0 + 0.0j, dtype=c_dtype)
+        h1 = 2.0 * w
+
+        def body(k, state):
+            h_prev, h_curr = state
+            h_next = 2.0 * w * h_curr - 2.0 * jnp.asarray(k - 1, dtype=r_dtype) * h_prev
+            return h_curr, h_next
+
+        _, hn = lax.fori_loop(2, n + 1, body, (h0, h1))
+        return hn
+
     if n == 0:
-        return _acb_from_complex(jnp.complex128(1.0 + 0.0j))
+        return _acb_from_complex(scalar(z_m))
     if n == 1:
-        return _acb_from_complex(2.0 * z_m)
-    h0 = jnp.complex128(1.0 + 0.0j)
-    h1 = 2.0 * z_m
-
-    def body(k, state):
-        h_prev, h_curr = state
-        h_next = 2.0 * z_m * h_curr - 2.0 * jnp.float64(k - 1) * h_prev
-        return h_curr, h_next
-
-    _, hn = lax.fori_loop(2, n + 1, body, (h0, h1))
-    return _acb_from_complex(hn)
+        return _acb_from_complex(scalar(z_m))
+    mid = _acb_from_complex(scalar(z_m))
+    sample_vals = jax.vmap(scalar)(_acb_corners(z))
+    return _select_tighter_acb(mid, _acb_from_samples(sample_vals))
 
 
 @partial(jax.jit, static_argnames=("n",))
@@ -5828,9 +7019,14 @@ def acb_hypgeom_laguerre_l(n: int, a: jax.Array, z: jax.Array) -> jax.Array:
     n = int(n)
     a_m = acb_midpoint(a)
     z_m = acb_midpoint(z)
-    coeff = jnp.exp(_complex_loggamma(n + a_m + 1.0) - _complex_loggamma(n + 1.0) - _complex_loggamma(a_m + 1.0))
-    val = coeff * _complex_hyp1f1_scalar(-jnp.float64(n), a_m + 1.0, z_m)
-    return _acb_from_complex(val)
+
+    def scalar(w):
+        coeff = jnp.exp(_complex_loggamma(n + a_m + 1.0) - _complex_loggamma(n + 1.0) - _complex_loggamma(a_m + 1.0))
+        return coeff * _complex_hyp1f1_scalar(-jnp.asarray(n, dtype=w.real.dtype), a_m + 1.0, w)
+
+    mid = _acb_from_complex(scalar(z_m))
+    sample_vals = jax.vmap(scalar)(_acb_corners(z))
+    return _select_tighter_acb(mid, _acb_from_samples(sample_vals))
 
 
 @partial(jax.jit, static_argnames=("n", "type"))
@@ -5928,22 +7124,42 @@ def acb_hypgeom_pfq(
     a_arr = _acb_param_array(a)
     b_arr = _acb_param_array(b)
     z_m = acb_midpoint(z)
-    term = jnp.complex128(1.0 + 0.0j)
+    c_dtype = z_m.dtype
+    r_dtype = z_m.real.dtype
+    one = jnp.asarray(1.0 + 0.0j, dtype=c_dtype)
+
+    def scalar(zs):
+        term = one
+        acc = term
+
+        def body(k, state):
+            term, s = state
+            kf = jnp.asarray(k, dtype=r_dtype)
+            num = jnp.prod(a_arr + k) if a_arr.size else one
+            den = jnp.prod(b_arr + k) if b_arr.size else one
+            step = (num / den) * (zs / (kf + 1.0))
+            term = term * step
+            return term, s + term
+
+        _term, s = lax.fori_loop(0, n_terms - 1, body, (term, acc))
+        return s
+
+    term = one
     acc = term
 
     def body(k, state):
         term, s = state
-        kf = jnp.float64(k)
-        num = jnp.prod(a_arr + k) if a_arr.size else 1.0 + 0.0j
-        den = jnp.prod(b_arr + k) if b_arr.size else 1.0 + 0.0j
+        kf = jnp.asarray(k, dtype=r_dtype)
+        num = jnp.prod(a_arr + k) if a_arr.size else one
+        den = jnp.prod(b_arr + k) if b_arr.size else one
         step = (num / den) * (z_m / (kf + 1.0))
         term = term * step
         return term, s + term
 
     term, acc = lax.fori_loop(0, n_terms - 1, body, (term, acc))
-    k_last = jnp.float64(n_terms - 1)
-    num_last = jnp.prod(a_arr + k_last) if a_arr.size else 1.0 + 0.0j
-    den_last = jnp.prod(b_arr + k_last) if b_arr.size else 1.0 + 0.0j
+    k_last = jnp.asarray(n_terms - 1, dtype=r_dtype)
+    num_last = jnp.prod(a_arr + k_last) if a_arr.size else one
+    den_last = jnp.prod(b_arr + k_last) if b_arr.size else one
     ratio = jnp.abs(z_m) * jnp.abs(num_last / den_last) / (k_last + 1.0)
     term_abs = jnp.abs(term)
     ok = (ratio < 0.95) & jnp.isfinite(ratio) & jnp.isfinite(term_abs)
@@ -5951,7 +7167,8 @@ def acb_hypgeom_pfq(
     mid_box = _acb_from_complex(acc)
     tail_box = _acb_box_from_mid_tail(acc, tail)
     tail_box = jnp.where(ok, tail_box, _full_box())
-    out = _select_tighter_acb(mid_box, tail_box)
+    samples = _acb_from_samples(jax.vmap(scalar)(_acb_corners(z)))
+    out = _select_tighter_acb(_select_tighter_acb(mid_box, samples), tail_box)
     if reciprocal:
         out = acb_box_inv(out)
     return out

@@ -6,9 +6,11 @@ from pathlib import Path
 try:
     from .core_status_report import _status_rows
     from .point_status_report import _rows as _point_rows
+    from arbplusjax.function_provenance import engineering_status_for_public_name
 except ImportError:
     from core_status_report import _status_rows
     from point_status_report import _rows as _point_rows
+    from arbplusjax.function_provenance import engineering_status_for_public_name
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -103,13 +105,14 @@ def main() -> None:
         "",
         "## Status Table",
         "",
-        "| function | module | family | point | basic | adaptive | rigorous_specialized | generic_rigorous | tightening_priority | notes |",
-        "|---|---|---|---|---|---|---|---|---|---|",
+        "| function | module | family | point | basic | adaptive | rigorous_specialized | generic_rigorous | kernel_split | helper_consolidation | batch | ad | hardening | tightening_priority | notes |",
+        "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
 
     for meta in rows:
         status = status_map[(meta.name, meta.module)]
         point = point_map[(meta.name, meta.module)].available
+        eng = engineering_status_for_public_name(meta.name) or {}
         lines.append(
             f"| {meta.name} | {meta.module} | {meta.family} | "
             f"{'yes' if point else 'no'} | "
@@ -117,6 +120,11 @@ def main() -> None:
             f"{'yes' if status.adaptive else 'no'} | "
             f"{'yes' if status.rigorous_specialized else 'no'} | "
             f"{'yes' if not status.rigorous_specialized else 'no'} | "
+            f"{eng.get('kernel_split', 'shared_dispatch_separate_mode_kernels')} | "
+            f"{eng.get('helper_consolidation', 'shared_elementary_or_core')} | "
+            f"{eng.get('batch', 'mixed')} | "
+            f"{eng.get('ad', 'mixed')} | "
+            f"{eng.get('hardening', 'specialized')} | "
             f"{meta.priority} | {meta.reason}; {status.notes} |"
         )
 

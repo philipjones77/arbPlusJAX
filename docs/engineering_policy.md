@@ -10,6 +10,7 @@ This policy applies to canonical Arb-like functions, alternative implementations
 
 - Public functions should expose the expected mode surface for their family (`point`, `basic`, and where appropriate `adaptive` / `rigorous`).
 - Functions should obey the repo dtype rules. Family-specific algorithms do not get a separate dtype policy.
+- Families should share batching/padding/dispatch infrastructure while keeping separate numerical kernels for `point`, `basic`, and tighter interval modes. Point paths should not be forced through interval/box kernels just to reuse plumbing.
 - Batch execution should stay shape-stable where possible, and padding-friendly where practical.
 - Unnecessary Python-side value extraction and control flow should be removed from performance-sensitive paths.
 - Automatic differentiation compatibility is a target, but current status must be reported honestly per implementation family.
@@ -19,6 +20,7 @@ This policy applies to canonical Arb-like functions, alternative implementations
 
 - `pure_jax` is an aspiration-oriented field, not a binary admission rule.
 - `dtype` reports current conformance to repo dtype expectations.
+- `kernel_split` reports whether a family uses shared dispatch with separate per-mode kernels, or still mixes point and interval implementation layers.
 - `batch` reports current batch stability, not an idealized future state.
 - `ad` reports current compatibility expectations, not theoretical differentiability.
 - `hardening` reports the current numerical-hardening level of the implementation path.

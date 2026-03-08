@@ -7,6 +7,9 @@ This folder is organized by purpose (similar to `docs_continuous` style): govern
 - See `architecture.md` for the overall system layout and execution modes.
 - See `benchmarks.md` and `benchmark_process.md` for benchmark backends, sweeps, and reporting workflow.
 - See `engineering_policy.md` for the repo-wide implementation contract and engineering-status methodology.
+- See `reports/hypgeom_status.md` for the staged current-state matrix covering canonical and alternative hypergeometric families.
+- See `reports/hypgeom_compile_probe.md` and `reports/hypgeom_compile_probe_rigorous.md` for second-tranche compile-count probes.
+- See `reports/hypgeom_mode_benchmark_smoke.md` for the current staged padded-batch smoke benchmark across selected hypergeometric families.
 - See `results/benchmarks/bessel_compile_probe_float32/bessel_compile_probe.md` for the current canonical Bessel padded-core compile probe.
 - See `implementation/modules/hypgeom.md` for current hypergeometric scope and approximations.
 - See `implementation/modules/jrb_mat.md` and `implementation/modules/jcb_mat.md` for the Jones-labeled matrix-function subsystem scaffold.

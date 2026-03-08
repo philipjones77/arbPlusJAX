@@ -7,6 +7,8 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
+from arbplusjax.function_provenance import engineering_status_for_public_name
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 LEGACY_WINDOWS_ROOT = Path(r"C:/Users/phili/OneDrive/Documents/GitHub")
@@ -44,6 +46,11 @@ class CoreFunctionStatus:
     adaptive: bool
     rigorous_specialized: bool
     basic_only: bool
+    kernel_split: str
+    helper_consolidation: str
+    batch: str
+    ad: str
+    hardening: str
     notes: str
 
 
@@ -142,6 +149,7 @@ def _status_rows() -> list[CoreFunctionStatus]:
         adaptive = True
         rigorous_specialized = f"{name}_prec" in arb_rig_prec or f"{name}_batch_prec" in arb_rig_prec
         basic_only = implemented and basic and not adaptive and not rigorous_specialized
+        eng = engineering_status_for_public_name(name) or {}
         if rigorous_specialized and adaptive:
             notes = "interval kernel is the rigorous path; adaptive uses dedicated or generic tightening"
         elif rigorous_specialized:
@@ -157,6 +165,11 @@ def _status_rows() -> list[CoreFunctionStatus]:
                 adaptive=adaptive,
                 rigorous_specialized=rigorous_specialized,
                 basic_only=basic_only,
+                kernel_split=eng.get("kernel_split", "shared_dispatch_separate_mode_kernels"),
+                helper_consolidation=eng.get("helper_consolidation", "shared_elementary_or_core"),
+                batch=eng.get("batch", "mixed"),
+                ad=eng.get("ad", "mixed"),
+                hardening=eng.get("hardening", "generic_or_mixed"),
                 notes=notes,
             )
         )
@@ -171,6 +184,7 @@ def _status_rows() -> list[CoreFunctionStatus]:
             or (basic and not f"{name}_prec" in acb_adapt_prec and not f"{name}_batch_prec" in acb_adapt_prec)
         )
         basic_only = implemented and basic and not adaptive and not rigorous_specialized
+        eng = engineering_status_for_public_name(name) or {}
         if rigorous_specialized and adaptive:
             notes = "specialized rigorous adapter and adaptive path present"
         elif rigorous_specialized:
@@ -188,6 +202,11 @@ def _status_rows() -> list[CoreFunctionStatus]:
                 adaptive=adaptive,
                 rigorous_specialized=rigorous_specialized,
                 basic_only=basic_only,
+                kernel_split=eng.get("kernel_split", "shared_dispatch_separate_mode_kernels"),
+                helper_consolidation=eng.get("helper_consolidation", "shared_elementary_or_core"),
+                batch=eng.get("batch", "mixed"),
+                ad=eng.get("ad", "mixed"),
+                hardening=eng.get("hardening", "generic_or_mixed"),
                 notes=notes,
             )
         )
@@ -231,15 +250,19 @@ def _write_status_markdown(rows: list[CoreFunctionStatus]) -> None:
         "- `adaptive`: adaptive mode path exists through a dedicated or generic wrapper",
         "- `rigorous_specialized`: function has a dedicated rigorous adapter in `core_wrappers.py`",
         "- `basic_only`: implemented/basic, but no adaptive path and no specialized rigorous path",
+        "- `kernel_split`: whether the family shares dispatch while keeping separate mode kernels",
+        "- `helper_consolidation`: whether constants/dtype/helper math has been centralized in shared substrate layers",
+        "- `batch`, `ad`, `hardening`: current engineering state pulled from the repo-wide engineering policy registry",
         "",
-        "| function | module | implemented | basic | adaptive | rigorous_specialized | basic_only | notes |",
-        "|---|---|---|---|---|---|---|---|",
+        "| function | module | implemented | basic | adaptive | rigorous_specialized | basic_only | kernel_split | helper_consolidation | batch | ad | hardening | notes |",
+        "|---|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for row in rows:
         lines.append(
             f"| {row.name} | {row.module} | {'yes' if row.implemented else 'no'} | "
             f"{'yes' if row.basic else 'no'} | {'yes' if row.adaptive else 'no'} | "
-            f"{'yes' if row.rigorous_specialized else 'no'} | {'yes' if row.basic_only else 'no'} | {row.notes} |"
+            f"{'yes' if row.rigorous_specialized else 'no'} | {'yes' if row.basic_only else 'no'} | "
+            f"{row.kernel_split} | {row.helper_consolidation} | {row.batch} | {row.ad} | {row.hardening} | {row.notes} |"
         )
     out.write_text("\n".join(lines) + "\n", encoding="utf-8")
 

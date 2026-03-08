@@ -44,16 +44,75 @@ def _adapt_bessel_k_integration(nu, z, *, prec_bits: int, scaled: bool = False, 
     )
 
 
+def _arb_unit_interval(dtype):
+    one = jax.numpy.asarray(1.0, dtype=dtype)
+    return hypgeom.di.interval(one, one)
+
+
+def _acb_unit_box(dtype):
+    return hypgeom.acb_box(_arb_unit_interval(dtype), hypgeom.di.interval(jax.numpy.asarray(0.0, dtype=dtype), jax.numpy.asarray(0.0, dtype=dtype)))
+
+
+def _arb_incomplete_gamma_special(s, z, *, prec_bits: int, regularized: bool, upper: bool, adaptive: bool):
+    kernel = wc.adaptive_interval_kernel if adaptive else wc.rigorous_interval_kernel
+    gamma_kernel = ball_wrappers.arb_ball_gamma_adaptive if adaptive else ball_wrappers.arb_ball_gamma
+    direct_fn = hypgeom.arb_hypgeom_gamma_upper if upper else hypgeom.arb_hypgeom_gamma_lower
+    comp_fn = hypgeom.arb_hypgeom_gamma_lower if upper else hypgeom.arb_hypgeom_gamma_upper
+    direct = kernel(lambda ss, zz: direct_fn(ss, zz, regularized=regularized), (s, z), prec_bits)
+    comp_other = kernel(lambda ss, zz: comp_fn(ss, zz, regularized=regularized), (s, z), prec_bits)
+    if regularized:
+        comp = hypgeom.di.fast_sub(_arb_unit_interval(direct.dtype), comp_other)
+    else:
+        gamma_box = gamma_kernel(s, prec_bits)
+        comp = hypgeom.di.fast_sub(gamma_box, comp_other)
+    return hypgeom._select_tighter_interval(direct, comp)
+
+
+def _arb_incomplete_gamma_special_batch(s, z, *, prec_bits: int, regularized: bool, upper: bool, adaptive: bool):
+    return jax.vmap(
+        lambda ss, zz: _arb_incomplete_gamma_special(ss, zz, prec_bits=prec_bits, regularized=regularized, upper=upper, adaptive=adaptive)
+    )(s, z)
+
+
+def _acb_incomplete_gamma_special(s, z, *, prec_bits: int, regularized: bool, upper: bool, adaptive: bool):
+    kernel = wc.adaptive_acb_kernel if adaptive else wc.rigorous_acb_kernel
+    gamma_kernel = ball_wrappers.acb_ball_gamma_adaptive if adaptive else ball_wrappers.acb_ball_gamma
+    direct_fn = hypgeom.acb_hypgeom_gamma_upper if upper else hypgeom.acb_hypgeom_gamma_lower
+    comp_fn = hypgeom.acb_hypgeom_gamma_lower if upper else hypgeom.acb_hypgeom_gamma_upper
+    direct = kernel(lambda ss, zz: direct_fn(ss, zz, regularized=regularized), (s, z), prec_bits)
+    comp_other = kernel(lambda ss, zz: comp_fn(ss, zz, regularized=regularized), (s, z), prec_bits)
+    if regularized:
+        comp = hypgeom.acb_box_sub(_acb_unit_box(direct.dtype), comp_other)
+    else:
+        gamma_box = gamma_kernel(s, prec_bits)
+        comp = hypgeom.acb_box_sub(gamma_box, comp_other)
+    return hypgeom._select_tighter_acb(direct, comp)
+
+
+def _acb_incomplete_gamma_special_batch(s, z, *, prec_bits: int, regularized: bool, upper: bool, adaptive: bool):
+    return jax.vmap(
+        lambda ss, zz: _acb_incomplete_gamma_special(ss, zz, prec_bits=prec_bits, regularized=regularized, upper=upper, adaptive=adaptive)
+    )(s, z)
+
+
 def _wrap_series_rig(fn):
+    accepts_prec = "prec_bits" in inspect.signature(fn).parameters
+
     def wrapped(*args, prec_bits: int, **kwargs):
-        return fn(*args, prec_bits=prec_bits, **kwargs)
+        if accepts_prec:
+            return fn(*args, prec_bits=prec_bits, **kwargs)
+        return fn(*args, **kwargs)
 
     return wrapped
 
 
 def _wrap_series_rig_batch(fn, in_axes):
+    accepts_prec = "prec_bits" in inspect.signature(fn).parameters
+
     def wrapped(*args, prec_bits: int, **kwargs):
-        return jax.vmap(lambda *aa: fn(*aa, prec_bits=prec_bits, **kwargs), in_axes=in_axes)(*args)
+        if accepts_prec:
+            return jax.vmap(lambda *aa: fn(*aa, prec_bits=prec_bits, **kwargs), in_axes=in_axes)(*args)
+        return jax.vmap(lambda *aa: fn(*aa, **kwargs), in_axes=in_axes)(*args)
 
     return wrapped
 
@@ -152,6 +211,30 @@ _SPECIAL_RIG: dict[str, Callable[..., jax.Array]] = {
     "acb_hypgeom_1f1_batch_prec": _wrap_series_rig_batch(hypgeom.acb_hypgeom_1f1_rigorous, (0, 0, 0)),
     "acb_hypgeom_2f1_batch_prec": _wrap_series_rig_batch(hypgeom.acb_hypgeom_2f1_rigorous, (0, 0, 0, 0)),
     "acb_hypgeom_u_batch_prec": _wrap_series_rig_batch(hypgeom.acb_hypgeom_u_rigorous, (0, 0, 0)),
+    "arb_hypgeom_gamma_lower_prec": lambda s, z, *, prec_bits, regularized=False, **kwargs: _arb_incomplete_gamma_special(
+        s, z, prec_bits=prec_bits, regularized=regularized, upper=False, adaptive=False
+    ),
+    "arb_hypgeom_gamma_upper_prec": lambda s, z, *, prec_bits, regularized=False, **kwargs: _arb_incomplete_gamma_special(
+        s, z, prec_bits=prec_bits, regularized=regularized, upper=True, adaptive=False
+    ),
+    "arb_hypgeom_gamma_lower_batch_prec": lambda s, z, *, prec_bits, regularized=False, **kwargs: _arb_incomplete_gamma_special_batch(
+        s, z, prec_bits=prec_bits, regularized=regularized, upper=False, adaptive=False
+    ),
+    "arb_hypgeom_gamma_upper_batch_prec": lambda s, z, *, prec_bits, regularized=False, **kwargs: _arb_incomplete_gamma_special_batch(
+        s, z, prec_bits=prec_bits, regularized=regularized, upper=True, adaptive=False
+    ),
+    "acb_hypgeom_gamma_lower_prec": lambda s, z, *, prec_bits, regularized=False, **kwargs: _acb_incomplete_gamma_special(
+        s, z, prec_bits=prec_bits, regularized=regularized, upper=False, adaptive=False
+    ),
+    "acb_hypgeom_gamma_upper_prec": lambda s, z, *, prec_bits, regularized=False, **kwargs: _acb_incomplete_gamma_special(
+        s, z, prec_bits=prec_bits, regularized=regularized, upper=True, adaptive=False
+    ),
+    "acb_hypgeom_gamma_lower_batch_prec": lambda s, z, *, prec_bits, regularized=False, **kwargs: _acb_incomplete_gamma_special_batch(
+        s, z, prec_bits=prec_bits, regularized=regularized, upper=False, adaptive=False
+    ),
+    "acb_hypgeom_gamma_upper_batch_prec": lambda s, z, *, prec_bits, regularized=False, **kwargs: _acb_incomplete_gamma_special_batch(
+        s, z, prec_bits=prec_bits, regularized=regularized, upper=True, adaptive=False
+    ),
     "arb_hypgeom_rising_coeffs_1_prec": hypgeom.arb_hypgeom_rising_coeffs_1_prec,
     "arb_hypgeom_rising_coeffs_2_prec": hypgeom.arb_hypgeom_rising_coeffs_2_prec,
     "arb_hypgeom_rising_coeffs_fmpz_prec": hypgeom.arb_hypgeom_rising_coeffs_fmpz_prec,
@@ -216,6 +299,30 @@ _SPECIAL_ADAPT: dict[str, Callable[..., jax.Array]] = {
     "acb_hypgeom_bessel_k_batch_prec": ball_wrappers.acb_ball_bessel_k_adaptive,
     "acb_hypgeom_bessel_i_scaled_batch_prec": ball_wrappers.acb_ball_bessel_i_scaled_adaptive,
     "acb_hypgeom_bessel_k_scaled_batch_prec": ball_wrappers.acb_ball_bessel_k_scaled_adaptive,
+    "arb_hypgeom_gamma_lower_prec": lambda s, z, *, prec_bits, regularized=False, **kwargs: _arb_incomplete_gamma_special(
+        s, z, prec_bits=prec_bits, regularized=regularized, upper=False, adaptive=True
+    ),
+    "arb_hypgeom_gamma_upper_prec": lambda s, z, *, prec_bits, regularized=False, **kwargs: _arb_incomplete_gamma_special(
+        s, z, prec_bits=prec_bits, regularized=regularized, upper=True, adaptive=True
+    ),
+    "arb_hypgeom_gamma_lower_batch_prec": lambda s, z, *, prec_bits, regularized=False, **kwargs: _arb_incomplete_gamma_special_batch(
+        s, z, prec_bits=prec_bits, regularized=regularized, upper=False, adaptive=True
+    ),
+    "arb_hypgeom_gamma_upper_batch_prec": lambda s, z, *, prec_bits, regularized=False, **kwargs: _arb_incomplete_gamma_special_batch(
+        s, z, prec_bits=prec_bits, regularized=regularized, upper=True, adaptive=True
+    ),
+    "acb_hypgeom_gamma_lower_prec": lambda s, z, *, prec_bits, regularized=False, **kwargs: _acb_incomplete_gamma_special(
+        s, z, prec_bits=prec_bits, regularized=regularized, upper=False, adaptive=True
+    ),
+    "acb_hypgeom_gamma_upper_prec": lambda s, z, *, prec_bits, regularized=False, **kwargs: _acb_incomplete_gamma_special(
+        s, z, prec_bits=prec_bits, regularized=regularized, upper=True, adaptive=True
+    ),
+    "acb_hypgeom_gamma_lower_batch_prec": lambda s, z, *, prec_bits, regularized=False, **kwargs: _acb_incomplete_gamma_special_batch(
+        s, z, prec_bits=prec_bits, regularized=regularized, upper=False, adaptive=True
+    ),
+    "acb_hypgeom_gamma_upper_batch_prec": lambda s, z, *, prec_bits, regularized=False, **kwargs: _acb_incomplete_gamma_special_batch(
+        s, z, prec_bits=prec_bits, regularized=regularized, upper=True, adaptive=True
+    ),
     "arb_hypgeom_rising_coeffs_1_prec": hypgeom.arb_hypgeom_rising_coeffs_1_prec,
     "arb_hypgeom_rising_coeffs_2_prec": hypgeom.arb_hypgeom_rising_coeffs_2_prec,
     "arb_hypgeom_rising_coeffs_fmpz_prec": hypgeom.arb_hypgeom_rising_coeffs_fmpz_prec,
@@ -374,3 +481,577 @@ for _name in dir(hypgeom):
     globals()[_wrapper.__name__] = _wrapper
     __all__.append(_wrapper.__name__)
 
+
+def _pad_trim_call(core_fn, args: tuple[jax.Array, ...], pad_to: int):
+    n = int(args[0].shape[0])
+    padded = tuple(hypgeom._pad_rows_to(arg, pad_to) for arg in args)
+    out = core_fn(*padded)
+    return hypgeom._trim_rows(out, n)
+
+
+@partial(jax.jit, static_argnames=("prec_bits", "impl", "regularized"))
+def _arb_hypgeom_0f1_batch_mode_core(a, z, *, prec_bits: int, impl: str, regularized: bool = False):
+    return jax.vmap(lambda aa, zz: arb_hypgeom_0f1_mode(aa, zz, impl=impl, prec_bits=prec_bits, regularized=regularized))(a, z)
+
+
+@partial(jax.jit, static_argnames=("prec_bits", "impl", "regularized"))
+def _arb_hypgeom_1f1_batch_mode_core(a, b, z, *, prec_bits: int, impl: str, regularized: bool = False):
+    if impl == "basic":
+        return hypgeom.arb_hypgeom_1f1_batch_prec(a, b, z, prec_bits=prec_bits, regularized=regularized)
+    if impl == "rigorous":
+        return _SPECIAL_RIG["arb_hypgeom_1f1_batch_prec"](a, b, z, prec_bits=prec_bits, regularized=regularized)
+    if impl == "adaptive":
+        return jax.vmap(lambda aa, bb, zz: wc.adaptive_interval_kernel(hypgeom.arb_hypgeom_1f1, (aa, bb, zz), prec_bits, regularized=regularized))(a, b, z)
+    raise ValueError(f"Unsupported impl: {impl}")
+
+
+@partial(jax.jit, static_argnames=("prec_bits", "impl", "regularized"))
+def _arb_hypgeom_2f1_batch_mode_core(a, b, c, z, *, prec_bits: int, impl: str, regularized: bool = False):
+    if impl == "basic":
+        return hypgeom.arb_hypgeom_2f1_batch_prec(a, b, c, z, prec_bits=prec_bits, regularized=regularized)
+    if impl == "rigorous":
+        return _SPECIAL_RIG["arb_hypgeom_2f1_batch_prec"](a, b, c, z, prec_bits=prec_bits, regularized=regularized)
+    if impl == "adaptive":
+        return jax.vmap(lambda aa, bb, cc, zz: wc.adaptive_interval_kernel(hypgeom.arb_hypgeom_2f1, (aa, bb, cc, zz), prec_bits, regularized=regularized))(a, b, c, z)
+    raise ValueError(f"Unsupported impl: {impl}")
+
+
+@partial(jax.jit, static_argnames=("prec_bits", "impl"))
+def _arb_hypgeom_u_batch_mode_core(a, b, z, *, prec_bits: int, impl: str):
+    if impl == "basic":
+        return hypgeom.arb_hypgeom_u_batch_prec(a, b, z, prec_bits=prec_bits)
+    if impl == "rigorous":
+        return _SPECIAL_RIG["arb_hypgeom_u_batch_prec"](a, b, z, prec_bits=prec_bits)
+    if impl == "adaptive":
+        return jax.vmap(lambda aa, bb, zz: wc.adaptive_interval_kernel(hypgeom.arb_hypgeom_u, (aa, bb, zz), prec_bits))(a, b, z)
+    raise ValueError(f"Unsupported impl: {impl}")
+
+
+@partial(jax.jit, static_argnames=("prec_bits", "impl", "regularized"))
+def _arb_hypgeom_gamma_lower_batch_mode_core(s, z, *, prec_bits: int, impl: str, regularized: bool = False):
+    if impl == "basic":
+        return hypgeom.arb_hypgeom_gamma_lower_batch_prec(s, z, prec_bits=prec_bits, regularized=regularized)
+    if impl == "rigorous":
+        return _arb_incomplete_gamma_special_batch(s, z, prec_bits=prec_bits, regularized=regularized, upper=False, adaptive=False)
+    if impl == "adaptive":
+        return _arb_incomplete_gamma_special_batch(s, z, prec_bits=prec_bits, regularized=regularized, upper=False, adaptive=True)
+    raise ValueError(f"Unsupported impl: {impl}")
+
+
+@partial(jax.jit, static_argnames=("prec_bits", "impl", "regularized"))
+def _arb_hypgeom_gamma_upper_batch_mode_core(s, z, *, prec_bits: int, impl: str, regularized: bool = False):
+    if impl == "basic":
+        return hypgeom.arb_hypgeom_gamma_upper_batch_prec(s, z, prec_bits=prec_bits, regularized=regularized)
+    if impl == "rigorous":
+        return _arb_incomplete_gamma_special_batch(s, z, prec_bits=prec_bits, regularized=regularized, upper=True, adaptive=False)
+    if impl == "adaptive":
+        return _arb_incomplete_gamma_special_batch(s, z, prec_bits=prec_bits, regularized=regularized, upper=True, adaptive=True)
+    raise ValueError(f"Unsupported impl: {impl}")
+
+
+@partial(jax.jit, static_argnames=("n", "type", "prec_bits", "impl"))
+def _arb_hypgeom_legendre_p_batch_mode_core(n, m, z, *, type: int, prec_bits: int, impl: str):
+    return jax.vmap(lambda mm, zz: arb_hypgeom_legendre_p_mode(n, mm, zz, type=type, impl=impl, prec_bits=prec_bits))(m, z)
+
+
+@partial(jax.jit, static_argnames=("n", "type", "prec_bits", "impl"))
+def _arb_hypgeom_legendre_q_batch_mode_core(n, m, z, *, type: int, prec_bits: int, impl: str):
+    return jax.vmap(lambda mm, zz: arb_hypgeom_legendre_q_mode(n, mm, zz, type=type, impl=impl, prec_bits=prec_bits))(m, z)
+
+
+@partial(jax.jit, static_argnames=("n", "prec_bits", "impl"))
+def _arb_hypgeom_jacobi_p_batch_mode_core(n, a, b, z, *, prec_bits: int, impl: str):
+    return jax.vmap(lambda aa, bb, zz: arb_hypgeom_jacobi_p_mode(n, aa, bb, zz, impl=impl, prec_bits=prec_bits))(a, b, z)
+
+
+@partial(jax.jit, static_argnames=("n", "prec_bits", "impl"))
+def _arb_hypgeom_gegenbauer_c_batch_mode_core(n, m, z, *, prec_bits: int, impl: str):
+    return jax.vmap(lambda mm, zz: arb_hypgeom_gegenbauer_c_mode(n, mm, zz, impl=impl, prec_bits=prec_bits))(m, z)
+
+
+@partial(jax.jit, static_argnames=("prec_bits", "impl", "regularized"))
+def _acb_hypgeom_0f1_batch_mode_core(a, z, *, prec_bits: int, impl: str, regularized: bool = False):
+    return jax.vmap(lambda aa, zz: acb_hypgeom_0f1_mode(aa, zz, impl=impl, prec_bits=prec_bits, regularized=regularized))(a, z)
+
+
+@partial(jax.jit, static_argnames=("prec_bits", "impl", "regularized"))
+def _acb_hypgeom_1f1_batch_mode_core(a, b, z, *, prec_bits: int, impl: str, regularized: bool = False):
+    if impl == "basic":
+        return hypgeom.acb_hypgeom_1f1_batch_prec(a, b, z, prec_bits=prec_bits, regularized=regularized)
+    if impl == "rigorous":
+        return _SPECIAL_RIG["acb_hypgeom_1f1_batch_prec"](a, b, z, prec_bits=prec_bits, regularized=regularized)
+    if impl == "adaptive":
+        return jax.vmap(lambda aa, bb, zz: wc.adaptive_acb_kernel(hypgeom.acb_hypgeom_1f1, (aa, bb, zz), prec_bits, regularized=regularized))(a, b, z)
+    raise ValueError(f"Unsupported impl: {impl}")
+
+
+@partial(jax.jit, static_argnames=("prec_bits", "impl", "regularized"))
+def _acb_hypgeom_2f1_batch_mode_core(a, b, c, z, *, prec_bits: int, impl: str, regularized: bool = False):
+    if impl == "basic":
+        return hypgeom.acb_hypgeom_2f1_batch_prec(a, b, c, z, prec_bits=prec_bits, regularized=regularized)
+    if impl == "rigorous":
+        return _SPECIAL_RIG["acb_hypgeom_2f1_batch_prec"](a, b, c, z, prec_bits=prec_bits, regularized=regularized)
+    if impl == "adaptive":
+        return jax.vmap(lambda aa, bb, cc, zz: wc.adaptive_acb_kernel(hypgeom.acb_hypgeom_2f1, (aa, bb, cc, zz), prec_bits, regularized=regularized))(a, b, c, z)
+    raise ValueError(f"Unsupported impl: {impl}")
+
+
+@partial(jax.jit, static_argnames=("prec_bits", "impl"))
+def _acb_hypgeom_u_batch_mode_core(a, b, z, *, prec_bits: int, impl: str):
+    if impl == "basic":
+        return hypgeom.acb_hypgeom_u_batch_prec(a, b, z, prec_bits=prec_bits)
+    if impl == "rigorous":
+        return _SPECIAL_RIG["acb_hypgeom_u_batch_prec"](a, b, z, prec_bits=prec_bits)
+    if impl == "adaptive":
+        return jax.vmap(lambda aa, bb, zz: wc.adaptive_acb_kernel(hypgeom.acb_hypgeom_u, (aa, bb, zz), prec_bits))(a, b, z)
+    raise ValueError(f"Unsupported impl: {impl}")
+
+
+@partial(jax.jit, static_argnames=("prec_bits", "impl", "regularized"))
+def _acb_hypgeom_gamma_lower_batch_mode_core(s, z, *, prec_bits: int, impl: str, regularized: bool = False):
+    if impl == "basic":
+        return hypgeom.acb_hypgeom_gamma_lower_batch_prec(s, z, prec_bits=prec_bits, regularized=regularized)
+    if impl == "rigorous":
+        return _acb_incomplete_gamma_special_batch(s, z, prec_bits=prec_bits, regularized=regularized, upper=False, adaptive=False)
+    if impl == "adaptive":
+        return _acb_incomplete_gamma_special_batch(s, z, prec_bits=prec_bits, regularized=regularized, upper=False, adaptive=True)
+    raise ValueError(f"Unsupported impl: {impl}")
+
+
+@partial(jax.jit, static_argnames=("prec_bits", "impl", "regularized"))
+def _acb_hypgeom_gamma_upper_batch_mode_core(s, z, *, prec_bits: int, impl: str, regularized: bool = False):
+    if impl == "basic":
+        return hypgeom.acb_hypgeom_gamma_upper_batch_prec(s, z, prec_bits=prec_bits, regularized=regularized)
+    if impl == "rigorous":
+        return _acb_incomplete_gamma_special_batch(s, z, prec_bits=prec_bits, regularized=regularized, upper=True, adaptive=False)
+    if impl == "adaptive":
+        return _acb_incomplete_gamma_special_batch(s, z, prec_bits=prec_bits, regularized=regularized, upper=True, adaptive=True)
+    raise ValueError(f"Unsupported impl: {impl}")
+
+
+@partial(jax.jit, static_argnames=("n", "prec_bits", "impl"))
+def _arb_hypgeom_chebyshev_t_batch_mode_core(n, z, *, prec_bits: int, impl: str):
+    if impl == "basic":
+        return jax.vmap(lambda zz: hypgeom.arb_hypgeom_chebyshev_t_prec(n, zz, prec_bits=prec_bits))(z)
+    if impl == "rigorous":
+        return jax.vmap(lambda zz: wc.rigorous_interval_kernel(partial(hypgeom.arb_hypgeom_chebyshev_t, n), (zz,), prec_bits))(z)
+    if impl == "adaptive":
+        return jax.vmap(lambda zz: wc.adaptive_interval_kernel(partial(hypgeom.arb_hypgeom_chebyshev_t, n), (zz,), prec_bits))(z)
+    raise ValueError(f"Unsupported impl: {impl}")
+
+
+@partial(jax.jit, static_argnames=("n", "prec_bits", "impl"))
+def _arb_hypgeom_chebyshev_u_batch_mode_core(n, z, *, prec_bits: int, impl: str):
+    if impl == "basic":
+        return jax.vmap(lambda zz: hypgeom.arb_hypgeom_chebyshev_u_prec(n, zz, prec_bits=prec_bits))(z)
+    if impl == "rigorous":
+        return jax.vmap(lambda zz: wc.rigorous_interval_kernel(partial(hypgeom.arb_hypgeom_chebyshev_u, n), (zz,), prec_bits))(z)
+    if impl == "adaptive":
+        return jax.vmap(lambda zz: wc.adaptive_interval_kernel(partial(hypgeom.arb_hypgeom_chebyshev_u, n), (zz,), prec_bits))(z)
+    raise ValueError(f"Unsupported impl: {impl}")
+
+
+@partial(jax.jit, static_argnames=("n", "prec_bits", "impl"))
+def _arb_hypgeom_laguerre_l_batch_mode_core(n, m, z, *, prec_bits: int, impl: str):
+    if impl == "basic":
+        return jax.vmap(lambda mm, zz: hypgeom.arb_hypgeom_laguerre_l_prec(n, mm, zz, prec_bits=prec_bits))(m, z)
+    if impl == "rigorous":
+        return jax.vmap(lambda mm, zz: wc.rigorous_interval_kernel(partial(hypgeom.arb_hypgeom_laguerre_l, n), (mm, zz), prec_bits))(m, z)
+    if impl == "adaptive":
+        return jax.vmap(lambda mm, zz: wc.adaptive_interval_kernel(partial(hypgeom.arb_hypgeom_laguerre_l, n), (mm, zz), prec_bits))(m, z)
+    raise ValueError(f"Unsupported impl: {impl}")
+
+
+@partial(jax.jit, static_argnames=("n", "prec_bits", "impl"))
+def _arb_hypgeom_hermite_h_batch_mode_core(n, z, *, prec_bits: int, impl: str):
+    if impl == "basic":
+        return jax.vmap(lambda zz: hypgeom.arb_hypgeom_hermite_h_prec(n, zz, prec_bits=prec_bits))(z)
+    if impl == "rigorous":
+        return jax.vmap(lambda zz: wc.rigorous_interval_kernel(partial(hypgeom.arb_hypgeom_hermite_h, n), (zz,), prec_bits))(z)
+    if impl == "adaptive":
+        return jax.vmap(lambda zz: wc.adaptive_interval_kernel(partial(hypgeom.arb_hypgeom_hermite_h, n), (zz,), prec_bits))(z)
+    raise ValueError(f"Unsupported impl: {impl}")
+
+
+@partial(jax.jit, static_argnames=("prec_bits", "impl", "reciprocal", "n_terms"))
+def _arb_hypgeom_pfq_batch_mode_core(a, b, z, *, prec_bits: int, impl: str, reciprocal: bool = False, n_terms: int = 32):
+    if impl == "basic":
+        return hypgeom.arb_hypgeom_pfq_batch_prec(a, b, z, prec_bits=prec_bits, reciprocal=reciprocal, n_terms=n_terms)
+    if impl == "rigorous":
+        return jax.vmap(
+            lambda aa, bb, zz: wc.rigorous_interval_kernel(
+                hypgeom.arb_hypgeom_pfq,
+                (aa, bb, zz),
+                prec_bits,
+                reciprocal=reciprocal,
+                n_terms=n_terms,
+            )
+        )(a, b, z)
+    if impl == "adaptive":
+        return jax.vmap(
+            lambda aa, bb, zz: wc.adaptive_interval_kernel(
+                hypgeom.arb_hypgeom_pfq,
+                (aa, bb, zz),
+                prec_bits,
+                reciprocal=reciprocal,
+                n_terms=n_terms,
+            )
+        )(a, b, z)
+    raise ValueError(f"Unsupported impl: {impl}")
+
+
+@partial(jax.jit, static_argnames=("n", "prec_bits", "impl"))
+def _acb_hypgeom_chebyshev_t_batch_mode_core(n, z, *, prec_bits: int, impl: str):
+    if impl == "basic":
+        return jax.vmap(lambda zz: hypgeom.acb_hypgeom_chebyshev_t_prec(n, zz, prec_bits=prec_bits))(z)
+    if impl == "rigorous":
+        return jax.vmap(lambda zz: wc.rigorous_acb_kernel(partial(hypgeom.acb_hypgeom_chebyshev_t, n), (zz,), prec_bits))(z)
+    if impl == "adaptive":
+        return jax.vmap(lambda zz: wc.adaptive_acb_kernel(partial(hypgeom.acb_hypgeom_chebyshev_t, n), (zz,), prec_bits))(z)
+    raise ValueError(f"Unsupported impl: {impl}")
+
+
+@partial(jax.jit, static_argnames=("n", "prec_bits", "impl"))
+def _acb_hypgeom_chebyshev_u_batch_mode_core(n, z, *, prec_bits: int, impl: str):
+    if impl == "basic":
+        return jax.vmap(lambda zz: hypgeom.acb_hypgeom_chebyshev_u_prec(n, zz, prec_bits=prec_bits))(z)
+    if impl == "rigorous":
+        return jax.vmap(lambda zz: wc.rigorous_acb_kernel(partial(hypgeom.acb_hypgeom_chebyshev_u, n), (zz,), prec_bits))(z)
+    if impl == "adaptive":
+        return jax.vmap(lambda zz: wc.adaptive_acb_kernel(partial(hypgeom.acb_hypgeom_chebyshev_u, n), (zz,), prec_bits))(z)
+    raise ValueError(f"Unsupported impl: {impl}")
+
+
+@partial(jax.jit, static_argnames=("n", "prec_bits", "impl"))
+def _acb_hypgeom_laguerre_l_batch_mode_core(n, a, z, *, prec_bits: int, impl: str):
+    if impl == "basic":
+        return jax.vmap(lambda aa, zz: hypgeom.acb_hypgeom_laguerre_l_prec(n, aa, zz, prec_bits=prec_bits))(a, z)
+    if impl == "rigorous":
+        return jax.vmap(lambda aa, zz: wc.rigorous_acb_kernel(partial(hypgeom.acb_hypgeom_laguerre_l, n), (aa, zz), prec_bits))(a, z)
+    if impl == "adaptive":
+        return jax.vmap(lambda aa, zz: wc.adaptive_acb_kernel(partial(hypgeom.acb_hypgeom_laguerre_l, n), (aa, zz), prec_bits))(a, z)
+    raise ValueError(f"Unsupported impl: {impl}")
+
+
+@partial(jax.jit, static_argnames=("n", "prec_bits", "impl"))
+def _acb_hypgeom_hermite_h_batch_mode_core(n, z, *, prec_bits: int, impl: str):
+    if impl == "basic":
+        return jax.vmap(lambda zz: hypgeom.acb_hypgeom_hermite_h_prec(n, zz, prec_bits=prec_bits))(z)
+    if impl == "rigorous":
+        return jax.vmap(lambda zz: wc.rigorous_acb_kernel(partial(hypgeom.acb_hypgeom_hermite_h, n), (zz,), prec_bits))(z)
+    if impl == "adaptive":
+        return jax.vmap(lambda zz: wc.adaptive_acb_kernel(partial(hypgeom.acb_hypgeom_hermite_h, n), (zz,), prec_bits))(z)
+    raise ValueError(f"Unsupported impl: {impl}")
+
+
+@partial(jax.jit, static_argnames=("prec_bits", "impl", "reciprocal", "n_terms"))
+def _acb_hypgeom_pfq_batch_mode_core(a, b, z, *, prec_bits: int, impl: str, reciprocal: bool = False, n_terms: int = 32):
+    if impl == "basic":
+        return hypgeom.acb_hypgeom_pfq_batch_prec(a, b, z, prec_bits=prec_bits, reciprocal=reciprocal, n_terms=n_terms)
+    if impl == "rigorous":
+        return jax.vmap(
+            lambda aa, bb, zz: wc.rigorous_acb_kernel(
+                hypgeom.acb_hypgeom_pfq,
+                (aa, bb, zz),
+                prec_bits,
+                reciprocal=reciprocal,
+                n_terms=n_terms,
+            )
+        )(a, b, z)
+    if impl == "adaptive":
+        return jax.vmap(
+            lambda aa, bb, zz: wc.adaptive_acb_kernel(
+                hypgeom.acb_hypgeom_pfq,
+                (aa, bb, zz),
+                prec_bits,
+                reciprocal=reciprocal,
+                n_terms=n_terms,
+            )
+        )(a, b, z)
+    raise ValueError(f"Unsupported impl: {impl}")
+
+
+def arb_hypgeom_0f1_batch_mode_padded(a, z, *, pad_to: int, impl: str, prec_bits: int = 53, regularized: bool = False):
+    return _pad_trim_call(lambda aa, zz: _arb_hypgeom_0f1_batch_mode_core(aa, zz, prec_bits=prec_bits, impl=impl, regularized=regularized), (a, z), pad_to)
+
+
+def arb_hypgeom_0f1_batch_mode_fixed(a, z, *, impl: str, prec_bits: int = 53, regularized: bool = False):
+    return _arb_hypgeom_0f1_batch_mode_core(a, z, prec_bits=prec_bits, impl=impl, regularized=regularized)
+
+
+def arb_hypgeom_1f1_batch_mode_padded(a, b, z, *, pad_to: int, impl: str, prec_bits: int = 53, regularized: bool = False):
+    return _pad_trim_call(lambda aa, bb, zz: _arb_hypgeom_1f1_batch_mode_core(aa, bb, zz, prec_bits=prec_bits, impl=impl, regularized=regularized), (a, b, z), pad_to)
+
+
+def arb_hypgeom_1f1_batch_mode_fixed(a, b, z, *, impl: str, prec_bits: int = 53, regularized: bool = False):
+    return _arb_hypgeom_1f1_batch_mode_core(a, b, z, prec_bits=prec_bits, impl=impl, regularized=regularized)
+
+
+def arb_hypgeom_2f1_batch_mode_padded(a, b, c, z, *, pad_to: int, impl: str, prec_bits: int = 53, regularized: bool = False):
+    return _pad_trim_call(
+        lambda aa, bb, cc, zz: _arb_hypgeom_2f1_batch_mode_core(aa, bb, cc, zz, prec_bits=prec_bits, impl=impl, regularized=regularized),
+        (a, b, c, z),
+        pad_to,
+    )
+
+
+def arb_hypgeom_2f1_batch_mode_fixed(a, b, c, z, *, impl: str, prec_bits: int = 53, regularized: bool = False):
+    return _arb_hypgeom_2f1_batch_mode_core(a, b, c, z, prec_bits=prec_bits, impl=impl, regularized=regularized)
+
+
+def arb_hypgeom_u_batch_mode_padded(a, b, z, *, pad_to: int, impl: str, prec_bits: int = 53):
+    return _pad_trim_call(lambda aa, bb, zz: _arb_hypgeom_u_batch_mode_core(aa, bb, zz, prec_bits=prec_bits, impl=impl), (a, b, z), pad_to)
+
+
+def arb_hypgeom_u_batch_mode_fixed(a, b, z, *, impl: str, prec_bits: int = 53):
+    return _arb_hypgeom_u_batch_mode_core(a, b, z, prec_bits=prec_bits, impl=impl)
+
+
+def arb_hypgeom_gamma_lower_batch_mode_padded(s, z, *, pad_to: int, impl: str, prec_bits: int = 53, regularized: bool = False):
+    return _pad_trim_call(lambda ss, zz: _arb_hypgeom_gamma_lower_batch_mode_core(ss, zz, prec_bits=prec_bits, impl=impl, regularized=regularized), (s, z), pad_to)
+
+
+def arb_hypgeom_gamma_lower_batch_mode_fixed(s, z, *, impl: str, prec_bits: int = 53, regularized: bool = False):
+    return _arb_hypgeom_gamma_lower_batch_mode_core(s, z, prec_bits=prec_bits, impl=impl, regularized=regularized)
+
+
+def arb_hypgeom_gamma_upper_batch_mode_padded(s, z, *, pad_to: int, impl: str, prec_bits: int = 53, regularized: bool = False):
+    return _pad_trim_call(lambda ss, zz: _arb_hypgeom_gamma_upper_batch_mode_core(ss, zz, prec_bits=prec_bits, impl=impl, regularized=regularized), (s, z), pad_to)
+
+
+def arb_hypgeom_gamma_upper_batch_mode_fixed(s, z, *, impl: str, prec_bits: int = 53, regularized: bool = False):
+    return _arb_hypgeom_gamma_upper_batch_mode_core(s, z, prec_bits=prec_bits, impl=impl, regularized=regularized)
+
+
+def arb_hypgeom_legendre_p_batch_mode_padded(n, m, z, *, pad_to: int, impl: str, prec_bits: int = 53, type: int = 0):
+    return _pad_trim_call(lambda mm, zz: _arb_hypgeom_legendre_p_batch_mode_core(n, mm, zz, type=type, prec_bits=prec_bits, impl=impl), (m, z), pad_to)
+
+
+def arb_hypgeom_legendre_p_batch_mode_fixed(n, m, z, *, impl: str, prec_bits: int = 53, type: int = 0):
+    return _arb_hypgeom_legendre_p_batch_mode_core(n, m, z, type=type, prec_bits=prec_bits, impl=impl)
+
+
+def arb_hypgeom_legendre_q_batch_mode_padded(n, m, z, *, pad_to: int, impl: str, prec_bits: int = 53, type: int = 0):
+    return _pad_trim_call(lambda mm, zz: _arb_hypgeom_legendre_q_batch_mode_core(n, mm, zz, type=type, prec_bits=prec_bits, impl=impl), (m, z), pad_to)
+
+
+def arb_hypgeom_legendre_q_batch_mode_fixed(n, m, z, *, impl: str, prec_bits: int = 53, type: int = 0):
+    return _arb_hypgeom_legendre_q_batch_mode_core(n, m, z, type=type, prec_bits=prec_bits, impl=impl)
+
+
+def arb_hypgeom_jacobi_p_batch_mode_padded(n, a, b, z, *, pad_to: int, impl: str, prec_bits: int = 53):
+    return _pad_trim_call(lambda aa, bb, zz: _arb_hypgeom_jacobi_p_batch_mode_core(n, aa, bb, zz, prec_bits=prec_bits, impl=impl), (a, b, z), pad_to)
+
+
+def arb_hypgeom_jacobi_p_batch_mode_fixed(n, a, b, z, *, impl: str, prec_bits: int = 53):
+    return _arb_hypgeom_jacobi_p_batch_mode_core(n, a, b, z, prec_bits=prec_bits, impl=impl)
+
+
+def arb_hypgeom_gegenbauer_c_batch_mode_padded(n, m, z, *, pad_to: int, impl: str, prec_bits: int = 53):
+    return _pad_trim_call(lambda mm, zz: _arb_hypgeom_gegenbauer_c_batch_mode_core(n, mm, zz, prec_bits=prec_bits, impl=impl), (m, z), pad_to)
+
+
+def arb_hypgeom_gegenbauer_c_batch_mode_fixed(n, m, z, *, impl: str, prec_bits: int = 53):
+    return _arb_hypgeom_gegenbauer_c_batch_mode_core(n, m, z, prec_bits=prec_bits, impl=impl)
+
+
+def acb_hypgeom_0f1_batch_mode_padded(a, z, *, pad_to: int, impl: str, prec_bits: int = 53, regularized: bool = False):
+    return _pad_trim_call(lambda aa, zz: _acb_hypgeom_0f1_batch_mode_core(aa, zz, prec_bits=prec_bits, impl=impl, regularized=regularized), (a, z), pad_to)
+
+
+def acb_hypgeom_0f1_batch_mode_fixed(a, z, *, impl: str, prec_bits: int = 53, regularized: bool = False):
+    return _acb_hypgeom_0f1_batch_mode_core(a, z, prec_bits=prec_bits, impl=impl, regularized=regularized)
+
+
+def acb_hypgeom_1f1_batch_mode_padded(a, b, z, *, pad_to: int, impl: str, prec_bits: int = 53, regularized: bool = False):
+    return _pad_trim_call(lambda aa, bb, zz: _acb_hypgeom_1f1_batch_mode_core(aa, bb, zz, prec_bits=prec_bits, impl=impl, regularized=regularized), (a, b, z), pad_to)
+
+
+def acb_hypgeom_1f1_batch_mode_fixed(a, b, z, *, impl: str, prec_bits: int = 53, regularized: bool = False):
+    return _acb_hypgeom_1f1_batch_mode_core(a, b, z, prec_bits=prec_bits, impl=impl, regularized=regularized)
+
+
+def acb_hypgeom_2f1_batch_mode_padded(a, b, c, z, *, pad_to: int, impl: str, prec_bits: int = 53, regularized: bool = False):
+    return _pad_trim_call(
+        lambda aa, bb, cc, zz: _acb_hypgeom_2f1_batch_mode_core(aa, bb, cc, zz, prec_bits=prec_bits, impl=impl, regularized=regularized),
+        (a, b, c, z),
+        pad_to,
+    )
+
+
+def acb_hypgeom_2f1_batch_mode_fixed(a, b, c, z, *, impl: str, prec_bits: int = 53, regularized: bool = False):
+    return _acb_hypgeom_2f1_batch_mode_core(a, b, c, z, prec_bits=prec_bits, impl=impl, regularized=regularized)
+
+
+def acb_hypgeom_u_batch_mode_padded(a, b, z, *, pad_to: int, impl: str, prec_bits: int = 53):
+    return _pad_trim_call(lambda aa, bb, zz: _acb_hypgeom_u_batch_mode_core(aa, bb, zz, prec_bits=prec_bits, impl=impl), (a, b, z), pad_to)
+
+
+def acb_hypgeom_u_batch_mode_fixed(a, b, z, *, impl: str, prec_bits: int = 53):
+    return _acb_hypgeom_u_batch_mode_core(a, b, z, prec_bits=prec_bits, impl=impl)
+
+
+def acb_hypgeom_gamma_lower_batch_mode_padded(s, z, *, pad_to: int, impl: str, prec_bits: int = 53, regularized: bool = False):
+    return _pad_trim_call(lambda ss, zz: _acb_hypgeom_gamma_lower_batch_mode_core(ss, zz, prec_bits=prec_bits, impl=impl, regularized=regularized), (s, z), pad_to)
+
+
+def acb_hypgeom_gamma_lower_batch_mode_fixed(s, z, *, impl: str, prec_bits: int = 53, regularized: bool = False):
+    return _acb_hypgeom_gamma_lower_batch_mode_core(s, z, prec_bits=prec_bits, impl=impl, regularized=regularized)
+
+
+def acb_hypgeom_gamma_upper_batch_mode_padded(s, z, *, pad_to: int, impl: str, prec_bits: int = 53, regularized: bool = False):
+    return _pad_trim_call(lambda ss, zz: _acb_hypgeom_gamma_upper_batch_mode_core(ss, zz, prec_bits=prec_bits, impl=impl, regularized=regularized), (s, z), pad_to)
+
+
+def acb_hypgeom_gamma_upper_batch_mode_fixed(s, z, *, impl: str, prec_bits: int = 53, regularized: bool = False):
+    return _acb_hypgeom_gamma_upper_batch_mode_core(s, z, prec_bits=prec_bits, impl=impl, regularized=regularized)
+
+
+def arb_hypgeom_chebyshev_t_batch_mode_padded(n, z, *, pad_to: int, impl: str, prec_bits: int = 53):
+    return _pad_trim_call(lambda zz: _arb_hypgeom_chebyshev_t_batch_mode_core(n, zz, prec_bits=prec_bits, impl=impl), (z,), pad_to)
+
+
+def arb_hypgeom_chebyshev_t_batch_mode_fixed(n, z, *, impl: str, prec_bits: int = 53):
+    return _arb_hypgeom_chebyshev_t_batch_mode_core(n, z, prec_bits=prec_bits, impl=impl)
+
+
+def arb_hypgeom_chebyshev_u_batch_mode_padded(n, z, *, pad_to: int, impl: str, prec_bits: int = 53):
+    return _pad_trim_call(lambda zz: _arb_hypgeom_chebyshev_u_batch_mode_core(n, zz, prec_bits=prec_bits, impl=impl), (z,), pad_to)
+
+
+def arb_hypgeom_chebyshev_u_batch_mode_fixed(n, z, *, impl: str, prec_bits: int = 53):
+    return _arb_hypgeom_chebyshev_u_batch_mode_core(n, z, prec_bits=prec_bits, impl=impl)
+
+
+def arb_hypgeom_laguerre_l_batch_mode_padded(n, m, z, *, pad_to: int, impl: str, prec_bits: int = 53):
+    return _pad_trim_call(lambda mm, zz: _arb_hypgeom_laguerre_l_batch_mode_core(n, mm, zz, prec_bits=prec_bits, impl=impl), (m, z), pad_to)
+
+
+def arb_hypgeom_laguerre_l_batch_mode_fixed(n, m, z, *, impl: str, prec_bits: int = 53):
+    return _arb_hypgeom_laguerre_l_batch_mode_core(n, m, z, prec_bits=prec_bits, impl=impl)
+
+
+def arb_hypgeom_hermite_h_batch_mode_padded(n, z, *, pad_to: int, impl: str, prec_bits: int = 53):
+    return _pad_trim_call(lambda zz: _arb_hypgeom_hermite_h_batch_mode_core(n, zz, prec_bits=prec_bits, impl=impl), (z,), pad_to)
+
+
+def arb_hypgeom_hermite_h_batch_mode_fixed(n, z, *, impl: str, prec_bits: int = 53):
+    return _arb_hypgeom_hermite_h_batch_mode_core(n, z, prec_bits=prec_bits, impl=impl)
+
+
+def arb_hypgeom_pfq_batch_mode_padded(a, b, z, *, pad_to: int, impl: str, prec_bits: int = 53, reciprocal: bool = False, n_terms: int = 32):
+    return _pad_trim_call(
+        lambda aa, bb, zz: _arb_hypgeom_pfq_batch_mode_core(
+            aa, bb, zz, prec_bits=prec_bits, impl=impl, reciprocal=reciprocal, n_terms=n_terms
+        ),
+        (a, b, z),
+        pad_to,
+    )
+
+
+def arb_hypgeom_pfq_batch_mode_fixed(a, b, z, *, impl: str, prec_bits: int = 53, reciprocal: bool = False, n_terms: int = 32):
+    return _arb_hypgeom_pfq_batch_mode_core(a, b, z, prec_bits=prec_bits, impl=impl, reciprocal=reciprocal, n_terms=n_terms)
+
+
+def acb_hypgeom_chebyshev_t_batch_mode_padded(n, z, *, pad_to: int, impl: str, prec_bits: int = 53):
+    return _pad_trim_call(lambda zz: _acb_hypgeom_chebyshev_t_batch_mode_core(n, zz, prec_bits=prec_bits, impl=impl), (z,), pad_to)
+
+
+def acb_hypgeom_chebyshev_t_batch_mode_fixed(n, z, *, impl: str, prec_bits: int = 53):
+    return _acb_hypgeom_chebyshev_t_batch_mode_core(n, z, prec_bits=prec_bits, impl=impl)
+
+
+def acb_hypgeom_chebyshev_u_batch_mode_padded(n, z, *, pad_to: int, impl: str, prec_bits: int = 53):
+    return _pad_trim_call(lambda zz: _acb_hypgeom_chebyshev_u_batch_mode_core(n, zz, prec_bits=prec_bits, impl=impl), (z,), pad_to)
+
+
+def acb_hypgeom_chebyshev_u_batch_mode_fixed(n, z, *, impl: str, prec_bits: int = 53):
+    return _acb_hypgeom_chebyshev_u_batch_mode_core(n, z, prec_bits=prec_bits, impl=impl)
+
+
+def acb_hypgeom_laguerre_l_batch_mode_padded(n, a, z, *, pad_to: int, impl: str, prec_bits: int = 53):
+    return _pad_trim_call(lambda aa, zz: _acb_hypgeom_laguerre_l_batch_mode_core(n, aa, zz, prec_bits=prec_bits, impl=impl), (a, z), pad_to)
+
+
+def acb_hypgeom_laguerre_l_batch_mode_fixed(n, a, z, *, impl: str, prec_bits: int = 53):
+    return _acb_hypgeom_laguerre_l_batch_mode_core(n, a, z, prec_bits=prec_bits, impl=impl)
+
+
+def acb_hypgeom_hermite_h_batch_mode_padded(n, z, *, pad_to: int, impl: str, prec_bits: int = 53):
+    return _pad_trim_call(lambda zz: _acb_hypgeom_hermite_h_batch_mode_core(n, zz, prec_bits=prec_bits, impl=impl), (z,), pad_to)
+
+
+def acb_hypgeom_hermite_h_batch_mode_fixed(n, z, *, impl: str, prec_bits: int = 53):
+    return _acb_hypgeom_hermite_h_batch_mode_core(n, z, prec_bits=prec_bits, impl=impl)
+
+
+def acb_hypgeom_pfq_batch_mode_padded(a, b, z, *, pad_to: int, impl: str, prec_bits: int = 53, reciprocal: bool = False, n_terms: int = 32):
+    return _pad_trim_call(
+        lambda aa, bb, zz: _acb_hypgeom_pfq_batch_mode_core(
+            aa, bb, zz, prec_bits=prec_bits, impl=impl, reciprocal=reciprocal, n_terms=n_terms
+        ),
+        (a, b, z),
+        pad_to,
+    )
+
+
+def acb_hypgeom_pfq_batch_mode_fixed(a, b, z, *, impl: str, prec_bits: int = 53, reciprocal: bool = False, n_terms: int = 32):
+    return _acb_hypgeom_pfq_batch_mode_core(a, b, z, prec_bits=prec_bits, impl=impl, reciprocal=reciprocal, n_terms=n_terms)
+
+
+__all__.extend(
+    [
+        "arb_hypgeom_0f1_batch_mode_padded",
+        "arb_hypgeom_0f1_batch_mode_fixed",
+        "arb_hypgeom_1f1_batch_mode_padded",
+        "arb_hypgeom_1f1_batch_mode_fixed",
+        "arb_hypgeom_2f1_batch_mode_padded",
+        "arb_hypgeom_2f1_batch_mode_fixed",
+        "arb_hypgeom_u_batch_mode_padded",
+        "arb_hypgeom_u_batch_mode_fixed",
+        "arb_hypgeom_gamma_lower_batch_mode_padded",
+        "arb_hypgeom_gamma_lower_batch_mode_fixed",
+        "arb_hypgeom_gamma_upper_batch_mode_padded",
+        "arb_hypgeom_gamma_upper_batch_mode_fixed",
+        "arb_hypgeom_legendre_p_batch_mode_padded",
+        "arb_hypgeom_legendre_p_batch_mode_fixed",
+        "arb_hypgeom_legendre_q_batch_mode_padded",
+        "arb_hypgeom_legendre_q_batch_mode_fixed",
+        "arb_hypgeom_jacobi_p_batch_mode_padded",
+        "arb_hypgeom_jacobi_p_batch_mode_fixed",
+        "arb_hypgeom_gegenbauer_c_batch_mode_padded",
+        "arb_hypgeom_gegenbauer_c_batch_mode_fixed",
+        "arb_hypgeom_chebyshev_t_batch_mode_padded",
+        "arb_hypgeom_chebyshev_t_batch_mode_fixed",
+        "arb_hypgeom_chebyshev_u_batch_mode_padded",
+        "arb_hypgeom_chebyshev_u_batch_mode_fixed",
+        "arb_hypgeom_laguerre_l_batch_mode_padded",
+        "arb_hypgeom_laguerre_l_batch_mode_fixed",
+        "arb_hypgeom_hermite_h_batch_mode_padded",
+        "arb_hypgeom_hermite_h_batch_mode_fixed",
+        "arb_hypgeom_pfq_batch_mode_padded",
+        "arb_hypgeom_pfq_batch_mode_fixed",
+        "acb_hypgeom_0f1_batch_mode_padded",
+        "acb_hypgeom_0f1_batch_mode_fixed",
+        "acb_hypgeom_1f1_batch_mode_padded",
+        "acb_hypgeom_1f1_batch_mode_fixed",
+        "acb_hypgeom_2f1_batch_mode_padded",
+        "acb_hypgeom_2f1_batch_mode_fixed",
+        "acb_hypgeom_u_batch_mode_padded",
+        "acb_hypgeom_u_batch_mode_fixed",
+        "acb_hypgeom_gamma_lower_batch_mode_padded",
+        "acb_hypgeom_gamma_lower_batch_mode_fixed",
+        "acb_hypgeom_gamma_upper_batch_mode_padded",
+        "acb_hypgeom_gamma_upper_batch_mode_fixed",
+        "acb_hypgeom_chebyshev_t_batch_mode_padded",
+        "acb_hypgeom_chebyshev_t_batch_mode_fixed",
+        "acb_hypgeom_chebyshev_u_batch_mode_padded",
+        "acb_hypgeom_chebyshev_u_batch_mode_fixed",
+        "acb_hypgeom_laguerre_l_batch_mode_padded",
+        "acb_hypgeom_laguerre_l_batch_mode_fixed",
+        "acb_hypgeom_hermite_h_batch_mode_padded",
+        "acb_hypgeom_hermite_h_batch_mode_fixed",
+        "acb_hypgeom_pfq_batch_mode_padded",
+        "acb_hypgeom_pfq_batch_mode_fixed",
+    ]
+)

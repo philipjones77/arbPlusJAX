@@ -27,7 +27,18 @@ Last updated: 2026-03-01T00:00:00Z
     - extend dtype-compliance validation beyond the current `float32`/`complex64` point/basic checks
 - Matrix-function roadmap for the Jones matrix-function subsystem (`jrb_mat` / `jcb_mat`) layered alongside `arb_mat` / `acb_mat`:
   - current state:
-    - `src/arbplusjax/arb_mat.py` and `src/arbplusjax/acb_mat.py` only cover 2x2 `det` / `trace`
+    - `src/arbplusjax/arb_mat.py` and `src/arbplusjax/acb_mat.py` now cover canonical `n x n` substrate:
+      - `matmul`
+      - `matvec`
+      - `solve`
+      - `triangular_solve`
+      - `lu`
+      - `det`
+      - `trace`
+    - current tightening status:
+      - `trace_basic` and `trace_rigorous` use exact interval/box diagonal summation
+      - `det_basic` and `det_rigorous` use exact interval/box formulas for `1x1`-`3x3`, midpoint determinant fallback for larger sizes
+      - `solve_basic`, `triangular_solve_basic`, and `lu_basic` remain midpoint-first with outward boxing
     - `arb_mat` / `acb_mat` should continue to exist and be expanded as the canonical Arb/FLINT-style JAX matrix extension surface
     - new Jones-labeled subsystem should hold the contour-integral / Krylov matrix-function stack as a separate subsystem, not as a replacement for `arb_mat` / `acb_mat`
     - there is no current matrix-log, matrix-root, matrix-sign, matrix exponential/inverse scaling path, Fréchet derivative, or rational-Krylov substrate
@@ -108,6 +119,11 @@ Last updated: 2026-03-01T00:00:00Z
     - do not start with `logm` directly
     - first add the reusable substrate and a single dense contour-based prototype for `jcb_mat_logm` / `jrb_mat_logm`
     - after that, add a matching AD test and a small benchmark before expanding to roots/sign/Krylov
+  - immediate canonical matrix backlog:
+    - add `inv`
+    - add `qr`
+    - add stronger large-`n` determinant enclosures beyond midpoint fallback
+    - add parity/reference checks for general `n x n` determinant and trace once the C chassis exposes them
 
 ## Missing C implementations
 - Source: `docs/audit.md` (snapshot `2026-02-25T03:51:38Z`), grouped by function prefix/module.
@@ -130,3 +146,30 @@ Last updated: 2026-03-01T00:00:00Z
 - ACB Elliptic: 17
 - Arb Calc: 0
 - ACB Calc: 0
+- `hypgeom` staged engineering cleanup:
+  - current pass improves helper consolidation for the gamma / erf / Ei-Si-Ci-Shi-Chi-li-dilog-fresnel tranche and adds padded-batch/AD smoke coverage across the first and second tranches
+  - current pass also adds dedicated fixed-shape padded basic batch entry points for canonical `0f1 / 1f1 / 2f1 / u` and the stronger orthogonal families (`legendre_p`, `legendre_q`, `jacobi_p`, `gegenbauer_c`)
+  - current pass also adds dedicated fixed-shape padded adaptive/rigorous batch entry points for the same canonical second tranche and compile-count probes in `docs/reports/hypgeom_compile_probe*.md`
+  - current pass also extends the fixed-shape padded basic/adaptive/rigorous batch path to the weaker orthogonal families (`chebyshev_t`, `chebyshev_u`, `laguerre_l`, `hermite_h`) and canonical `pfq`, with matching engineering tests and refreshed compile/smoke reports
+  - current pass also strengthens the canonical scalar kernels for `1f1`, `2f1`, `u`, `pfq`, and incomplete gamma:
+    - `1f1`: explicit Kummer-style regime candidate and boundary AD sweeps
+    - `2f1`: explicit transformed regime candidate and boundary AD sweeps
+    - `u`: explicit asymptotic candidate and boundary AD sweeps
+    - `pfq`: stronger sample tightening on top of the series/tail path
+    - incomplete gamma: sampled direct/complement candidates on real and complex paths
+  - current pass also adds fixed-shape padded basic batch support and mode-batch fastpaths for canonical lower/upper incomplete gamma, plus complex cut/corner AD checks for `2f1`, `u`, and incomplete gamma
+  - current pass also switches incomplete-gamma API padding to the family-specific padded fastpath and removes the earlier padded `gamma_upper` smoke-benchmark outlier; padded overhead remains, but it is now in-family rather than pathological
+  - current pass also adds specialized complement-aware adaptive/rigorous wrappers for lower/upper incomplete gamma on the real and complex sides, instead of relying only on the generic mode inflators
+  - current pass also extracts the shared real/complex direct-vs-complement incomplete-gamma candidate builders out of the duplicated scalar lower/upper implementations in `hypgeom.py`
+  - current pass also replaces incomplete-gamma batch-mode cores in `hypgeom_wrappers.py` so they dispatch directly to the specialized family kernels instead of routing through generic `*_mode` lambdas
+  - targeted incomplete-gamma compile probes now show family compile events reduced from `4` to `2` in both `basic` and `rigorous`
+  - current pass also extracts shared regime/sample candidate builders for canonical `1f1`, `2f1`, and `u` out of the duplicated real/complex scalar paths in `hypgeom.py`
+  - current pass also replaces the canonical `1f1`, `2f1`, and `u` batch-mode cores in `hypgeom_wrappers.py` so they dispatch directly to family kernels for `basic`, `rigorous`, and `adaptive` instead of routing through generic `*_mode` lambdas
+  - current pass also deepens the complex AD cut/corner sweeps for `1f1`, `2f1`, and `u`
+  - current pass also applies the same direct adaptive/rigorous batch-core treatment to the remaining weaker canonical families (`chebyshev_t`, `chebyshev_u`, `laguerre_l`, `hermite_h`, `pfq`)
+  - targeted `1f1/2f1/u` compile probes now show family compile events reduced from `6` to `3`; total padded compile count still rises from `27` to `31`, so caller/helper overhead remains the bottleneck
+  - still open:
+    - deeper helper extraction across the remaining canonical `hypgeom.py` families outside `1f1`, `2f1`, `u`, and incomplete gamma
+    - expand complex AD audits beyond the current representative cut/corner sweeps for the remaining canonical families outside `1f1`, `2f1`, `u`, and incomplete gamma
+    - deeper family-specific adaptive/rigorous kernels beyond the current staged mode-batch wrappers for the remaining weaker orthogonal families and the other heavy canonical families
+    - reduce remaining total compile noise; current fixed-shape work halves family-level compile events in the probe, but total compile events only improve from `49` to `47`

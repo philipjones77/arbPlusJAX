@@ -15,6 +15,8 @@ from . import bessel_kernels as bk
 from . import coeffs
 from . import double_gamma
 from . import elementary as el
+from . import hypgeom as _hypgeom
+from . import sampling_helpers as sh
 
 jax.config.update("jax_enable_x64", True)
 
@@ -24,54 +26,35 @@ def _gamma_real(x: jax.Array) -> jax.Array:
 
 
 def _expi_real(x: jax.Array) -> jax.Array:
-    from . import hypgeom
-    return jnp.real(hypgeom._complex_ei_series(jnp.asarray(x, dtype=jnp.complex128)))
+    return _hypgeom._real_ei_scalar(x)
 
 
 def _dilog_real(x: jax.Array) -> jax.Array:
-    from . import hypgeom
-    return jnp.real(hypgeom._complex_dilog_series(jnp.asarray(x, dtype=jnp.complex128)))
+    return _hypgeom._real_dilog_scalar(x)
 
 
 def _erfinv_real(x: jax.Array) -> jax.Array:
-    from . import hypgeom
-    return hypgeom._real_erfinv_scalar(x)
+    return _hypgeom._real_erfinv_scalar(x)
 
 
 def _erfi_real(x: jax.Array) -> jax.Array:
-    from . import hypgeom
-    return jnp.real(hypgeom._complex_erfi_series(jnp.asarray(x, dtype=jnp.complex128)))
+    return _hypgeom._real_erfi_scalar(x)
 
 
 def _erf_complex(z: jax.Array) -> jax.Array:
-    from . import hypgeom
-    return hypgeom._complex_erf_series(jnp.asarray(z, dtype=jnp.complex128))
+    return _hypgeom._complex_erf_series(jnp.asarray(z, dtype=el.complex_dtype_from(z)))
 
 
 def _si_ci_real(x: jax.Array) -> tuple[jax.Array, jax.Array]:
-    from . import hypgeom
-    use_series = jnp.abs(x) <= 4.0
-    s_series, c_series = hypgeom._si_ci_from_series(x)
-    s_asymp, c_asymp = hypgeom._si_ci_asymp(x)
-    s = jnp.where(use_series, s_series, s_asymp)
-    c = jnp.where(use_series, c_series, c_asymp)
-    return s, c
+    return _hypgeom._real_si_ci_scalar(x)
 
 
 def _fresnel_real(x: jax.Array, normalized: bool) -> tuple[jax.Array, jax.Array]:
-    from . import hypgeom
-    s, c = hypgeom._complex_fresnel(jnp.asarray(x, dtype=jnp.complex128), True)
-    if not normalized:
-        s = hypgeom._SQRT_PI_OVER_2 * s
-        c = hypgeom._SQRT_PI_OVER_2 * c
-    return s, c
+    return _hypgeom._real_fresnel_scalar(x, normalized)
 
 
 def _airy_real(x: jax.Array) -> tuple[jax.Array, jax.Array, jax.Array, jax.Array]:
-    from . import hypgeom
-    ai, aip = hypgeom._airy_series(x, -1.0)
-    bi, bip = hypgeom._airy_series(x, 1.0)
-    return ai, aip, bi, bip
+    return _hypgeom._real_airy_scalar(x)
 
 _LANCZOS = coeffs.LANCZOS
 
@@ -222,14 +205,7 @@ def _rigorous_complex(fn, x: jax.Array, eps: float) -> jax.Array:
 
 
 def _adaptive_real(fn, x: jax.Array, eps: float, samples: int) -> jax.Array:
-    mid, rad = _ball_from_interval(x)
-    t = jnp.linspace(-1.0, 1.0, samples)
-    xs = mid + rad * t
-    vals = jax.vmap(fn)(xs)
-    v0 = fn(mid)
-    rad_out = jnp.max(jnp.abs(vals - v0)) + eps
-    out = di.interval(di._below(v0 - rad_out), di._above(v0 + rad_out))
-    return jnp.where(jnp.isfinite(v0), out, _full_interval())
+    return sh.adaptive_real(fn, x, eps, samples)
 
 
 def _real_partial_bound(fn, x: jax.Array, y: jax.Array, argnum: int) -> jax.Array:
@@ -256,19 +232,7 @@ def _rigorous_real_bivariate(fn, x: jax.Array, y: jax.Array, eps: float) -> jax.
 
 
 def _adaptive_real_bivariate(fn, x: jax.Array, y: jax.Array, eps: float, samples: int) -> jax.Array:
-    mid_x, rad_x = _ball_from_interval(x)
-    mid_y, rad_y = _ball_from_interval(y)
-    v0 = fn(mid_x, mid_y)
-
-    ts = jnp.linspace(-1.0, 1.0, samples)
-    gx, gy = jnp.meshgrid(ts, ts, indexing="ij")
-    pts_x = mid_x + rad_x * jnp.ravel(gx)
-    pts_y = mid_y + rad_y * jnp.ravel(gy)
-    vals = jax.vmap(fn)(pts_x, pts_y)
-
-    rad_out = jnp.max(jnp.abs(vals - v0)) + eps
-    out = di.interval(di._below(v0 - rad_out), di._above(v0 + rad_out))
-    return jnp.where(jnp.isfinite(v0), out, _full_interval())
+    return sh.adaptive_real_bivariate(fn, x, y, eps, samples)
 
 
 def _rigorous_complex_bivariate(fn, x: jax.Array, y: jax.Array, eps: float) -> jax.Array:
@@ -310,15 +274,7 @@ def _adaptive_complex_bivariate(fn, x: jax.Array, y: jax.Array, eps: float, samp
 
 
 def _adaptive_complex(fn, x: jax.Array, eps: float, samples: int) -> jax.Array:
-    mid, rad = _ball_from_box(x)
-    angles = jnp.linspace(0.0, el.TWO_PI, samples, endpoint=False)
-    zs = mid + rad * (jnp.cos(angles) + 1j * jnp.sin(angles))
-    vals = jax.vmap(fn)(zs)
-    v0 = fn(mid)
-    rad_out = jnp.max(jnp.abs(vals - v0)) + eps
-    finite = jnp.isfinite(jnp.real(v0)) & jnp.isfinite(jnp.imag(v0))
-    out = _box_from_ball(v0, rad_out)
-    return jnp.where(finite, out, _full_box())
+    return sh.adaptive_complex(fn, x, eps, samples)
 
 
 def _rigorous_real_bivariate(fn, x: jax.Array, y: jax.Array, eps: float) -> jax.Array:
@@ -367,43 +323,15 @@ def _bivariate_sample_interval(fn, x: jax.Array, y: jax.Array) -> jax.Array:
 
 
 def _sample_interval_bivariate_grid(fn, x: jax.Array, y: jax.Array, samples: int = 3) -> jax.Array:
-    xs = jnp.linspace(x[0], x[1], samples)
-    ys = jnp.linspace(y[0], y[1], samples)
-    vals = jax.vmap(lambda a: jax.vmap(lambda b: fn(a, b))(ys))(xs).reshape(-1)
-    finite = jnp.all(jnp.isfinite(vals))
-    out = di.interval(di._below(jnp.min(vals)), di._above(jnp.max(vals)))
-    return jnp.where(finite, out, _full_interval())
+    return sh.sample_interval_bivariate_grid(fn, x, y, samples=samples)
 
 
 def _sample_box_bivariate_grid(fn, x: jax.Array, y: jax.Array, samples: int = 3) -> jax.Array:
-    xm, xr = _ball_from_box(x)
-    ym, yr = _ball_from_box(y)
-    angles = jnp.linspace(0.0, el.TWO_PI, samples, endpoint=False)
-    zs = xm + xr * (jnp.cos(angles) + 1j * jnp.sin(angles))
-    ws = ym + yr * (jnp.cos(angles) + 1j * jnp.sin(angles))
-    gz, gw = jnp.meshgrid(zs, ws, indexing="ij")
-    vals = jax.vmap(fn)(jnp.ravel(gz), jnp.ravel(gw))
-    finite = jnp.all(jnp.isfinite(jnp.real(vals)) & jnp.isfinite(jnp.imag(vals)))
-    re = di.interval(di._below(jnp.min(jnp.real(vals))), di._above(jnp.max(jnp.real(vals))))
-    im = di.interval(di._below(jnp.min(jnp.imag(vals))), di._above(jnp.max(jnp.imag(vals))))
-    out = acb_core.acb_box(re, im)
-    return jnp.where(finite, out, _full_box())
+    return sh.sample_box_bivariate_grid(fn, x, y, samples=samples)
 
 
 def _sample_box_bivariate_candidates(fn, x: jax.Array, y: jax.Array) -> jax.Array:
-    xm, xr = _ball_from_box(x)
-    ym, yr = _ball_from_box(y)
-    z_offsets = jnp.asarray([0.0 + 0.0j, 1.0 + 0.0j, -1.0 + 0.0j, 0.0 + 1.0j, 0.0 - 1.0j], dtype=el.complex_dtype_from(xm, ym))
-    w_offsets = z_offsets
-    zs = xm + xr * z_offsets
-    ws = ym + yr * w_offsets
-    gz, gw = jnp.meshgrid(zs, ws, indexing="ij")
-    vals = jax.vmap(fn)(jnp.ravel(gz), jnp.ravel(gw))
-    finite = jnp.all(jnp.isfinite(jnp.real(vals)) & jnp.isfinite(jnp.imag(vals)))
-    re = di.interval(di._below(jnp.min(jnp.real(vals))), di._above(jnp.max(jnp.real(vals))))
-    im = di.interval(di._below(jnp.min(jnp.imag(vals))), di._above(jnp.max(jnp.imag(vals))))
-    out = acb_core.acb_box(re, im)
-    return jnp.where(finite, out, _full_box())
+    return sh.sample_box_bivariate_candidates(fn, x, y)
 
 
 def _bivariate_sample_interval_dense(fn, x: jax.Array, y: jax.Array) -> jax.Array:
@@ -551,17 +479,7 @@ def _rigorous_complex_bivariate(fn, x: jax.Array, y: jax.Array, eps: float) -> j
 
 
 def _adaptive_complex_bivariate(fn, x: jax.Array, y: jax.Array, eps: float, samples: int) -> jax.Array:
-    x_mid, x_rad = _ball_from_box(x)
-    y_mid, y_rad = _ball_from_box(y)
-    angles = jnp.linspace(0.0, el.TWO_PI, samples, endpoint=False)
-    xs = x_mid + x_rad * (jnp.cos(angles) + 1j * jnp.sin(angles))
-    ys = y_mid + y_rad * (jnp.cos(angles) + 1j * jnp.sin(angles))
-    vals = jax.vmap(lambda a: jax.vmap(lambda b: fn(a, b))(ys))(xs).reshape(-1)
-    v0 = fn(x_mid, y_mid)
-    rad_out = jnp.max(jnp.abs(vals - v0)) + eps
-    out = _box_from_ball(v0, rad_out)
-    finite = jnp.isfinite(jnp.real(v0)) & jnp.isfinite(jnp.imag(v0))
-    return jnp.where(finite, out, _full_box())
+    return sh.adaptive_complex_bivariate(fn, x, y, eps, samples)
 
 
 _real_bessel_series = bk.real_bessel_series

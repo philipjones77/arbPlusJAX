@@ -19,7 +19,7 @@ SUFFIXES = (
     "_prec",
     "_jit",
 )
-ALT_PREFIXES = ("bdg_", "boost_", "cuda_", "cusf_", "jaxsci_", "mpmath_", "scipy_")
+ALT_PREFIXES = ("bdg_", "boost_", "cuda_", "cusf_", "jaxsci_", "mpmath_", "scipy_", "shahen_")
 NEW_MODULE_HINTS = ("acb_dirichlet", "acb_modular")
 
 
@@ -95,6 +95,7 @@ This policy applies to canonical Arb-like functions, alternative implementations
 
 - Public functions should expose the expected mode surface for their family (`point`, `basic`, and where appropriate `adaptive` / `rigorous`).
 - Functions should obey the repo dtype rules. Family-specific algorithms do not get a separate dtype policy.
+- Families should share batching/padding/dispatch infrastructure while keeping separate numerical kernels for `point`, `basic`, and tighter interval modes. Point paths should not be forced through interval/box kernels just to reuse plumbing.
 - Batch execution should stay shape-stable where possible, and padding-friendly where practical.
 - Unnecessary Python-side value extraction and control flow should be removed from performance-sensitive paths.
 - Automatic differentiation compatibility is a target, but current status must be reported honestly per implementation family.
@@ -104,6 +105,7 @@ This policy applies to canonical Arb-like functions, alternative implementations
 
 - `pure_jax` is an aspiration-oriented field, not a binary admission rule.
 - `dtype` reports current conformance to repo dtype expectations.
+- `kernel_split` reports whether a family uses shared dispatch with separate per-mode kernels, or still mixes point and interval implementation layers.
 - `batch` reports current batch stability, not an idealized future state.
 - `ad` reports current compatibility expectations, not theoretical differentiability.
 - `hardening` reports the current numerical-hardening level of the implementation path.
@@ -290,6 +292,10 @@ MANUAL_IMPLEMENTATIONS: tuple[ImplementationEntry, ...] = (
     ImplementationEntry("hypergeometric_2f0", "alternative", "boost_hypergeometric_2f0", "boost_hypergeometric_2f0", "Boost.Math-inspired alternative implementation", "src/arbplusjax/boost_hypgeom.py", "point|basic|adaptive|rigorous", "implementation-specific mode-aware tightening", "Alternative implementation aligned to the hypergeometric 2f0 family."),
     ImplementationEntry("hypergeometric_pfq", "alternative", "boost_hypergeometric_pfq", "boost_hypergeometric_pfq", "Boost.Math-inspired alternative implementation", "src/arbplusjax/boost_hypgeom.py", "point|basic|adaptive|rigorous", "implementation-specific mode-aware tightening", "Alternative implementation aligned to the generic hypergeometric pfq family."),
     ImplementationEntry("besselk", "alternative", "cuda_besselk", "cuda_besselk", "CUDA/CubesselK-inspired alternative Bessel-K implementation", "src/arbplusjax/cubesselk.py", "point|basic|adaptive|rigorous", "implementation-specific mode-aware tightening", "Alternative implementation aligned to the canonical Arb-like `besselk` base name."),
+    ImplementationEntry("barnesdoublegamma", "alternative", "shahen_barnesdoublegamma", "shahen_barnesdoublegamma", "Alexanian--Kuznetsov paper-lineage alternative implementation", "src/arbplusjax/shahen_double_gamma.py", "point|basic|adaptive|rigorous", "implementation-specific mode-aware tightening", "Alternative implementation aligned to the existing Barnes double-gamma family; current implementation delegates to `bdg_*` because the mathematical intent is the same."),
+    ImplementationEntry("barnesgamma2", "alternative", "shahen_barnesgamma2", "shahen_barnesgamma2", "Alexanian--Kuznetsov paper-lineage alternative implementation", "src/arbplusjax/shahen_double_gamma.py", "point|basic|adaptive|rigorous", "implementation-specific mode-aware tightening", "Alternative implementation aligned to the existing BarnesGamma2 family; current implementation delegates to `bdg_*` because the mathematical intent is the same."),
+    ImplementationEntry("normalizeddoublegamma", "alternative", "shahen_normalizeddoublegamma", "shahen_normalizeddoublegamma", "Alexanian--Kuznetsov paper-lineage alternative implementation", "src/arbplusjax/shahen_double_gamma.py", "point|basic|adaptive|rigorous", "implementation-specific mode-aware tightening", "Alternative implementation aligned to the existing normalized double-gamma family; current implementation delegates to `bdg_*` because the mathematical intent is the same."),
+    ImplementationEntry("double_sine", "alternative", "shahen_double_sine", "shahen_double_sine", "Alexanian--Kuznetsov paper-lineage alternative implementation", "src/arbplusjax/shahen_double_gamma.py", "point|basic|adaptive|rigorous", "implementation-specific mode-aware tightening", "Alternative implementation aligned to the existing double-sine family; current implementation delegates to `bdg_*` because the mathematical intent is the same."),
 )
 
 MANUAL_FUNCTION_ENTRIES: tuple[FunctionEntry, ...] = tuple(
@@ -329,6 +335,39 @@ MANUAL_FUNCTION_ENTRIES: tuple[FunctionEntry, ...] = tuple(
             ("bdg_complex_log_normalizeddoublegamma_mode", "log_normalizeddoublegamma", "basic|adaptive|rigorous", "implementation-specific mode-aware tightening", "Mode-dispatched complex box wrapper for the Julia-derived normalized double-gamma logarithm."),
             ("bdg_complex_normalizeddoublegamma_mode", "normalizeddoublegamma", "basic|adaptive|rigorous", "implementation-specific mode-aware tightening", "Mode-dispatched complex box wrapper for the Julia-derived normalized double-gamma family."),
             ("bdg_complex_double_sine_mode", "double_sine", "basic|adaptive|rigorous", "implementation-specific mode-aware tightening", "Mode-dispatched complex box wrapper for the Julia-derived double-sine family."),
+            ("shahen_log_barnesdoublegamma", "log_barnesdoublegamma", "point", "point-only or helper path", "Alexanian--Kuznetsov paper-lineage alternative; current runtime implementation delegates to the existing `bdg_*` family because the mathematical intent is the same."),
+            ("shahen_barnesdoublegamma", "barnesdoublegamma", "point", "point-only or helper path", "Alexanian--Kuznetsov paper-lineage alternative; current runtime implementation delegates to the existing `bdg_*` family because the mathematical intent is the same."),
+            ("shahen_log_barnesgamma2", "log_barnesgamma2", "point", "point-only or helper path", "Alexanian--Kuznetsov paper-lineage alternative; current runtime implementation delegates to the existing `bdg_*` family because the mathematical intent is the same."),
+            ("shahen_barnesgamma2", "barnesgamma2", "point", "point-only or helper path", "Alexanian--Kuznetsov paper-lineage alternative; current runtime implementation delegates to the existing `bdg_*` family because the mathematical intent is the same."),
+            ("shahen_log_normalizeddoublegamma", "log_normalizeddoublegamma", "point", "point-only or helper path", "Alexanian--Kuznetsov paper-lineage alternative; current runtime implementation delegates to the existing `bdg_*` family because the mathematical intent is the same."),
+            ("shahen_normalizeddoublegamma", "normalizeddoublegamma", "point", "point-only or helper path", "Alexanian--Kuznetsov paper-lineage alternative; current runtime implementation delegates to the existing `bdg_*` family because the mathematical intent is the same."),
+            ("shahen_double_sine", "double_sine", "point", "point-only or helper path", "Alexanian--Kuznetsov paper-lineage alternative; current runtime implementation delegates to the existing `bdg_*` family because the mathematical intent is the same."),
+            ("shahen_interval_log_barnesdoublegamma", "log_barnesdoublegamma", "basic", "implementation-specific mode-aware tightening", "Real interval wrapper for the Alexanian--Kuznetsov paper-lineage alternative; currently delegates to `bdg_*`."),
+            ("shahen_interval_barnesdoublegamma", "barnesdoublegamma", "basic", "implementation-specific mode-aware tightening", "Real interval wrapper for the Alexanian--Kuznetsov paper-lineage alternative; currently delegates to `bdg_*`."),
+            ("shahen_interval_log_barnesgamma2", "log_barnesgamma2", "basic", "implementation-specific mode-aware tightening", "Real interval wrapper for the Alexanian--Kuznetsov paper-lineage alternative; currently delegates to `bdg_*`."),
+            ("shahen_interval_barnesgamma2", "barnesgamma2", "basic", "implementation-specific mode-aware tightening", "Real interval wrapper for the Alexanian--Kuznetsov paper-lineage alternative; currently delegates to `bdg_*`."),
+            ("shahen_interval_log_normalizeddoublegamma", "log_normalizeddoublegamma", "basic", "implementation-specific mode-aware tightening", "Real interval wrapper for the Alexanian--Kuznetsov paper-lineage alternative; currently delegates to `bdg_*`."),
+            ("shahen_interval_normalizeddoublegamma", "normalizeddoublegamma", "basic", "implementation-specific mode-aware tightening", "Real interval wrapper for the Alexanian--Kuznetsov paper-lineage alternative; currently delegates to `bdg_*`."),
+            ("shahen_complex_log_barnesdoublegamma", "log_barnesdoublegamma", "basic", "implementation-specific mode-aware tightening", "Complex box wrapper for the Alexanian--Kuznetsov paper-lineage alternative; currently delegates to `bdg_*`."),
+            ("shahen_complex_barnesdoublegamma", "barnesdoublegamma", "basic", "implementation-specific mode-aware tightening", "Complex box wrapper for the Alexanian--Kuznetsov paper-lineage alternative; currently delegates to `bdg_*`."),
+            ("shahen_complex_log_barnesgamma2", "log_barnesgamma2", "basic", "implementation-specific mode-aware tightening", "Complex box wrapper for the Alexanian--Kuznetsov paper-lineage alternative; currently delegates to `bdg_*`."),
+            ("shahen_complex_barnesgamma2", "barnesgamma2", "basic", "implementation-specific mode-aware tightening", "Complex box wrapper for the Alexanian--Kuznetsov paper-lineage alternative; currently delegates to `bdg_*`."),
+            ("shahen_complex_log_normalizeddoublegamma", "log_normalizeddoublegamma", "basic", "implementation-specific mode-aware tightening", "Complex box wrapper for the Alexanian--Kuznetsov paper-lineage alternative; currently delegates to `bdg_*`."),
+            ("shahen_complex_normalizeddoublegamma", "normalizeddoublegamma", "basic", "implementation-specific mode-aware tightening", "Complex box wrapper for the Alexanian--Kuznetsov paper-lineage alternative; currently delegates to `bdg_*`."),
+            ("shahen_complex_double_sine", "double_sine", "basic", "implementation-specific mode-aware tightening", "Complex box wrapper for the Alexanian--Kuznetsov paper-lineage alternative; currently delegates to `bdg_*`."),
+            ("shahen_interval_log_barnesdoublegamma_mode", "log_barnesdoublegamma", "basic|adaptive|rigorous", "implementation-specific mode-aware tightening", "Mode-dispatched real interval wrapper for the Alexanian--Kuznetsov paper-lineage alternative; currently delegates to `bdg_*`."),
+            ("shahen_interval_barnesdoublegamma_mode", "barnesdoublegamma", "basic|adaptive|rigorous", "implementation-specific mode-aware tightening", "Mode-dispatched real interval wrapper for the Alexanian--Kuznetsov paper-lineage alternative; currently delegates to `bdg_*`."),
+            ("shahen_interval_log_barnesgamma2_mode", "log_barnesgamma2", "basic|adaptive|rigorous", "implementation-specific mode-aware tightening", "Mode-dispatched real interval wrapper for the Alexanian--Kuznetsov paper-lineage alternative; currently delegates to `bdg_*`."),
+            ("shahen_interval_barnesgamma2_mode", "barnesgamma2", "basic|adaptive|rigorous", "implementation-specific mode-aware tightening", "Mode-dispatched real interval wrapper for the Alexanian--Kuznetsov paper-lineage alternative; currently delegates to `bdg_*`."),
+            ("shahen_interval_log_normalizeddoublegamma_mode", "log_normalizeddoublegamma", "basic|adaptive|rigorous", "implementation-specific mode-aware tightening", "Mode-dispatched real interval wrapper for the Alexanian--Kuznetsov paper-lineage alternative; currently delegates to `bdg_*`."),
+            ("shahen_interval_normalizeddoublegamma_mode", "normalizeddoublegamma", "basic|adaptive|rigorous", "implementation-specific mode-aware tightening", "Mode-dispatched real interval wrapper for the Alexanian--Kuznetsov paper-lineage alternative; currently delegates to `bdg_*`."),
+            ("shahen_complex_log_barnesdoublegamma_mode", "log_barnesdoublegamma", "basic|adaptive|rigorous", "implementation-specific mode-aware tightening", "Mode-dispatched complex box wrapper for the Alexanian--Kuznetsov paper-lineage alternative; currently delegates to `bdg_*`."),
+            ("shahen_complex_barnesdoublegamma_mode", "barnesdoublegamma", "basic|adaptive|rigorous", "implementation-specific mode-aware tightening", "Mode-dispatched complex box wrapper for the Alexanian--Kuznetsov paper-lineage alternative; currently delegates to `bdg_*`."),
+            ("shahen_complex_log_barnesgamma2_mode", "log_barnesgamma2", "basic|adaptive|rigorous", "implementation-specific mode-aware tightening", "Mode-dispatched complex box wrapper for the Alexanian--Kuznetsov paper-lineage alternative; currently delegates to `bdg_*`."),
+            ("shahen_complex_barnesgamma2_mode", "barnesgamma2", "basic|adaptive|rigorous", "implementation-specific mode-aware tightening", "Mode-dispatched complex box wrapper for the Alexanian--Kuznetsov paper-lineage alternative; currently delegates to `bdg_*`."),
+            ("shahen_complex_log_normalizeddoublegamma_mode", "log_normalizeddoublegamma", "basic|adaptive|rigorous", "implementation-specific mode-aware tightening", "Mode-dispatched complex box wrapper for the Alexanian--Kuznetsov paper-lineage alternative; currently delegates to `bdg_*`."),
+            ("shahen_complex_normalizeddoublegamma_mode", "normalizeddoublegamma", "basic|adaptive|rigorous", "implementation-specific mode-aware tightening", "Mode-dispatched complex box wrapper for the Alexanian--Kuznetsov paper-lineage alternative; currently delegates to `bdg_*`."),
+            ("shahen_complex_double_sine_mode", "double_sine", "basic|adaptive|rigorous", "implementation-specific mode-aware tightening", "Mode-dispatched complex box wrapper for the Alexanian--Kuznetsov paper-lineage alternative; currently delegates to `bdg_*`."),
         )
     ]
 )
@@ -570,6 +609,10 @@ def _engineering_pure_jax(row: ImplementationEntry) -> str:
     module = row.module.lower()
     if name.startswith("bdg_"):
         return "partial"
+    if name.startswith("shahen_"):
+        return "partial"
+    if (name.startswith("boost_hyp2f1_")) or (name.startswith("boost_") and base in {"hypergeometric_0f1", "hypergeometric_1f1", "hypergeometric_2f0", "hypergeometric_pfq"}):
+        return "mixed"
     if row.category == "arb_like" and base in BESSEL_BASES:
         return "mostly"
     if name.startswith(("boost_", "cuda_")):
@@ -586,6 +629,10 @@ def _engineering_dtype(row: ImplementationEntry) -> str:
     base = row.base_name
     if name.startswith("bdg_"):
         return "partial"
+    if name.startswith("shahen_"):
+        return "partial"
+    if (name.startswith("boost_hyp2f1_")) or (name.startswith("boost_") and base in {"hypergeometric_0f1", "hypergeometric_1f1", "hypergeometric_2f0", "hypergeometric_pfq"}):
+        return "mixed"
     if row.category == "arb_like" and base in BESSEL_BASES:
         return "current"
     if name.startswith(("boost_", "cuda_", "cusf_")):
@@ -595,11 +642,99 @@ def _engineering_dtype(row: ImplementationEntry) -> str:
     return "mixed"
 
 
+def _engineering_kernel_split(row: ImplementationEntry) -> str:
+    name = row.preferred_public_name
+    base = row.base_name
+    module = row.module.lower()
+    if name.startswith(("bdg_", "shahen_")):
+        return "shared_dispatch_separate_mode_kernels"
+    if row.category == "arb_like" and ("arb_core" in module or "acb_core" in module or name.startswith(("arb_", "acb_"))):
+        return "shared_dispatch_separate_mode_kernels"
+    if row.category == "arb_like" and base in BESSEL_BASES:
+        return "shared_dispatch_separate_mode_kernels"
+    if base in {
+        "hypgeom_0f1",
+        "hypgeom_1f1",
+        "hypgeom_2f1",
+        "hypgeom_u",
+        "gamma_lower",
+        "gamma_upper",
+        "legendre_p",
+        "legendre_q",
+        "jacobi_p",
+        "gegenbauer_c",
+        "chebyshev_t",
+        "chebyshev_u",
+        "laguerre_l",
+        "hermite_h",
+        "hypgeom_pfq",
+    }:
+        return "shared_dispatch_separate_mode_kernels"
+    if name.startswith("boost_hyp2f1_") or (name.startswith("boost_") and base in {"hypergeometric_0f1", "hypergeometric_1f1", "hypergeometric_2f0", "hypergeometric_pfq"}):
+        return "shared_dispatch_separate_mode_kernels"
+    if name.startswith("boost_"):
+        return "shared_canonical_substrate_in_progress"
+    if base in {"dirichlet_zeta", "dirichlet_eta", "modular_j", "elliptic_k", "elliptic_e"}:
+        return "point_basic_only"
+    if name.startswith(("cuda_", "cusf_")):
+        return "shared_dispatch_separate_mode_kernels" if base in BESSEL_BASES else "inherited_or_mixed"
+    if row.category == "arb_like":
+        return "mixed"
+    return "mixed"
+
+
+def _engineering_helper_consolidation(row: ImplementationEntry) -> str:
+    name = row.preferred_public_name
+    base = row.base_name
+    module = row.module.lower()
+    if name.startswith(("bdg_", "shahen_")):
+        return "partial"
+    if row.category == "arb_like" and ("arb_core" in module or "acb_core" in module or name.startswith(("arb_", "acb_"))):
+        return "shared_elementary_or_core"
+    if row.category == "arb_like" and base in BESSEL_BASES:
+        return "shared_helper_layer"
+    if base in {
+        "hypgeom_0f1",
+        "hypgeom_1f1",
+        "hypgeom_2f1",
+        "hypgeom_u",
+        "gamma_lower",
+        "gamma_upper",
+        "legendre_p",
+        "legendre_q",
+        "jacobi_p",
+        "gegenbauer_c",
+        "chebyshev_t",
+        "chebyshev_u",
+        "laguerre_l",
+        "hermite_h",
+        "hypgeom_pfq",
+    }:
+        return "shared_helper_layer"
+    if "arb_core" in module or "acb_core" in module or "inventory-derived canonical surface" in module:
+        return "shared_elementary_or_core"
+    if name.startswith("boost_hyp2f1_") or (name.startswith("boost_") and base in {"hypergeometric_0f1", "hypergeometric_1f1", "hypergeometric_2f0", "hypergeometric_pfq"}):
+        return "shared_helper_layer"
+    if name.startswith("boost_"):
+        return "shared_canonical_substrate_in_progress"
+    if base in {"dirichlet_zeta", "dirichlet_eta", "modular_j", "elliptic_k", "elliptic_e"}:
+        return "shared_helper_layer"
+    if name.startswith(("cuda_", "cusf_")):
+        return "shared_helper_layer" if base in BESSEL_BASES else "inherited_or_mixed"
+    if row.category == "arb_like":
+        return "shared_elementary_or_core"
+    return "mixed"
+
+
 def _engineering_batch(row: ImplementationEntry) -> str:
     name = row.preferred_public_name
     base = row.base_name
     if name.startswith("bdg_"):
         return "partial"
+    if name.startswith("shahen_"):
+        return "partial"
+    if name.startswith("boost_hyp2f1_") or (name.startswith("boost_") and base in {"hypergeometric_0f1", "hypergeometric_1f1", "hypergeometric_2f0", "hypergeometric_pfq"}):
+        return "fixed_shape_batch_available"
     if row.category == "arb_like" and base in BESSEL_BASES:
         return "fixed_shape_batch_available"
     if name.startswith("cuda_") and base == "besselk":
@@ -608,6 +743,8 @@ def _engineering_batch(row: ImplementationEntry) -> str:
         return "limited"
     if name.startswith(("boost_", "cuda_", "cusf_")):
         return "limited"
+    if base in {"dirichlet_zeta", "dirichlet_eta", "modular_j", "elliptic_k", "elliptic_e"}:
+        return "mixed"
     if "point" == row.four_modes:
         return "not_targeted"
     return "mixed"
@@ -618,12 +755,18 @@ def _engineering_ad(row: ImplementationEntry) -> str:
     base = row.base_name
     if name.startswith("bdg_"):
         return "partial"
+    if name.startswith("shahen_"):
+        return "limited"
+    if name.startswith("boost_hyp2f1_") or (name.startswith("boost_") and base in {"hypergeometric_0f1", "hypergeometric_1f1", "hypergeometric_2f0", "hypergeometric_pfq"}):
+        return "point_audited"
     if row.category == "arb_like" and base in BESSEL_UNIVERSAL_AD_BASES:
         return "universal_audit"
     if name.startswith("cuda_") and base == "besselk":
         return "inherited"
     if name.startswith("cusf_") and base in BESSEL_BASES:
         return "inherited"
+    if base in {"dirichlet_zeta", "dirichlet_eta", "modular_j", "elliptic_k", "elliptic_e"}:
+        return "limited"
     if name.startswith(("boost_", "cuda_")):
         return "limited"
     if name.startswith("cusf_"):
@@ -634,11 +777,21 @@ def _engineering_ad(row: ImplementationEntry) -> str:
 def _engineering_hardening(row: ImplementationEntry) -> str:
     base = row.base_name
     name = row.preferred_public_name
+    if name.startswith(("bdg_", "shahen_")):
+        return "partial"
+    if name.startswith("boost_hyp2f1_") or (name.startswith("boost_") and base in {"hypergeometric_0f1", "hypergeometric_1f1", "hypergeometric_2f0", "hypergeometric_pfq"}):
+        return "inherited_or_family_specific"
+    if base in {"dirichlet_zeta", "dirichlet_eta", "modular_j", "elliptic_k", "elliptic_e"}:
+        return "minimal"
     if base in CORE_TIGHTNESS:
         return "specialized"
     if base in HARDENED_CANONICAL_BASES and row.category == "arb_like":
         return "hardened"
     if name.startswith("bdg_"):
+        if "rigorous" in row.four_modes or "adaptive" in row.four_modes:
+            return "partial"
+        return "point_basic_only"
+    if name.startswith("shahen_"):
         if "rigorous" in row.four_modes or "adaptive" in row.four_modes:
             return "partial"
         return "point_basic_only"
@@ -656,6 +809,8 @@ def _engineering_note(row: ImplementationEntry) -> str:
     base = row.base_name
     if name.startswith("bdg_"):
         return "Barnes/double-gamma family is dtype-cleaner and less Python-heavy than before, but batch/AD/hardening are still partial."
+    if name.startswith("shahen_"):
+        return "Alexanian--Kuznetsov paper-lineage Barnes/double-gamma family currently delegates to the existing `bdg_*` kernels; provenance differs, but current engineering status is effectively the same."
     if row.category == "arb_like" and base in BESSEL_UNIVERSAL_AD_BASES:
         return "Canonical Bessel family uses shared JAX kernels, caller-side padded fixed-shape batch entry points, and universal AD audits across point and wrapper paths in non-singular regimes."
     if name.startswith("cuda_"):
@@ -827,21 +982,40 @@ def render_engineering_status() -> str:
         "Methodology:",
         "- Uses the same inventory/provenance source as the naming and implementation reports.",
         "- `pure_jax` is an aspiration-oriented field; `partial` or `mixed` means the family is still being moved toward that target.",
+        "- `kernel_split` tracks whether a family shares dispatch/padding infrastructure while still keeping separate numerical kernels for `point`, `basic`, and tighter interval modes.",
+        "- `helper_consolidation` tracks whether constants, dtype helpers, and common batch/helper math have been moved into shared substrate layers instead of being duplicated per family.",
         "- Unknown families inherit conservative defaults from category and module lineage until a stronger override is added.",
         "",
         f"Summary: `implementations={len(rows)}`.",
         "",
-        "| base_name | category | public_name | modes | tightening | pure_jax | dtype | batch | ad | hardening | note |",
-        "|---|---|---|---|---|---|---|---|---|---|---|",
+        "| base_name | category | public_name | modes | tightening | pure_jax | dtype | kernel_split | helper_consolidation | batch | ad | hardening | note |",
+        "|---|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     for row in rows:
         lines.append(
             f"| {row.base_name} | {row.category} | {row.preferred_public_name} | {row.four_modes} | "
-            f"{row.tightening} | {_engineering_pure_jax(row)} | {_engineering_dtype(row)} | "
-            f"{_engineering_batch(row)} | {_engineering_ad(row)} | {_engineering_hardening(row)} | "
+            f"{row.tightening} | {_engineering_pure_jax(row)} | {_engineering_dtype(row)} | {_engineering_kernel_split(row)} | "
+            f"{_engineering_helper_consolidation(row)} | {_engineering_batch(row)} | {_engineering_ad(row)} | {_engineering_hardening(row)} | "
             f"{_engineering_note(row)} |"
         )
     return "\n".join(lines) + "\n"
+
+
+def engineering_status_for_public_name(name: str) -> dict[str, str] | None:
+    short = name.rsplit(".", 1)[-1]
+    for row in build_implementation_entries():
+        if row.preferred_public_name == short or row.public_name == short:
+            return {
+                "pure_jax": _engineering_pure_jax(row),
+                "dtype": _engineering_dtype(row),
+                "kernel_split": _engineering_kernel_split(row),
+                "helper_consolidation": _engineering_helper_consolidation(row),
+                "batch": _engineering_batch(row),
+                "ad": _engineering_ad(row),
+                "hardening": _engineering_hardening(row),
+                "note": _engineering_note(row),
+            }
+    return None
 
 
 def render_lookup(base_name: str) -> str:
@@ -881,5 +1055,6 @@ __all__ = [
     "render_registry_summary",
     "render_implementation_index",
     "render_engineering_status",
+    "engineering_status_for_public_name",
     "render_lookup",
 ]

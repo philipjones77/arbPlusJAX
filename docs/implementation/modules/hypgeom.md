@@ -37,6 +37,9 @@ Last updated: 2026-02-25T03:51:38Z
 
 - Differentiable w.r.t. midpoint parameters for smooth subdomains.
 - Truncation counts and mode switches are static JIT args.
+- Current staged status and smoke benchmark:
+  - [hypgeom_status.md](/home/phili/projects/arbplusJAX/docs/reports/hypgeom_status.md)
+  - [hypgeom_mode_benchmark_smoke.md](/home/phili/projects/arbplusJAX/docs/reports/hypgeom_mode_benchmark_smoke.md)
 
 ## Notes
 
@@ -125,6 +128,7 @@ Notes: <limits, accuracy regimes>
 - Constants: factorials, rising factorials.
 - Branch cuts: none (entire in z, for fixed parameters).
 - Tightening: explicit remainder bound in `hypgeom.py`.
+- Batch/JAX: dedicated fixed-shape padded batch entry points now exist for basic/adaptive/rigorous on the canonical real and complex families.
 - Code: `src/arbplusjax/hypgeom.py` (`arb_hypgeom_0f1`, `acb_hypgeom_0f1`, tail bound helpers).
 
 ### arb_hypgeom_1f1 / acb_hypgeom_1f1
@@ -139,7 +143,10 @@ Notes: <limits, accuracy regimes>
 - Formulas: 1F1 series.
 - Constants: factorials, rising factorials.
 - Branch cuts: none (entire in z).
-- Tightening: tail bound + corner sampling.
+- Tightening: tail bound + explicit regime candidates (Kummer-style transform on the canonical scalar path) + corner/endpoint sampling, now assembled through shared helper builders in `hypgeom.py`.
+- Batch/JAX: dedicated fixed-shape padded batch entry points now exist for basic/adaptive/rigorous on the canonical real and complex families; `m` follows the same implementation path, and the family mode-batch cores now dispatch directly to the specialized family kernels instead of generic `*_mode` lambdas.
+- AD: boundary sweeps now cover the main real regime switch around `z≈6` plus deeper representative complex cut/corner-adjacent points.
+- Compile behavior: targeted probe for `1f1/2f1/u` shows family compile events reduced from `6` to `3`, though total padded compile count still rises from `27` to `31` because caller/helper overhead remains.
 - Code: `src/arbplusjax/hypgeom.py` (`arb_hypgeom_1f1`, `acb_hypgeom_1f1`, tail bound helpers).
 
 ### arb_hypgeom_2f1 / acb_hypgeom_2f1
@@ -154,7 +161,10 @@ Notes: <limits, accuracy regimes>
 - Formulas: 2F1 series in |z|<1; analytic continuation not fully mirrored.
 - Constants: factorials, rising factorials.
 - Branch cuts: [1, ∞) on real axis; widened bounds if box crosses cut.
-- Tightening: tail bounds + corner sampling; no full analytic continuation.
+- Tightening: tail bounds + explicit transform candidates + corner sampling; still no full analytic continuation. Candidate assembly is now shared through helper builders in `hypgeom.py`.
+- Batch/JAX: dedicated fixed-shape padded batch entry points now exist for basic/adaptive/rigorous on the canonical real and complex families, and the family mode-batch cores now dispatch directly to the specialized family kernels instead of generic `*_mode` lambdas.
+- AD: boundary sweeps now cover the main real transform switch around `|z|≈0.75` plus deeper representative complex cut/corner-adjacent points.
+- Compile behavior: targeted probe for `1f1/2f1/u` shows family compile events reduced from `6` to `3`, though total padded compile count still rises from `27` to `31` because caller/helper overhead remains.
 - Code: `src/arbplusjax/hypgeom.py` (`arb_hypgeom_2f1`, `acb_hypgeom_2f1`).
 
 ### arb_hypgeom_u / acb_hypgeom_u
@@ -169,8 +179,37 @@ Notes: <limits, accuracy regimes>
 - Formulas: series/asymptotic regimes.
 - Constants: pi, gamma.
 - Branch cuts: negative real axis; widened bounds if box crosses cut.
-- Tightening: regime-specific bounds and corner sampling.
+- Tightening: regime-specific bounds, explicit asymptotic candidates, and corner sampling, now assembled through shared helper builders in `hypgeom.py`.
+- Batch/JAX: dedicated fixed-shape padded batch entry points now exist for basic/adaptive/rigorous on the canonical real and complex families, and the family mode-batch cores now dispatch directly to the specialized family kernels instead of generic `*_mode` lambdas; full AD guarantees across all regime switches are still a staged target.
+- AD: boundary sweeps now cover the main real regime change around `z≈8` plus deeper representative complex cut/corner-adjacent points.
+- Compile behavior: targeted probe for `1f1/2f1/u` shows family compile events reduced from `6` to `3`, though total padded compile count still rises from `27` to `31` because caller/helper overhead remains.
 - Code: `src/arbplusjax/hypgeom.py` (`arb_hypgeom_u`, `_real_hypu_regime`, `_complex_hypu_regime`).
+
+### Stronger orthogonal families
+
+- Families: `arb_hypgeom_legendre_p`, `arb_hypgeom_legendre_q`, `arb_hypgeom_jacobi_p`, `arb_hypgeom_gegenbauer_c`.
+- JAX basic: recurrence or coefficient evaluation at midpoint with outward rounding.
+- JAX rigorous: explicit recurrence/interval kernels; `jacobi_p_rigorous` is now structured with `lax.fori_loop` instead of a Python accumulation loop.
+- JAX adaptive: currently wrapper-level adaptive inflation on top of the canonical kernels, but the staged batch path now has dedicated fixed-shape entry points.
+- Batch/JAX: dedicated fixed-shape padded batch entry points now exist for basic/adaptive/rigorous on the stronger orthogonal families.
+- Tightening: explicit rigorous kernels exist for these families; Chebyshev/Laguerre/Hermite remain weaker and are not in the same engineering state yet.
+
+### Weaker orthogonal families and pfq
+
+- Families: `arb/acb_hypgeom_chebyshev_t`, `arb/acb_hypgeom_chebyshev_u`, `arb/acb_hypgeom_laguerre_l`, `arb/acb_hypgeom_hermite_h`, `arb/acb_hypgeom_pfq`.
+- JAX basic: canonical batch paths now have dedicated fixed-shape padded entry points for both real and complex surfaces.
+- JAX adaptive/rigorous: staged fixed-shape mode-batch wrappers now exist and now dispatch directly to the family kernels instead of generic mode-wrapper lambdas, but they still rely on generic adaptive/rigorous kernel inflation more than family-specific analytic bounds.
+- AD/JAX cleanup: the real Chebyshev kernels now use `lax.cond` instead of `jnp.where` across `arccos/arccosh`, and the complex weaker-orthogonal/pfq kernels now preserve input dtype more consistently.
+- Tightening: `pfq` now uses explicit sample tightening on top of the series/tail path; `laguerre_l` and `hermite_h` now use endpoint/corner tightening. These families are improved, but they remain more generic than the stronger orthogonal families and the headline `0f1/1f1/2f1/u` tranche.
+
+### Incomplete gamma
+
+- Families: `arb_hypgeom_gamma_lower`, `arb_hypgeom_gamma_upper`, `acb_hypgeom_gamma_lower`, `acb_hypgeom_gamma_upper`.
+- JAX basic: direct sampled evaluation using midpoint-plus-sample boxes.
+- Tightening: direct and complementary candidates are now compared explicitly through shared helper builders in `hypgeom.py`, with sampled real/complex parameter boxes instead of midpoint-only evaluation. Adaptive and rigorous mode wrappers now use complement-aware specialized kernels instead of only relying on the generic wrapper inflators.
+- Batch/JAX: dedicated fixed-shape padded basic batch entry points now exist for the real and complex lower/upper incomplete gamma families, mode-batch fastpaths are wired in at the API layer, the API now prefers the family-specific padded fastpath for lower/upper incomplete gamma instead of doing generic caller-side padding first, and the family mode-batch cores now dispatch directly to specialized kernels instead of bouncing through generic `*_mode` lambdas.
+- AD: boundary sweeps now cover representative real positive-`z` points and complex cut/corner-adjacent points for lower/upper incomplete gamma.
+- Compile behavior: family-level compile counts are reduced by the fixed-shape path, and the previous padded `gamma_upper` smoke-benchmark outlier is reduced to ordinary padded overhead. In the broad tranche probe, total compile counts remain `49 -> 47` while family-level counts remain `28 -> 14`; in the targeted incomplete-gamma probe, family compile counts are `4 -> 2` in both `basic` and `rigorous`. Incomplete gamma is improved materially, but still not yet at the same engineering level as base gamma.
 
 ### Bessel J/Y/I/K (real/complex)
 

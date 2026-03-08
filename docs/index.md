@@ -44,6 +44,9 @@ Generated reports:
 - `reports/function_provenance_registry.md` for the generated naming/provenance summary
 - `reports/function_implementation_index.md` for base-name lookup across canonical and alternative implementations
 - `reports/function_engineering_status.md` for the generated current engineering-status matrix
+- `reports/hypgeom_status.md` for the staged canonical/alternative hypergeometric family status table
+- `reports/hypgeom_compile_probe.md` and `reports/hypgeom_compile_probe_rigorous.md` for second-tranche compile-count probes
+- `reports/hypgeom_mode_benchmark_smoke.md` for the staged canonical/alternative hypergeometric batch smoke benchmark
 - `results/benchmarks/bessel_compile_probe_float32/bessel_compile_probe.md` for the current canonical Bessel compile-count probe and padded-core comparison
 - `reports/arb_like_functions.md` for canonical Arb-like public names
 - `reports/alternative_functions.md` for prefixed alternative implementations

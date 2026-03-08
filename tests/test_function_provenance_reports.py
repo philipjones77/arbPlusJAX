@@ -12,7 +12,9 @@ from arbplusjax import (
     cusf_compat,
     double_gamma,
     function_provenance as fpr,
+    shahen_double_gamma,
 )
+from tools import hypgeom_status_report as hsr
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -28,6 +30,7 @@ def test_function_provenance_reports_are_current():
         REPO_ROOT / "docs" / "reports" / "arb_like_functions.md": fpr.render_report("arb_like", "Arb-like Functions"),
         REPO_ROOT / "docs" / "reports" / "alternative_functions.md": fpr.render_report("alternative", "Alternative Functions"),
         REPO_ROOT / "docs" / "reports" / "new_functions.md": fpr.render_report("new", "New Functions"),
+        REPO_ROOT / "docs" / "reports" / "hypgeom_status.md": hsr.render(),
     }
     for path, content in expected.items():
         assert path.read_text(encoding="utf-8") == content, f"Generated report out of date: {path}"
@@ -65,6 +68,7 @@ def test_known_alternative_overlays_are_present():
     assert ("gamma", "cusf_gamma") in rows
     assert ("hypergeometric_1f1", "boost_hypergeometric_1f1") in rows
     assert ("barnesgamma2", "bdg_barnesgamma2") in rows
+    assert ("barnesgamma2", "shahen_barnesgamma2") in rows
 
 
 def test_engineering_status_reports_known_family_states():
@@ -74,6 +78,8 @@ def test_engineering_status_reports_known_family_states():
     assert "Barnes/double-gamma family is dtype-cleaner" in text
     assert "cuda_besselk" in text
     assert "Alternative path; interval tightening is inherited from canonical Bessel-K wrappers" in text
+    assert "shahen_barnesgamma2" in text
+    assert "Alexanian--Kuznetsov paper-lineage" in text
 
 
 def test_noncanonical_modules_expose_provenance_metadata():
@@ -88,6 +94,7 @@ def test_noncanonical_modules_expose_provenance_metadata():
         arb_calc,
         acb_calc,
         barnesg,
+        shahen_double_gamma,
     ):
         assert hasattr(module, "PROVENANCE")
         data = module.PROVENANCE

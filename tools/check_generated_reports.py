@@ -15,6 +15,7 @@ def _run(cmd: list[str]) -> None:
 
 def main() -> None:
     _run([PYTHON, "tools/function_provenance_report.py"])
+    _run([PYTHON, "tools/hypgeom_status_report.py"])
     _run([PYTHON, "-m", "pytest", "-q", "tests/test_function_provenance_reports.py"])
 
 
