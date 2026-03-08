@@ -8,6 +8,8 @@ from jax import lax
 
 from . import acb_core
 from . import acb_dirichlet
+from . import acb_elliptic
+from . import acb_modular
 from . import double_interval as di
 from . import hypgeom
 from . import elementary as el
@@ -120,7 +122,9 @@ def _complex_digamma_scalar(z: jax.Array) -> jax.Array:
 
 def _complex_zeta_scalar(s: jax.Array, n_terms: int = 64) -> jax.Array:
     ss = el.as_complex(s)
-    return acb_dirichlet._zeta_series(ss, n_terms)
+    real_dtype = el.real_dtype_from_complex_dtype(ss.dtype)
+    n = jnp.arange(1, n_terms + 1, dtype=real_dtype)
+    return jnp.sum(jnp.exp(-ss * jnp.log(n)))
 
 
 def _complex_hurwitz_zeta_scalar(
@@ -229,6 +233,10 @@ def _complex_agm_scalar(a: jax.Array, b: jax.Array, iters: int = 10) -> jax.Arra
 
     out, _ = lax.fori_loop(0, iters, body, (aa, bb))
     return out
+
+
+def _pad_point_batch_last(args, pad_to: int):
+    return kh.pad_mixed_batch_args_repeat_last(args, pad_to=pad_to)
 
 @partial(jax.jit, static_argnames=())
 def arb_exp_point(x: jax.Array) -> jax.Array:
@@ -1114,6 +1122,104 @@ def acb_polylog_si_point(s: int, z: jax.Array) -> jax.Array:
 acb_agm_point = scalarize_binary_complex(_complex_agm_scalar)
 acb_agm1_point = scalarize_unary_complex(lambda x: _complex_agm_scalar(jnp.asarray(1.0 + 0.0j, dtype=el.as_complex(x).dtype), x))
 acb_agm1_cpx_point = scalarize_unary_complex(lambda x: _complex_agm_scalar(jnp.asarray(1.0 + 0.0j, dtype=el.as_complex(x).dtype), x))
+
+
+@partial(jax.jit, static_argnames=("n_terms",))
+def acb_dirichlet_zeta_point(s: jax.Array, n_terms: int = 64) -> jax.Array:
+    out = _vectorize_complex_scalar(lambda ss: _complex_zeta_scalar(ss, n_terms), s)
+    return out.astype(el.complex_dtype_from(s))
+
+
+@partial(jax.jit, static_argnames=("n_terms",))
+def acb_dirichlet_eta_point(s: jax.Array, n_terms: int = 64) -> jax.Array:
+    ss = el.as_complex(s)
+    zeta = acb_dirichlet_zeta_point(ss, n_terms=n_terms)
+    one = jnp.asarray(1.0, dtype=el.real_dtype_from_complex_dtype(ss.dtype))
+    two = jnp.asarray(2.0, dtype=el.real_dtype_from_complex_dtype(ss.dtype))
+    factor = one - jnp.exp((ss - one) * jnp.log(two))
+    return (factor * zeta).astype(el.complex_dtype_from(s))
+
+
+@partial(jax.jit, static_argnames=())
+def acb_modular_j_point(tau: jax.Array) -> jax.Array:
+    tt = el.as_complex(tau)
+    real_dtype = el.real_dtype_from_complex_dtype(tt.dtype)
+    q = jnp.exp(jnp.asarray(2j, dtype=tt.dtype) * jnp.asarray(el.PI, dtype=real_dtype) * tt)
+    c744 = jnp.asarray(744.0, dtype=real_dtype)
+    c1 = jnp.asarray(196884.0, dtype=real_dtype)
+    c2 = jnp.asarray(21493760.0, dtype=real_dtype)
+    return jnp.asarray(1.0, dtype=real_dtype) / q + c744 + c1 * q + c2 * q * q
+
+
+@partial(jax.jit, static_argnames=())
+def acb_elliptic_k_point(m: jax.Array) -> jax.Array:
+    return _vectorize_complex_scalar(
+        lambda mm: jnp.asarray(el.HALF_PI, dtype=el.real_dtype_from_complex_dtype(el.as_complex(mm).dtype))
+        / acb_elliptic._agm(
+            jnp.asarray(1.0 + 0.0j, dtype=el.as_complex(mm).dtype),
+            jnp.sqrt(1.0 - el.as_complex(mm)),
+            iters=8,
+        ),
+        m,
+    )
+
+
+@partial(jax.jit, static_argnames=())
+def acb_elliptic_e_point(m: jax.Array) -> jax.Array:
+    return _vectorize_complex_scalar(
+        lambda mm: jnp.asarray(el.HALF_PI, dtype=el.real_dtype_from_complex_dtype(el.as_complex(mm).dtype))
+        * acb_elliptic._agm(
+            jnp.asarray(1.0 + 0.0j, dtype=el.as_complex(mm).dtype),
+            jnp.sqrt(1.0 - el.as_complex(mm)),
+            iters=8,
+        ),
+        m,
+    )
+
+
+def acb_dirichlet_zeta_batch_fixed_point(s: jax.Array, *, n_terms: int = 64) -> jax.Array:
+    return acb_dirichlet_zeta_point(s, n_terms=n_terms)
+
+
+def acb_dirichlet_zeta_batch_padded_point(s: jax.Array, *, pad_to: int, n_terms: int = 64) -> jax.Array:
+    call_args, _ = _pad_point_batch_last((s,), pad_to)
+    return acb_dirichlet_zeta_point(*call_args, n_terms=n_terms)
+
+
+def acb_dirichlet_eta_batch_fixed_point(s: jax.Array, *, n_terms: int = 64) -> jax.Array:
+    return acb_dirichlet_eta_point(s, n_terms=n_terms)
+
+
+def acb_dirichlet_eta_batch_padded_point(s: jax.Array, *, pad_to: int, n_terms: int = 64) -> jax.Array:
+    call_args, _ = _pad_point_batch_last((s,), pad_to)
+    return acb_dirichlet_eta_point(*call_args, n_terms=n_terms)
+
+
+def acb_modular_j_batch_fixed_point(tau: jax.Array) -> jax.Array:
+    return acb_modular_j_point(tau)
+
+
+def acb_modular_j_batch_padded_point(tau: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_point_batch_last((tau,), pad_to)
+    return acb_modular_j_point(*call_args)
+
+
+def acb_elliptic_k_batch_fixed_point(m: jax.Array) -> jax.Array:
+    return acb_elliptic_k_point(m)
+
+
+def acb_elliptic_k_batch_padded_point(m: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_point_batch_last((m,), pad_to)
+    return acb_elliptic_k_point(*call_args)
+
+
+def acb_elliptic_e_batch_fixed_point(m: jax.Array) -> jax.Array:
+    return acb_elliptic_e_point(m)
+
+
+def acb_elliptic_e_batch_padded_point(m: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_point_batch_last((m,), pad_to)
+    return acb_elliptic_e_point(*call_args)
 
 
 @partial(jax.jit, static_argnames=())

@@ -197,9 +197,23 @@ def test_api_complex_core_helper_point_batch_stays_on_point_kernels():
         _check(out.shape == jnp.asarray(expected).shape)
         _check(bool(jnp.allclose(out, expected, rtol=1e-4, atol=1e-4, equal_nan=True)))
 
-    for name, args in binary_cases:
-        expected = api.eval_point(name, *args, dtype="float32")
-        out = api.eval_point_batch(name, *args, dtype="float32", pad_to=8)
+
+def test_api_custom_complex_point_batch_uses_direct_point_kernels():
+    z = jnp.array([0.4 + 0.3j, 0.6 + 0.5j, 0.8 + 0.7j], dtype=jnp.complex64)
+
+    cases = [
+        ("acb_dirichlet_zeta", (z,), {"n_terms": 24}),
+        ("acb_dirichlet_eta", (z,), {"n_terms": 24}),
+        ("acb_modular_j", (z,)),
+        ("acb_elliptic_k", (jnp.array([0.1 + 0.1j, 0.2 + 0.15j, 0.3 + 0.2j], dtype=jnp.complex64),)),
+        ("acb_elliptic_e", (jnp.array([0.1 + 0.1j, 0.2 + 0.15j, 0.3 + 0.2j], dtype=jnp.complex64),)),
+    ]
+
+    for entry in cases:
+        name, args = entry[0], entry[1]
+        kwargs = entry[2] if len(entry) > 2 else {}
+        expected = getattr(pw, f"{name}_point")(*args, **kwargs)
+        out = api.eval_point_batch(name, *args, dtype="float32", pad_to=8, **kwargs)
         _check(out.dtype == jnp.asarray(expected).dtype)
         _check(out.shape == jnp.asarray(expected).shape)
         _check(bool(jnp.allclose(out, expected, rtol=1e-4, atol=1e-4, equal_nan=True)))

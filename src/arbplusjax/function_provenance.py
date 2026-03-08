@@ -756,7 +756,7 @@ def _engineering_batch(row: ImplementationEntry) -> str:
     if name.startswith(("boost_", "cuda_", "cusf_")):
         return "limited"
     if base in {"elliptic_k", "elliptic_e"}:
-        return "mixed"
+        return "fixed_shape_batch_available"
     if "point" == row.four_modes:
         return "not_targeted"
     return "mixed"

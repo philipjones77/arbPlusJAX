@@ -221,6 +221,11 @@ _DIRECT_POINT_BATCH_FASTPATHS = {
     "boost_hyp2f1_pade": (boost_hypgeom.boost_hyp2f1_series_batch_fixed_point, boost_hypgeom.boost_hyp2f1_series_batch_padded_point),
     "boost_hyp2f1_rational": (boost_hypgeom.boost_hyp2f1_series_batch_fixed_point, boost_hypgeom.boost_hyp2f1_series_batch_padded_point),
     "boost_hypergeometric_pfq": (boost_hypgeom.boost_hypergeometric_pfq_batch_fixed_point, boost_hypgeom.boost_hypergeometric_pfq_batch_padded_point),
+    "acb_dirichlet_zeta": (point_wrappers.acb_dirichlet_zeta_batch_fixed_point, point_wrappers.acb_dirichlet_zeta_batch_padded_point),
+    "acb_dirichlet_eta": (point_wrappers.acb_dirichlet_eta_batch_fixed_point, point_wrappers.acb_dirichlet_eta_batch_padded_point),
+    "acb_modular_j": (point_wrappers.acb_modular_j_batch_fixed_point, point_wrappers.acb_modular_j_batch_padded_point),
+    "acb_elliptic_k": (point_wrappers.acb_elliptic_k_batch_fixed_point, point_wrappers.acb_elliptic_k_batch_padded_point),
+    "acb_elliptic_e": (point_wrappers.acb_elliptic_e_batch_fixed_point, point_wrappers.acb_elliptic_e_batch_padded_point),
 }
 
 
@@ -421,24 +426,31 @@ def _maybe_direct_interval_batch_fastpath(
     return trim_batch_out(out, trim_n)
 
 
-def _maybe_direct_point_batch_fastpath(name: str, args: tuple[object, ...], *, pad_to: int | None):
+def _maybe_direct_point_batch_fastpath(
+    name: str,
+    args: tuple[object, ...],
+    *,
+    pad_to: int | None,
+    extra_kwargs: dict | None = None,
+):
     entry = _DIRECT_POINT_BATCH_FASTPATHS.get(name)
     if entry is None:
         return None
+    kwargs = dict(extra_kwargs or {})
     if isinstance(entry, tuple):
         fixed_fn, padded_fn = entry
         batch_n = mixed_batch_size_or_none(args)
         if pad_to is not None:
             if batch_n is not None and int(pad_to) == batch_n:
-                return fixed_fn(*args)
-            out = padded_fn(*args, pad_to=pad_to)
+                return fixed_fn(*args, **kwargs)
+            out = padded_fn(*args, pad_to=pad_to, **kwargs)
             return trim_batch_out(out, batch_n if batch_n is not None else 0)
         call_args, trim_n = pad_mixed_batch_args_repeat_last(args, pad_to=pad_to)
-        out = fixed_fn(*call_args)
+        out = fixed_fn(*call_args, **kwargs)
         return trim_batch_out(out, trim_n)
     fn = entry
     call_args, trim_n = pad_mixed_batch_args_repeat_last(args, pad_to=pad_to)
-    out = fn(*call_args)
+    out = fn(*call_args, **kwargs)
     return trim_batch_out(out, trim_n)
 
 
@@ -758,10 +770,11 @@ def eval_point(
     *args: jax.Array,
     jit: bool = False,
     dtype: str | jnp.dtype | None = None,
+    **kwargs,
 ) -> jax.Array:
     fn = _point_jit_fn(name) if jit else _resolve_point_fn(name)
     target = _resolve_dtype_for_args(args, dtype)
-    out = fn(*tuple(_cast_arg_to_dtype(arg, target) for arg in args))
+    out = fn(*tuple(_cast_arg_to_dtype(arg, target) for arg in args), **kwargs)
     return _cast_out_to_dtype(out, target)
 
 
@@ -771,15 +784,16 @@ def eval_point_batch(
     dtype: str | jnp.dtype | None = None,
     pad_to: int | None = None,
     pad_value: float | complex = 0.0,
+    **kwargs,
 ) -> jax.Array:
     target = _resolve_dtype_for_args(args, dtype)
     cast_args = tuple(_cast_arg_to_dtype(arg, target) for arg in args)
-    direct_fast = _maybe_direct_point_batch_fastpath(name, cast_args, pad_to=pad_to)
+    direct_fast = _maybe_direct_point_batch_fastpath(name, cast_args, pad_to=pad_to, extra_kwargs=kwargs if kwargs else None)
     if direct_fast is not None:
         return _cast_out_to_dtype(direct_fast, target)
     batch_args, n = pad_batch_args(cast_args, pad_to=pad_to, pad_value=pad_value)
     batched = _point_batch_fn(name)
-    out = batched(*batch_args)
+    out = batched(*batch_args, **kwargs)
     return trim_batch_out(_cast_out_to_dtype(out, target), n)
 
 
