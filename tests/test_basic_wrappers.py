@@ -4,6 +4,7 @@ import jax.numpy as jnp
 from arbplusjax import baseline_wrappers as bw
 from arbplusjax import double_interval as di
 from arbplusjax import api
+from arbplusjax import point_wrappers as pw
 
 
 from tests._test_checks import _check
@@ -160,6 +161,44 @@ def test_api_canonical_arb_acb_point_batch_aliases_use_direct_point_kernels():
     ]
 
     for name, args, expected in real_cases + complex_cases:
+        out = api.eval_point_batch(name, *args, dtype="float32", pad_to=8)
+        _check(out.dtype == jnp.asarray(expected).dtype)
+        _check(out.shape == jnp.asarray(expected).shape)
+        _check(bool(jnp.allclose(out, expected, rtol=1e-4, atol=1e-4, equal_nan=True)))
+
+
+def test_api_complex_core_helper_point_batch_stays_on_point_kernels():
+    z = jnp.array([0.8 + 0.1j, 1.1 - 0.2j, 1.4 + 0.3j], dtype=jnp.complex64)
+    w = jnp.array([1.2 + 0.0j, 1.5 + 0.2j, 1.8 - 0.1j], dtype=jnp.complex64)
+
+    unary_cases = [
+        ("acb_digamma", (z,)),
+        ("acb_zeta", (z,)),
+        ("acb_agm1", (z,)),
+        ("acb_agm1_cpx", (z,)),
+        ("acb_polylog_si", (z,), {"s": 2}),
+    ]
+    binary_cases = [
+        ("acb_hurwitz_zeta", (z, w)),
+        ("acb_polylog", (z, w)),
+        ("acb_agm", (z, w)),
+    ]
+
+    for entry in unary_cases:
+        name, args = entry[0], entry[1]
+        kwargs = entry[2] if len(entry) > 2 else {}
+        if name == "acb_polylog_si":
+            expected = pw.acb_polylog_si_point(kwargs["s"], *args)
+            out = pw.acb_polylog_si_point(kwargs["s"], *args)
+        else:
+            expected = api.eval_point(name, *args, dtype="float32")
+            out = api.eval_point_batch(name, *args, dtype="float32", pad_to=8)
+        _check(out.dtype == jnp.asarray(expected).dtype)
+        _check(out.shape == jnp.asarray(expected).shape)
+        _check(bool(jnp.allclose(out, expected, rtol=1e-4, atol=1e-4, equal_nan=True)))
+
+    for name, args in binary_cases:
+        expected = api.eval_point(name, *args, dtype="float32")
         out = api.eval_point_batch(name, *args, dtype="float32", pad_to=8)
         _check(out.dtype == jnp.asarray(expected).dtype)
         _check(out.shape == jnp.asarray(expected).shape)

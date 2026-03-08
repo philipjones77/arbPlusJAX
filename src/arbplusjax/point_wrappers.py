@@ -7,10 +7,12 @@ import jax.numpy as jnp
 from jax import lax
 
 from . import acb_core
+from . import acb_dirichlet
 from . import double_interval as di
 from . import hypgeom
 from . import elementary as el
-from .kernel_helpers import point_box, scalarize_binary_complex, scalarize_unary_complex, vmap_complex_scalar
+from . import kernel_helpers as kh
+from .kernel_helpers import scalarize_binary_complex, scalarize_unary_complex, vmap_complex_scalar
 
 jax.config.update("jax_enable_x64", True)
 
@@ -35,6 +37,10 @@ def _vectorize_complex_scalar(fn, *args):
     flats, shape = _broadcast_flatten(*args)
     out = jax.vmap(fn)(*flats)
     return out.reshape(shape)
+
+
+def _pad_args_repeat_last(args, pad_to: int):
+    return kh.pad_mixed_batch_args_repeat_last(args, pad_to=pad_to)
 
 
 def _real_laguerre_l_scalar(n: int, m: jax.Array, x: jax.Array) -> jax.Array:
@@ -102,6 +108,127 @@ def _complex_pfq_scalar(a: jax.Array, b: jax.Array, z: jax.Array, *, reciprocal:
     term0 = jnp.asarray(1.0 + 0.0j, dtype=z.dtype)
     _, out = lax.fori_loop(0, n_terms - 1, body, (term0, term0))
     return jnp.where(reciprocal, 1.0 / out, out)
+
+
+def _complex_digamma_scalar(z: jax.Array) -> jax.Array:
+    zz = el.as_complex(z)
+    real_dtype = el.real_dtype_from_complex_dtype(zz.dtype)
+    h = jnp.asarray(1e-6 + 0.0j, dtype=zz.dtype)
+    two = jnp.asarray(2.0, dtype=real_dtype)
+    return (acb_core._complex_loggamma(zz + h) - acb_core._complex_loggamma(zz - h)) / (two * h)
+
+
+def _complex_zeta_scalar(s: jax.Array, n_terms: int = 64) -> jax.Array:
+    ss = el.as_complex(s)
+    return acb_dirichlet._zeta_series(ss, n_terms)
+
+
+def _complex_hurwitz_zeta_scalar(
+    s: jax.Array,
+    a: jax.Array,
+    terms: int = 64,
+    max_terms: int = 512,
+    min_terms: int = 32,
+) -> jax.Array:
+    ss = el.as_complex(s)
+    aa = el.as_complex(a)
+    real_dtype = el.real_dtype_from_complex_dtype(ss.dtype)
+    re_s = jnp.real(ss)
+    eps = jnp.asarray(1e-12, dtype=real_dtype)
+    tail_target = eps * jnp.maximum(re_s - 1.0, jnp.asarray(1e-12, dtype=real_dtype))
+    base = jnp.power(tail_target, 1.0 / jnp.maximum(1.0 - re_s, jnp.asarray(1e-12, dtype=real_dtype)))
+    n_est = jnp.ceil(base + 1.0)
+    n_eff = jnp.where(re_s > 1.1, n_est, jnp.asarray(terms, dtype=real_dtype))
+    n_eff = jnp.clip(n_eff, jnp.asarray(min_terms, dtype=real_dtype), jnp.asarray(max_terms, dtype=real_dtype))
+    ks = jnp.arange(max_terms, dtype=real_dtype)
+    mask = ks < n_eff
+    terms_arr = jnp.power(aa + ks, -ss)
+    return jnp.sum(jnp.where(mask, terms_arr, jnp.zeros_like(terms_arr)))
+
+
+def _complex_polygamma_scalar(
+    m: int,
+    z: jax.Array,
+    terms: int = 64,
+    max_terms: int = 512,
+    min_terms: int = 32,
+) -> jax.Array:
+    zz = el.as_complex(z)
+    real_dtype = el.real_dtype_from_complex_dtype(zz.dtype)
+    if m == 0:
+        return _complex_digamma_scalar(zz)
+    re_z = jnp.real(zz)
+    m_float = jnp.asarray(float(m), dtype=real_dtype)
+    eps = jnp.asarray(1e-12, dtype=real_dtype)
+    tail_target = eps * jnp.maximum(m_float, jnp.asarray(1.0, dtype=real_dtype))
+    base = jnp.power(tail_target, -1.0 / jnp.maximum(m_float, eps))
+    n_est = jnp.ceil(base - re_z)
+    n_eff = jnp.where(m_float > 0, n_est, jnp.asarray(terms, dtype=real_dtype))
+    n_eff = jnp.clip(n_eff, jnp.asarray(min_terms, dtype=real_dtype), jnp.asarray(max_terms, dtype=real_dtype))
+    ks = jnp.arange(max_terms, dtype=real_dtype)
+    mask = ks < n_eff
+    factorial = jnp.exp(lax.lgamma(m_float + 1.0))
+    series_terms = jnp.power(zz + ks, -(m_float + 1.0))
+    series = jnp.sum(jnp.where(mask, series_terms, jnp.zeros_like(series_terms)))
+    sign = -1.0 if (m + 1) % 2 else 1.0
+    return jnp.asarray(sign, dtype=real_dtype) * factorial * series
+
+
+def _complex_bernoulli_poly_ui_scalar(n: int, z: jax.Array) -> jax.Array:
+    zz = el.as_complex(z)
+    real_dtype = el.real_dtype_from_complex_dtype(zz.dtype)
+    if n == 0:
+        return jnp.asarray(1.0 + 0.0j, dtype=zz.dtype)
+    if n == 1:
+        return zz - jnp.asarray(0.5, dtype=real_dtype)
+    if n == 2:
+        return zz * zz - zz + jnp.asarray(1.0 / 6.0, dtype=real_dtype)
+    if n == 3:
+        return zz * zz * zz - jnp.asarray(1.5, dtype=real_dtype) * zz * zz + jnp.asarray(0.5, dtype=real_dtype) * zz
+    if n == 4:
+        return zz**4 - jnp.asarray(2.0, dtype=real_dtype) * zz**3 + zz * zz - jnp.asarray(1.0 / 30.0, dtype=real_dtype)
+    return jnp.asarray(jnp.nan + 1j * jnp.nan, dtype=zz.dtype)
+
+
+def _complex_polylog_scalar(
+    s: jax.Array,
+    z: jax.Array,
+    terms: int = 64,
+    max_terms: int = 512,
+    min_terms: int = 32,
+) -> jax.Array:
+    ss = el.as_complex(s)
+    zz = el.as_complex(z)
+    real_dtype = el.real_dtype_from_complex_dtype(zz.dtype)
+    absz = jnp.abs(zz)
+    eps = jnp.asarray(1e-12, dtype=real_dtype)
+    base = jnp.ceil(jnp.asarray(8.0, dtype=real_dtype) / jnp.maximum(jnp.asarray(1.0, dtype=real_dtype) - absz, eps))
+    n_eff = jnp.where(absz < 1.0, base, jnp.asarray(terms, dtype=real_dtype))
+    n_eff = jnp.clip(n_eff, jnp.asarray(min_terms, dtype=real_dtype), jnp.asarray(max_terms, dtype=real_dtype))
+    ks = jnp.arange(1, max_terms + 1, dtype=real_dtype)
+    mask = ks <= n_eff
+    series_terms = jnp.power(zz, ks) / jnp.power(ks, ss)
+    series = jnp.sum(jnp.where(mask, series_terms, jnp.zeros_like(series_terms)))
+    nanv = jnp.asarray(jnp.nan + 1j * jnp.nan, dtype=zz.dtype)
+    return jnp.where(absz < 1.0, series, nanv)
+
+
+def _complex_polylog_si_scalar(s: int, z: jax.Array, terms: int = 64, max_terms: int = 512, min_terms: int = 32) -> jax.Array:
+    zz = el.as_complex(z)
+    sval = jnp.asarray(float(s) + 0.0j, dtype=zz.dtype)
+    return _complex_polylog_scalar(sval, zz, terms=terms, max_terms=max_terms, min_terms=min_terms)
+
+
+def _complex_agm_scalar(a: jax.Array, b: jax.Array, iters: int = 10) -> jax.Array:
+    aa = el.as_complex(a)
+    bb = el.as_complex(b)
+
+    def body(_, state):
+        x, y = state
+        return (0.5 * (x + y), jnp.sqrt(x * y))
+
+    out, _ = lax.fori_loop(0, iters, body, (aa, bb))
+    return out
 
 @partial(jax.jit, static_argnames=())
 def arb_exp_point(x: jax.Array) -> jax.Array:
@@ -427,6 +554,78 @@ def arb_hypgeom_pfq_point(a: jax.Array, b: jax.Array, z: jax.Array, reciprocal: 
     return jax.vmap(lambda aa, bb, zz: _real_pfq_scalar(aa, bb, zz, reciprocal=reciprocal, n_terms=n_terms))(a_arr, b_arr, z_arr)
 
 
+def arb_hypgeom_0f1_batch_fixed_point(a: jax.Array, z: jax.Array, *, regularized: bool = False) -> jax.Array:
+    return arb_hypgeom_0f1_point(a, z, regularized=regularized)
+
+
+def arb_hypgeom_0f1_batch_padded_point(a: jax.Array, z: jax.Array, *, pad_to: int, regularized: bool = False) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((a, z), pad_to)
+    return arb_hypgeom_0f1_point(*call_args, regularized=regularized)
+
+
+def arb_hypgeom_1f1_batch_fixed_point(a: jax.Array, b: jax.Array, z: jax.Array, *, regularized: bool = False) -> jax.Array:
+    return arb_hypgeom_1f1_point(a, b, z, regularized=regularized)
+
+
+def arb_hypgeom_1f1_batch_padded_point(a: jax.Array, b: jax.Array, z: jax.Array, *, pad_to: int, regularized: bool = False) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((a, b, z), pad_to)
+    return arb_hypgeom_1f1_point(*call_args, regularized=regularized)
+
+
+def arb_hypgeom_m_batch_fixed_point(a: jax.Array, b: jax.Array, z: jax.Array, *, regularized: bool = False) -> jax.Array:
+    return arb_hypgeom_m_point(a, b, z, regularized=regularized)
+
+
+def arb_hypgeom_m_batch_padded_point(a: jax.Array, b: jax.Array, z: jax.Array, *, pad_to: int, regularized: bool = False) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((a, b, z), pad_to)
+    return arb_hypgeom_m_point(*call_args, regularized=regularized)
+
+
+def arb_hypgeom_2f1_batch_fixed_point(a: jax.Array, b: jax.Array, c: jax.Array, z: jax.Array, *, regularized: bool = False) -> jax.Array:
+    return arb_hypgeom_2f1_point(a, b, c, z, regularized=regularized)
+
+
+def arb_hypgeom_2f1_batch_padded_point(a: jax.Array, b: jax.Array, c: jax.Array, z: jax.Array, *, pad_to: int, regularized: bool = False) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((a, b, c, z), pad_to)
+    return arb_hypgeom_2f1_point(*call_args, regularized=regularized)
+
+
+def arb_hypgeom_u_batch_fixed_point(a: jax.Array, b: jax.Array, z: jax.Array) -> jax.Array:
+    return arb_hypgeom_u_point(a, b, z)
+
+
+def arb_hypgeom_u_batch_padded_point(a: jax.Array, b: jax.Array, z: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((a, b, z), pad_to)
+    return arb_hypgeom_u_point(*call_args)
+
+
+def arb_hypgeom_gamma_lower_batch_fixed_point(s: jax.Array, z: jax.Array, *, regularized: bool = False) -> jax.Array:
+    return arb_hypgeom_gamma_lower_point(s, z, regularized=regularized)
+
+
+def arb_hypgeom_gamma_lower_batch_padded_point(s: jax.Array, z: jax.Array, *, pad_to: int, regularized: bool = False) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((s, z), pad_to)
+    return arb_hypgeom_gamma_lower_point(*call_args, regularized=regularized)
+
+
+def arb_hypgeom_gamma_upper_batch_fixed_point(s: jax.Array, z: jax.Array, *, regularized: bool = False) -> jax.Array:
+    return arb_hypgeom_gamma_upper_point(s, z, regularized=regularized)
+
+
+def arb_hypgeom_gamma_upper_batch_padded_point(s: jax.Array, z: jax.Array, *, pad_to: int, regularized: bool = False) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((s, z), pad_to)
+    return arb_hypgeom_gamma_upper_point(*call_args, regularized=regularized)
+
+
+def arb_hypgeom_pfq_batch_fixed_point(a: jax.Array, b: jax.Array, z: jax.Array, *, reciprocal: bool = False, n_terms: int = 32) -> jax.Array:
+    return arb_hypgeom_pfq_point(a, b, z, reciprocal=reciprocal, n_terms=n_terms)
+
+
+def arb_hypgeom_pfq_batch_padded_point(a: jax.Array, b: jax.Array, z: jax.Array, *, pad_to: int, reciprocal: bool = False, n_terms: int = 32) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((a, b, z), pad_to)
+    return arb_hypgeom_pfq_point(*call_args, reciprocal=reciprocal, n_terms=n_terms)
+
+
 @partial(jax.jit, static_argnames=())
 def acb_abs_point(z: jax.Array) -> jax.Array:
     return jnp.abs(z)
@@ -585,6 +784,78 @@ def acb_hypgeom_pfq_point(a: jax.Array, b: jax.Array, z: jax.Array, reciprocal: 
     if z_arr.ndim == 0:
         z_arr = jnp.broadcast_to(z_arr, (a_arr.shape[0],))
     return jax.vmap(lambda aa, bb, zz: _complex_pfq_scalar(aa, bb, zz, reciprocal=reciprocal, n_terms=n_terms))(a_arr, b_arr, z_arr)
+
+
+def acb_hypgeom_0f1_batch_fixed_point(a: jax.Array, z: jax.Array, *, regularized: bool = False) -> jax.Array:
+    return acb_hypgeom_0f1_point(a, z, regularized=regularized)
+
+
+def acb_hypgeom_0f1_batch_padded_point(a: jax.Array, z: jax.Array, *, pad_to: int, regularized: bool = False) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((a, z), pad_to)
+    return acb_hypgeom_0f1_point(*call_args, regularized=regularized)
+
+
+def acb_hypgeom_1f1_batch_fixed_point(a: jax.Array, b: jax.Array, z: jax.Array, *, regularized: bool = False) -> jax.Array:
+    return acb_hypgeom_1f1_point(a, b, z, regularized=regularized)
+
+
+def acb_hypgeom_1f1_batch_padded_point(a: jax.Array, b: jax.Array, z: jax.Array, *, pad_to: int, regularized: bool = False) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((a, b, z), pad_to)
+    return acb_hypgeom_1f1_point(*call_args, regularized=regularized)
+
+
+def acb_hypgeom_m_batch_fixed_point(a: jax.Array, b: jax.Array, z: jax.Array, *, regularized: bool = False) -> jax.Array:
+    return acb_hypgeom_m_point(a, b, z, regularized=regularized)
+
+
+def acb_hypgeom_m_batch_padded_point(a: jax.Array, b: jax.Array, z: jax.Array, *, pad_to: int, regularized: bool = False) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((a, b, z), pad_to)
+    return acb_hypgeom_m_point(*call_args, regularized=regularized)
+
+
+def acb_hypgeom_2f1_batch_fixed_point(a: jax.Array, b: jax.Array, c: jax.Array, z: jax.Array, *, regularized: bool = False) -> jax.Array:
+    return acb_hypgeom_2f1_point(a, b, c, z, regularized=regularized)
+
+
+def acb_hypgeom_2f1_batch_padded_point(a: jax.Array, b: jax.Array, c: jax.Array, z: jax.Array, *, pad_to: int, regularized: bool = False) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((a, b, c, z), pad_to)
+    return acb_hypgeom_2f1_point(*call_args, regularized=regularized)
+
+
+def acb_hypgeom_u_batch_fixed_point(a: jax.Array, b: jax.Array, z: jax.Array) -> jax.Array:
+    return acb_hypgeom_u_point(a, b, z)
+
+
+def acb_hypgeom_u_batch_padded_point(a: jax.Array, b: jax.Array, z: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((a, b, z), pad_to)
+    return acb_hypgeom_u_point(*call_args)
+
+
+def acb_hypgeom_gamma_lower_batch_fixed_point(s: jax.Array, z: jax.Array, *, regularized: bool = False) -> jax.Array:
+    return acb_hypgeom_gamma_lower_point(s, z, regularized=regularized)
+
+
+def acb_hypgeom_gamma_lower_batch_padded_point(s: jax.Array, z: jax.Array, *, pad_to: int, regularized: bool = False) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((s, z), pad_to)
+    return acb_hypgeom_gamma_lower_point(*call_args, regularized=regularized)
+
+
+def acb_hypgeom_gamma_upper_batch_fixed_point(s: jax.Array, z: jax.Array, *, regularized: bool = False) -> jax.Array:
+    return acb_hypgeom_gamma_upper_point(s, z, regularized=regularized)
+
+
+def acb_hypgeom_gamma_upper_batch_padded_point(s: jax.Array, z: jax.Array, *, pad_to: int, regularized: bool = False) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((s, z), pad_to)
+    return acb_hypgeom_gamma_upper_point(*call_args, regularized=regularized)
+
+
+def acb_hypgeom_pfq_batch_fixed_point(a: jax.Array, b: jax.Array, z: jax.Array, *, reciprocal: bool = False, n_terms: int = 32) -> jax.Array:
+    return acb_hypgeom_pfq_point(a, b, z, reciprocal=reciprocal, n_terms=n_terms)
+
+
+def acb_hypgeom_pfq_batch_padded_point(a: jax.Array, b: jax.Array, z: jax.Array, *, pad_to: int, reciprocal: bool = False, n_terms: int = 32) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((a, b, z), pad_to)
+    return acb_hypgeom_pfq_point(*call_args, reciprocal=reciprocal, n_terms=n_terms)
 
 
 @partial(jax.jit, static_argnames=())
@@ -813,45 +1084,36 @@ def acb_log_sin_pi_point(x: jax.Array) -> jax.Array:
     return el.log_sin_pi(x)
 
 
-acb_digamma_point = scalarize_unary_complex(acb_core.acb_digamma)
-acb_zeta_point = scalarize_unary_complex(acb_core.acb_zeta)
+acb_digamma_point = scalarize_unary_complex(_complex_digamma_scalar)
+acb_zeta_point = scalarize_unary_complex(_complex_zeta_scalar)
 
 
 @jax.jit
 def acb_hurwitz_zeta_point(s: jax.Array, a: jax.Array) -> jax.Array:
-    ss = jnp.ravel(jnp.asarray(s, dtype=jnp.complex128))
-    aa = jnp.ravel(jnp.asarray(a, dtype=jnp.complex128))
-    out = jax.vmap(lambda x, y: acb_core.acb_midpoint(acb_core.acb_hurwitz_zeta(point_box(x), point_box(y))))(ss, aa)
-    return out.reshape(jnp.shape(s))
+    return _vectorize_complex_scalar(_complex_hurwitz_zeta_scalar, s, a)
 
 
 @partial(jax.jit, static_argnames=("n",))
 def acb_polygamma_point(n: int, x: jax.Array) -> jax.Array:
-    flat = jnp.ravel(jnp.asarray(x, dtype=jnp.complex128))
-    out = jax.vmap(lambda t: acb_core.acb_midpoint(acb_core.acb_polygamma(n, point_box(t))))(flat)
-    return out.reshape(jnp.shape(x))
+    return _vectorize_complex_scalar(partial(_complex_polygamma_scalar, n), x)
 
 
 @partial(jax.jit, static_argnames=("n",))
 def acb_bernoulli_poly_ui_point(n: int, x: jax.Array) -> jax.Array:
-    flat = jnp.ravel(jnp.asarray(x, dtype=jnp.complex128))
-    out = jax.vmap(lambda t: acb_core.acb_midpoint(acb_core.acb_bernoulli_poly_ui(n, point_box(t))))(flat)
-    return out.reshape(jnp.shape(x))
+    return _vectorize_complex_scalar(partial(_complex_bernoulli_poly_ui_scalar, n), x)
 
 
-acb_polylog_point = scalarize_binary_complex(acb_core.acb_polylog)
+acb_polylog_point = scalarize_binary_complex(_complex_polylog_scalar)
 
 
 @partial(jax.jit, static_argnames=("s",))
 def acb_polylog_si_point(s: int, z: jax.Array) -> jax.Array:
-    flat = jnp.ravel(jnp.asarray(z, dtype=jnp.complex128))
-    out = jax.vmap(lambda t: acb_core.acb_midpoint(acb_core.acb_polylog_si(s, point_box(t))))(flat)
-    return out.reshape(jnp.shape(z))
+    return _vectorize_complex_scalar(partial(_complex_polylog_si_scalar, s), z)
 
 
-acb_agm_point = scalarize_binary_complex(acb_core.acb_agm)
-acb_agm1_point = scalarize_unary_complex(acb_core.acb_agm1)
-acb_agm1_cpx_point = scalarize_unary_complex(acb_core.acb_agm1_cpx)
+acb_agm_point = scalarize_binary_complex(_complex_agm_scalar)
+acb_agm1_point = scalarize_unary_complex(lambda x: _complex_agm_scalar(jnp.asarray(1.0 + 0.0j, dtype=el.as_complex(x).dtype), x))
+acb_agm1_cpx_point = scalarize_unary_complex(lambda x: _complex_agm_scalar(jnp.asarray(1.0 + 0.0j, dtype=el.as_complex(x).dtype), x))
 
 
 @partial(jax.jit, static_argnames=())

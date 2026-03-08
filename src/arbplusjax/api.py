@@ -186,13 +186,13 @@ def _mid_acb_batch(fn: Callable) -> Callable:
 
 
 _DIRECT_POINT_BATCH_FASTPATHS = {
-    "hypgeom.arb_hypgeom_0f1": point_wrappers.arb_hypgeom_0f1_point,
-    "hypgeom.arb_hypgeom_1f1": point_wrappers.arb_hypgeom_1f1_point,
-    "hypgeom.arb_hypgeom_m": point_wrappers.arb_hypgeom_m_point,
-    "hypgeom.arb_hypgeom_2f1": point_wrappers.arb_hypgeom_2f1_point,
-    "hypgeom.arb_hypgeom_u": point_wrappers.arb_hypgeom_u_point,
-    "hypgeom.arb_hypgeom_gamma_lower": point_wrappers.arb_hypgeom_gamma_lower_point,
-    "hypgeom.arb_hypgeom_gamma_upper": point_wrappers.arb_hypgeom_gamma_upper_point,
+    "hypgeom.arb_hypgeom_0f1": (point_wrappers.arb_hypgeom_0f1_batch_fixed_point, point_wrappers.arb_hypgeom_0f1_batch_padded_point),
+    "hypgeom.arb_hypgeom_1f1": (point_wrappers.arb_hypgeom_1f1_batch_fixed_point, point_wrappers.arb_hypgeom_1f1_batch_padded_point),
+    "hypgeom.arb_hypgeom_m": (point_wrappers.arb_hypgeom_m_batch_fixed_point, point_wrappers.arb_hypgeom_m_batch_padded_point),
+    "hypgeom.arb_hypgeom_2f1": (point_wrappers.arb_hypgeom_2f1_batch_fixed_point, point_wrappers.arb_hypgeom_2f1_batch_padded_point),
+    "hypgeom.arb_hypgeom_u": (point_wrappers.arb_hypgeom_u_batch_fixed_point, point_wrappers.arb_hypgeom_u_batch_padded_point),
+    "hypgeom.arb_hypgeom_gamma_lower": (point_wrappers.arb_hypgeom_gamma_lower_batch_fixed_point, point_wrappers.arb_hypgeom_gamma_lower_batch_padded_point),
+    "hypgeom.arb_hypgeom_gamma_upper": (point_wrappers.arb_hypgeom_gamma_upper_batch_fixed_point, point_wrappers.arb_hypgeom_gamma_upper_batch_padded_point),
     "hypgeom.arb_hypgeom_chebyshev_t": point_wrappers.arb_hypgeom_chebyshev_t_point,
     "hypgeom.arb_hypgeom_chebyshev_u": point_wrappers.arb_hypgeom_chebyshev_u_point,
     "hypgeom.arb_hypgeom_laguerre_l": point_wrappers.arb_hypgeom_laguerre_l_point,
@@ -201,26 +201,26 @@ _DIRECT_POINT_BATCH_FASTPATHS = {
     "hypgeom.arb_hypgeom_legendre_q": point_wrappers.arb_hypgeom_legendre_q_point,
     "hypgeom.arb_hypgeom_jacobi_p": point_wrappers.arb_hypgeom_jacobi_p_point,
     "hypgeom.arb_hypgeom_gegenbauer_c": point_wrappers.arb_hypgeom_gegenbauer_c_point,
-    "hypgeom.arb_hypgeom_pfq": point_wrappers.arb_hypgeom_pfq_point,
-    "hypgeom.acb_hypgeom_0f1": point_wrappers.acb_hypgeom_0f1_point,
-    "hypgeom.acb_hypgeom_1f1": point_wrappers.acb_hypgeom_1f1_point,
-    "hypgeom.acb_hypgeom_m": point_wrappers.acb_hypgeom_m_point,
-    "hypgeom.acb_hypgeom_2f1": point_wrappers.acb_hypgeom_2f1_point,
-    "hypgeom.acb_hypgeom_u": point_wrappers.acb_hypgeom_u_point,
-    "hypgeom.acb_hypgeom_gamma_lower": point_wrappers.acb_hypgeom_gamma_lower_point,
-    "hypgeom.acb_hypgeom_gamma_upper": point_wrappers.acb_hypgeom_gamma_upper_point,
+    "hypgeom.arb_hypgeom_pfq": (point_wrappers.arb_hypgeom_pfq_batch_fixed_point, point_wrappers.arb_hypgeom_pfq_batch_padded_point),
+    "hypgeom.acb_hypgeom_0f1": (point_wrappers.acb_hypgeom_0f1_batch_fixed_point, point_wrappers.acb_hypgeom_0f1_batch_padded_point),
+    "hypgeom.acb_hypgeom_1f1": (point_wrappers.acb_hypgeom_1f1_batch_fixed_point, point_wrappers.acb_hypgeom_1f1_batch_padded_point),
+    "hypgeom.acb_hypgeom_m": (point_wrappers.acb_hypgeom_m_batch_fixed_point, point_wrappers.acb_hypgeom_m_batch_padded_point),
+    "hypgeom.acb_hypgeom_2f1": (point_wrappers.acb_hypgeom_2f1_batch_fixed_point, point_wrappers.acb_hypgeom_2f1_batch_padded_point),
+    "hypgeom.acb_hypgeom_u": (point_wrappers.acb_hypgeom_u_batch_fixed_point, point_wrappers.acb_hypgeom_u_batch_padded_point),
+    "hypgeom.acb_hypgeom_gamma_lower": (point_wrappers.acb_hypgeom_gamma_lower_batch_fixed_point, point_wrappers.acb_hypgeom_gamma_lower_batch_padded_point),
+    "hypgeom.acb_hypgeom_gamma_upper": (point_wrappers.acb_hypgeom_gamma_upper_batch_fixed_point, point_wrappers.acb_hypgeom_gamma_upper_batch_padded_point),
     "hypgeom.acb_hypgeom_chebyshev_t": point_wrappers.acb_hypgeom_chebyshev_t_point,
     "hypgeom.acb_hypgeom_chebyshev_u": point_wrappers.acb_hypgeom_chebyshev_u_point,
     "hypgeom.acb_hypgeom_laguerre_l": point_wrappers.acb_hypgeom_laguerre_l_point,
     "hypgeom.acb_hypgeom_hermite_h": point_wrappers.acb_hypgeom_hermite_h_point,
-    "hypgeom.acb_hypgeom_pfq": point_wrappers.acb_hypgeom_pfq_point,
-    "boost_hypergeometric_0f1": boost_hypgeom.boost_hypergeometric_0f1,
-    "boost_hypergeometric_1f1": boost_hypgeom.boost_hypergeometric_1f1,
-    "boost_hyp2f1_series": boost_hypgeom.boost_hyp2f1_series,
-    "boost_hyp2f1_cf": boost_hypgeom.boost_hyp2f1_cf,
-    "boost_hyp2f1_pade": boost_hypgeom.boost_hyp2f1_pade,
-    "boost_hyp2f1_rational": boost_hypgeom.boost_hyp2f1_rational,
-    "boost_hypergeometric_pfq": boost_hypgeom.boost_hypergeometric_pfq,
+    "hypgeom.acb_hypgeom_pfq": (point_wrappers.acb_hypgeom_pfq_batch_fixed_point, point_wrappers.acb_hypgeom_pfq_batch_padded_point),
+    "boost_hypergeometric_0f1": (boost_hypgeom.boost_hypergeometric_0f1_batch_fixed_point, boost_hypgeom.boost_hypergeometric_0f1_batch_padded_point),
+    "boost_hypergeometric_1f1": (boost_hypgeom.boost_hypergeometric_1f1_batch_fixed_point, boost_hypgeom.boost_hypergeometric_1f1_batch_padded_point),
+    "boost_hyp2f1_series": (boost_hypgeom.boost_hyp2f1_series_batch_fixed_point, boost_hypgeom.boost_hyp2f1_series_batch_padded_point),
+    "boost_hyp2f1_cf": (boost_hypgeom.boost_hyp2f1_series_batch_fixed_point, boost_hypgeom.boost_hyp2f1_series_batch_padded_point),
+    "boost_hyp2f1_pade": (boost_hypgeom.boost_hyp2f1_series_batch_fixed_point, boost_hypgeom.boost_hyp2f1_series_batch_padded_point),
+    "boost_hyp2f1_rational": (boost_hypgeom.boost_hyp2f1_series_batch_fixed_point, boost_hypgeom.boost_hyp2f1_series_batch_padded_point),
+    "boost_hypergeometric_pfq": (boost_hypgeom.boost_hypergeometric_pfq_batch_fixed_point, boost_hypgeom.boost_hypergeometric_pfq_batch_padded_point),
 }
 
 
@@ -422,9 +422,21 @@ def _maybe_direct_interval_batch_fastpath(
 
 
 def _maybe_direct_point_batch_fastpath(name: str, args: tuple[object, ...], *, pad_to: int | None):
-    fn = _DIRECT_POINT_BATCH_FASTPATHS.get(name)
-    if fn is None:
+    entry = _DIRECT_POINT_BATCH_FASTPATHS.get(name)
+    if entry is None:
         return None
+    if isinstance(entry, tuple):
+        fixed_fn, padded_fn = entry
+        batch_n = mixed_batch_size_or_none(args)
+        if pad_to is not None:
+            if batch_n is not None and int(pad_to) == batch_n:
+                return fixed_fn(*args)
+            out = padded_fn(*args, pad_to=pad_to)
+            return trim_batch_out(out, batch_n if batch_n is not None else 0)
+        call_args, trim_n = pad_mixed_batch_args_repeat_last(args, pad_to=pad_to)
+        out = fixed_fn(*call_args)
+        return trim_batch_out(out, trim_n)
+    fn = entry
     call_args, trim_n = pad_mixed_batch_args_repeat_last(args, pad_to=pad_to)
     out = fn(*call_args)
     return trim_batch_out(out, trim_n)

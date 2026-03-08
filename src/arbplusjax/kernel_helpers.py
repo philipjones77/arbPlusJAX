@@ -5,6 +5,7 @@ import jax.numpy as jnp
 
 from . import acb_core
 from . import double_interval as di
+from . import elementary as el
 
 
 def batch_size(args: tuple[object, ...]) -> int:
@@ -115,9 +116,10 @@ def point_box(z: jax.Array) -> jax.Array:
 def scalarize_unary_complex(fn):
     @jax.jit
     def wrapped(z: jax.Array) -> jax.Array:
-        flat = jnp.ravel(jnp.asarray(z, dtype=jnp.complex128))
-        out = jax.vmap(lambda t: acb_core.acb_midpoint(fn(point_box(t))))(flat)
-        return out.reshape(jnp.shape(z))
+        zz = el.as_complex(z)
+        flat = jnp.ravel(zz)
+        out = jax.vmap(fn)(flat)
+        return out.reshape(jnp.shape(zz))
 
     return wrapped
 
@@ -125,11 +127,11 @@ def scalarize_unary_complex(fn):
 def scalarize_binary_complex(fn):
     @jax.jit
     def wrapped(x: jax.Array, y: jax.Array) -> jax.Array:
-        xx = jnp.asarray(x, dtype=jnp.complex128)
-        yy = jnp.asarray(y, dtype=jnp.complex128)
+        xx = el.as_complex(x)
+        yy = el.as_complex(y)
         flat_x = jnp.ravel(xx)
         flat_y = jnp.ravel(yy)
-        out = jax.vmap(lambda a, b: acb_core.acb_midpoint(fn(point_box(a), point_box(b))))(flat_x, flat_y)
+        out = jax.vmap(fn)(flat_x, flat_y)
         return out.reshape(jnp.shape(xx))
 
     return wrapped
@@ -138,10 +140,9 @@ def scalarize_binary_complex(fn):
 def vmap_complex_scalar(fn):
     @jax.jit
     def wrapped(z: jax.Array) -> jax.Array:
-        zz = jnp.asarray(z, dtype=jnp.complex128)
+        zz = el.as_complex(z)
         flat = jnp.ravel(zz)
         out = jax.vmap(fn)(flat)
         return out.reshape(jnp.shape(zz))
 
     return wrapped
-

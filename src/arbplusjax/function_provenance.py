@@ -611,6 +611,8 @@ def _engineering_pure_jax(row: ImplementationEntry) -> str:
         return "partial"
     if name.startswith("shahen_"):
         return "partial"
+    if base in {"dirichlet_zeta", "dirichlet_eta", "modular_j"}:
+        return "mostly"
     if (name.startswith("boost_hyp2f1_")) or (name.startswith("boost_") and base in {"hypergeometric_0f1", "hypergeometric_1f1", "hypergeometric_2f0", "hypergeometric_pfq"}):
         return "mixed"
     if row.category == "arb_like" and base in BESSEL_BASES:
@@ -631,6 +633,8 @@ def _engineering_dtype(row: ImplementationEntry) -> str:
         return "partial"
     if name.startswith("shahen_"):
         return "partial"
+    if base in {"dirichlet_zeta", "dirichlet_eta", "modular_j"}:
+        return "current"
     if (name.startswith("boost_hyp2f1_")) or (name.startswith("boost_") and base in {"hypergeometric_0f1", "hypergeometric_1f1", "hypergeometric_2f0", "hypergeometric_pfq"}):
         return "mixed"
     if row.category == "arb_like" and base in BESSEL_BASES:
@@ -647,6 +651,10 @@ def _engineering_kernel_split(row: ImplementationEntry) -> str:
     base = row.base_name
     module = row.module.lower()
     if name.startswith(("bdg_", "shahen_")):
+        return "shared_dispatch_separate_mode_kernels"
+    if base in {"dirichlet_zeta", "dirichlet_eta"}:
+        return "shared_dispatch_separate_mode_kernels"
+    if base == "modular_j":
         return "shared_dispatch_separate_mode_kernels"
     if row.category == "arb_like" and ("arb_core" in module or "acb_core" in module or name.startswith(("arb_", "acb_"))):
         return "shared_dispatch_separate_mode_kernels"
@@ -674,7 +682,7 @@ def _engineering_kernel_split(row: ImplementationEntry) -> str:
         return "shared_dispatch_separate_mode_kernels"
     if name.startswith("boost_"):
         return "shared_canonical_substrate_in_progress"
-    if base in {"dirichlet_zeta", "dirichlet_eta", "modular_j", "elliptic_k", "elliptic_e"}:
+    if base in {"elliptic_k", "elliptic_e"}:
         return "point_basic_only"
     if name.startswith(("cuda_", "cusf_")):
         return "shared_dispatch_separate_mode_kernels" if base in BESSEL_BASES else "inherited_or_mixed"
@@ -689,6 +697,8 @@ def _engineering_helper_consolidation(row: ImplementationEntry) -> str:
     module = row.module.lower()
     if name.startswith(("bdg_", "shahen_")):
         return "partial"
+    if base in {"dirichlet_zeta", "dirichlet_eta", "modular_j"}:
+        return "shared_helper_layer"
     if row.category == "arb_like" and ("arb_core" in module or "acb_core" in module or name.startswith(("arb_", "acb_"))):
         return "shared_elementary_or_core"
     if row.category == "arb_like" and base in BESSEL_BASES:
@@ -717,7 +727,7 @@ def _engineering_helper_consolidation(row: ImplementationEntry) -> str:
         return "shared_helper_layer"
     if name.startswith("boost_"):
         return "shared_canonical_substrate_in_progress"
-    if base in {"dirichlet_zeta", "dirichlet_eta", "modular_j", "elliptic_k", "elliptic_e"}:
+    if base in {"elliptic_k", "elliptic_e"}:
         return "shared_helper_layer"
     if name.startswith(("cuda_", "cusf_")):
         return "shared_helper_layer" if base in BESSEL_BASES else "inherited_or_mixed"
@@ -733,6 +743,8 @@ def _engineering_batch(row: ImplementationEntry) -> str:
         return "partial"
     if name.startswith("shahen_"):
         return "partial"
+    if base in {"dirichlet_zeta", "dirichlet_eta", "modular_j"}:
+        return "fixed_shape_batch_available"
     if name.startswith("boost_hyp2f1_") or (name.startswith("boost_") and base in {"hypergeometric_0f1", "hypergeometric_1f1", "hypergeometric_2f0", "hypergeometric_pfq"}):
         return "fixed_shape_batch_available"
     if row.category == "arb_like" and base in BESSEL_BASES:
@@ -743,7 +755,7 @@ def _engineering_batch(row: ImplementationEntry) -> str:
         return "limited"
     if name.startswith(("boost_", "cuda_", "cusf_")):
         return "limited"
-    if base in {"dirichlet_zeta", "dirichlet_eta", "modular_j", "elliptic_k", "elliptic_e"}:
+    if base in {"elliptic_k", "elliptic_e"}:
         return "mixed"
     if "point" == row.four_modes:
         return "not_targeted"
@@ -757,6 +769,8 @@ def _engineering_ad(row: ImplementationEntry) -> str:
         return "partial"
     if name.startswith("shahen_"):
         return "limited"
+    if base in {"dirichlet_zeta", "dirichlet_eta", "modular_j"}:
+        return "limited"
     if name.startswith("boost_hyp2f1_") or (name.startswith("boost_") and base in {"hypergeometric_0f1", "hypergeometric_1f1", "hypergeometric_2f0", "hypergeometric_pfq"}):
         return "point_audited"
     if row.category == "arb_like" and base in BESSEL_UNIVERSAL_AD_BASES:
@@ -765,7 +779,7 @@ def _engineering_ad(row: ImplementationEntry) -> str:
         return "inherited"
     if name.startswith("cusf_") and base in BESSEL_BASES:
         return "inherited"
-    if base in {"dirichlet_zeta", "dirichlet_eta", "modular_j", "elliptic_k", "elliptic_e"}:
+    if base in {"elliptic_k", "elliptic_e"}:
         return "limited"
     if name.startswith(("boost_", "cuda_")):
         return "limited"
@@ -779,6 +793,8 @@ def _engineering_hardening(row: ImplementationEntry) -> str:
     name = row.preferred_public_name
     if name.startswith(("bdg_", "shahen_")):
         return "partial"
+    if base in {"dirichlet_zeta", "dirichlet_eta", "modular_j"}:
+        return "module_specific"
     if name.startswith("boost_hyp2f1_") or (name.startswith("boost_") and base in {"hypergeometric_0f1", "hypergeometric_1f1", "hypergeometric_2f0", "hypergeometric_pfq"}):
         return "inherited_or_family_specific"
     if base in {"dirichlet_zeta", "dirichlet_eta", "modular_j", "elliptic_k", "elliptic_e"}:

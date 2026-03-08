@@ -22,6 +22,7 @@ from . import checks
 from . import double_interval as di
 from . import hypgeom
 from . import hypgeom_wrappers
+from . import kernel_helpers as kh
 from . import point_wrappers
 from . import precision
 from . import wrappers_common as wc
@@ -503,6 +504,93 @@ def boost_hypergeometric_pfq_precision(
     n_terms: int = 32,
 ):
     return boost_hypergeometric_pfq(a, b, z, mode="basic", prec_bits=prec_bits, reciprocal=reciprocal, n_terms=n_terms)
+
+
+def boost_hypergeometric_0f1_batch_fixed_point(
+    b: jax.Array,
+    z: jax.Array,
+    *,
+    regularized: bool = False,
+):
+    return boost_hypergeometric_0f1(b, z, mode="point", regularized=regularized)
+
+
+def boost_hypergeometric_0f1_batch_padded_point(
+    b: jax.Array,
+    z: jax.Array,
+    *,
+    pad_to: int,
+    regularized: bool = False,
+):
+    call_args, _ = kh.pad_mixed_batch_args_repeat_last((b, z), pad_to=pad_to)
+    return boost_hypergeometric_0f1(*call_args, mode="point", regularized=regularized)
+
+
+def boost_hypergeometric_1f1_batch_fixed_point(
+    a: jax.Array,
+    b: jax.Array,
+    z: jax.Array,
+    *,
+    regularized: bool = False,
+):
+    return boost_hypergeometric_1f1(a, b, z, mode="point", regularized=regularized)
+
+
+def boost_hypergeometric_1f1_batch_padded_point(
+    a: jax.Array,
+    b: jax.Array,
+    z: jax.Array,
+    *,
+    pad_to: int,
+    regularized: bool = False,
+):
+    call_args, _ = kh.pad_mixed_batch_args_repeat_last((a, b, z), pad_to=pad_to)
+    return boost_hypergeometric_1f1(*call_args, mode="point", regularized=regularized)
+
+
+def boost_hyp2f1_series_batch_fixed_point(
+    a: jax.Array,
+    b: jax.Array,
+    c: jax.Array,
+    z: jax.Array,
+):
+    return boost_hyp2f1_series(a, b, c, z, mode="point")
+
+
+def boost_hyp2f1_series_batch_padded_point(
+    a: jax.Array,
+    b: jax.Array,
+    c: jax.Array,
+    z: jax.Array,
+    *,
+    pad_to: int,
+):
+    call_args, _ = kh.pad_mixed_batch_args_repeat_last((a, b, c, z), pad_to=pad_to)
+    return boost_hyp2f1_series(*call_args, mode="point")
+
+
+def boost_hypergeometric_pfq_batch_fixed_point(
+    a: jax.Array,
+    b: jax.Array,
+    z: jax.Array,
+    *,
+    reciprocal: bool = False,
+    n_terms: int = 32,
+):
+    return boost_hypergeometric_pfq(a, b, z, mode="point", reciprocal=reciprocal, n_terms=n_terms)
+
+
+def boost_hypergeometric_pfq_batch_padded_point(
+    a: jax.Array,
+    b: jax.Array,
+    z: jax.Array,
+    *,
+    pad_to: int,
+    reciprocal: bool = False,
+    n_terms: int = 32,
+):
+    call_args, _ = kh.pad_mixed_batch_args_repeat_last((a, b, z), pad_to=pad_to)
+    return boost_hypergeometric_pfq(*call_args, mode="point", reciprocal=reciprocal, n_terms=n_terms)
 
 
 def boost_hypergeometric_0f1_batch_padded_prec(
