@@ -41,8 +41,29 @@ def _vectorize_complex_scalar(fn, *args):
     return out.reshape(shape)
 
 
+def _vectorize_real_scalar_tuple2(fn, *args):
+    flats, shape = _broadcast_flatten(*args)
+    out1, out2 = jax.vmap(fn)(*flats)
+    return out1.reshape(shape), out2.reshape(shape)
+
+
+def _vectorize_complex_scalar_tuple2(fn, *args):
+    flats, shape = _broadcast_flatten(*args)
+    out1, out2 = jax.vmap(fn)(*flats)
+    return out1.reshape(shape), out2.reshape(shape)
+
+
 def _pad_args_repeat_last(args, pad_to: int):
     return kh.pad_mixed_batch_args_repeat_last(args, pad_to=pad_to)
+
+
+def _fixed_unary_point(fn, x: jax.Array, **kwargs):
+    return fn(x, **kwargs)
+
+
+def _padded_unary_point(fn, x: jax.Array, *, pad_to: int, **kwargs):
+    call_args, _ = _pad_args_repeat_last((x,), pad_to)
+    return fn(*call_args, **kwargs)
 
 
 def _real_laguerre_l_scalar(n: int, m: jax.Array, x: jax.Array) -> jax.Array:
@@ -625,6 +646,80 @@ def arb_hypgeom_gamma_upper_batch_padded_point(s: jax.Array, z: jax.Array, *, pa
     return arb_hypgeom_gamma_upper_point(*call_args, regularized=regularized)
 
 
+@partial(jax.jit, static_argnames=())
+def arb_hypgeom_gamma_point(x: jax.Array) -> jax.Array:
+    return arb_gamma_point(x)
+
+
+@partial(jax.jit, static_argnames=())
+def arb_hypgeom_erf_point(x: jax.Array) -> jax.Array:
+    return _vectorize_real_scalar(hypgeom._real_erf_series, x)
+
+
+@partial(jax.jit, static_argnames=())
+def arb_hypgeom_erfc_point(x: jax.Array) -> jax.Array:
+    return _vectorize_real_scalar(lambda t: 1.0 - hypgeom._real_erf_series(t), x)
+
+
+@partial(jax.jit, static_argnames=())
+def arb_hypgeom_erfi_point(x: jax.Array) -> jax.Array:
+    return _vectorize_real_scalar(hypgeom._real_erfi, x)
+
+
+@partial(jax.jit, static_argnames=())
+def arb_hypgeom_erfinv_point(x: jax.Array) -> jax.Array:
+    return _vectorize_real_scalar(hypgeom._real_erfinv_scalar, x)
+
+
+@partial(jax.jit, static_argnames=())
+def arb_hypgeom_erfcinv_point(x: jax.Array) -> jax.Array:
+    arr = jnp.asarray(x)
+    return arb_hypgeom_erfinv_point(1.0 - arr)
+
+
+@partial(jax.jit, static_argnames=())
+def arb_hypgeom_ei_point(z: jax.Array) -> jax.Array:
+    return _vectorize_real_scalar(hypgeom._real_ei_scalar, z)
+
+
+@partial(jax.jit, static_argnames=())
+def arb_hypgeom_si_point(z: jax.Array) -> jax.Array:
+    return _vectorize_real_scalar(lambda t: hypgeom._real_si_ci_scalar(t)[0], z)
+
+
+@partial(jax.jit, static_argnames=())
+def arb_hypgeom_ci_point(z: jax.Array) -> jax.Array:
+    return _vectorize_real_scalar(lambda t: hypgeom._real_si_ci_scalar(t)[1], z)
+
+
+@partial(jax.jit, static_argnames=())
+def arb_hypgeom_shi_point(z: jax.Array) -> jax.Array:
+    return _vectorize_real_scalar(lambda t: 0.5 * (hypgeom._real_ei_scalar(t) - hypgeom._real_ei_scalar(-t)), z)
+
+
+@partial(jax.jit, static_argnames=())
+def arb_hypgeom_chi_point(z: jax.Array) -> jax.Array:
+    return _vectorize_real_scalar(lambda t: 0.5 * (hypgeom._real_ei_scalar(t) + hypgeom._real_ei_scalar(-t)), z)
+
+
+@partial(jax.jit, static_argnames=("offset",))
+def arb_hypgeom_li_point(z: jax.Array, offset: int = 0) -> jax.Array:
+    offset_term = jnp.asarray(0.0, dtype=jnp.asarray(z).dtype)
+    if offset > 0:
+        offset_term = hypgeom._real_ei_scalar(jnp.log(jnp.asarray(offset, dtype=jnp.asarray(z).dtype)))
+    return _vectorize_real_scalar(lambda t: hypgeom._real_ei_scalar(jnp.log(t)) - offset_term, z)
+
+
+@partial(jax.jit, static_argnames=())
+def arb_hypgeom_dilog_point(z: jax.Array) -> jax.Array:
+    return _vectorize_real_scalar(hypgeom._real_dilog_scalar, z)
+
+
+@partial(jax.jit, static_argnames=("normalized",))
+def arb_hypgeom_fresnel_point(z: jax.Array, normalized: bool = False) -> tuple[jax.Array, jax.Array]:
+    return _vectorize_real_scalar_tuple2(lambda t: hypgeom._real_fresnel_scalar(t, normalized), z)
+
+
 def arb_hypgeom_pfq_batch_fixed_point(a: jax.Array, b: jax.Array, z: jax.Array, *, reciprocal: bool = False, n_terms: int = 32) -> jax.Array:
     return arb_hypgeom_pfq_point(a, b, z, reciprocal=reciprocal, n_terms=n_terms)
 
@@ -632,6 +727,204 @@ def arb_hypgeom_pfq_batch_fixed_point(a: jax.Array, b: jax.Array, z: jax.Array, 
 def arb_hypgeom_pfq_batch_padded_point(a: jax.Array, b: jax.Array, z: jax.Array, *, pad_to: int, reciprocal: bool = False, n_terms: int = 32) -> jax.Array:
     call_args, _ = _pad_args_repeat_last((a, b, z), pad_to)
     return arb_hypgeom_pfq_point(*call_args, reciprocal=reciprocal, n_terms=n_terms)
+
+
+def arb_hypgeom_gamma_batch_fixed_point(x: jax.Array) -> jax.Array:
+    return arb_hypgeom_gamma_point(x)
+
+
+def arb_hypgeom_gamma_batch_padded_point(x: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((x,), pad_to)
+    return arb_hypgeom_gamma_point(*call_args)
+
+
+def arb_hypgeom_erf_batch_fixed_point(x: jax.Array) -> jax.Array:
+    return arb_hypgeom_erf_point(x)
+
+
+def arb_hypgeom_erf_batch_padded_point(x: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((x,), pad_to)
+    return arb_hypgeom_erf_point(*call_args)
+
+
+def arb_hypgeom_erfc_batch_fixed_point(x: jax.Array) -> jax.Array:
+    return arb_hypgeom_erfc_point(x)
+
+
+def arb_hypgeom_erfc_batch_padded_point(x: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((x,), pad_to)
+    return arb_hypgeom_erfc_point(*call_args)
+
+
+def arb_hypgeom_erfi_batch_fixed_point(x: jax.Array) -> jax.Array:
+    return arb_hypgeom_erfi_point(x)
+
+
+def arb_hypgeom_erfi_batch_padded_point(x: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((x,), pad_to)
+    return arb_hypgeom_erfi_point(*call_args)
+
+
+def arb_hypgeom_erfinv_batch_fixed_point(x: jax.Array) -> jax.Array:
+    return arb_hypgeom_erfinv_point(x)
+
+
+def arb_hypgeom_erfinv_batch_padded_point(x: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((x,), pad_to)
+    return arb_hypgeom_erfinv_point(*call_args)
+
+
+def arb_hypgeom_erfcinv_batch_fixed_point(x: jax.Array) -> jax.Array:
+    return arb_hypgeom_erfcinv_point(x)
+
+
+def arb_hypgeom_erfcinv_batch_padded_point(x: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((x,), pad_to)
+    return arb_hypgeom_erfcinv_point(*call_args)
+
+
+def arb_hypgeom_ei_batch_fixed_point(z: jax.Array) -> jax.Array:
+    return arb_hypgeom_ei_point(z)
+
+
+def arb_hypgeom_ei_batch_padded_point(z: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((z,), pad_to)
+    return arb_hypgeom_ei_point(*call_args)
+
+
+def arb_hypgeom_si_batch_fixed_point(z: jax.Array) -> jax.Array:
+    return arb_hypgeom_si_point(z)
+
+
+def arb_hypgeom_si_batch_padded_point(z: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((z,), pad_to)
+    return arb_hypgeom_si_point(*call_args)
+
+
+def arb_hypgeom_ci_batch_fixed_point(z: jax.Array) -> jax.Array:
+    return arb_hypgeom_ci_point(z)
+
+
+def arb_hypgeom_ci_batch_padded_point(z: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((z,), pad_to)
+    return arb_hypgeom_ci_point(*call_args)
+
+
+def arb_hypgeom_shi_batch_fixed_point(z: jax.Array) -> jax.Array:
+    return arb_hypgeom_shi_point(z)
+
+
+def arb_hypgeom_shi_batch_padded_point(z: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((z,), pad_to)
+    return arb_hypgeom_shi_point(*call_args)
+
+
+def arb_hypgeom_chi_batch_fixed_point(z: jax.Array) -> jax.Array:
+    return arb_hypgeom_chi_point(z)
+
+
+def arb_hypgeom_chi_batch_padded_point(z: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((z,), pad_to)
+    return arb_hypgeom_chi_point(*call_args)
+
+
+def arb_hypgeom_li_batch_fixed_point(z: jax.Array, *, offset: int = 0) -> jax.Array:
+    return arb_hypgeom_li_point(z, offset=offset)
+
+
+def arb_hypgeom_li_batch_padded_point(z: jax.Array, *, pad_to: int, offset: int = 0) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((z,), pad_to)
+    return arb_hypgeom_li_point(*call_args, offset=offset)
+
+
+def arb_hypgeom_dilog_batch_fixed_point(z: jax.Array) -> jax.Array:
+    return arb_hypgeom_dilog_point(z)
+
+
+def arb_hypgeom_dilog_batch_padded_point(z: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((z,), pad_to)
+    return arb_hypgeom_dilog_point(*call_args)
+
+
+def arb_hypgeom_fresnel_batch_fixed_point(z: jax.Array, *, normalized: bool = False) -> tuple[jax.Array, jax.Array]:
+    return arb_hypgeom_fresnel_point(z, normalized=normalized)
+
+
+def arb_hypgeom_fresnel_batch_padded_point(z: jax.Array, *, pad_to: int, normalized: bool = False) -> tuple[jax.Array, jax.Array]:
+    call_args, _ = _pad_args_repeat_last((z,), pad_to)
+    return arb_hypgeom_fresnel_point(*call_args, normalized=normalized)
+
+
+def arb_hypgeom_legendre_p_batch_fixed_point(n: int, m: jax.Array, z: jax.Array, *, type: int = 0) -> jax.Array:
+    return arb_hypgeom_legendre_p_point(n, m, z, type=type)
+
+
+def arb_hypgeom_legendre_p_batch_padded_point(n: int, m: jax.Array, z: jax.Array, *, pad_to: int, type: int = 0) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((m, z), pad_to)
+    return arb_hypgeom_legendre_p_point(n, *call_args, type=type)
+
+
+def arb_hypgeom_legendre_q_batch_fixed_point(n: int, m: jax.Array, z: jax.Array, *, type: int = 0) -> jax.Array:
+    return arb_hypgeom_legendre_q_point(n, m, z, type=type)
+
+
+def arb_hypgeom_legendre_q_batch_padded_point(n: int, m: jax.Array, z: jax.Array, *, pad_to: int, type: int = 0) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((m, z), pad_to)
+    return arb_hypgeom_legendre_q_point(n, *call_args, type=type)
+
+
+def arb_hypgeom_jacobi_p_batch_fixed_point(n: int, a: jax.Array, b: jax.Array, z: jax.Array) -> jax.Array:
+    return arb_hypgeom_jacobi_p_point(n, a, b, z)
+
+
+def arb_hypgeom_jacobi_p_batch_padded_point(n: int, a: jax.Array, b: jax.Array, z: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((a, b, z), pad_to)
+    return arb_hypgeom_jacobi_p_point(n, *call_args)
+
+
+def arb_hypgeom_gegenbauer_c_batch_fixed_point(n: int, lam: jax.Array, z: jax.Array) -> jax.Array:
+    return arb_hypgeom_gegenbauer_c_point(n, lam, z)
+
+
+def arb_hypgeom_gegenbauer_c_batch_padded_point(n: int, lam: jax.Array, z: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((lam, z), pad_to)
+    return arb_hypgeom_gegenbauer_c_point(n, *call_args)
+
+
+def arb_hypgeom_chebyshev_t_batch_fixed_point(n: int, z: jax.Array) -> jax.Array:
+    return arb_hypgeom_chebyshev_t_point(n, z)
+
+
+def arb_hypgeom_chebyshev_t_batch_padded_point(n: int, z: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((z,), pad_to)
+    return arb_hypgeom_chebyshev_t_point(n, *call_args)
+
+
+def arb_hypgeom_chebyshev_u_batch_fixed_point(n: int, z: jax.Array) -> jax.Array:
+    return arb_hypgeom_chebyshev_u_point(n, z)
+
+
+def arb_hypgeom_chebyshev_u_batch_padded_point(n: int, z: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((z,), pad_to)
+    return arb_hypgeom_chebyshev_u_point(n, *call_args)
+
+
+def arb_hypgeom_laguerre_l_batch_fixed_point(n: int, m: jax.Array, z: jax.Array) -> jax.Array:
+    return arb_hypgeom_laguerre_l_point(n, m, z)
+
+
+def arb_hypgeom_laguerre_l_batch_padded_point(n: int, m: jax.Array, z: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((m, z), pad_to)
+    return arb_hypgeom_laguerre_l_point(n, *call_args)
+
+
+def arb_hypgeom_hermite_h_batch_fixed_point(n: int, z: jax.Array) -> jax.Array:
+    return arb_hypgeom_hermite_h_point(n, z)
+
+
+def arb_hypgeom_hermite_h_batch_padded_point(n: int, z: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((z,), pad_to)
+    return arb_hypgeom_hermite_h_point(n, *call_args)
 
 
 @partial(jax.jit, static_argnames=())
@@ -857,6 +1150,66 @@ def acb_hypgeom_gamma_upper_batch_padded_point(s: jax.Array, z: jax.Array, *, pa
     return acb_hypgeom_gamma_upper_point(*call_args, regularized=regularized)
 
 
+@partial(jax.jit, static_argnames=())
+def acb_hypgeom_gamma_point(x: jax.Array) -> jax.Array:
+    return acb_gamma_point(x)
+
+
+@partial(jax.jit, static_argnames=())
+def acb_hypgeom_erf_point(z: jax.Array) -> jax.Array:
+    return _vectorize_complex_scalar(hypgeom._complex_erf_series, z)
+
+
+@partial(jax.jit, static_argnames=())
+def acb_hypgeom_erfc_point(z: jax.Array) -> jax.Array:
+    return _vectorize_complex_scalar(hypgeom._complex_erfc_series, z)
+
+
+@partial(jax.jit, static_argnames=())
+def acb_hypgeom_erfi_point(z: jax.Array) -> jax.Array:
+    return _vectorize_complex_scalar(hypgeom._complex_erfi_series, z)
+
+
+@partial(jax.jit, static_argnames=())
+def acb_hypgeom_ei_point(z: jax.Array) -> jax.Array:
+    return _vectorize_complex_scalar(hypgeom._complex_ei_series, z)
+
+
+@partial(jax.jit, static_argnames=())
+def acb_hypgeom_si_point(z: jax.Array) -> jax.Array:
+    return _vectorize_complex_scalar(lambda w: hypgeom._complex_si_ci_series(w)[0], z)
+
+
+@partial(jax.jit, static_argnames=())
+def acb_hypgeom_ci_point(z: jax.Array) -> jax.Array:
+    return _vectorize_complex_scalar(lambda w: hypgeom._complex_si_ci_series(w)[1], z)
+
+
+@partial(jax.jit, static_argnames=())
+def acb_hypgeom_shi_point(z: jax.Array) -> jax.Array:
+    return _vectorize_complex_scalar(lambda w: hypgeom._complex_shi_chi_series(w)[0], z)
+
+
+@partial(jax.jit, static_argnames=())
+def acb_hypgeom_chi_point(z: jax.Array) -> jax.Array:
+    return _vectorize_complex_scalar(lambda w: hypgeom._complex_shi_chi_series(w)[1], z)
+
+
+@partial(jax.jit, static_argnames=())
+def acb_hypgeom_li_point(z: jax.Array) -> jax.Array:
+    return _vectorize_complex_scalar(lambda w: hypgeom._complex_ei_series(jnp.log(w)), z)
+
+
+@partial(jax.jit, static_argnames=())
+def acb_hypgeom_dilog_point(z: jax.Array) -> jax.Array:
+    return _vectorize_complex_scalar(hypgeom._complex_dilog_series, z)
+
+
+@partial(jax.jit, static_argnames=("normalized",))
+def acb_hypgeom_fresnel_point(z: jax.Array, normalized: bool = False) -> tuple[jax.Array, jax.Array]:
+    return _vectorize_complex_scalar_tuple2(lambda w: hypgeom._complex_fresnel(w, normalized), z)
+
+
 def acb_hypgeom_pfq_batch_fixed_point(a: jax.Array, b: jax.Array, z: jax.Array, *, reciprocal: bool = False, n_terms: int = 32) -> jax.Array:
     return acb_hypgeom_pfq_point(a, b, z, reciprocal=reciprocal, n_terms=n_terms)
 
@@ -864,6 +1217,186 @@ def acb_hypgeom_pfq_batch_fixed_point(a: jax.Array, b: jax.Array, z: jax.Array, 
 def acb_hypgeom_pfq_batch_padded_point(a: jax.Array, b: jax.Array, z: jax.Array, *, pad_to: int, reciprocal: bool = False, n_terms: int = 32) -> jax.Array:
     call_args, _ = _pad_args_repeat_last((a, b, z), pad_to)
     return acb_hypgeom_pfq_point(*call_args, reciprocal=reciprocal, n_terms=n_terms)
+
+
+def acb_hypgeom_gamma_batch_fixed_point(x: jax.Array) -> jax.Array:
+    return acb_hypgeom_gamma_point(x)
+
+
+def acb_hypgeom_gamma_batch_padded_point(x: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((x,), pad_to)
+    return acb_hypgeom_gamma_point(*call_args)
+
+
+def acb_hypgeom_erf_batch_fixed_point(z: jax.Array) -> jax.Array:
+    return acb_hypgeom_erf_point(z)
+
+
+def acb_hypgeom_erf_batch_padded_point(z: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((z,), pad_to)
+    return acb_hypgeom_erf_point(*call_args)
+
+
+def acb_hypgeom_erfc_batch_fixed_point(z: jax.Array) -> jax.Array:
+    return acb_hypgeom_erfc_point(z)
+
+
+def acb_hypgeom_erfc_batch_padded_point(z: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((z,), pad_to)
+    return acb_hypgeom_erfc_point(*call_args)
+
+
+def acb_hypgeom_erfi_batch_fixed_point(z: jax.Array) -> jax.Array:
+    return acb_hypgeom_erfi_point(z)
+
+
+def acb_hypgeom_erfi_batch_padded_point(z: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((z,), pad_to)
+    return acb_hypgeom_erfi_point(*call_args)
+
+
+def acb_hypgeom_ei_batch_fixed_point(z: jax.Array) -> jax.Array:
+    return acb_hypgeom_ei_point(z)
+
+
+def acb_hypgeom_ei_batch_padded_point(z: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((z,), pad_to)
+    return acb_hypgeom_ei_point(*call_args)
+
+
+def acb_hypgeom_si_batch_fixed_point(z: jax.Array) -> jax.Array:
+    return acb_hypgeom_si_point(z)
+
+
+def acb_hypgeom_si_batch_padded_point(z: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((z,), pad_to)
+    return acb_hypgeom_si_point(*call_args)
+
+
+def acb_hypgeom_ci_batch_fixed_point(z: jax.Array) -> jax.Array:
+    return acb_hypgeom_ci_point(z)
+
+
+def acb_hypgeom_ci_batch_padded_point(z: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((z,), pad_to)
+    return acb_hypgeom_ci_point(*call_args)
+
+
+def acb_hypgeom_shi_batch_fixed_point(z: jax.Array) -> jax.Array:
+    return acb_hypgeom_shi_point(z)
+
+
+def acb_hypgeom_shi_batch_padded_point(z: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((z,), pad_to)
+    return acb_hypgeom_shi_point(*call_args)
+
+
+def acb_hypgeom_chi_batch_fixed_point(z: jax.Array) -> jax.Array:
+    return acb_hypgeom_chi_point(z)
+
+
+def acb_hypgeom_chi_batch_padded_point(z: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((z,), pad_to)
+    return acb_hypgeom_chi_point(*call_args)
+
+
+def acb_hypgeom_li_batch_fixed_point(z: jax.Array) -> jax.Array:
+    return acb_hypgeom_li_point(z)
+
+
+def acb_hypgeom_li_batch_padded_point(z: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((z,), pad_to)
+    return acb_hypgeom_li_point(*call_args)
+
+
+def acb_hypgeom_dilog_batch_fixed_point(z: jax.Array) -> jax.Array:
+    return acb_hypgeom_dilog_point(z)
+
+
+def acb_hypgeom_dilog_batch_padded_point(z: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((z,), pad_to)
+    return acb_hypgeom_dilog_point(*call_args)
+
+
+def acb_hypgeom_fresnel_batch_fixed_point(z: jax.Array, *, normalized: bool = False) -> tuple[jax.Array, jax.Array]:
+    return acb_hypgeom_fresnel_point(z, normalized=normalized)
+
+
+def acb_hypgeom_fresnel_batch_padded_point(z: jax.Array, *, pad_to: int, normalized: bool = False) -> tuple[jax.Array, jax.Array]:
+    call_args, _ = _pad_args_repeat_last((z,), pad_to)
+    return acb_hypgeom_fresnel_point(*call_args, normalized=normalized)
+
+
+def acb_hypgeom_legendre_p_batch_fixed_point(n: int, m: jax.Array, z: jax.Array, *, type: int = 0) -> jax.Array:
+    return acb_hypgeom_legendre_p_point(n, m, z, type=type)
+
+
+def acb_hypgeom_legendre_p_batch_padded_point(n: int, m: jax.Array, z: jax.Array, *, pad_to: int, type: int = 0) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((m, z), pad_to)
+    return acb_hypgeom_legendre_p_point(n, *call_args, type=type)
+
+
+def acb_hypgeom_legendre_q_batch_fixed_point(n: int, m: jax.Array, z: jax.Array, *, type: int = 0) -> jax.Array:
+    return acb_hypgeom_legendre_q_point(n, m, z, type=type)
+
+
+def acb_hypgeom_legendre_q_batch_padded_point(n: int, m: jax.Array, z: jax.Array, *, pad_to: int, type: int = 0) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((m, z), pad_to)
+    return acb_hypgeom_legendre_q_point(n, *call_args, type=type)
+
+
+def acb_hypgeom_jacobi_p_batch_fixed_point(n: int, a: jax.Array, b: jax.Array, z: jax.Array) -> jax.Array:
+    return acb_hypgeom_jacobi_p_point(n, a, b, z)
+
+
+def acb_hypgeom_jacobi_p_batch_padded_point(n: int, a: jax.Array, b: jax.Array, z: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((a, b, z), pad_to)
+    return acb_hypgeom_jacobi_p_point(n, *call_args)
+
+
+def acb_hypgeom_gegenbauer_c_batch_fixed_point(n: int, lam: jax.Array, z: jax.Array) -> jax.Array:
+    return acb_hypgeom_gegenbauer_c_point(n, lam, z)
+
+
+def acb_hypgeom_gegenbauer_c_batch_padded_point(n: int, lam: jax.Array, z: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((lam, z), pad_to)
+    return acb_hypgeom_gegenbauer_c_point(n, *call_args)
+
+
+def acb_hypgeom_chebyshev_t_batch_fixed_point(n: int, z: jax.Array) -> jax.Array:
+    return acb_hypgeom_chebyshev_t_point(n, z)
+
+
+def acb_hypgeom_chebyshev_t_batch_padded_point(n: int, z: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((z,), pad_to)
+    return acb_hypgeom_chebyshev_t_point(n, *call_args)
+
+
+def acb_hypgeom_chebyshev_u_batch_fixed_point(n: int, z: jax.Array) -> jax.Array:
+    return acb_hypgeom_chebyshev_u_point(n, z)
+
+
+def acb_hypgeom_chebyshev_u_batch_padded_point(n: int, z: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((z,), pad_to)
+    return acb_hypgeom_chebyshev_u_point(n, *call_args)
+
+
+def acb_hypgeom_laguerre_l_batch_fixed_point(n: int, a: jax.Array, z: jax.Array) -> jax.Array:
+    return acb_hypgeom_laguerre_l_point(n, a, z)
+
+
+def acb_hypgeom_laguerre_l_batch_padded_point(n: int, a: jax.Array, z: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((a, z), pad_to)
+    return acb_hypgeom_laguerre_l_point(n, *call_args)
+
+
+def acb_hypgeom_hermite_h_batch_fixed_point(n: int, z: jax.Array) -> jax.Array:
+    return acb_hypgeom_hermite_h_point(n, z)
+
+
+def acb_hypgeom_hermite_h_batch_padded_point(n: int, z: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((z,), pad_to)
+    return acb_hypgeom_hermite_h_point(n, *call_args)
 
 
 @partial(jax.jit, static_argnames=())

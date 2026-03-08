@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import importlib
 import inspect
-from functools import lru_cache
+from functools import lru_cache, partial
 from typing import Callable
 
 import jax
@@ -187,6 +187,20 @@ def _mid_acb_batch(fn: Callable) -> Callable:
 
 
 _DIRECT_POINT_BATCH_FASTPATHS = {
+    "hypgeom.arb_hypgeom_gamma": (partial(point_wrappers._fixed_unary_point, point_wrappers.arb_hypgeom_gamma_point), partial(point_wrappers._padded_unary_point, point_wrappers.arb_hypgeom_gamma_point)),
+    "hypgeom.arb_hypgeom_erf": (partial(point_wrappers._fixed_unary_point, point_wrappers.arb_hypgeom_erf_point), partial(point_wrappers._padded_unary_point, point_wrappers.arb_hypgeom_erf_point)),
+    "hypgeom.arb_hypgeom_erfc": (partial(point_wrappers._fixed_unary_point, point_wrappers.arb_hypgeom_erfc_point), partial(point_wrappers._padded_unary_point, point_wrappers.arb_hypgeom_erfc_point)),
+    "hypgeom.arb_hypgeom_erfi": (partial(point_wrappers._fixed_unary_point, point_wrappers.arb_hypgeom_erfi_point), partial(point_wrappers._padded_unary_point, point_wrappers.arb_hypgeom_erfi_point)),
+    "hypgeom.arb_hypgeom_erfinv": (partial(point_wrappers._fixed_unary_point, point_wrappers.arb_hypgeom_erfinv_point), partial(point_wrappers._padded_unary_point, point_wrappers.arb_hypgeom_erfinv_point)),
+    "hypgeom.arb_hypgeom_erfcinv": (partial(point_wrappers._fixed_unary_point, point_wrappers.arb_hypgeom_erfcinv_point), partial(point_wrappers._padded_unary_point, point_wrappers.arb_hypgeom_erfcinv_point)),
+    "hypgeom.arb_hypgeom_ei": (partial(point_wrappers._fixed_unary_point, point_wrappers.arb_hypgeom_ei_point), partial(point_wrappers._padded_unary_point, point_wrappers.arb_hypgeom_ei_point)),
+    "hypgeom.arb_hypgeom_si": (partial(point_wrappers._fixed_unary_point, point_wrappers.arb_hypgeom_si_point), partial(point_wrappers._padded_unary_point, point_wrappers.arb_hypgeom_si_point)),
+    "hypgeom.arb_hypgeom_ci": (partial(point_wrappers._fixed_unary_point, point_wrappers.arb_hypgeom_ci_point), partial(point_wrappers._padded_unary_point, point_wrappers.arb_hypgeom_ci_point)),
+    "hypgeom.arb_hypgeom_shi": (partial(point_wrappers._fixed_unary_point, point_wrappers.arb_hypgeom_shi_point), partial(point_wrappers._padded_unary_point, point_wrappers.arb_hypgeom_shi_point)),
+    "hypgeom.arb_hypgeom_chi": (partial(point_wrappers._fixed_unary_point, point_wrappers.arb_hypgeom_chi_point), partial(point_wrappers._padded_unary_point, point_wrappers.arb_hypgeom_chi_point)),
+    "hypgeom.arb_hypgeom_li": (partial(point_wrappers._fixed_unary_point, point_wrappers.arb_hypgeom_li_point), partial(point_wrappers._padded_unary_point, point_wrappers.arb_hypgeom_li_point)),
+    "hypgeom.arb_hypgeom_dilog": (partial(point_wrappers._fixed_unary_point, point_wrappers.arb_hypgeom_dilog_point), partial(point_wrappers._padded_unary_point, point_wrappers.arb_hypgeom_dilog_point)),
+    "hypgeom.arb_hypgeom_fresnel": (partial(point_wrappers._fixed_unary_point, point_wrappers.arb_hypgeom_fresnel_point), partial(point_wrappers._padded_unary_point, point_wrappers.arb_hypgeom_fresnel_point)),
     "hypgeom.arb_hypgeom_0f1": (point_wrappers.arb_hypgeom_0f1_batch_fixed_point, point_wrappers.arb_hypgeom_0f1_batch_padded_point),
     "hypgeom.arb_hypgeom_1f1": (point_wrappers.arb_hypgeom_1f1_batch_fixed_point, point_wrappers.arb_hypgeom_1f1_batch_padded_point),
     "hypgeom.arb_hypgeom_m": (point_wrappers.arb_hypgeom_m_batch_fixed_point, point_wrappers.arb_hypgeom_m_batch_padded_point),
@@ -210,6 +224,18 @@ _DIRECT_POINT_BATCH_FASTPATHS = {
     "hypgeom.acb_hypgeom_u": (point_wrappers.acb_hypgeom_u_batch_fixed_point, point_wrappers.acb_hypgeom_u_batch_padded_point),
     "hypgeom.acb_hypgeom_gamma_lower": (point_wrappers.acb_hypgeom_gamma_lower_batch_fixed_point, point_wrappers.acb_hypgeom_gamma_lower_batch_padded_point),
     "hypgeom.acb_hypgeom_gamma_upper": (point_wrappers.acb_hypgeom_gamma_upper_batch_fixed_point, point_wrappers.acb_hypgeom_gamma_upper_batch_padded_point),
+    "hypgeom.acb_hypgeom_gamma": (partial(point_wrappers._fixed_unary_point, point_wrappers.acb_hypgeom_gamma_point), partial(point_wrappers._padded_unary_point, point_wrappers.acb_hypgeom_gamma_point)),
+    "hypgeom.acb_hypgeom_erf": (partial(point_wrappers._fixed_unary_point, point_wrappers.acb_hypgeom_erf_point), partial(point_wrappers._padded_unary_point, point_wrappers.acb_hypgeom_erf_point)),
+    "hypgeom.acb_hypgeom_erfc": (partial(point_wrappers._fixed_unary_point, point_wrappers.acb_hypgeom_erfc_point), partial(point_wrappers._padded_unary_point, point_wrappers.acb_hypgeom_erfc_point)),
+    "hypgeom.acb_hypgeom_erfi": (partial(point_wrappers._fixed_unary_point, point_wrappers.acb_hypgeom_erfi_point), partial(point_wrappers._padded_unary_point, point_wrappers.acb_hypgeom_erfi_point)),
+    "hypgeom.acb_hypgeom_ei": (partial(point_wrappers._fixed_unary_point, point_wrappers.acb_hypgeom_ei_point), partial(point_wrappers._padded_unary_point, point_wrappers.acb_hypgeom_ei_point)),
+    "hypgeom.acb_hypgeom_si": (partial(point_wrappers._fixed_unary_point, point_wrappers.acb_hypgeom_si_point), partial(point_wrappers._padded_unary_point, point_wrappers.acb_hypgeom_si_point)),
+    "hypgeom.acb_hypgeom_ci": (partial(point_wrappers._fixed_unary_point, point_wrappers.acb_hypgeom_ci_point), partial(point_wrappers._padded_unary_point, point_wrappers.acb_hypgeom_ci_point)),
+    "hypgeom.acb_hypgeom_shi": (partial(point_wrappers._fixed_unary_point, point_wrappers.acb_hypgeom_shi_point), partial(point_wrappers._padded_unary_point, point_wrappers.acb_hypgeom_shi_point)),
+    "hypgeom.acb_hypgeom_chi": (partial(point_wrappers._fixed_unary_point, point_wrappers.acb_hypgeom_chi_point), partial(point_wrappers._padded_unary_point, point_wrappers.acb_hypgeom_chi_point)),
+    "hypgeom.acb_hypgeom_li": (partial(point_wrappers._fixed_unary_point, point_wrappers.acb_hypgeom_li_point), partial(point_wrappers._padded_unary_point, point_wrappers.acb_hypgeom_li_point)),
+    "hypgeom.acb_hypgeom_dilog": (partial(point_wrappers._fixed_unary_point, point_wrappers.acb_hypgeom_dilog_point), partial(point_wrappers._padded_unary_point, point_wrappers.acb_hypgeom_dilog_point)),
+    "hypgeom.acb_hypgeom_fresnel": (partial(point_wrappers._fixed_unary_point, point_wrappers.acb_hypgeom_fresnel_point), partial(point_wrappers._padded_unary_point, point_wrappers.acb_hypgeom_fresnel_point)),
     "hypgeom.acb_hypgeom_chebyshev_t": point_wrappers.acb_hypgeom_chebyshev_t_point,
     "hypgeom.acb_hypgeom_chebyshev_u": point_wrappers.acb_hypgeom_chebyshev_u_point,
     "hypgeom.acb_hypgeom_laguerre_l": point_wrappers.acb_hypgeom_laguerre_l_point,
@@ -594,6 +620,56 @@ for _name in dir(point_wrappers):
     if _public.startswith(("arb_hypgeom_", "acb_hypgeom_")):
         _DIRECT_POINT_BATCH_FASTPATHS.setdefault(f"hypgeom.{_public}", _fn)
         _POINT_FUNCS.setdefault(f"hypgeom.{_public}", _fn)
+
+
+_HYPGEOM_POINT_BATCH_ALIASES = {
+    "arb_hypgeom_gamma": (point_wrappers.arb_hypgeom_gamma_batch_fixed_point, point_wrappers.arb_hypgeom_gamma_batch_padded_point),
+    "arb_hypgeom_erf": (point_wrappers.arb_hypgeom_erf_batch_fixed_point, point_wrappers.arb_hypgeom_erf_batch_padded_point),
+    "arb_hypgeom_erfc": (point_wrappers.arb_hypgeom_erfc_batch_fixed_point, point_wrappers.arb_hypgeom_erfc_batch_padded_point),
+    "arb_hypgeom_erfi": (point_wrappers.arb_hypgeom_erfi_batch_fixed_point, point_wrappers.arb_hypgeom_erfi_batch_padded_point),
+    "arb_hypgeom_erfinv": (point_wrappers.arb_hypgeom_erfinv_batch_fixed_point, point_wrappers.arb_hypgeom_erfinv_batch_padded_point),
+    "arb_hypgeom_erfcinv": (point_wrappers.arb_hypgeom_erfcinv_batch_fixed_point, point_wrappers.arb_hypgeom_erfcinv_batch_padded_point),
+    "arb_hypgeom_ei": (point_wrappers.arb_hypgeom_ei_batch_fixed_point, point_wrappers.arb_hypgeom_ei_batch_padded_point),
+    "arb_hypgeom_si": (point_wrappers.arb_hypgeom_si_batch_fixed_point, point_wrappers.arb_hypgeom_si_batch_padded_point),
+    "arb_hypgeom_ci": (point_wrappers.arb_hypgeom_ci_batch_fixed_point, point_wrappers.arb_hypgeom_ci_batch_padded_point),
+    "arb_hypgeom_shi": (point_wrappers.arb_hypgeom_shi_batch_fixed_point, point_wrappers.arb_hypgeom_shi_batch_padded_point),
+    "arb_hypgeom_chi": (point_wrappers.arb_hypgeom_chi_batch_fixed_point, point_wrappers.arb_hypgeom_chi_batch_padded_point),
+    "arb_hypgeom_li": (point_wrappers.arb_hypgeom_li_batch_fixed_point, point_wrappers.arb_hypgeom_li_batch_padded_point),
+    "arb_hypgeom_dilog": (point_wrappers.arb_hypgeom_dilog_batch_fixed_point, point_wrappers.arb_hypgeom_dilog_batch_padded_point),
+    "arb_hypgeom_fresnel": (point_wrappers.arb_hypgeom_fresnel_batch_fixed_point, point_wrappers.arb_hypgeom_fresnel_batch_padded_point),
+    "arb_hypgeom_legendre_p": (point_wrappers.arb_hypgeom_legendre_p_batch_fixed_point, point_wrappers.arb_hypgeom_legendre_p_batch_padded_point),
+    "arb_hypgeom_legendre_q": (point_wrappers.arb_hypgeom_legendre_q_batch_fixed_point, point_wrappers.arb_hypgeom_legendre_q_batch_padded_point),
+    "arb_hypgeom_jacobi_p": (point_wrappers.arb_hypgeom_jacobi_p_batch_fixed_point, point_wrappers.arb_hypgeom_jacobi_p_batch_padded_point),
+    "arb_hypgeom_gegenbauer_c": (point_wrappers.arb_hypgeom_gegenbauer_c_batch_fixed_point, point_wrappers.arb_hypgeom_gegenbauer_c_batch_padded_point),
+    "arb_hypgeom_chebyshev_t": (point_wrappers.arb_hypgeom_chebyshev_t_batch_fixed_point, point_wrappers.arb_hypgeom_chebyshev_t_batch_padded_point),
+    "arb_hypgeom_chebyshev_u": (point_wrappers.arb_hypgeom_chebyshev_u_batch_fixed_point, point_wrappers.arb_hypgeom_chebyshev_u_batch_padded_point),
+    "arb_hypgeom_laguerre_l": (point_wrappers.arb_hypgeom_laguerre_l_batch_fixed_point, point_wrappers.arb_hypgeom_laguerre_l_batch_padded_point),
+    "arb_hypgeom_hermite_h": (point_wrappers.arb_hypgeom_hermite_h_batch_fixed_point, point_wrappers.arb_hypgeom_hermite_h_batch_padded_point),
+    "acb_hypgeom_gamma": (point_wrappers.acb_hypgeom_gamma_batch_fixed_point, point_wrappers.acb_hypgeom_gamma_batch_padded_point),
+    "acb_hypgeom_erf": (point_wrappers.acb_hypgeom_erf_batch_fixed_point, point_wrappers.acb_hypgeom_erf_batch_padded_point),
+    "acb_hypgeom_erfc": (point_wrappers.acb_hypgeom_erfc_batch_fixed_point, point_wrappers.acb_hypgeom_erfc_batch_padded_point),
+    "acb_hypgeom_erfi": (point_wrappers.acb_hypgeom_erfi_batch_fixed_point, point_wrappers.acb_hypgeom_erfi_batch_padded_point),
+    "acb_hypgeom_ei": (point_wrappers.acb_hypgeom_ei_batch_fixed_point, point_wrappers.acb_hypgeom_ei_batch_padded_point),
+    "acb_hypgeom_si": (point_wrappers.acb_hypgeom_si_batch_fixed_point, point_wrappers.acb_hypgeom_si_batch_padded_point),
+    "acb_hypgeom_ci": (point_wrappers.acb_hypgeom_ci_batch_fixed_point, point_wrappers.acb_hypgeom_ci_batch_padded_point),
+    "acb_hypgeom_shi": (point_wrappers.acb_hypgeom_shi_batch_fixed_point, point_wrappers.acb_hypgeom_shi_batch_padded_point),
+    "acb_hypgeom_chi": (point_wrappers.acb_hypgeom_chi_batch_fixed_point, point_wrappers.acb_hypgeom_chi_batch_padded_point),
+    "acb_hypgeom_li": (point_wrappers.acb_hypgeom_li_batch_fixed_point, point_wrappers.acb_hypgeom_li_batch_padded_point),
+    "acb_hypgeom_dilog": (point_wrappers.acb_hypgeom_dilog_batch_fixed_point, point_wrappers.acb_hypgeom_dilog_batch_padded_point),
+    "acb_hypgeom_fresnel": (point_wrappers.acb_hypgeom_fresnel_batch_fixed_point, point_wrappers.acb_hypgeom_fresnel_batch_padded_point),
+    "acb_hypgeom_legendre_p": (point_wrappers.acb_hypgeom_legendre_p_batch_fixed_point, point_wrappers.acb_hypgeom_legendre_p_batch_padded_point),
+    "acb_hypgeom_legendre_q": (point_wrappers.acb_hypgeom_legendre_q_batch_fixed_point, point_wrappers.acb_hypgeom_legendre_q_batch_padded_point),
+    "acb_hypgeom_jacobi_p": (point_wrappers.acb_hypgeom_jacobi_p_batch_fixed_point, point_wrappers.acb_hypgeom_jacobi_p_batch_padded_point),
+    "acb_hypgeom_gegenbauer_c": (point_wrappers.acb_hypgeom_gegenbauer_c_batch_fixed_point, point_wrappers.acb_hypgeom_gegenbauer_c_batch_padded_point),
+    "acb_hypgeom_chebyshev_t": (point_wrappers.acb_hypgeom_chebyshev_t_batch_fixed_point, point_wrappers.acb_hypgeom_chebyshev_t_batch_padded_point),
+    "acb_hypgeom_chebyshev_u": (point_wrappers.acb_hypgeom_chebyshev_u_batch_fixed_point, point_wrappers.acb_hypgeom_chebyshev_u_batch_padded_point),
+    "acb_hypgeom_laguerre_l": (point_wrappers.acb_hypgeom_laguerre_l_batch_fixed_point, point_wrappers.acb_hypgeom_laguerre_l_batch_padded_point),
+    "acb_hypgeom_hermite_h": (point_wrappers.acb_hypgeom_hermite_h_batch_fixed_point, point_wrappers.acb_hypgeom_hermite_h_batch_padded_point),
+}
+
+for _name, _entry in _HYPGEOM_POINT_BATCH_ALIASES.items():
+    _DIRECT_POINT_BATCH_FASTPATHS[_name] = _entry
+    _DIRECT_POINT_BATCH_FASTPATHS[f"hypgeom.{_name}"] = _entry
 
 
 _INTERVAL_FUNCS = {

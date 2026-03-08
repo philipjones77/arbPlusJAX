@@ -697,6 +697,8 @@ def _engineering_helper_consolidation(row: ImplementationEntry) -> str:
     module = row.module.lower()
     if name.startswith(("bdg_", "shahen_")):
         return "partial"
+    if name.startswith(("arb_hypgeom_", "acb_hypgeom_")):
+        return "shared_helper_layer"
     if base in {"dirichlet_zeta", "dirichlet_eta", "modular_j"}:
         return "shared_helper_layer"
     if row.category == "arb_like" and ("arb_core" in module or "acb_core" in module or name.startswith(("arb_", "acb_"))):
@@ -743,6 +745,41 @@ def _engineering_batch(row: ImplementationEntry) -> str:
         return "partial"
     if name.startswith("shahen_"):
         return "partial"
+    if name.startswith(("arb_hypgeom_", "acb_hypgeom_")) and base in {
+        "gamma",
+        "erf",
+        "erfc",
+        "erfi",
+        "erfinv",
+        "erfcinv",
+        "ei",
+        "si",
+        "ci",
+        "shi",
+        "chi",
+        "li",
+        "dilog",
+        "fresnel",
+    }:
+        return "fixed_shape_point_batch_available"
+    if name.startswith(("arb_hypgeom_", "acb_hypgeom_")) and base in {
+        "hypgeom_0f1",
+        "hypgeom_1f1",
+        "hypgeom_2f1",
+        "hypgeom_u",
+        "gamma_lower",
+        "gamma_upper",
+        "legendre_p",
+        "legendre_q",
+        "jacobi_p",
+        "gegenbauer_c",
+        "chebyshev_t",
+        "chebyshev_u",
+        "laguerre_l",
+        "hermite_h",
+        "hypgeom_pfq",
+    }:
+        return "fixed_shape_batch_available"
     if base in {"dirichlet_zeta", "dirichlet_eta", "modular_j"}:
         return "fixed_shape_batch_available"
     if name.startswith("boost_hyp2f1_") or (name.startswith("boost_") and base in {"hypergeometric_0f1", "hypergeometric_1f1", "hypergeometric_2f0", "hypergeometric_pfq"}):

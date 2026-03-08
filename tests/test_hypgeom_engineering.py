@@ -629,9 +629,49 @@ def test_hypgeom_point_batch_uses_direct_point_kernels():
         ("hypgeom.arb_hypgeom_u", (a, b, z), point_wrappers.arb_hypgeom_u_point(a, b, z)),
         ("hypgeom.arb_hypgeom_gamma_lower", (a, z), point_wrappers.arb_hypgeom_gamma_lower_point(a, z)),
         ("hypgeom.arb_hypgeom_gamma_upper", (a, z), point_wrappers.arb_hypgeom_gamma_upper_point(a, z)),
+        ("hypgeom.arb_hypgeom_gamma", (a,), point_wrappers.arb_hypgeom_gamma_point(a)),
+        ("hypgeom.arb_hypgeom_erf", (z,), point_wrappers.arb_hypgeom_erf_point(z)),
+        ("hypgeom.arb_hypgeom_erfc", (z,), point_wrappers.arb_hypgeom_erfc_point(z)),
+        ("hypgeom.arb_hypgeom_erfi", (z,), point_wrappers.arb_hypgeom_erfi_point(z)),
+        ("hypgeom.arb_hypgeom_erfinv", (jnp.linspace(jnp.float64(-0.5), jnp.float64(0.5), 4),), point_wrappers.arb_hypgeom_erfinv_point(jnp.linspace(jnp.float64(-0.5), jnp.float64(0.5), 4))),
+        ("hypgeom.arb_hypgeom_erfcinv", (jnp.linspace(jnp.float64(0.5), jnp.float64(1.5), 4),), point_wrappers.arb_hypgeom_erfcinv_point(jnp.linspace(jnp.float64(0.5), jnp.float64(1.5), 4))),
+        ("hypgeom.arb_hypgeom_ei", (z,), point_wrappers.arb_hypgeom_ei_point(z)),
+        ("hypgeom.arb_hypgeom_si", (z,), point_wrappers.arb_hypgeom_si_point(z)),
+        ("hypgeom.arb_hypgeom_ci", (z,), point_wrappers.arb_hypgeom_ci_point(z)),
+        ("hypgeom.arb_hypgeom_shi", (z,), point_wrappers.arb_hypgeom_shi_point(z)),
+        ("hypgeom.arb_hypgeom_chi", (z,), point_wrappers.arb_hypgeom_chi_point(z)),
+        ("hypgeom.arb_hypgeom_dilog", (z,), point_wrappers.arb_hypgeom_dilog_point(z)),
         ("hypgeom.arb_hypgeom_legendre_p", (2, zeros, z), point_wrappers.arb_hypgeom_legendre_p_point(2, zeros, z)),
         ("hypgeom.arb_hypgeom_gegenbauer_c", (2, lam, z), point_wrappers.arb_hypgeom_gegenbauer_c_point(2, lam, z)),
+        ("hypgeom.arb_hypgeom_fresnel", (z,), point_wrappers.arb_hypgeom_fresnel_point(z)),
     ]
     for name, args, direct in cases:
         via_api = api.eval_point_batch(name, *args)
         assert _allclose_or_tuple(via_api, direct)
+
+    li_direct = point_wrappers.arb_hypgeom_li_point(z, offset=1)
+    li_api = api.eval_point_batch("hypgeom.arb_hypgeom_li", z, offset=1)
+    assert _allclose_or_tuple(li_api, li_direct)
+
+
+def test_acb_hypgeom_point_batch_uses_direct_point_kernels():
+    z = jnp.linspace(jnp.complex64(0.1 + 0.05j), jnp.complex64(0.4 + 0.2j), 4)
+    a = jnp.linspace(jnp.complex64(1.1 + 0.0j), jnp.complex64(1.3 + 0.1j), 4)
+
+    cases = [
+        ("hypgeom.acb_hypgeom_gamma", (a,), point_wrappers.acb_hypgeom_gamma_point(a)),
+        ("hypgeom.acb_hypgeom_erf", (z,), point_wrappers.acb_hypgeom_erf_point(z)),
+        ("hypgeom.acb_hypgeom_erfc", (z,), point_wrappers.acb_hypgeom_erfc_point(z)),
+        ("hypgeom.acb_hypgeom_erfi", (z,), point_wrappers.acb_hypgeom_erfi_point(z)),
+        ("hypgeom.acb_hypgeom_ei", (z,), point_wrappers.acb_hypgeom_ei_point(z)),
+        ("hypgeom.acb_hypgeom_si", (z,), point_wrappers.acb_hypgeom_si_point(z)),
+        ("hypgeom.acb_hypgeom_ci", (z,), point_wrappers.acb_hypgeom_ci_point(z)),
+        ("hypgeom.acb_hypgeom_shi", (z,), point_wrappers.acb_hypgeom_shi_point(z)),
+        ("hypgeom.acb_hypgeom_chi", (z,), point_wrappers.acb_hypgeom_chi_point(z)),
+        ("hypgeom.acb_hypgeom_li", (z,), point_wrappers.acb_hypgeom_li_point(z)),
+        ("hypgeom.acb_hypgeom_dilog", (z,), point_wrappers.acb_hypgeom_dilog_point(z)),
+        ("hypgeom.acb_hypgeom_fresnel", (z,), point_wrappers.acb_hypgeom_fresnel_point(z)),
+    ]
+    for name, args, direct in cases:
+        via_api = api.eval_point_batch(name, *args, dtype="float32", pad_to=8)
+        assert _allclose_or_tuple(via_api, direct, rtol=1e-5, atol=1e-5)
