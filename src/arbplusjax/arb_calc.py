@@ -24,6 +24,7 @@ from . import baseline_wrappers
 from . import checks
 from . import double_interval as di
 from . import elementary as el
+from . import kernel_helpers as kh
 
 jax.config.update("jax_enable_x64", True)
 
@@ -137,6 +138,18 @@ def _integrate_line_midpoint(a: jax.Array, b: jax.Array, integrand: str, n_steps
     return jnp.where(finite[..., None], out_interval, _full_interval_like(a))
 
 
+def _integrate_line_point_value(a: jax.Array, b: jax.Array, integrand: str, n_steps: int) -> jax.Array:
+    a = jnp.asarray(a)
+    b = jnp.asarray(b)
+    if n_steps <= 0:
+        n_steps = 1
+    delta = b - a
+    ts = (jnp.arange(n_steps, dtype=a.dtype) + jnp.asarray(0.5, dtype=a.dtype)) / jnp.asarray(n_steps, dtype=a.dtype)
+    xs = a + delta * ts
+    fx = _eval_integrand(xs, integrand)
+    return jnp.sum(fx) * delta / jnp.asarray(n_steps, dtype=a.dtype)
+
+
 def _integrate_line_interval(a: jax.Array, b: jax.Array, integrand: str, n_steps: int) -> jax.Array:
     a = di.as_interval(a)
     b = di.as_interval(b)
@@ -181,6 +194,11 @@ def arb_calc_integrate_line(a: jax.Array, b: jax.Array, integrand: str = "exp", 
 
 
 @partial(jax.jit, static_argnames=("integrand", "n_steps"))
+def arb_calc_integrate_line_point(a: jax.Array, b: jax.Array, integrand: str = "exp", n_steps: int = 64) -> jax.Array:
+    return _integrate_line_point_value(a, b, integrand, n_steps)
+
+
+@partial(jax.jit, static_argnames=("integrand", "n_steps"))
 def arb_calc_integrate_line_rigorous(a: jax.Array, b: jax.Array, integrand: str = "exp", n_steps: int = 64) -> jax.Array:
     coarse = _integrate_line_interval(a, b, integrand, n_steps)
     fine = _integrate_line_interval(a, b, integrand, max(1, n_steps * 2))
@@ -209,6 +227,31 @@ def arb_calc_integrate_line_batch(
     return jax.vmap(lambda ai, bi: arb_calc_integrate_line(ai, bi, integrand, n_steps))(a, b)
 
 
+@partial(jax.jit, static_argnames=("integrand", "n_steps"))
+def arb_calc_integrate_line_batch_fixed_point(
+    a: jax.Array,
+    b: jax.Array,
+    integrand: str = "exp",
+    n_steps: int = 64,
+) -> jax.Array:
+    a = jnp.asarray(a)
+    b = jnp.asarray(b)
+    return jax.vmap(lambda ai, bi: arb_calc_integrate_line_point(ai, bi, integrand, n_steps))(a, b)
+
+
+def arb_calc_integrate_line_batch_padded_point(
+    a: jax.Array,
+    b: jax.Array,
+    *,
+    pad_to: int,
+    integrand: str = "exp",
+    n_steps: int = 64,
+) -> jax.Array:
+    call_args, trim_n = kh.pad_mixed_batch_args_repeat_last((jnp.asarray(a), jnp.asarray(b)), pad_to=pad_to)
+    out = arb_calc_integrate_line_batch_fixed_point(*call_args, integrand=integrand, n_steps=n_steps)
+    return kh.trim_batch_out(out, trim_n)
+
+
 def arb_calc_integrate_line_batch_rigorous(
     a: jax.Array,
     b: jax.Array,
@@ -218,6 +261,29 @@ def arb_calc_integrate_line_batch_rigorous(
     a = di.as_interval(a)
     b = di.as_interval(b)
     return jax.vmap(lambda ai, bi: arb_calc_integrate_line_rigorous(ai, bi, integrand, n_steps))(a, b)
+
+
+@partial(jax.jit, static_argnames=("integrand", "n_steps"))
+def arb_calc_integrate_line_batch_fixed(
+    a: jax.Array,
+    b: jax.Array,
+    integrand: str = "exp",
+    n_steps: int = 64,
+) -> jax.Array:
+    return jax.vmap(lambda ai, bi: arb_calc_integrate_line(ai, bi, integrand, n_steps))(di.as_interval(a), di.as_interval(b))
+
+
+def arb_calc_integrate_line_batch_padded(
+    a: jax.Array,
+    b: jax.Array,
+    *,
+    pad_to: int,
+    integrand: str = "exp",
+    n_steps: int = 64,
+) -> jax.Array:
+    call_args, trim_n = kh.pad_mixed_batch_args_repeat_last((di.as_interval(a), di.as_interval(b)), pad_to=pad_to)
+    out = arb_calc_integrate_line_batch_fixed(*call_args, integrand=integrand, n_steps=n_steps)
+    return kh.trim_batch_out(out, trim_n)
 
 
 def arb_calc_integrate_line_batch_prec(
@@ -230,6 +296,56 @@ def arb_calc_integrate_line_batch_prec(
     return di.round_interval_outward(
         arb_calc_integrate_line_batch(a, b, integrand, n_steps), prec_bits
     )
+
+
+@partial(jax.jit, static_argnames=("integrand", "n_steps", "prec_bits"))
+def arb_calc_integrate_line_batch_fixed_prec(
+    a: jax.Array,
+    b: jax.Array,
+    integrand: str = "exp",
+    n_steps: int = 64,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return di.round_interval_outward(
+        arb_calc_integrate_line_batch_fixed(a, b, integrand=integrand, n_steps=n_steps), prec_bits
+    )
+
+
+def arb_calc_integrate_line_batch_padded_prec(
+    a: jax.Array,
+    b: jax.Array,
+    *,
+    pad_to: int,
+    integrand: str = "exp",
+    n_steps: int = 64,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    call_args, trim_n = kh.pad_mixed_batch_args_repeat_last((di.as_interval(a), di.as_interval(b)), pad_to=pad_to)
+    out = arb_calc_integrate_line_batch_fixed_prec(*call_args, integrand=integrand, n_steps=n_steps, prec_bits=prec_bits)
+    return kh.trim_batch_out(out, trim_n)
+
+
+@partial(jax.jit, static_argnames=("integrand", "n_steps"))
+def arb_calc_integrate_line_batch_fixed_rigorous(
+    a: jax.Array,
+    b: jax.Array,
+    integrand: str = "exp",
+    n_steps: int = 64,
+) -> jax.Array:
+    return jax.vmap(lambda ai, bi: arb_calc_integrate_line_rigorous(ai, bi, integrand, n_steps))(di.as_interval(a), di.as_interval(b))
+
+
+def arb_calc_integrate_line_batch_padded_rigorous(
+    a: jax.Array,
+    b: jax.Array,
+    *,
+    pad_to: int,
+    integrand: str = "exp",
+    n_steps: int = 64,
+) -> jax.Array:
+    call_args, trim_n = kh.pad_mixed_batch_args_repeat_last((di.as_interval(a), di.as_interval(b)), pad_to=pad_to)
+    out = arb_calc_integrate_line_batch_fixed_rigorous(*call_args, integrand=integrand, n_steps=n_steps)
+    return kh.trim_batch_out(out, trim_n)
 
 
 @partial(jax.jit, static_argnames=("parts",))
@@ -387,6 +503,10 @@ arb_calc_integrate_line_batch_jit = jax.jit(arb_calc_integrate_line_batch, stati
 arb_calc_integrate_line_batch_prec_jit = jax.jit(
     arb_calc_integrate_line_batch_prec, static_argnames=("integrand", "n_steps", "prec_bits")
 )
+arb_calc_integrate_line_batch_fixed_point_jit = arb_calc_integrate_line_batch_fixed_point
+arb_calc_integrate_line_batch_fixed_jit = arb_calc_integrate_line_batch_fixed
+arb_calc_integrate_line_batch_fixed_prec_jit = arb_calc_integrate_line_batch_fixed_prec
+arb_calc_integrate_line_batch_fixed_rigorous_jit = arb_calc_integrate_line_batch_fixed_rigorous
 arb_calc_partition_batch_jit = jax.jit(arb_calc_partition_batch, static_argnames=("parts",))
 arb_calc_partition_batch_prec_jit = jax.jit(
     arb_calc_partition_batch_prec, static_argnames=("parts", "prec_bits")
@@ -395,13 +515,26 @@ arb_calc_partition_batch_prec_jit = jax.jit(
 
 __all__ = [
     "arb_calc_integrate_line",
+    "arb_calc_integrate_line_point",
     "arb_calc_integrate_line_rigorous",
     "arb_calc_integrate_line_prec",
     "arb_calc_integrate_line_batch",
+    "arb_calc_integrate_line_batch_fixed_point",
+    "arb_calc_integrate_line_batch_padded_point",
+    "arb_calc_integrate_line_batch_fixed",
+    "arb_calc_integrate_line_batch_padded",
     "arb_calc_integrate_line_batch_rigorous",
+    "arb_calc_integrate_line_batch_fixed_rigorous",
+    "arb_calc_integrate_line_batch_padded_rigorous",
     "arb_calc_integrate_line_batch_prec",
+    "arb_calc_integrate_line_batch_fixed_prec",
+    "arb_calc_integrate_line_batch_padded_prec",
     "arb_calc_integrate_line_batch_jit",
     "arb_calc_integrate_line_batch_prec_jit",
+    "arb_calc_integrate_line_batch_fixed_point_jit",
+    "arb_calc_integrate_line_batch_fixed_jit",
+    "arb_calc_integrate_line_batch_fixed_prec_jit",
+    "arb_calc_integrate_line_batch_fixed_rigorous_jit",
     "arb_calc_partition",
     "arb_calc_partition_prec",
     "arb_calc_partition_batch",

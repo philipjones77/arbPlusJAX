@@ -144,28 +144,11 @@ def _scan_mpmath_names() -> Set[str]:
     return names
 
 
-def _scan_jax_scipy_special() -> Set[str]:
-    names: Set[str] = set()
-    try:
-        import jax.scipy.special as jsp  # type: ignore
-
-        for name in dir(jsp):
-            if name.startswith("_"):
-                continue
-            attr = getattr(jsp, name)
-            if callable(attr):
-                names.add(name)
-    except Exception:
-        pass
-    return names
-
-
 def main() -> None:
     c_names = _scan_c_headers()
     jax_defs = _scan_jax_defs()
     tests_text = _scan_tests_text()
     mpmath_names = _scan_mpmath_names()
-    jax_scipy_names = _scan_jax_scipy_special()
 
     jax_funcs = set(jax_defs.keys())
     c_missing = sorted(n for n in c_names if n not in jax_funcs)
@@ -207,18 +190,11 @@ def main() -> None:
         if len(overlap_mpmath) > 200:
             f.write(f"- ... ({len(overlap_mpmath)} total)\n")
 
-        f.write("\n## jax.scipy.special overlap\n\n")
-        overlap_jsp = sorted(n for n in jax_funcs if n in jax_scipy_names)
-        for name in overlap_jsp[:200]:
-            f.write(f"- {name}\n")
-        if len(overlap_jsp) > 200:
-            f.write(f"- ... ({len(overlap_jsp)} total)\n")
-
     # targets registry
     targets_csv = TESTS_ROOT / "targets.csv"
     with targets_csv.open("w", newline="", encoding="utf-8") as f:
         writer = csv.writer(f)
-        writer.writerow(["function", "module", "path", "in_c", "tested", "in_mpmath", "in_jax_scipy"])
+        writer.writerow(["function", "module", "path", "in_c", "tested", "in_mpmath"])
         for name in sorted(jax_funcs):
             jd = jax_defs[name]
             writer.writerow([
@@ -228,7 +204,6 @@ def main() -> None:
                 "yes" if name in c_names else "no",
                 "yes" if name in tested else "no",
                 "yes" if name in mpmath_names else "no",
-                "yes" if name in jax_scipy_names else "no",
             ])
 
     targets_md = TESTS_ROOT / "targets.md"

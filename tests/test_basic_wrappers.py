@@ -2,6 +2,7 @@ import jax
 import jax.numpy as jnp
 
 from arbplusjax import baseline_wrappers as bw
+from arbplusjax import arb_calc, acb_calc
 from arbplusjax import double_interval as di
 from arbplusjax import api
 from arbplusjax import double_gamma as bdg
@@ -218,6 +219,50 @@ def test_api_custom_complex_point_batch_uses_direct_point_kernels():
         _check(out.dtype == jnp.asarray(expected).dtype)
         _check(out.shape == jnp.asarray(expected).shape)
         _check(bool(jnp.allclose(out, expected, rtol=1e-4, atol=1e-4, equal_nan=True)))
+
+
+def test_api_calc_point_batch_uses_direct_point_kernels():
+    a = jnp.array([0.1, 0.2, 0.3], dtype=jnp.float32)
+    b = jnp.array([0.5, 0.6, 0.7], dtype=jnp.float32)
+    out = api.eval_point_batch("arb_calc_integrate_line", a, b, dtype="float32", pad_to=8, integrand="sin", n_steps=16)
+    expected = arb_calc.arb_calc_integrate_line_batch_fixed_point(a, b, integrand="sin", n_steps=16)
+    _check(out.dtype == expected.dtype)
+    _check(out.shape == expected.shape)
+    _check(bool(jnp.allclose(out, expected, rtol=1e-5, atol=1e-5, equal_nan=True)))
+
+    ac = jnp.array([0.1 + 0.05j, 0.2 + 0.1j, 0.3 + 0.15j], dtype=jnp.complex64)
+    bc = jnp.array([0.4 + 0.1j, 0.5 + 0.15j, 0.6 + 0.2j], dtype=jnp.complex64)
+    outc = api.eval_point_batch("acb_calc_integrate_line", ac, bc, dtype="float32", pad_to=8, integrand="exp", n_steps=16)
+    expectedc = acb_calc.acb_calc_integrate_line_batch_fixed_point(ac, bc, integrand="exp", n_steps=16)
+    _check(outc.dtype == expectedc.dtype)
+    _check(outc.shape == expectedc.shape)
+    _check(bool(jnp.allclose(outc, expectedc, rtol=1e-5, atol=1e-5, equal_nan=True)))
+
+
+def test_api_calc_interval_batch_fastpaths_match_direct_kernels():
+    a = di.interval(jnp.array([0.1, 0.2, 0.3], dtype=jnp.float32), jnp.array([0.15, 0.25, 0.35], dtype=jnp.float32))
+    b = di.interval(jnp.array([0.5, 0.6, 0.7], dtype=jnp.float32), jnp.array([0.55, 0.65, 0.75], dtype=jnp.float32))
+    basic = api.eval_interval_batch("arb_calc_integrate_line", a, b, mode="basic", dtype="float32", pad_to=8, integrand="exp", n_steps=16, prec_bits=53)
+    basic_expected = arb_calc.arb_calc_integrate_line_batch_padded_prec(a, b, pad_to=8, integrand="exp", n_steps=16, prec_bits=53)
+    _check(bool(jnp.allclose(basic, basic_expected, rtol=1e-5, atol=1e-5, equal_nan=True)))
+
+    rigorous = api.eval_interval_batch("arb_calc_integrate_line", a, b, mode="rigorous", dtype="float32", pad_to=8, integrand="exp", n_steps=16)
+    rigorous_expected = arb_calc.arb_calc_integrate_line_batch_padded_rigorous(a, b, pad_to=8, integrand="exp", n_steps=16)
+    _check(bool(jnp.allclose(rigorous, rigorous_expected, rtol=1e-5, atol=1e-5, equal_nan=True)))
+
+    re_lo = jnp.array([0.1, 0.2, 0.3], dtype=jnp.float32)
+    re_hi = re_lo + jnp.float32(0.05)
+    im_lo = jnp.array([0.0, 0.05, 0.1], dtype=jnp.float32)
+    im_hi = im_lo + jnp.float32(0.05)
+    ac = jnp.stack((re_lo, re_hi, im_lo, im_hi), axis=-1)
+    bc = jnp.stack((re_lo + 0.3, re_hi + 0.3, im_lo, im_hi), axis=-1)
+    cbasic = api.eval_interval_batch("acb_calc_integrate_line", ac, bc, mode="basic", dtype="float32", pad_to=8, integrand="sin", n_steps=16, prec_bits=53)
+    cbasic_expected = acb_calc.acb_calc_integrate_line_batch_padded_prec(ac, bc, pad_to=8, integrand="sin", n_steps=16, prec_bits=53)
+    _check(bool(jnp.allclose(cbasic, cbasic_expected, rtol=1e-5, atol=1e-5, equal_nan=True)))
+
+    crigorous = api.eval_interval_batch("acb_calc_integrate_line", ac, bc, mode="rigorous", dtype="float32", pad_to=8, integrand="sin", n_steps=16, prec_bits=53)
+    crigorous_expected = acb_calc.acb_calc_integrate_line_batch_padded_rigorous(ac, bc, pad_to=8, integrand="sin", n_steps=16, prec_bits=53)
+    _check(bool(jnp.allclose(crigorous, crigorous_expected, rtol=1e-5, atol=1e-5, equal_nan=True)))
 
 
 def test_api_barnes_family_point_batch_uses_direct_point_kernels():

@@ -30,8 +30,8 @@ Provenance:
 from functools import partial
 
 import jax
+from jax import lax
 import jax.numpy as jnp
-import jax.scipy.linalg as jsp_linalg
 
 from . import acb_core
 from . import checks
@@ -165,7 +165,13 @@ def jcb_mat_triangular_solve_point(
     a = jcb_mat_as_box_matrix(a)
     b = jcb_mat_as_box_vector(b)
     checks.check_equal(a.shape[-2], b.shape[-2], "jcb_mat.triangular_solve.inner")
-    x = jsp_linalg.solve_triangular(_jcb_mid_matrix(a), _jcb_mid_vector(b), lower=lower, unit_diagonal=unit_diagonal)
+    x = lax.linalg.triangular_solve(
+        _jcb_mid_matrix(a),
+        _jcb_mid_vector(b),
+        left_side=True,
+        lower=lower,
+        unit_diagonal=unit_diagonal,
+    )
     out = _jcb_point_box(x)
     finite = jnp.all(jnp.isfinite(jnp.real(x)) & jnp.isfinite(jnp.imag(x)), axis=-1)
     return jnp.where(finite[..., None, None], out, _full_box_like(out))
@@ -183,7 +189,13 @@ def jcb_mat_triangular_solve_basic(
 
 def jcb_mat_lu_point(a: jax.Array) -> tuple[jax.Array, jax.Array, jax.Array]:
     a = jcb_mat_as_box_matrix(a)
-    p, l, u = jsp_linalg.lu(_jcb_mid_matrix(a))
+    mid = _jcb_mid_matrix(a)
+    lu, _, perm = lax.linalg.lu(mid)
+    n = mid.shape[-1]
+    eye = jnp.eye(n, dtype=mid.dtype)
+    p = eye[perm]
+    l = jnp.tril(lu, k=-1) + eye
+    u = jnp.triu(lu)
     return _jcb_point_box(p), _jcb_point_box(l), _jcb_point_box(u)
 
 

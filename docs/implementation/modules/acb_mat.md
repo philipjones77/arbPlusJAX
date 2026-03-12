@@ -17,8 +17,10 @@ Implementation lives in the corresponding `*_wrappers.py` module and uses `impl=
   - `matmul`
   - `matvec`
   - `solve`
+  - `inv`
   - `triangular_solve`
   - `lu`
+  - `qr`
   - `det`
   - `trace`
 - legacy/specialized `2x2` determinant and trace entry points also remain present
@@ -35,9 +37,11 @@ Implementation lives in the corresponding `*_wrappers.py` module and uses `impl=
   - `acb_mat_matmul(a, b)` / `acb_mat_matmul_basic(a, b)`
   - `acb_mat_matvec(a, x)` / `acb_mat_matvec_basic(a, x)`
   - `acb_mat_solve(a, b)` / `acb_mat_solve_basic(a, b)`
+  - `acb_mat_inv(a)` / `acb_mat_inv_basic(a)`
   - `acb_mat_triangular_solve(a, b, lower=..., unit_diagonal=...)`
   - `acb_mat_triangular_solve_basic(a, b, lower=..., unit_diagonal=...)`
   - `acb_mat_lu(a)` / `acb_mat_lu_basic(a)`
+  - `acb_mat_qr(a)` / `acb_mat_qr_basic(a)`
   - `acb_mat_det(a)` / `acb_mat_det_basic(a)`
   - `acb_mat_trace(a)` / `acb_mat_trace_basic(a)`
   - `acb_mat_2x2_det(a)`
@@ -49,8 +53,10 @@ Implementation lives in the corresponding `*_wrappers.py` module and uses `impl=
 - matrix entries are interpreted as complex boxes
 - `matmul_basic` / `matvec_basic` use box arithmetic directly
 - `solve_basic` currently uses midpoint solve plus outward boxing
+- `inv_basic` currently uses midpoint inverse plus outward boxing
 - `triangular_solve_basic` currently uses midpoint triangular solve plus outward boxing
 - `lu_basic` currently uses midpoint LU plus outward boxing of `(P, L, U)`
+- `qr_basic` currently uses midpoint QR plus outward boxing of `(Q, R)`
 - `trace_basic` uses direct complex-box summation on the diagonal
 - `det_basic` uses exact complex-box formulas for `1x1`-`3x3`, then midpoint-plus-outward boxing fallback for larger sizes
 - `trace_rigorous` currently aliases the exact complex-box trace path

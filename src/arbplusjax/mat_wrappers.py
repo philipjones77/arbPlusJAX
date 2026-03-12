@@ -7,6 +7,8 @@ import jax
 
 from . import acb_mat
 from . import arb_mat
+from . import kernel_helpers as kh
+from . import point_wrappers
 from . import wrappers_common as wc
 
 jax.config.update("jax_enable_x64", True)
@@ -20,8 +22,14 @@ def _kernel_name(name: str) -> str:
     return name
 
 
+def _point_name(name: str) -> str:
+    kernel = _kernel_name(name)
+    return f"{kernel}_point"
+
+
 def _make_wrapper(name: str, base_fn: Callable[..., jax.Array], kernel_fn: Callable[..., jax.Array]) -> Callable[..., jax.Array]:
     is_acb = name.startswith("acb_")
+    point_fn = getattr(point_wrappers, _point_name(name), None)
 
     def rig_fn(*args, prec_bits: int, **kwargs):
         if is_acb:
@@ -51,10 +59,10 @@ def _make_wrapper(name: str, base_fn: Callable[..., jax.Array], kernel_fn: Calla
 
     def wrapper(*args, impl: str = "basic", dps: int | None = None, prec_bits: int | None = None, **kwargs):
         pb = wc.resolve_prec_bits(dps, prec_bits)
-        return wc.dispatch_mode(impl, base_fn, rig_fn, adapt_fn, is_acb, pb, args, kwargs)
+        return wc.dispatch_mode(impl, point_fn, base_fn, rig_fn, adapt_fn, is_acb, pb, args, kwargs)
 
     wrapper.__name__ = name.replace("_prec", "_mode")
-    wrapper.__doc__ = f"Mode-dispatched wrapper around {name}. impl: basic|rigorous|adaptive."
+    wrapper.__doc__ = f"Mode-dispatched wrapper around {name}. impl: point|basic|rigorous|adaptive."
     return wrapper
 
 
@@ -80,3 +88,46 @@ for _mod in (acb_mat, arb_mat):
         _wrapper = _make_wrapper(_name, _fn, kernel_fn)
         globals()[_wrapper.__name__] = _wrapper
         __all__.append(_wrapper.__name__)
+
+
+def _make_batch_mode_fixed(name: str) -> Callable[..., jax.Array]:
+    fn = globals()[f"{name}_mode"]
+
+    def wrapped(*args, impl: str = "basic", dps: int | None = None, prec_bits: int | None = None, **kwargs):
+        return fn(*args, impl=impl, dps=dps, prec_bits=prec_bits, **kwargs)
+
+    wrapped.__name__ = f"{name}_batch_mode_fixed"
+    return wrapped
+
+
+def _make_batch_mode_padded(name: str) -> Callable[..., jax.Array]:
+    fn = globals()[f"{name}_mode"]
+
+    def wrapped(*args, pad_to: int, impl: str = "basic", dps: int | None = None, prec_bits: int | None = None, **kwargs):
+        call_args, _ = kh.pad_mixed_batch_args_repeat_last(args, pad_to=pad_to)
+        return fn(*call_args, impl=impl, dps=dps, prec_bits=prec_bits, **kwargs)
+
+    wrapped.__name__ = f"{name}_batch_mode_padded"
+    return wrapped
+
+
+for _base in (
+    "arb_mat_matmul",
+    "arb_mat_matvec",
+    "arb_mat_matvec_cached_apply",
+    "arb_mat_det",
+    "arb_mat_trace",
+    "arb_mat_sqr",
+    "acb_mat_matmul",
+    "acb_mat_matvec",
+    "acb_mat_matvec_cached_apply",
+    "acb_mat_det",
+    "acb_mat_trace",
+    "acb_mat_sqr",
+):
+    _fixed = _make_batch_mode_fixed(_base)
+    _padded = _make_batch_mode_padded(_base)
+    globals()[_fixed.__name__] = _fixed
+    globals()[_padded.__name__] = _padded
+    __all__.append(_fixed.__name__)
+    __all__.append(_padded.__name__)

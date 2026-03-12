@@ -650,6 +650,8 @@ def _engineering_kernel_split(row: ImplementationEntry) -> str:
     name = row.preferred_public_name
     base = row.base_name
     module = row.module.lower()
+    if base.startswith("calc_integrate_line"):
+        return "shared_dispatch_separate_mode_kernels"
     if name.startswith(("bdg_", "shahen_")):
         return "shared_dispatch_separate_mode_kernels"
     if base in {"dirichlet_zeta", "dirichlet_eta"}:
@@ -695,6 +697,8 @@ def _engineering_helper_consolidation(row: ImplementationEntry) -> str:
     name = row.preferred_public_name
     base = row.base_name
     module = row.module.lower()
+    if base.startswith("calc_integrate_line"):
+        return "shared_helper_layer"
     if name.startswith(("bdg_", "shahen_")):
         return "partial"
     if name.startswith(("arb_hypgeom_", "acb_hypgeom_")):
@@ -741,6 +745,8 @@ def _engineering_helper_consolidation(row: ImplementationEntry) -> str:
 def _engineering_batch(row: ImplementationEntry) -> str:
     name = row.preferred_public_name
     base = row.base_name
+    if base.startswith("calc_integrate_line"):
+        return "fixed_shape_batch_available"
     if name.startswith("bdg_"):
         return "partial"
     if name.startswith("shahen_"):
@@ -802,6 +808,8 @@ def _engineering_batch(row: ImplementationEntry) -> str:
 def _engineering_ad(row: ImplementationEntry) -> str:
     name = row.preferred_public_name
     base = row.base_name
+    if base.startswith("calc_integrate_line"):
+        return "mixed"
     if name.startswith("bdg_"):
         return "partial"
     if name.startswith("shahen_"):
@@ -828,6 +836,8 @@ def _engineering_ad(row: ImplementationEntry) -> str:
 def _engineering_hardening(row: ImplementationEntry) -> str:
     base = row.base_name
     name = row.preferred_public_name
+    if base.startswith("calc_integrate_line"):
+        return "generic_or_mixed"
     if name.startswith(("bdg_", "shahen_")):
         return "partial"
     if base in {"dirichlet_zeta", "dirichlet_eta", "modular_j"}:

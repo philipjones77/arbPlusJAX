@@ -82,6 +82,7 @@ def _inflate_like_basic(basic, prec_bits: int, adaptive: bool, is_acb: bool):
 
 def dispatch_mode(
     impl: str,
+    point_fn: Callable[..., jax.Array] | None,
     base_fn: Callable[..., jax.Array],
     rig_fn: Callable[..., jax.Array] | None,
     adapt_fn: Callable[..., jax.Array] | None,
@@ -92,7 +93,11 @@ def dispatch_mode(
 ) -> jax.Array:
     if impl == "baseline":
         impl = "basic"
-    checks.check_in_set(impl, ("basic", "rigorous", "adaptive"), "wrappers_common.impl")
+    allowed = ("point", "basic", "rigorous", "adaptive") if point_fn is not None else ("basic", "rigorous", "adaptive")
+    checks.check_in_set(impl, allowed, "wrappers_common.impl")
+    if impl == "point":
+        checks.check(point_fn is not None, "wrappers_common.point_fn")
+        return point_fn(*args, **kwargs)
     if impl == "basic":
         return base_fn(*args, prec_bits=prec_bits, **kwargs)
     if impl == "rigorous":

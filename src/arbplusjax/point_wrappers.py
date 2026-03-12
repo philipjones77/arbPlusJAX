@@ -10,10 +10,12 @@ from . import acb_core
 from . import acb_dirichlet
 from . import acb_elliptic
 from . import acb_modular
+from . import checks
 from . import double_interval as di
 from . import hypgeom
 from . import elementary as el
 from . import kernel_helpers as kh
+from . import mat_common
 from .kernel_helpers import scalarize_binary_complex, scalarize_unary_complex, vmap_complex_scalar
 
 jax.config.update("jax_enable_x64", True)
@@ -64,6 +66,508 @@ def _fixed_unary_point(fn, x: jax.Array, **kwargs):
 def _padded_unary_point(fn, x: jax.Array, *, pad_to: int, **kwargs):
     call_args, _ = _pad_args_repeat_last((x,), pad_to)
     return fn(*call_args, **kwargs)
+
+
+def _arb_mat_point_matrix(a: jax.Array) -> jax.Array:
+    return di.midpoint(mat_common.as_interval_matrix(a, "point_wrappers.arb_mat_point_matrix"))
+
+
+def _arb_mat_point_vector(x: jax.Array) -> jax.Array:
+    return di.midpoint(mat_common.as_interval_vector(x, "point_wrappers.arb_mat_point_vector"))
+
+
+def _arb_mat_point_2x2(a: jax.Array) -> jax.Array:
+    return di.midpoint(mat_common.as_interval_mat_2x2(a, "point_wrappers.arb_mat_point_2x2"))
+
+
+def _acb_mat_point_matrix(a: jax.Array) -> jax.Array:
+    return acb_core.acb_midpoint(mat_common.as_box_matrix(a, "point_wrappers.acb_mat_point_matrix"))
+
+
+def _acb_mat_point_vector(x: jax.Array) -> jax.Array:
+    return acb_core.acb_midpoint(mat_common.as_box_vector(x, "point_wrappers.acb_mat_point_vector"))
+
+
+def _acb_mat_point_2x2(a: jax.Array) -> jax.Array:
+    return acb_core.acb_midpoint(mat_common.as_box_mat_2x2(a, "point_wrappers.acb_mat_point_2x2"))
+
+
+def _band_mask(rows: int, cols: int, lower_bandwidth: int, upper_bandwidth: int) -> jax.Array:
+    i = jnp.arange(rows)[:, None]
+    j = jnp.arange(cols)[None, :]
+    return (i - j <= lower_bandwidth) & (j - i <= upper_bandwidth)
+
+
+def arb_mat_zero_point(n: int, *, dtype: jnp.dtype = jnp.float64) -> jax.Array:
+    return jnp.zeros((n, n), dtype=dtype)
+
+
+def arb_mat_identity_point(n: int, *, dtype: jnp.dtype = jnp.float64) -> jax.Array:
+    return jnp.eye(n, dtype=dtype)
+
+
+@partial(jax.jit, static_argnames=())
+def arb_mat_matmul_point(a: jax.Array, b: jax.Array) -> jax.Array:
+    a_mid = _arb_mat_point_matrix(a)
+    b_mid = _arb_mat_point_matrix(b)
+    checks.check_equal(a_mid.shape[-1], b_mid.shape[-2], "point_wrappers.arb_mat_matmul_point.inner")
+    return jnp.matmul(a_mid, b_mid)
+
+
+@partial(jax.jit, static_argnames=())
+def arb_mat_matvec_point(a: jax.Array, x: jax.Array) -> jax.Array:
+    a_mid = _arb_mat_point_matrix(a)
+    x_mid = _arb_mat_point_vector(x)
+    checks.check_equal(a_mid.shape[-1], x_mid.shape[-1], "point_wrappers.arb_mat_matvec_point.inner")
+    return jnp.einsum("...ij,...j->...i", a_mid, x_mid)
+
+
+@partial(jax.jit, static_argnames=("lower_bandwidth", "upper_bandwidth"))
+def arb_mat_banded_matvec_point(a: jax.Array, x: jax.Array, *, lower_bandwidth: int, upper_bandwidth: int) -> jax.Array:
+    a_mid = _arb_mat_point_matrix(a)
+    x_mid = _arb_mat_point_vector(x)
+    checks.check_equal(a_mid.shape[-1], x_mid.shape[-1], "point_wrappers.arb_mat_banded_matvec_point.inner")
+    mask = _band_mask(a_mid.shape[-2], a_mid.shape[-1], lower_bandwidth, upper_bandwidth)
+    return jnp.einsum("...ij,...j->...i", jnp.where(mask, a_mid, jnp.zeros_like(a_mid)), x_mid)
+
+
+@partial(jax.jit, static_argnames=())
+def arb_mat_solve_point(a: jax.Array, b: jax.Array) -> jax.Array:
+    a_mid = _arb_mat_point_matrix(a)
+    b_mid = _arb_mat_point_vector(b)
+    checks.check_equal(a_mid.shape[-1], b_mid.shape[-1], "point_wrappers.arb_mat_solve_point.inner")
+    return jnp.linalg.solve(a_mid, b_mid)
+
+
+@partial(jax.jit, static_argnames=())
+def arb_mat_inv_point(a: jax.Array) -> jax.Array:
+    return jnp.linalg.inv(_arb_mat_point_matrix(a))
+
+
+@partial(jax.jit, static_argnames=())
+def arb_mat_det_point(a: jax.Array) -> jax.Array:
+    return jnp.linalg.det(_arb_mat_point_matrix(a))
+
+
+@partial(jax.jit, static_argnames=())
+def arb_mat_trace_point(a: jax.Array) -> jax.Array:
+    return jnp.trace(_arb_mat_point_matrix(a), axis1=-2, axis2=-1)
+
+
+@partial(jax.jit, static_argnames=())
+def arb_mat_norm_fro_point(a: jax.Array) -> jax.Array:
+    return jnp.linalg.norm(_arb_mat_point_matrix(a), ord="fro", axis=(-2, -1))
+
+
+@partial(jax.jit, static_argnames=())
+def arb_mat_norm_1_point(a: jax.Array) -> jax.Array:
+    return jnp.linalg.norm(_arb_mat_point_matrix(a), ord=1, axis=(-2, -1))
+
+
+@partial(jax.jit, static_argnames=())
+def arb_mat_norm_inf_point(a: jax.Array) -> jax.Array:
+    return jnp.linalg.norm(_arb_mat_point_matrix(a), ord=jnp.inf, axis=(-2, -1))
+
+
+@partial(jax.jit, static_argnames=("lower", "unit_diagonal"))
+def arb_mat_triangular_solve_point(a: jax.Array, b: jax.Array, *, lower: bool, unit_diagonal: bool = False) -> jax.Array:
+    a_mid = _arb_mat_point_matrix(a)
+    b_mid = _arb_mat_point_vector(b)
+    checks.check_equal(a_mid.shape[-1], b_mid.shape[-1], "point_wrappers.arb_mat_triangular_solve_point.inner")
+    return lax.linalg.triangular_solve(a_mid, b_mid, left_side=True, lower=lower, unit_diagonal=unit_diagonal)
+
+
+@partial(jax.jit, static_argnames=())
+def arb_mat_lu_point(a: jax.Array) -> tuple[jax.Array, jax.Array, jax.Array]:
+    a_mid = _arb_mat_point_matrix(a)
+    lu, _, perm = lax.linalg.lu(a_mid)
+    n = a_mid.shape[-1]
+    eye = jnp.eye(n, dtype=a_mid.dtype)
+    p = eye[perm]
+    l = jnp.tril(lu, k=-1) + eye
+    u = jnp.triu(lu)
+    return p, l, u
+
+
+@partial(jax.jit, static_argnames=())
+def arb_mat_qr_point(a: jax.Array) -> tuple[jax.Array, jax.Array]:
+    return jnp.linalg.qr(_arb_mat_point_matrix(a))
+
+
+@partial(jax.jit, static_argnames=())
+def arb_mat_2x2_det_point(a: jax.Array) -> jax.Array:
+    a_mid = _arb_mat_point_2x2(a)
+    return a_mid[..., 0, 0] * a_mid[..., 1, 1] - a_mid[..., 0, 1] * a_mid[..., 1, 0]
+
+
+@partial(jax.jit, static_argnames=())
+def arb_mat_2x2_trace_point(a: jax.Array) -> jax.Array:
+    a_mid = _arb_mat_point_2x2(a)
+    return a_mid[..., 0, 0] + a_mid[..., 1, 1]
+
+
+def arb_mat_2x2_det_batch_point(a: jax.Array) -> jax.Array:
+    return arb_mat_2x2_det_point(a)
+
+
+def arb_mat_2x2_trace_batch_point(a: jax.Array) -> jax.Array:
+    return arb_mat_2x2_trace_point(a)
+
+
+@partial(jax.jit, static_argnames=())
+def arb_mat_sqr_point(a: jax.Array) -> jax.Array:
+    a_mid = _arb_mat_point_matrix(a)
+    return jnp.matmul(a_mid, a_mid)
+
+
+def arb_mat_matmul_batch_fixed_point(a: jax.Array, b: jax.Array) -> jax.Array:
+    return arb_mat_matmul_point(a, b)
+
+
+def arb_mat_matmul_batch_padded_point(a: jax.Array, b: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((a, b), pad_to)
+    return arb_mat_matmul_point(*call_args)
+
+
+def arb_mat_matvec_batch_fixed_point(a: jax.Array, x: jax.Array) -> jax.Array:
+    return arb_mat_matvec_point(a, x)
+
+
+def arb_mat_matvec_batch_padded_point(a: jax.Array, x: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((a, x), pad_to)
+    return arb_mat_matvec_point(*call_args)
+
+
+def arb_mat_banded_matvec_batch_fixed_point(
+    a: jax.Array,
+    x: jax.Array,
+    *,
+    lower_bandwidth: int,
+    upper_bandwidth: int,
+) -> jax.Array:
+    return arb_mat_banded_matvec_point(a, x, lower_bandwidth=lower_bandwidth, upper_bandwidth=upper_bandwidth)
+
+
+def arb_mat_banded_matvec_batch_padded_point(
+    a: jax.Array,
+    x: jax.Array,
+    *,
+    pad_to: int,
+    lower_bandwidth: int,
+    upper_bandwidth: int,
+) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((a, x), pad_to)
+    return arb_mat_banded_matvec_point(*call_args, lower_bandwidth=lower_bandwidth, upper_bandwidth=upper_bandwidth)
+
+
+def arb_mat_det_batch_fixed_point(a: jax.Array) -> jax.Array:
+    return arb_mat_det_point(a)
+
+
+def arb_mat_det_batch_padded_point(a: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((a,), pad_to)
+    return arb_mat_det_point(*call_args)
+
+
+def arb_mat_trace_batch_fixed_point(a: jax.Array) -> jax.Array:
+    return arb_mat_trace_point(a)
+
+
+def arb_mat_trace_batch_padded_point(a: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((a,), pad_to)
+    return arb_mat_trace_point(*call_args)
+
+
+def arb_mat_sqr_batch_fixed_point(a: jax.Array) -> jax.Array:
+    return arb_mat_sqr_point(a)
+
+
+def arb_mat_sqr_batch_padded_point(a: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((a,), pad_to)
+    return arb_mat_sqr_point(*call_args)
+
+
+def arb_mat_norm_fro_batch_fixed_point(a: jax.Array) -> jax.Array:
+    return arb_mat_norm_fro_point(a)
+
+
+def arb_mat_norm_fro_batch_padded_point(a: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((a,), pad_to)
+    return arb_mat_norm_fro_point(*call_args)
+
+
+def arb_mat_norm_1_batch_fixed_point(a: jax.Array) -> jax.Array:
+    return arb_mat_norm_1_point(a)
+
+
+def arb_mat_norm_1_batch_padded_point(a: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((a,), pad_to)
+    return arb_mat_norm_1_point(*call_args)
+
+
+def arb_mat_norm_inf_batch_fixed_point(a: jax.Array) -> jax.Array:
+    return arb_mat_norm_inf_point(a)
+
+
+def arb_mat_norm_inf_batch_padded_point(a: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((a,), pad_to)
+    return arb_mat_norm_inf_point(*call_args)
+
+
+def arb_mat_matvec_cached_prepare_point(a: jax.Array) -> jax.Array:
+    return _arb_mat_point_matrix(a)
+
+
+@partial(jax.jit, static_argnames=())
+def arb_mat_matvec_cached_apply_point(cache: jax.Array, x: jax.Array) -> jax.Array:
+    x_mid = _arb_mat_point_vector(x)
+    checks.check_equal(cache.shape[-1], x_mid.shape[-1], "point_wrappers.arb_mat_matvec_cached_apply_point.inner")
+    return jnp.einsum("...ij,...j->...i", jnp.asarray(cache), x_mid)
+
+
+def arb_mat_matvec_cached_apply_batch_fixed_point(cache: jax.Array, x: jax.Array) -> jax.Array:
+    return arb_mat_matvec_cached_apply_point(cache, x)
+
+
+def arb_mat_matvec_cached_apply_batch_padded_point(cache: jax.Array, x: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((cache, x), pad_to)
+    return arb_mat_matvec_cached_apply_point(*call_args)
+
+
+@partial(jax.jit, static_argnames=())
+def acb_mat_matmul_point(a: jax.Array, b: jax.Array) -> jax.Array:
+    a_mid = _acb_mat_point_matrix(a)
+    b_mid = _acb_mat_point_matrix(b)
+    checks.check_equal(a_mid.shape[-1], b_mid.shape[-2], "point_wrappers.acb_mat_matmul_point.inner")
+    return jnp.matmul(a_mid, b_mid)
+
+
+@partial(jax.jit, static_argnames=())
+def acb_mat_matvec_point(a: jax.Array, x: jax.Array) -> jax.Array:
+    a_mid = _acb_mat_point_matrix(a)
+    x_mid = _acb_mat_point_vector(x)
+    checks.check_equal(a_mid.shape[-1], x_mid.shape[-1], "point_wrappers.acb_mat_matvec_point.inner")
+    return jnp.einsum("...ij,...j->...i", a_mid, x_mid)
+
+
+@partial(jax.jit, static_argnames=("lower_bandwidth", "upper_bandwidth"))
+def acb_mat_banded_matvec_point(a: jax.Array, x: jax.Array, *, lower_bandwidth: int, upper_bandwidth: int) -> jax.Array:
+    a_mid = _acb_mat_point_matrix(a)
+    x_mid = _acb_mat_point_vector(x)
+    checks.check_equal(a_mid.shape[-1], x_mid.shape[-1], "point_wrappers.acb_mat_banded_matvec_point.inner")
+    mask = _band_mask(a_mid.shape[-2], a_mid.shape[-1], lower_bandwidth, upper_bandwidth)
+    return jnp.einsum("...ij,...j->...i", jnp.where(mask, a_mid, jnp.zeros_like(a_mid)), x_mid)
+
+
+@partial(jax.jit, static_argnames=())
+def acb_mat_solve_point(a: jax.Array, b: jax.Array) -> jax.Array:
+    a_mid = _acb_mat_point_matrix(a)
+    b_mid = _acb_mat_point_vector(b)
+    checks.check_equal(a_mid.shape[-1], b_mid.shape[-1], "point_wrappers.acb_mat_solve_point.inner")
+    return jnp.linalg.solve(a_mid, b_mid)
+
+
+@partial(jax.jit, static_argnames=())
+def acb_mat_inv_point(a: jax.Array) -> jax.Array:
+    return jnp.linalg.inv(_acb_mat_point_matrix(a))
+
+
+@partial(jax.jit, static_argnames=())
+def acb_mat_det_point(a: jax.Array) -> jax.Array:
+    return jnp.linalg.det(_acb_mat_point_matrix(a))
+
+
+@partial(jax.jit, static_argnames=())
+def acb_mat_trace_point(a: jax.Array) -> jax.Array:
+    return jnp.trace(_acb_mat_point_matrix(a), axis1=-2, axis2=-1)
+
+
+@partial(jax.jit, static_argnames=("lower", "unit_diagonal"))
+def acb_mat_triangular_solve_point(a: jax.Array, b: jax.Array, *, lower: bool, unit_diagonal: bool = False) -> jax.Array:
+    a_mid = _acb_mat_point_matrix(a)
+    b_mid = _acb_mat_point_vector(b)
+    checks.check_equal(a_mid.shape[-1], b_mid.shape[-1], "point_wrappers.acb_mat_triangular_solve_point.inner")
+    return lax.linalg.triangular_solve(a_mid, b_mid, left_side=True, lower=lower, unit_diagonal=unit_diagonal)
+
+
+@partial(jax.jit, static_argnames=())
+def acb_mat_lu_point(a: jax.Array) -> tuple[jax.Array, jax.Array, jax.Array]:
+    a_mid = _acb_mat_point_matrix(a)
+    lu, _, perm = lax.linalg.lu(a_mid)
+    n = a_mid.shape[-1]
+    eye = jnp.eye(n, dtype=a_mid.dtype)
+    p = eye[perm]
+    l = jnp.tril(lu, k=-1) + eye
+    u = jnp.triu(lu)
+    return p, l, u
+
+
+@partial(jax.jit, static_argnames=())
+def acb_mat_qr_point(a: jax.Array) -> tuple[jax.Array, jax.Array]:
+    return jnp.linalg.qr(_acb_mat_point_matrix(a))
+
+
+@partial(jax.jit, static_argnames=())
+def acb_mat_2x2_det_point(a: jax.Array) -> jax.Array:
+    a_mid = _acb_mat_point_2x2(a)
+    return a_mid[..., 0, 0] * a_mid[..., 1, 1] - a_mid[..., 0, 1] * a_mid[..., 1, 0]
+
+
+@partial(jax.jit, static_argnames=())
+def acb_mat_2x2_trace_point(a: jax.Array) -> jax.Array:
+    a_mid = _acb_mat_point_2x2(a)
+    return a_mid[..., 0, 0] + a_mid[..., 1, 1]
+
+
+def acb_mat_2x2_det_batch_point(a: jax.Array) -> jax.Array:
+    return acb_mat_2x2_det_point(a)
+
+
+def acb_mat_2x2_trace_batch_point(a: jax.Array) -> jax.Array:
+    return acb_mat_2x2_trace_point(a)
+
+
+@partial(jax.jit, static_argnames=())
+def acb_mat_sqr_point(a: jax.Array) -> jax.Array:
+    a_mid = _acb_mat_point_matrix(a)
+    return jnp.matmul(a_mid, a_mid)
+
+
+def acb_mat_matmul_batch_fixed_point(a: jax.Array, b: jax.Array) -> jax.Array:
+    return acb_mat_matmul_point(a, b)
+
+
+def acb_mat_matmul_batch_padded_point(a: jax.Array, b: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((a, b), pad_to)
+    return acb_mat_matmul_point(*call_args)
+
+
+def acb_mat_matvec_batch_fixed_point(a: jax.Array, x: jax.Array) -> jax.Array:
+    return acb_mat_matvec_point(a, x)
+
+
+def acb_mat_matvec_batch_padded_point(a: jax.Array, x: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((a, x), pad_to)
+    return acb_mat_matvec_point(*call_args)
+
+
+def acb_mat_banded_matvec_batch_fixed_point(
+    a: jax.Array,
+    x: jax.Array,
+    *,
+    lower_bandwidth: int,
+    upper_bandwidth: int,
+) -> jax.Array:
+    return acb_mat_banded_matvec_point(a, x, lower_bandwidth=lower_bandwidth, upper_bandwidth=upper_bandwidth)
+
+
+def acb_mat_banded_matvec_batch_padded_point(
+    a: jax.Array,
+    x: jax.Array,
+    *,
+    pad_to: int,
+    lower_bandwidth: int,
+    upper_bandwidth: int,
+) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((a, x), pad_to)
+    return acb_mat_banded_matvec_point(*call_args, lower_bandwidth=lower_bandwidth, upper_bandwidth=upper_bandwidth)
+
+
+def acb_mat_det_batch_fixed_point(a: jax.Array) -> jax.Array:
+    return acb_mat_det_point(a)
+
+
+def acb_mat_det_batch_padded_point(a: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((a,), pad_to)
+    return acb_mat_det_point(*call_args)
+
+
+def acb_mat_trace_batch_fixed_point(a: jax.Array) -> jax.Array:
+    return acb_mat_trace_point(a)
+
+
+def acb_mat_trace_batch_padded_point(a: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((a,), pad_to)
+    return acb_mat_trace_point(*call_args)
+
+
+def acb_mat_sqr_batch_fixed_point(a: jax.Array) -> jax.Array:
+    return acb_mat_sqr_point(a)
+
+
+def acb_mat_sqr_batch_padded_point(a: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((a,), pad_to)
+    return acb_mat_sqr_point(*call_args)
+
+
+def acb_mat_matvec_cached_prepare_point(a: jax.Array) -> jax.Array:
+    return _acb_mat_point_matrix(a)
+
+
+@partial(jax.jit, static_argnames=())
+def acb_mat_matvec_cached_apply_point(cache: jax.Array, x: jax.Array) -> jax.Array:
+    x_mid = _acb_mat_point_vector(x)
+    checks.check_equal(cache.shape[-1], x_mid.shape[-1], "point_wrappers.acb_mat_matvec_cached_apply_point.inner")
+    return jnp.einsum("...ij,...j->...i", jnp.asarray(cache), x_mid)
+
+
+def acb_mat_matvec_cached_apply_batch_fixed_point(cache: jax.Array, x: jax.Array) -> jax.Array:
+    return acb_mat_matvec_cached_apply_point(cache, x)
+
+
+def acb_mat_matvec_cached_apply_batch_padded_point(cache: jax.Array, x: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((cache, x), pad_to)
+    return acb_mat_matvec_cached_apply_point(*call_args)
+
+
+def acb_mat_zero_point(n: int, *, dtype: jnp.dtype = jnp.float64) -> jax.Array:
+    return jnp.zeros((n, n), dtype=jnp.result_type(dtype, jnp.complex64))
+
+
+def acb_mat_identity_point(n: int, *, dtype: jnp.dtype = jnp.float64) -> jax.Array:
+    return jnp.eye(n, dtype=jnp.result_type(dtype, jnp.complex64))
+
+
+@partial(jax.jit, static_argnames=())
+def acb_mat_norm_fro_point(a: jax.Array) -> jax.Array:
+    return jnp.linalg.norm(_acb_mat_point_matrix(a), ord="fro", axis=(-2, -1))
+
+
+@partial(jax.jit, static_argnames=())
+def acb_mat_norm_1_point(a: jax.Array) -> jax.Array:
+    return jnp.linalg.norm(_acb_mat_point_matrix(a), ord=1, axis=(-2, -1))
+
+
+@partial(jax.jit, static_argnames=())
+def acb_mat_norm_inf_point(a: jax.Array) -> jax.Array:
+    return jnp.linalg.norm(_acb_mat_point_matrix(a), ord=jnp.inf, axis=(-2, -1))
+
+
+def acb_mat_norm_fro_batch_fixed_point(a: jax.Array) -> jax.Array:
+    return acb_mat_norm_fro_point(a)
+
+
+def acb_mat_norm_fro_batch_padded_point(a: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((a,), pad_to)
+    return acb_mat_norm_fro_point(*call_args)
+
+
+def acb_mat_norm_1_batch_fixed_point(a: jax.Array) -> jax.Array:
+    return acb_mat_norm_1_point(a)
+
+
+def acb_mat_norm_1_batch_padded_point(a: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((a,), pad_to)
+    return acb_mat_norm_1_point(*call_args)
+
+
+def acb_mat_norm_inf_batch_fixed_point(a: jax.Array) -> jax.Array:
+    return acb_mat_norm_inf_point(a)
+
+
+def acb_mat_norm_inf_batch_padded_point(a: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((a,), pad_to)
+    return acb_mat_norm_inf_point(*call_args)
 
 
 def _real_laguerre_l_scalar(n: int, m: jax.Array, x: jax.Array) -> jax.Array:
@@ -1820,17 +2324,101 @@ __all__ = [
     "acb_log1p_point",
     "acb_expm1_point",
     "acb_sin_cos_point",
-    "arb_gamma_point",
-    "arb_erf_point",
-    "arb_erfc_point",
-    "arb_bessel_j_point",
-    "arb_bessel_y_point",
-    "arb_bessel_i_point",
-    "arb_bessel_k_point",
+        "arb_gamma_point",
+        "arb_erf_point",
+        "arb_erfc_point",
+        "arb_bessel_j_point",
+        "arb_bessel_y_point",
+        "arb_bessel_i_point",
+        "arb_bessel_k_point",
+        "arb_mat_matmul_point",
+        "arb_mat_matvec_point",
+        "arb_mat_banded_matvec_point",
+        "arb_mat_solve_point",
+        "arb_mat_inv_point",
+        "arb_mat_det_point",
+        "arb_mat_trace_point",
+        "arb_mat_triangular_solve_point",
+        "arb_mat_lu_point",
+        "arb_mat_qr_point",
+        "arb_mat_2x2_det_point",
+        "arb_mat_2x2_trace_point",
+        "arb_mat_2x2_det_batch_point",
+        "arb_mat_2x2_trace_batch_point",
+        "acb_mat_matmul_point",
+        "acb_mat_matvec_point",
+        "acb_mat_banded_matvec_point",
+        "acb_mat_solve_point",
+        "acb_mat_inv_point",
+        "acb_mat_det_point",
+        "acb_mat_trace_point",
+        "acb_mat_triangular_solve_point",
+        "acb_mat_lu_point",
+        "acb_mat_qr_point",
+        "acb_mat_2x2_det_point",
+        "acb_mat_2x2_trace_point",
+        "acb_mat_2x2_det_batch_point",
+        "acb_mat_2x2_trace_batch_point",
 ]
 
 __all__.extend(
     [
+        "arb_mat_zero_point",
+        "arb_mat_identity_point",
+        "arb_mat_sqr_point",
+        "arb_mat_matmul_batch_fixed_point",
+        "arb_mat_matmul_batch_padded_point",
+        "arb_mat_matvec_batch_fixed_point",
+        "arb_mat_matvec_batch_padded_point",
+        "arb_mat_banded_matvec_batch_fixed_point",
+        "arb_mat_banded_matvec_batch_padded_point",
+        "arb_mat_det_batch_fixed_point",
+        "arb_mat_det_batch_padded_point",
+        "arb_mat_trace_batch_fixed_point",
+        "arb_mat_trace_batch_padded_point",
+        "arb_mat_sqr_batch_fixed_point",
+        "arb_mat_sqr_batch_padded_point",
+        "arb_mat_norm_fro_point",
+        "arb_mat_norm_1_point",
+        "arb_mat_norm_inf_point",
+        "arb_mat_norm_fro_batch_fixed_point",
+        "arb_mat_norm_fro_batch_padded_point",
+        "arb_mat_norm_1_batch_fixed_point",
+        "arb_mat_norm_1_batch_padded_point",
+        "arb_mat_norm_inf_batch_fixed_point",
+        "arb_mat_norm_inf_batch_padded_point",
+        "arb_mat_matvec_cached_prepare_point",
+        "arb_mat_matvec_cached_apply_point",
+        "arb_mat_matvec_cached_apply_batch_fixed_point",
+        "arb_mat_matvec_cached_apply_batch_padded_point",
+        "acb_mat_zero_point",
+        "acb_mat_identity_point",
+        "acb_mat_sqr_point",
+        "acb_mat_matmul_batch_fixed_point",
+        "acb_mat_matmul_batch_padded_point",
+        "acb_mat_matvec_batch_fixed_point",
+        "acb_mat_matvec_batch_padded_point",
+        "acb_mat_banded_matvec_batch_fixed_point",
+        "acb_mat_banded_matvec_batch_padded_point",
+        "acb_mat_det_batch_fixed_point",
+        "acb_mat_det_batch_padded_point",
+        "acb_mat_trace_batch_fixed_point",
+        "acb_mat_trace_batch_padded_point",
+        "acb_mat_sqr_batch_fixed_point",
+        "acb_mat_sqr_batch_padded_point",
+        "acb_mat_norm_fro_point",
+        "acb_mat_norm_1_point",
+        "acb_mat_norm_inf_point",
+        "acb_mat_norm_fro_batch_fixed_point",
+        "acb_mat_norm_fro_batch_padded_point",
+        "acb_mat_norm_1_batch_fixed_point",
+        "acb_mat_norm_1_batch_padded_point",
+        "acb_mat_norm_inf_batch_fixed_point",
+        "acb_mat_norm_inf_batch_padded_point",
+        "acb_mat_matvec_cached_prepare_point",
+        "acb_mat_matvec_cached_apply_point",
+        "acb_mat_matvec_cached_apply_batch_fixed_point",
+        "acb_mat_matvec_cached_apply_batch_padded_point",
         "arb_sinh_cosh_point",
         "arb_sin_pi_point",
         "arb_cos_pi_point",

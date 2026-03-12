@@ -100,6 +100,33 @@ def test_nxn_matmul_matvec_solve():
     _check(bool(jnp.allclose(acb_core.acb_midpoint(sol), x_mid)))
 
 
+def test_nxn_matvec_cached_and_sqr():
+    a = jnp.array(
+        [
+            [[1.0, 1.0, 0.0, 0.0], [2.0, 2.0, 1.0, 1.0], [0.0, 0.0, 0.0, 0.0]],
+            [[0.0, 0.0, 0.0, 0.0], [3.0, 3.0, 0.0, 0.0], [1.0, 1.0, -1.0, -1.0]],
+            [[0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0], [4.0, 4.0, 0.0, 0.0]],
+        ],
+        dtype=jnp.float64,
+    )
+    x = jnp.array(
+        [[1.0, 1.0, 0.0, 0.0], [2.0, 2.0, -1.0, -1.0], [3.0, 3.0, 1.0, 1.0]],
+        dtype=jnp.float64,
+    )
+
+    cache = acb_mat.acb_mat_matvec_cached_prepare(a)
+    mv = acb_mat.acb_mat_matvec_cached_apply_jit(cache, x)
+    sq = acb_mat.acb_mat_sqr_jit(a)
+
+    a_mid = acb_core.acb_midpoint(a)
+    x_mid = acb_core.acb_midpoint(x)
+
+    _check(mv.shape == (3, 4))
+    _check(sq.shape == (3, 3, 4))
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(mv), a_mid @ x_mid)))
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(sq), a_mid @ a_mid)))
+
+
 def test_nxn_triangular_solve_and_lu():
     a = jnp.array(
         [
@@ -128,6 +155,31 @@ def test_nxn_triangular_solve_and_lu():
     _check(bool(jnp.allclose(acb_core.acb_midpoint(p) @ a_mid, acb_core.acb_midpoint(l) @ acb_core.acb_midpoint(u))))
 
 
+def test_nxn_inv_and_qr():
+    a = jnp.array(
+        [
+            [[2.0, 2.0, 0.0, 0.0], [1.0, 1.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0]],
+            [[0.0, 0.0, 1.0, 1.0], [3.0, 3.0, 0.0, 0.0], [1.0, 1.0, 0.0, 0.0]],
+            [[1.0, 1.0, -1.0, -1.0], [0.0, 0.0, 0.0, 0.0], [4.0, 4.0, 0.5, 0.5]],
+        ],
+        dtype=jnp.float64,
+    )
+
+    inv = acb_mat.acb_mat_inv_jit(a)
+    q, r = acb_mat.acb_mat_qr_jit(a)
+
+    a_mid = acb_core.acb_midpoint(a)
+    inv_mid = jnp.linalg.inv(a_mid)
+    q_mid, r_mid = jnp.linalg.qr(a_mid)
+
+    _check(inv.shape == (3, 3, 4))
+    _check(q.shape == (3, 3, 4))
+    _check(r.shape == (3, 3, 4))
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(inv), inv_mid)))
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(q), q_mid)))
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(r), r_mid)))
+
+
 def test_nxn_det_and_trace():
     a = jnp.array(
         [
@@ -152,3 +204,30 @@ def test_nxn_det_and_trace():
     _check(bool(jnp.allclose(acb_core.acb_midpoint(det_basic), jnp.linalg.det(a_mid))))
     _check(bool(jnp.allclose(acb_core.acb_midpoint(tr_point), jnp.trace(a_mid))))
     _check(bool(jnp.allclose(acb_core.acb_midpoint(tr_basic), jnp.trace(a_mid))))
+
+
+def test_norms_and_batch_helpers():
+    a = jnp.array(
+        [
+            [[2.0, 2.0, 0.0, 0.0], [1.0, 1.0, -1.0, -1.0], [0.0, 0.0, 0.5, 0.5]],
+            [[-1.0, -1.0, 0.5, 0.5], [3.0, 3.0, 0.0, 0.0], [2.0, 2.0, -0.5, -0.5]],
+            [[0.5, 0.5, 1.0, 1.0], [0.0, 0.0, 0.0, 0.0], [4.0, 4.0, 0.0, 0.0]],
+        ],
+        dtype=jnp.float64,
+    )
+    batch = jnp.stack([a, a + 1.0], axis=0)
+    mid = acb_core.acb_midpoint(a)
+
+    eye = acb_mat.acb_mat_identity(3)
+    zeros = acb_mat.acb_mat_zero(3)
+    fro = acb_mat.acb_mat_norm_fro(a)
+    one = acb_mat.acb_mat_norm_1(a)
+    infn = acb_mat.acb_mat_norm_inf(a)
+    batch_fro = acb_mat.acb_mat_norm_fro_batch_fixed(batch)
+
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(eye), jnp.eye(3, dtype=mid.dtype))))
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(zeros), jnp.zeros((3, 3), dtype=mid.dtype))))
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(fro), jnp.linalg.norm(mid, ord="fro"))))
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(one), jnp.linalg.norm(mid, ord=1))))
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(infn), jnp.linalg.norm(mid, ord=jnp.inf))))
+    _check(batch_fro.shape == (2, 4))
