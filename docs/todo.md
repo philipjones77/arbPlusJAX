@@ -3,6 +3,7 @@ Last updated: 2026-03-01T00:00:00Z
 # TODO
 
 ## Recent updates
+- Added a new top-priority roadmap workstream for the general incomplete-tail acceleration engine, incomplete Bessel specialization, and explicit derivative/AD support; demoted multivariate Bessel below that dependency chain.
 - Added asymptotic bessel evaluation + tightened bessel bounds (rigorous/adaptive) with denser sampling; basic mode uses midpoint evaluation; ran warmup bessel benchmarks (5000 samples).
 - Added JAX batch warmup timing option (`--jax-warmup`) and cached batch JITs for single-compile runs.
 - Added loggamma comparison tool with real/complex + branch-cut stress tests; included jax.scipy (real-only).
@@ -14,6 +15,31 @@ Last updated: 2026-03-01T00:00:00Z
 - Added `boost_hypgeom` module with Boost-prefixed hypergeometric APIs and helper aliases in four modes (`point|basic|rigorous|adaptive`), with docs and tests.
 
 ## Open items
+- Major workstream: incomplete-tail acceleration and incomplete Bessel roadmap
+  - priority order:
+    - Phase 1: clean public API layer, capability registry, and stable-vs-experimental metadata for function families
+    - Phase 2: general Slevinsky-Safouhi-style tail-acceleration engine with diagnostics, region logic, NumPy reference path, and JAX-parallel API
+    - Phase 3: incomplete Bessel specialization on top of the generic tail engine, with recurrence, quadrature, asymptotic, and mp fallback modes
+    - Phase 4: explicit derivative formulas and AD-safe custom JVP/VJP rules for incomplete Bessel and related tail families
+    - Phase 5: extensions to incomplete gamma / Laplace-Bessel / hypergeometric tails, then multivariate Bessel only after the scalar incomplete infrastructure is in place
+  - API and metadata deliverables:
+    - define arbPlusJAX as the low-level special-function backend with a clean public API surface
+    - add family metadata for methods, regimes, derivative status, and stable vs experimental entry points
+    - expose future stable entry points such as `tail_integral(...)`, `tail_integral_accelerated(...)`, `incomplete_bessel_k(...)`, `incomplete_bessel_i(...)`, and derivative wrappers
+  - general tail-acceleration engine:
+    - add `src/arbplusjax/special/tail_acceleration/{core,quadrature,sequence,recurrence,regions,diagnostics,fallback_mp}.py`
+    - implement a generic tail-integral problem abstraction with integrand callback, lower limit, recurrence metadata, derivative metadata, and regime metadata
+    - support evaluation modes `quadrature`, `aitken`, `wynn`, `recurrence`, `mpfallback`, and `auto`
+    - add reusable ratio-recurrence support and non-optional diagnostics for chosen method, step counts, remainder estimates, instability flags, and fallback usage
+  - incomplete Bessel specialization:
+    - add `src/arbplusjax/special/bessel/{incomplete_bessel_base,incomplete_bessel_k,incomplete_bessel_i,recurrences,derivatives,asymptotics,regions,fallback_mp}.py`
+    - prioritize incomplete `K`-type objects, then incomplete `I`-type objects and related weighted Laplace-Bessel tails
+    - dispatch `method=\"auto\"` among `recurrence`, `quadrature`, `asymptotic`, and `mpfallback`
+    - add explicit fragile-region detection for cancellation, transition zones, mixed large-order/large-argument scaling, and unstable recurrence coefficients
+  - testing and benchmarks:
+    - add tail-engine tests for exponential, Gaussian, damped oscillatory, and incomplete-gamma-type tails
+    - add incomplete-Bessel tests for quadrature parity, recurrence parity, asymptotic parity, fallback correctness, and derivative consistency
+    - benchmark plain quadrature vs sequence acceleration vs recurrence vs mp fallback, with environment headers retained in notebooks and reports
 - Continue completing missing JAX implementations and tests for remaining Arb modules (see Missing C implementations section below).
 - Finish hardening and characterization of the `bdg_*` Barnes/double-gamma family:
   - point path is implemented and dtype-cleaned, but still needs dedicated optimization/benchmark characterization

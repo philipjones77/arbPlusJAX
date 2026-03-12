@@ -10,6 +10,10 @@ from jax import lax
 import jax.numpy as jnp
 
 from . import acb_core
+from . import acb_calc
+from . import arb_calc
+from . import arb_mat
+from . import acb_mat
 from . import baseline_wrappers
 from . import boost_hypgeom
 from . import cubesselk
@@ -17,6 +21,7 @@ from . import double_gamma
 from . import double_interval as di
 from . import hypgeom
 from . import hypgeom_wrappers
+from . import mat_wrappers
 from .kernel_helpers import (
     mixed_batch_size_or_none,
     pad_batch_args,
@@ -24,6 +29,22 @@ from .kernel_helpers import (
     trim_batch_out,
 )
 from . import point_wrappers
+from .public_metadata import PublicFunctionMetadata, build_public_metadata_registry
+from .special.tail_acceleration import (
+    TailDerivativeMetadata,
+    TailEvaluationDiagnostics,
+    TailIntegralProblem,
+    TailRatioRecurrence,
+    TailRegimeMetadata,
+    evaluate_tail_integral,
+)
+from .special.bessel import (
+    incomplete_bessel_k as _incomplete_bessel_k_impl,
+    incomplete_bessel_k_argument_derivative,
+    incomplete_bessel_k_derivative,
+    incomplete_bessel_k_lower_limit_derivative,
+    incomplete_bessel_k_point as _incomplete_bessel_k_point_impl,
+)
 
 # Public API for optimized calls.
 # - eval_point: point-only kernels (fastest, no bounds)
@@ -152,6 +173,28 @@ _DIRECT_INTERVAL_BASIC_BATCH_FASTPATHS = {
     "boost_hyp2f1_pade": (boost_hypgeom.boost_hyp2f1_series_batch_fixed_prec, boost_hypgeom.boost_hyp2f1_series_batch_padded_prec),
     "boost_hyp2f1_rational": (boost_hypgeom.boost_hyp2f1_series_batch_fixed_prec, boost_hypgeom.boost_hyp2f1_series_batch_padded_prec),
     "boost_hypergeometric_pfq": (boost_hypgeom.boost_hypergeometric_pfq_batch_fixed_prec, boost_hypgeom.boost_hypergeometric_pfq_batch_padded_prec),
+    "arb_calc_integrate_line": (arb_calc.arb_calc_integrate_line_batch_fixed_prec, arb_calc.arb_calc_integrate_line_batch_padded_prec),
+    "arb_calc.arb_calc_integrate_line": (arb_calc.arb_calc_integrate_line_batch_fixed_prec, arb_calc.arb_calc_integrate_line_batch_padded_prec),
+    "acb_calc_integrate_line": (acb_calc.acb_calc_integrate_line_batch_fixed_prec, acb_calc.acb_calc_integrate_line_batch_padded_prec),
+    "acb_calc.acb_calc_integrate_line": (acb_calc.acb_calc_integrate_line_batch_fixed_prec, acb_calc.acb_calc_integrate_line_batch_padded_prec),
+    "arb_mat_matmul": (arb_mat.arb_mat_matmul_batch_fixed_prec, arb_mat.arb_mat_matmul_batch_padded_prec),
+    "arb_mat_matvec": (arb_mat.arb_mat_matvec_batch_fixed_prec, arb_mat.arb_mat_matvec_batch_padded_prec),
+    "arb_mat_matvec_cached_apply": (arb_mat.arb_mat_matvec_cached_apply_batch_fixed_prec, arb_mat.arb_mat_matvec_cached_apply_batch_padded_prec),
+    "arb_mat_det": (arb_mat.arb_mat_det_batch_fixed_prec, arb_mat.arb_mat_det_batch_padded_prec),
+    "arb_mat_trace": (arb_mat.arb_mat_trace_batch_fixed_prec, arb_mat.arb_mat_trace_batch_padded_prec),
+    "arb_mat_sqr": (arb_mat.arb_mat_sqr_batch_fixed_prec, arb_mat.arb_mat_sqr_batch_padded_prec),
+    "arb_mat_norm_fro": (arb_mat.arb_mat_norm_fro_batch_fixed_prec, arb_mat.arb_mat_norm_fro_batch_padded_prec),
+    "arb_mat_norm_1": (arb_mat.arb_mat_norm_1_batch_fixed_prec, arb_mat.arb_mat_norm_1_batch_padded_prec),
+    "arb_mat_norm_inf": (arb_mat.arb_mat_norm_inf_batch_fixed_prec, arb_mat.arb_mat_norm_inf_batch_padded_prec),
+    "acb_mat_matmul": (acb_mat.acb_mat_matmul_batch_fixed_prec, acb_mat.acb_mat_matmul_batch_padded_prec),
+    "acb_mat_matvec": (acb_mat.acb_mat_matvec_batch_fixed_prec, acb_mat.acb_mat_matvec_batch_padded_prec),
+    "acb_mat_matvec_cached_apply": (acb_mat.acb_mat_matvec_cached_apply_batch_fixed_prec, acb_mat.acb_mat_matvec_cached_apply_batch_padded_prec),
+    "acb_mat_det": (acb_mat.acb_mat_det_batch_fixed_prec, acb_mat.acb_mat_det_batch_padded_prec),
+    "acb_mat_trace": (acb_mat.acb_mat_trace_batch_fixed_prec, acb_mat.acb_mat_trace_batch_padded_prec),
+    "acb_mat_sqr": (acb_mat.acb_mat_sqr_batch_fixed_prec, acb_mat.acb_mat_sqr_batch_padded_prec),
+    "acb_mat_norm_fro": (acb_mat.acb_mat_norm_fro_batch_fixed_prec, acb_mat.acb_mat_norm_fro_batch_padded_prec),
+    "acb_mat_norm_1": (acb_mat.acb_mat_norm_1_batch_fixed_prec, acb_mat.acb_mat_norm_1_batch_padded_prec),
+    "acb_mat_norm_inf": (acb_mat.acb_mat_norm_inf_batch_fixed_prec, acb_mat.acb_mat_norm_inf_batch_padded_prec),
 }
 
 _DIRECT_INTERVAL_MODE_BATCH_FASTPATHS = {
@@ -172,6 +215,28 @@ _DIRECT_INTERVAL_MODE_BATCH_FASTPATHS = {
     "boost_hyp2f1_pade": (boost_hypgeom.boost_hyp2f1_series_batch_mode_fixed, boost_hypgeom.boost_hyp2f1_series_batch_mode_padded),
     "boost_hyp2f1_rational": (boost_hypgeom.boost_hyp2f1_series_batch_mode_fixed, boost_hypgeom.boost_hyp2f1_series_batch_mode_padded),
     "boost_hypergeometric_pfq": (boost_hypgeom.boost_hypergeometric_pfq_batch_mode_fixed, boost_hypgeom.boost_hypergeometric_pfq_batch_mode_padded),
+    "arb_calc_integrate_line": (arb_calc.arb_calc_integrate_line_batch_fixed_rigorous, arb_calc.arb_calc_integrate_line_batch_padded_rigorous),
+    "arb_calc.arb_calc_integrate_line": (arb_calc.arb_calc_integrate_line_batch_fixed_rigorous, arb_calc.arb_calc_integrate_line_batch_padded_rigorous),
+    "acb_calc_integrate_line": (acb_calc.acb_calc_integrate_line_batch_fixed_rigorous, acb_calc.acb_calc_integrate_line_batch_padded_rigorous),
+    "acb_calc.acb_calc_integrate_line": (acb_calc.acb_calc_integrate_line_batch_fixed_rigorous, acb_calc.acb_calc_integrate_line_batch_padded_rigorous),
+    "arb_mat_matmul": (mat_wrappers.arb_mat_matmul_batch_fixed_mode, mat_wrappers.arb_mat_matmul_batch_padded_mode),
+    "arb_mat_matvec": (mat_wrappers.arb_mat_matvec_batch_fixed_mode, mat_wrappers.arb_mat_matvec_batch_padded_mode),
+    "arb_mat_matvec_cached_apply": (mat_wrappers.arb_mat_matvec_cached_apply_batch_fixed_mode, mat_wrappers.arb_mat_matvec_cached_apply_batch_padded_mode),
+    "arb_mat_det": (mat_wrappers.arb_mat_det_batch_fixed_mode, mat_wrappers.arb_mat_det_batch_padded_mode),
+    "arb_mat_trace": (mat_wrappers.arb_mat_trace_batch_fixed_mode, mat_wrappers.arb_mat_trace_batch_padded_mode),
+    "arb_mat_sqr": (mat_wrappers.arb_mat_sqr_batch_fixed_mode, mat_wrappers.arb_mat_sqr_batch_padded_mode),
+    "arb_mat_norm_fro": (mat_wrappers.arb_mat_norm_fro_batch_fixed_mode, mat_wrappers.arb_mat_norm_fro_batch_padded_mode),
+    "arb_mat_norm_1": (mat_wrappers.arb_mat_norm_1_batch_fixed_mode, mat_wrappers.arb_mat_norm_1_batch_padded_mode),
+    "arb_mat_norm_inf": (mat_wrappers.arb_mat_norm_inf_batch_fixed_mode, mat_wrappers.arb_mat_norm_inf_batch_padded_mode),
+    "acb_mat_matmul": (mat_wrappers.acb_mat_matmul_batch_fixed_mode, mat_wrappers.acb_mat_matmul_batch_padded_mode),
+    "acb_mat_matvec": (mat_wrappers.acb_mat_matvec_batch_fixed_mode, mat_wrappers.acb_mat_matvec_batch_padded_mode),
+    "acb_mat_matvec_cached_apply": (mat_wrappers.acb_mat_matvec_cached_apply_batch_fixed_mode, mat_wrappers.acb_mat_matvec_cached_apply_batch_padded_mode),
+    "acb_mat_det": (mat_wrappers.acb_mat_det_batch_fixed_mode, mat_wrappers.acb_mat_det_batch_padded_mode),
+    "acb_mat_trace": (mat_wrappers.acb_mat_trace_batch_fixed_mode, mat_wrappers.acb_mat_trace_batch_padded_mode),
+    "acb_mat_sqr": (mat_wrappers.acb_mat_sqr_batch_fixed_mode, mat_wrappers.acb_mat_sqr_batch_padded_mode),
+    "acb_mat_norm_fro": (mat_wrappers.acb_mat_norm_fro_batch_fixed_mode, mat_wrappers.acb_mat_norm_fro_batch_padded_mode),
+    "acb_mat_norm_1": (mat_wrappers.acb_mat_norm_1_batch_fixed_mode, mat_wrappers.acb_mat_norm_1_batch_padded_mode),
+    "acb_mat_norm_inf": (mat_wrappers.acb_mat_norm_inf_batch_fixed_mode, mat_wrappers.acb_mat_norm_inf_batch_padded_mode),
 }
 
 def _mid_arb_batch(fn: Callable) -> Callable:
@@ -267,6 +332,10 @@ _DIRECT_POINT_BATCH_FASTPATHS = {
     "shahen_log_normalizeddoublegamma": (double_gamma.bdg_log_normalizeddoublegamma_batch_fixed_point, double_gamma.bdg_log_normalizeddoublegamma_batch_padded_point),
     "shahen_normalizeddoublegamma": (double_gamma.bdg_normalizeddoublegamma_batch_fixed_point, double_gamma.bdg_normalizeddoublegamma_batch_padded_point),
     "shahen_double_sine": (double_gamma.bdg_double_sine_batch_fixed_point, double_gamma.bdg_double_sine_batch_padded_point),
+    "arb_calc_integrate_line": (arb_calc.arb_calc_integrate_line_batch_fixed_point, arb_calc.arb_calc_integrate_line_batch_padded_point),
+    "arb_calc.arb_calc_integrate_line": (arb_calc.arb_calc_integrate_line_batch_fixed_point, arb_calc.arb_calc_integrate_line_batch_padded_point),
+    "acb_calc_integrate_line": (acb_calc.acb_calc_integrate_line_batch_fixed_point, acb_calc.acb_calc_integrate_line_batch_padded_point),
+    "acb_calc.acb_calc_integrate_line": (acb_calc.acb_calc_integrate_line_batch_fixed_point, acb_calc.acb_calc_integrate_line_batch_padded_point),
 }
 
 
@@ -446,7 +515,7 @@ def _maybe_direct_interval_batch_fastpath(
         kwargs = {"prec_bits": prec_bits} if prec_bits is not None else {}
     elif mode in ("adaptive", "rigorous"):
         mapping = _DIRECT_INTERVAL_MODE_BATCH_FASTPATHS
-        kwargs = {"impl": mode}
+        kwargs = {}
         if prec_bits is not None:
             kwargs["prec_bits"] = prec_bits
     else:
@@ -455,6 +524,15 @@ def _maybe_direct_interval_batch_fastpath(
     if pair is None:
         return None
     fixed_fn, padded_fn = pair
+    if mode in ("adaptive", "rigorous"):
+        try:
+            params = inspect.signature(fixed_fn).parameters
+        except Exception:
+            params = {}
+        if "impl" in params:
+            kwargs["impl"] = mode
+        elif mode == "adaptive":
+            return None
     if extra_kwargs:
         kwargs.update(extra_kwargs)
     batch_n = mixed_batch_size_or_none(args)
@@ -594,8 +672,89 @@ _POINT_FUNCS = {
     "bessely": point_wrappers.arb_bessel_y_point,
     "besseli": point_wrappers.arb_bessel_i_point,
     "besselk": point_wrappers.arb_bessel_k_point,
+    "incomplete_bessel_k": _incomplete_bessel_k_point_impl,
     "cuda_besselk": cubesselk.cuda_besselk_point,
+    "arb_calc_integrate_line": arb_calc.arb_calc_integrate_line_point,
+    "acb_calc_integrate_line": acb_calc.acb_calc_integrate_line_point,
+    "arb_calc.arb_calc_integrate_line": arb_calc.arb_calc_integrate_line_point,
+    "acb_calc.acb_calc_integrate_line": acb_calc.acb_calc_integrate_line_point,
 }
+
+_POINT_FUNCS.update(
+    {
+        "arb_mat_matmul": point_wrappers.arb_mat_matmul_point,
+        "arb_mat_zero": point_wrappers.arb_mat_zero_point,
+        "arb_mat_identity": point_wrappers.arb_mat_identity_point,
+        "arb_mat_matvec": point_wrappers.arb_mat_matvec_point,
+        "arb_mat_matvec_cached_prepare": point_wrappers.arb_mat_matvec_cached_prepare_point,
+        "arb_mat_matvec_cached_apply": point_wrappers.arb_mat_matvec_cached_apply_point,
+        "arb_mat_solve": point_wrappers.arb_mat_solve_point,
+        "arb_mat_inv": point_wrappers.arb_mat_inv_point,
+        "arb_mat_sqr": point_wrappers.arb_mat_sqr_point,
+        "arb_mat_det": point_wrappers.arb_mat_det_point,
+        "arb_mat_trace": point_wrappers.arb_mat_trace_point,
+        "arb_mat_norm_fro": point_wrappers.arb_mat_norm_fro_point,
+        "arb_mat_norm_1": point_wrappers.arb_mat_norm_1_point,
+        "arb_mat_norm_inf": point_wrappers.arb_mat_norm_inf_point,
+        "arb_mat_triangular_solve": point_wrappers.arb_mat_triangular_solve_point,
+        "arb_mat_lu": point_wrappers.arb_mat_lu_point,
+        "arb_mat_qr": point_wrappers.arb_mat_qr_point,
+        "arb_mat_2x2_det": point_wrappers.arb_mat_2x2_det_point,
+        "arb_mat_2x2_trace": point_wrappers.arb_mat_2x2_trace_point,
+        "arb_mat_2x2_det_batch": point_wrappers.arb_mat_2x2_det_batch_point,
+        "arb_mat_2x2_trace_batch": point_wrappers.arb_mat_2x2_trace_batch_point,
+        "acb_mat_matmul": point_wrappers.acb_mat_matmul_point,
+        "acb_mat_zero": point_wrappers.acb_mat_zero_point,
+        "acb_mat_identity": point_wrappers.acb_mat_identity_point,
+        "acb_mat_matvec": point_wrappers.acb_mat_matvec_point,
+        "acb_mat_matvec_cached_prepare": point_wrappers.acb_mat_matvec_cached_prepare_point,
+        "acb_mat_matvec_cached_apply": point_wrappers.acb_mat_matvec_cached_apply_point,
+        "acb_mat_solve": point_wrappers.acb_mat_solve_point,
+        "acb_mat_inv": point_wrappers.acb_mat_inv_point,
+        "acb_mat_sqr": point_wrappers.acb_mat_sqr_point,
+        "acb_mat_det": point_wrappers.acb_mat_det_point,
+        "acb_mat_trace": point_wrappers.acb_mat_trace_point,
+        "acb_mat_norm_fro": point_wrappers.acb_mat_norm_fro_point,
+        "acb_mat_norm_1": point_wrappers.acb_mat_norm_1_point,
+        "acb_mat_norm_inf": point_wrappers.acb_mat_norm_inf_point,
+        "acb_mat_triangular_solve": point_wrappers.acb_mat_triangular_solve_point,
+        "acb_mat_lu": point_wrappers.acb_mat_lu_point,
+        "acb_mat_qr": point_wrappers.acb_mat_qr_point,
+        "acb_mat_2x2_det": point_wrappers.acb_mat_2x2_det_point,
+        "acb_mat_2x2_trace": point_wrappers.acb_mat_2x2_trace_point,
+        "acb_mat_2x2_det_batch": point_wrappers.acb_mat_2x2_det_batch_point,
+        "acb_mat_2x2_trace_batch": point_wrappers.acb_mat_2x2_trace_batch_point,
+    }
+)
+
+_DIRECT_POINT_BATCH_FASTPATHS.update(
+    {
+        "arb_mat_matmul": (point_wrappers.arb_mat_matmul_batch_fixed_point, point_wrappers.arb_mat_matmul_batch_padded_point),
+        "arb_mat_matvec": (point_wrappers.arb_mat_matvec_batch_fixed_point, point_wrappers.arb_mat_matvec_batch_padded_point),
+        "arb_mat_matvec_cached_apply": (
+            point_wrappers.arb_mat_matvec_cached_apply_batch_fixed_point,
+            point_wrappers.arb_mat_matvec_cached_apply_batch_padded_point,
+        ),
+        "arb_mat_det": (point_wrappers.arb_mat_det_batch_fixed_point, point_wrappers.arb_mat_det_batch_padded_point),
+        "arb_mat_trace": (point_wrappers.arb_mat_trace_batch_fixed_point, point_wrappers.arb_mat_trace_batch_padded_point),
+        "arb_mat_sqr": (point_wrappers.arb_mat_sqr_batch_fixed_point, point_wrappers.arb_mat_sqr_batch_padded_point),
+        "arb_mat_norm_fro": (point_wrappers.arb_mat_norm_fro_batch_fixed_point, point_wrappers.arb_mat_norm_fro_batch_padded_point),
+        "arb_mat_norm_1": (point_wrappers.arb_mat_norm_1_batch_fixed_point, point_wrappers.arb_mat_norm_1_batch_padded_point),
+        "arb_mat_norm_inf": (point_wrappers.arb_mat_norm_inf_batch_fixed_point, point_wrappers.arb_mat_norm_inf_batch_padded_point),
+        "acb_mat_matmul": (point_wrappers.acb_mat_matmul_batch_fixed_point, point_wrappers.acb_mat_matmul_batch_padded_point),
+        "acb_mat_matvec": (point_wrappers.acb_mat_matvec_batch_fixed_point, point_wrappers.acb_mat_matvec_batch_padded_point),
+        "acb_mat_matvec_cached_apply": (
+            point_wrappers.acb_mat_matvec_cached_apply_batch_fixed_point,
+            point_wrappers.acb_mat_matvec_cached_apply_batch_padded_point,
+        ),
+        "acb_mat_det": (point_wrappers.acb_mat_det_batch_fixed_point, point_wrappers.acb_mat_det_batch_padded_point),
+        "acb_mat_trace": (point_wrappers.acb_mat_trace_batch_fixed_point, point_wrappers.acb_mat_trace_batch_padded_point),
+        "acb_mat_sqr": (point_wrappers.acb_mat_sqr_batch_fixed_point, point_wrappers.acb_mat_sqr_batch_padded_point),
+        "acb_mat_norm_fro": (point_wrappers.acb_mat_norm_fro_batch_fixed_point, point_wrappers.acb_mat_norm_fro_batch_padded_point),
+        "acb_mat_norm_1": (point_wrappers.acb_mat_norm_1_batch_fixed_point, point_wrappers.acb_mat_norm_1_batch_padded_point),
+        "acb_mat_norm_inf": (point_wrappers.acb_mat_norm_inf_batch_fixed_point, point_wrappers.acb_mat_norm_inf_batch_padded_point),
+    }
+)
 
 for _name, _fn in _POINT_FUNCS.items():
     _DIRECT_POINT_BATCH_FASTPATHS.setdefault(_name, _fn)
@@ -672,6 +831,10 @@ for _name, _entry in _HYPGEOM_POINT_BATCH_ALIASES.items():
     _DIRECT_POINT_BATCH_FASTPATHS[f"hypgeom.{_name}"] = _entry
 
 
+# Use the generic vmapped batch path for scalar incomplete-tail kernels.
+_DIRECT_POINT_BATCH_FASTPATHS.pop("incomplete_bessel_k", None)
+
+
 _INTERVAL_FUNCS = {
     "exp": baseline_wrappers.arb_exp_mp,
     "log": baseline_wrappers.arb_log_mp,
@@ -701,6 +864,7 @@ _INTERVAL_FUNCS = {
     "bessely": baseline_wrappers.arb_bessel_y_mp,
     "besseli": baseline_wrappers.arb_bessel_i_mp,
     "besselk": baseline_wrappers.arb_bessel_k_mp,
+    "incomplete_bessel_k": _incomplete_bessel_k_impl,
     "cuda_besselk": cubesselk.cuda_besselk,
 }
 
@@ -735,6 +899,7 @@ _MODULE_NAMES = (
     "hypgeom",
     "mag",
     "partitions",
+    "special.bessel",
     "shahen_double_gamma",
 )
 
@@ -1211,6 +1376,13 @@ __all__ = [
     "eval_interval",
     "eval_interval_batch",
     "eval_interval_batch_chunked",
+    "tail_integral",
+    "tail_integral_accelerated",
+    "incomplete_bessel_k",
+    "incomplete_bessel_k_batch",
+    "incomplete_bessel_k_derivative",
+    "incomplete_bessel_k_argument_derivative",
+    "incomplete_bessel_k_lower_limit_derivative",
     "bind_point",
     "bind_point_batch",
     "bind_interval",
@@ -1221,6 +1393,14 @@ __all__ = [
     "list_public_functions",
     "list_point_functions",
     "list_interval_functions",
+    "get_public_function_metadata",
+    "list_public_function_metadata",
+    "PublicFunctionMetadata",
+    "TailDerivativeMetadata",
+    "TailEvaluationDiagnostics",
+    "TailIntegralProblem",
+    "TailRatioRecurrence",
+    "TailRegimeMetadata",
 ]
 
 
@@ -1236,6 +1416,126 @@ def list_public_functions() -> list[str]:
     return list(_PUBLIC_FUNC_NAMES())
 
 
+def tail_integral(
+    integrand_or_problem,
+    lower_limit: jax.Array | float | None = None,
+    *,
+    panel_width: float = 0.25,
+    max_panels: int = 128,
+    samples_per_panel: int = 32,
+    return_diagnostics: bool = False,
+) -> jax.Array | tuple[jax.Array, TailEvaluationDiagnostics]:
+    problem = _coerce_tail_problem(
+        integrand_or_problem,
+        lower_limit=lower_limit,
+        panel_width=panel_width,
+        max_panels=max_panels,
+        samples_per_panel=samples_per_panel,
+    )
+    return evaluate_tail_integral(problem, method="quadrature", return_diagnostics=return_diagnostics)
+
+
+def tail_integral_accelerated(
+    integrand_or_problem,
+    lower_limit: jax.Array | float | None = None,
+    *,
+    method: str = "auto",
+    panel_width: float = 0.25,
+    max_panels: int = 128,
+    samples_per_panel: int = 32,
+    recurrence: TailRatioRecurrence | None = None,
+    derivative_metadata: TailDerivativeMetadata | None = None,
+    regime_metadata: TailRegimeMetadata | None = None,
+    return_diagnostics: bool = False,
+) -> jax.Array | tuple[jax.Array, TailEvaluationDiagnostics]:
+    problem = _coerce_tail_problem(
+        integrand_or_problem,
+        lower_limit=lower_limit,
+        panel_width=panel_width,
+        max_panels=max_panels,
+        samples_per_panel=samples_per_panel,
+        recurrence=recurrence,
+        derivative_metadata=derivative_metadata,
+        regime_metadata=regime_metadata,
+    )
+    return evaluate_tail_integral(problem, method=method, return_diagnostics=return_diagnostics)
+
+
+def incomplete_bessel_k(
+    nu,
+    z,
+    lower_limit,
+    *,
+    mode: str = "point",
+    prec_bits: int | None = None,
+    dps: int | None = None,
+    method: str = "quadrature",
+    panel_width: float = 0.125,
+    max_panels: int = 160,
+    samples_per_panel: int = 24,
+    return_diagnostics: bool = False,
+):
+    return _incomplete_bessel_k_impl(
+        nu,
+        z,
+        lower_limit,
+        mode=mode,
+        prec_bits=prec_bits,
+        dps=dps,
+        method=method,
+        panel_width=panel_width,
+        max_panels=max_panels,
+        samples_per_panel=samples_per_panel,
+        return_diagnostics=return_diagnostics,
+    )
+
+
+def incomplete_bessel_k_batch(
+    nu,
+    z,
+    lower_limit,
+    *,
+    mode: str = "point",
+    prec_bits: int | None = None,
+    dps: int | None = None,
+    method: str = "quadrature",
+    panel_width: float = 0.125,
+    max_panels: int = 160,
+    samples_per_panel: int = 24,
+):
+    fn = lambda a, b, c: incomplete_bessel_k(
+        a,
+        b,
+        c,
+        mode=mode,
+        prec_bits=prec_bits,
+        dps=dps,
+        method=method,
+        panel_width=panel_width,
+        max_panels=max_panels,
+        samples_per_panel=samples_per_panel,
+    )
+    return jax.vmap(fn)(nu, z, lower_limit)
+
+
+def get_public_function_metadata(name: str) -> PublicFunctionMetadata:
+    registry = _PUBLIC_METADATA_REGISTRY()
+    return _require(registry, name)
+
+
+def list_public_function_metadata(
+    *,
+    family: str | None = None,
+    stability: str | None = None,
+) -> list[PublicFunctionMetadata]:
+    entries = list(_PUBLIC_METADATA_REGISTRY().values())
+    if family is not None:
+        entries = [entry for entry in entries if entry.family == family]
+    if stability is not None:
+        entries = [entry for entry in entries if entry.stability == stability]
+    return sorted(entries, key=lambda entry: entry.name)
+
+
 _POINT_FUNC_NAMES = tuple(sorted(_POINT_FUNCS.keys()))
 _INTERVAL_FUNC_NAMES = tuple(sorted(_INTERVAL_FUNCS.keys()))
 
@@ -1243,3 +1543,49 @@ _INTERVAL_FUNC_NAMES = tuple(sorted(_INTERVAL_FUNCS.keys()))
 @lru_cache(maxsize=1)
 def _PUBLIC_FUNC_NAMES() -> tuple[str, ...]:
     return tuple(sorted(_public_registry().keys()))
+
+
+@lru_cache(maxsize=1)
+def _PUBLIC_METADATA_REGISTRY() -> dict[str, PublicFunctionMetadata]:
+    combined_registry = dict(_public_registry())
+    combined_registry.update(_INTERVAL_FUNCS)
+    combined_registry.update(_POINT_FUNCS)
+    combined_registry["tail_integral"] = tail_integral
+    combined_registry["tail_integral_accelerated"] = tail_integral_accelerated
+    combined_registry["incomplete_bessel_k"] = incomplete_bessel_k
+    combined_registry["incomplete_bessel_k_batch"] = incomplete_bessel_k_batch
+    combined_registry["incomplete_bessel_k_derivative"] = incomplete_bessel_k_derivative
+    combined_registry["incomplete_bessel_k_argument_derivative"] = incomplete_bessel_k_argument_derivative
+    combined_registry["incomplete_bessel_k_lower_limit_derivative"] = incomplete_bessel_k_lower_limit_derivative
+    return build_public_metadata_registry(
+        combined_registry,
+        point_names=set(_POINT_FUNC_NAMES),
+        interval_names=set(_INTERVAL_FUNC_NAMES),
+    )
+
+
+def _coerce_tail_problem(
+    integrand_or_problem,
+    *,
+    lower_limit: jax.Array | float | None,
+    panel_width: float,
+    max_panels: int,
+    samples_per_panel: int,
+    recurrence: TailRatioRecurrence | None = None,
+    derivative_metadata: TailDerivativeMetadata | None = None,
+    regime_metadata: TailRegimeMetadata | None = None,
+) -> TailIntegralProblem:
+    if isinstance(integrand_or_problem, TailIntegralProblem):
+        return integrand_or_problem
+    if lower_limit is None:
+        raise ValueError("lower_limit is required when passing a raw integrand.")
+    return TailIntegralProblem(
+        integrand=integrand_or_problem,
+        lower_limit=lower_limit,
+        panel_width=panel_width,
+        max_panels=max_panels,
+        samples_per_panel=samples_per_panel,
+        recurrence=recurrence,
+        derivative_metadata=derivative_metadata or TailDerivativeMetadata(),
+        regime_metadata=regime_metadata or TailRegimeMetadata(),
+    )
