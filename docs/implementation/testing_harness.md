@@ -241,6 +241,42 @@ So the harness is already structured to compare:
 
 Boost and Mathematica are optional overlays on top of that core stack.
 
+## Local source installs
+
+The standard local source-install prefix in this workspace is:
+
+```bash
+~/.local/opt/arbplusjax_refs
+```
+
+Current subpaths:
+
+- `~/.local/opt/arbplusjax_refs/flint/current`
+- `~/.local/opt/arbplusjax_refs/boost/current`
+
+The repository bootstrap for tests, benchmarks, and notebooks now auto-discovers that prefix and exports:
+
+- `ARBPLUSJAX_REF_PREFIX`
+- `FLINT_ROOT`
+- `BOOST_ROOT`
+- `BOOST_INCLUDEDIR`
+- `BOOST_LIBRARYDIR`
+- `BOOST_REF_CMD`
+- `WOLFRAM_LINUX_DIR`
+
+Manual shell bootstrap remains available:
+
+```bash
+source tools/source_reference_env.sh
+```
+
+Important distinction:
+
+- `flint_install` means the FLINT/Arb source install is present.
+- `arb_flint_c_ref` means the repo's separate C reference adapter layer is present.
+
+Those are related but not identical. The elementary/core notebook reports both so that an installed FLINT tree is visible even if the older C adapter path is absent.
+
 ## Local vs cloud Mathematica
 
 The repo should treat Mathematica availability as:

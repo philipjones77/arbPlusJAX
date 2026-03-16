@@ -15,12 +15,18 @@ from typing import Any
 import numpy as np
 import platform
 
+from tools.reference_backends import apply_reference_env
 from tools.runtime_manifest import collect_runtime_manifest
 from tools.runtime_manifest import write_runtime_manifest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+SRC_ROOT = REPO_ROOT / "src"
+if str(SRC_ROOT) not in sys.path:
+    sys.path.insert(0, str(SRC_ROOT))
 if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
+    sys.path.insert(1, str(REPO_ROOT))
+
+apply_reference_env(REPO_ROOT)
 
 
 def _maybe_add_repo(path: str | None) -> None:
@@ -51,6 +57,7 @@ def _auto_detect_c_ref_dir(repo_root: Path) -> Path | None:
             return p
 
     candidates = [
+        repo_root / "stuff" / "migration" / "c_chassis" / "build_linux_wsl",
         repo_root / "stuff" / "migration" / "c_chassis" / "build",
     ]
 

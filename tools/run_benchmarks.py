@@ -6,6 +6,13 @@ import subprocess
 import sys
 from pathlib import Path
 
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from tools.reference_backends import apply_reference_env
+from tools.reference_backends import default_boost_ref_cmd
+
 
 def _default_c_ref_dir(repo_root: Path) -> str:
     env = os.getenv("ARB_C_REF_DIR", "")
@@ -14,30 +21,13 @@ def _default_c_ref_dir(repo_root: Path) -> str:
     candidates = [
         repo_root.parent / "flint" / "build",
         repo_root.parent / "arb" / "build",
+        repo_root / "stuff" / "migration" / "c_chassis" / "build_linux_wsl",
         repo_root / "stuff" / "migration" / "c_chassis" / "build",
     ]
     for path in candidates:
         if path.exists():
             return str(path)
     return ""
-
-
-def _default_boost_ref_cmd(repo_root: Path) -> str:
-    if os.name == "nt":
-        wrapper = repo_root / "tools" / "run_boost_ref_adapter.ps1"
-        if wrapper.exists():
-            return f'powershell -ExecutionPolicy Bypass -File "{wrapper}"'
-    else:
-        wrapper = repo_root / "tools" / "run_boost_ref_adapter.sh"
-        if wrapper.exists():
-            return str(wrapper)
-
-    adapter = repo_root / "benchmarks" / "boost_ref_adapter.py"
-    if adapter.exists():
-        return f'{sys.executable} "{adapter}"'
-    return ""
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(
         description="Run arbPlusJAX benchmark sweeps with optional external baselines."
@@ -66,6 +56,7 @@ def main() -> int:
     args = parser.parse_args()
 
     repo_root = Path(__file__).resolve().parents[1]
+    apply_reference_env(repo_root)
     harness = repo_root / "benchmarks" / "bench_harness.py"
     cmd = [sys.executable, str(harness), "--seed", str(args.seed)]
 
@@ -97,7 +88,7 @@ def main() -> int:
         if cloud:
             cmd.extend(["--wolfram-cloud-url", cloud])
     if args.with_boost:
-        boost_ref_cmd = args.boost_ref_cmd or _default_boost_ref_cmd(repo_root)
+        boost_ref_cmd = args.boost_ref_cmd or default_boost_ref_cmd(repo_root)
         if boost_ref_cmd:
             cmd.extend(["--boost-ref-cmd", boost_ref_cmd])
         else:

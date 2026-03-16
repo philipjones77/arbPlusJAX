@@ -5,6 +5,10 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SRC_DIR="$ROOT_DIR/benchmarks/native"
 BUILD_DIR="${BOOST_REF_BUILD_DIR:-$ROOT_DIR/stuff/migration/boost_ref_adapter/build_linux_wsl}"
 BIN_PATH="$BUILD_DIR/boost_ref_adapter"
+REF_PREFIX="${ARBPLUSJAX_REF_PREFIX:-$HOME/.local/opt/arbplusjax_refs}"
+BOOST_ROOT="${BOOST_ROOT:-$REF_PREFIX/boost/current}"
+BOOST_INCLUDEDIR="${BOOST_INCLUDEDIR:-$BOOST_ROOT/include}"
+BOOST_LIBRARYDIR="${BOOST_LIBRARYDIR:-$BOOST_ROOT/lib}"
 
 needs_build=0
 if [[ ! -x "$BIN_PATH" ]]; then
@@ -14,7 +18,11 @@ elif [[ "$SRC_DIR/boost_ref_adapter.cpp" -nt "$BIN_PATH" || "$SRC_DIR/CMakeLists
 fi
 
 if [[ "$needs_build" -eq 1 ]]; then
-  cmake -S "$SRC_DIR" -B "$BUILD_DIR" -DCMAKE_BUILD_TYPE=Release >&2
+  cmake -S "$SRC_DIR" -B "$BUILD_DIR" \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DBOOST_ROOT="$BOOST_ROOT" \
+    -DBOOST_INCLUDEDIR="$BOOST_INCLUDEDIR" \
+    -DBOOST_LIBRARYDIR="$BOOST_LIBRARYDIR" >&2
   cmake --build "$BUILD_DIR" --config Release -j >&2
 fi
 

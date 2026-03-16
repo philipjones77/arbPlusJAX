@@ -33,6 +33,9 @@ arbPlusJAX is the active JAX implementation workspace. The repository separates 
   - [implementation/modules](/home/phili/projects/arbplusJAX/docs/implementation/modules)
   - [implementation/wrappers](/home/phili/projects/arbplusJAX/docs/implementation/wrappers)
   - [implementation/external](/home/phili/projects/arbplusJAX/docs/implementation/external)
+- specs:
+  - [specs/README.md](/home/phili/projects/arbplusJAX/docs/specs/README.md)
+  - [specs/structured_matrix_functionality_poa.md](/home/phili/projects/arbplusJAX/docs/specs/structured_matrix_functionality_poa.md)
 - status docs:
   - [status/todo.md](/home/phili/projects/arbplusJAX/docs/status/todo.md)
   - [status/audit.md](/home/phili/projects/arbplusJAX/docs/status/audit.md)
