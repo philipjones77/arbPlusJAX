@@ -1,3 +1,4 @@
+import jax
 import jax.numpy as jnp
 
 from arbplusjax import api
@@ -72,3 +73,109 @@ def test_incomplete_bessel_k_batch_matches_scalar_calls():
     )
 
     assert jnp.allclose(batch, scalar, rtol=1e-10, atol=1e-10)
+
+
+def test_incomplete_bessel_k_auto_chooses_asymptotic_in_large_decay_regime():
+    nu = jnp.float64(0.5)
+    z = jnp.float64(20.0)
+    lower = jnp.float64(0.6)
+
+    value, diagnostics = api.incomplete_bessel_k(
+        nu,
+        z,
+        lower,
+        mode="point",
+        method="auto",
+        return_diagnostics=True,
+    )
+    reference = api.incomplete_bessel_k(nu, z, lower, mode="point", method="quadrature")
+
+    assert diagnostics.method == "asymptotic"
+    assert jnp.isclose(value, reference, rtol=1.5e-1, atol=1e-8)
+
+
+def test_incomplete_bessel_k_auto_can_trigger_high_precision_refine_for_fragile_regime():
+    nu = jnp.float64(13.0)
+    z = jnp.float64(0.5)
+    lower = jnp.float64(0.05)
+
+    value, diagnostics = api.incomplete_bessel_k(
+        nu,
+        z,
+        lower,
+        mode="point",
+        method="auto",
+        return_diagnostics=True,
+    )
+
+    assert diagnostics.method == "high_precision_refine"
+    assert diagnostics.fallback_used is True
+    assert jnp.isfinite(value)
+
+
+def test_incomplete_bessel_k_recurrence_reports_instability_flags_in_fragile_regime():
+    _, diagnostics = api.incomplete_bessel_k(
+        jnp.float64(9.0),
+        jnp.float64(0.8),
+        jnp.float64(0.15),
+        mode="point",
+        method="recurrence",
+        return_diagnostics=True,
+    )
+
+    assert diagnostics.method == "recurrence"
+    assert "small_phi_prime" in diagnostics.instability_flags
+    assert diagnostics.precision_warning is True
+
+
+def test_incomplete_bessel_k_asymptotic_reports_small_lower_flag():
+    _, diagnostics = api.incomplete_bessel_k(
+        jnp.float64(0.5),
+        jnp.float64(25.0),
+        jnp.float64(0.1),
+        mode="point",
+        method="asymptotic",
+        return_diagnostics=True,
+    )
+
+    assert diagnostics.method == "asymptotic"
+    assert "small_lower_limit" in diagnostics.instability_flags
+
+
+def test_incomplete_bessel_k_explicit_recurrence_tracks_large_lower_limit_regime():
+    nu = jnp.float64(0.5)
+    z = jnp.float64(20.0)
+    lower = jnp.float64(1.2)
+
+    value, diagnostics = api.incomplete_bessel_k(
+        nu,
+        z,
+        lower,
+        mode="point",
+        method="recurrence",
+        return_diagnostics=True,
+    )
+    reference = api.incomplete_bessel_k(nu, z, lower, mode="point", method="quadrature")
+
+    assert diagnostics.method == "recurrence"
+    assert jnp.isclose(value, reference, rtol=1.5e-1, atol=1e-8)
+
+
+def test_incomplete_bessel_k_custom_jvp_matches_explicit_derivatives():
+    nu = jnp.float64(0.7)
+    z = jnp.float64(1.4)
+    lower = jnp.float64(0.3)
+
+    def target(nu_v, z_v, lower_v):
+        return api.incomplete_bessel_k(nu_v, z_v, lower_v, mode="point", method="quadrature")
+
+    _, tangent_out = jax.jvp(
+        target,
+        (nu, z, lower),
+        (jnp.float64(0.0), jnp.float64(1.0), jnp.float64(1.0)),
+    )
+    expected = api.incomplete_bessel_k_argument_derivative(nu, z, lower, method="quadrature") + api.incomplete_bessel_k_lower_limit_derivative(
+        nu, z, lower
+    )
+
+    assert jnp.isclose(tangent_out, expected, rtol=5e-2, atol=5e-3)

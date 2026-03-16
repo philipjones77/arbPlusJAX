@@ -23,6 +23,10 @@ def acb_mat_as_vector(x: jax.Array) -> jax.Array:
     return mat_common.as_box_vector(x, "acb_mat.as_vector")
 
 
+def acb_mat_as_rhs(x: jax.Array) -> jax.Array:
+    return mat_common.as_box_rhs(x, "acb_mat.as_rhs")
+
+
 def acb_mat_shape(a: jax.Array) -> tuple[int, ...]:
     arr = acb_mat_as_matrix(a)
     return tuple(int(x) for x in arr.shape)
@@ -60,6 +64,30 @@ def _mid_matrix(a: jax.Array) -> jax.Array:
 
 def _mid_vector(x: jax.Array) -> jax.Array:
     return acb_core.acb_midpoint(acb_mat_as_vector(x))
+
+
+def _mid_rhs(x: jax.Array) -> jax.Array:
+    arr = acb_mat_as_rhs(x)
+    return acb_core.acb_midpoint(arr)
+
+
+def _rhs_rows_like(rhs: jax.Array, a: jax.Array) -> int:
+    arr = jnp.asarray(rhs)
+    return int(arr.shape[-2] if arr.ndim == a.ndim - 1 else arr.shape[-3])
+
+
+def _finite_mask_from_point(z: jax.Array) -> jax.Array:
+    if z.ndim >= 2:
+        return jnp.all(mat_common.complex_is_finite(z), axis=tuple(range(z.ndim - 2, z.ndim)))
+    return jnp.all(mat_common.complex_is_finite(z), axis=-1)
+
+
+def _apply_perm_rhs(p: jax.Array, b: jax.Array) -> jax.Array:
+    p_mid = acb_core.acb_midpoint(acb_mat_as_matrix(p))
+    b_mid = _mid_rhs(b)
+    if b.ndim == p.ndim - 1:
+        return mat_common.box_from_point(jnp.einsum("...ij,...j->...i", p_mid, b_mid))
+    return mat_common.box_from_point(jnp.matmul(p_mid, b_mid))
 
 
 def acb_mat_matmul(a: jax.Array, b: jax.Array) -> jax.Array:
@@ -106,14 +134,173 @@ def acb_mat_matvec_cached_prepare(a: jax.Array) -> jax.Array:
     return acb_mat_as_matrix(a)
 
 
+def acb_mat_matvec_cached_prepare_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_mat_matvec_cached_prepare(a), prec_bits)
+
+
+def acb_mat_dense_matvec_plan_prepare(a: jax.Array) -> mat_common.DenseMatvecPlan:
+    matrix = acb_mat_as_matrix(a)
+    return mat_common.DenseMatvecPlan(matrix=matrix, rows=int(matrix.shape[-3]), cols=int(matrix.shape[-2]), algebra="acb")
+
+
+def acb_mat_dense_matvec_plan_prepare_prec(
+    a: jax.Array,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> mat_common.DenseMatvecPlan:
+    matrix = acb_core.acb_box_round_prec(acb_mat_as_matrix(a), prec_bits)
+    return mat_common.DenseMatvecPlan(matrix=matrix, rows=int(matrix.shape[-3]), cols=int(matrix.shape[-2]), algebra="acb")
+
+
 def acb_mat_matvec_cached_apply(cache: jax.Array, x: jax.Array) -> jax.Array:
-    cache = acb_mat_as_matrix(cache)
+    cache = mat_common.as_dense_matvec_plan(cache, algebra="acb", label="acb_mat.matvec_cached_apply")
+    matrix = acb_mat_as_matrix(cache.matrix)
     x = acb_mat_as_vector(x)
-    checks.check_equal(cache.shape[-2], x.shape[-2], "acb_mat.matvec_cached_apply.inner")
-    prods = acb_core.acb_mul(cache, x[..., None, :, :])
+    checks.check_equal(cache.rows, x.shape[-2], "acb_mat.matvec_cached_apply.inner")
+    prods = acb_core.acb_mul(matrix, x[..., None, :, :])
     out = mat_common.box_sum(prods, axis=-1)
     finite = jnp.all(jnp.isfinite(out), axis=(-2, -1))
     return jnp.where(finite[..., None, None], out, mat_common.full_box_like(out))
+
+
+def acb_mat_dense_matvec_plan_apply(plan: mat_common.DenseMatvecPlan | jax.Array, x: jax.Array) -> jax.Array:
+    return acb_mat_matvec_cached_apply(plan, x)
+
+
+def acb_mat_permutation_matrix(perm: jax.Array, *, dtype: jnp.dtype = jnp.float64) -> jax.Array:
+    perm = jnp.asarray(perm, dtype=jnp.int32)
+    p = jnp.eye(perm.shape[-1], dtype=jnp.result_type(dtype, jnp.complex64))[perm]
+    return mat_common.box_from_point(p)
+
+
+def acb_mat_transpose(a: jax.Array) -> jax.Array:
+    return jnp.swapaxes(acb_mat_as_matrix(a), -3, -2)
+
+
+def acb_mat_conjugate_transpose(a: jax.Array) -> jax.Array:
+    return acb_core.acb_conj(acb_mat_transpose(a))
+
+
+def acb_mat_submatrix(a: jax.Array, row_start: int, row_stop: int, col_start: int, col_stop: int) -> jax.Array:
+    a = acb_mat_as_matrix(a)
+    return a[..., row_start:row_stop, col_start:col_stop, :]
+
+
+def acb_mat_diag(a: jax.Array) -> jax.Array:
+    a = acb_mat_as_matrix(a)
+    idx = jnp.arange(a.shape[-2])
+    return a[..., idx, idx, :]
+
+
+def acb_mat_diag_matrix(d: jax.Array) -> jax.Array:
+    d = acb_mat_as_vector(d)
+    n = d.shape[-2]
+    re = di.interval(jnp.zeros(d.shape[:-2] + (n, n), dtype=d.dtype), jnp.zeros(d.shape[:-2] + (n, n), dtype=d.dtype))
+    im = di.interval(jnp.zeros(d.shape[:-2] + (n, n), dtype=d.dtype), jnp.zeros(d.shape[:-2] + (n, n), dtype=d.dtype))
+    out = acb_core.acb_box(re, im)
+    idx = jnp.arange(n)
+    return out.at[..., idx, idx, :].set(d)
+
+
+def _acb_block_zero(rows: int, cols: int, *, dtype: jnp.dtype) -> jax.Array:
+    return mat_common.box_from_point(jnp.zeros((rows, cols), dtype=jnp.result_type(dtype, jnp.complex64)))
+
+
+def _acb_block_sizes_from_matrix_blocks(block_rows) -> tuple[tuple[int, ...], tuple[int, ...]]:
+    checks.check(len(block_rows) > 0, "acb_mat.block_rows_nonempty")
+    row_count = len(block_rows)
+    col_count = len(block_rows[0])
+    checks.check(col_count > 0, "acb_mat.block_cols_nonempty")
+    row_sizes: list[int] = []
+    col_sizes: list[int] = [0] * col_count
+    for i, row in enumerate(block_rows):
+        checks.check_equal(len(row), col_count, "acb_mat.block_row_width")
+        row_height = None
+        for j, block in enumerate(row):
+            block = acb_mat_as_matrix(block)
+            if row_height is None:
+                row_height = int(block.shape[-3])
+            else:
+                checks.check_equal(int(block.shape[-3]), row_height, "acb_mat.block_row_height")
+            if i == 0:
+                col_sizes[j] = int(block.shape[-2])
+            else:
+                checks.check_equal(int(block.shape[-2]), col_sizes[j], "acb_mat.block_col_width")
+        row_sizes.append(int(row_height))
+    return tuple(row_sizes), tuple(col_sizes)
+
+
+def _acb_offsets(sizes) -> tuple[int, ...]:
+    offsets = [0]
+    total = 0
+    for size in sizes:
+        total += int(size)
+        offsets.append(total)
+    return tuple(offsets)
+
+
+def acb_mat_block_assemble(block_rows) -> jax.Array:
+    row_sizes, col_sizes = _acb_block_sizes_from_matrix_blocks(block_rows)
+    del row_sizes, col_sizes
+    row_chunks = []
+    for row in block_rows:
+        row_chunks.append(jnp.concatenate([acb_mat_as_matrix(block) for block in row], axis=-2))
+    return jnp.concatenate(row_chunks, axis=-3)
+
+
+def acb_mat_block_diag(blocks) -> jax.Array:
+    checks.check(len(blocks) > 0, "acb_mat.block_diag_nonempty")
+    matrices = [acb_mat_as_matrix(block) for block in blocks]
+    row_sizes = [int(block.shape[-3]) for block in matrices]
+    col_sizes = [int(block.shape[-2]) for block in matrices]
+    dtype = matrices[0].dtype
+    block_rows = []
+    for i, row_block in enumerate(matrices):
+        row_entries = []
+        for j, _ in enumerate(matrices):
+            if i == j:
+                row_entries.append(row_block)
+            else:
+                row_entries.append(_acb_block_zero(row_sizes[i], col_sizes[j], dtype=dtype))
+        block_rows.append(tuple(row_entries))
+    return acb_mat_block_assemble(tuple(block_rows))
+
+
+def acb_mat_block_extract(a: jax.Array, row_block_sizes, col_block_sizes, row_block: int, col_block: int) -> jax.Array:
+    a = acb_mat_as_matrix(a)
+    row_offsets = _acb_offsets(row_block_sizes)
+    col_offsets = _acb_offsets(col_block_sizes)
+    return acb_mat_submatrix(a, row_offsets[row_block], row_offsets[row_block + 1], col_offsets[col_block], col_offsets[col_block + 1])
+
+
+def acb_mat_block_row(a: jax.Array, row_block_sizes, row_block: int) -> jax.Array:
+    a = acb_mat_as_matrix(a)
+    row_offsets = _acb_offsets(row_block_sizes)
+    return a[..., row_offsets[row_block] : row_offsets[row_block + 1], :, :]
+
+
+def acb_mat_block_col(a: jax.Array, col_block_sizes, col_block: int) -> jax.Array:
+    a = acb_mat_as_matrix(a)
+    col_offsets = _acb_offsets(col_block_sizes)
+    return a[..., :, col_offsets[col_block] : col_offsets[col_block + 1], :]
+
+
+def acb_mat_block_matmul(a_blocks, b_blocks) -> jax.Array:
+    a_row_sizes, a_col_sizes = _acb_block_sizes_from_matrix_blocks(a_blocks)
+    b_row_sizes, b_col_sizes = _acb_block_sizes_from_matrix_blocks(b_blocks)
+    checks.check_equal(a_col_sizes, b_row_sizes, "acb_mat.block_matmul.partition_inner")
+    out_rows = []
+    for i, a_row in enumerate(a_blocks):
+        out_row = []
+        for j in range(len(b_col_sizes)):
+            total = None
+            for k in range(len(a_col_sizes)):
+                prod = acb_mat_matmul(a_row[k], b_blocks[k][j])
+                total = prod if total is None else acb_core.acb_add(total, prod)
+            if total is None:
+                total = _acb_block_zero(a_row_sizes[i], b_col_sizes[j], dtype=acb_mat_as_matrix(a_row[0]).dtype)
+            out_row.append(total)
+        out_rows.append(tuple(out_row))
+    return acb_mat_block_assemble(tuple(out_rows))
 
 
 def acb_mat_banded_matvec(a: jax.Array, x: jax.Array, *, lower_bandwidth: int, upper_bandwidth: int) -> jax.Array:
@@ -141,11 +328,16 @@ def acb_mat_banded_matvec_basic(a: jax.Array, x: jax.Array, *, lower_bandwidth: 
 
 def acb_mat_solve(a: jax.Array, b: jax.Array) -> jax.Array:
     a = acb_mat_as_matrix(a)
-    b = acb_mat_as_vector(b)
-    checks.check_equal(a.shape[-2], b.shape[-2], "acb_mat.solve.inner")
-    x = jnp.linalg.solve(_mid_matrix(a), _mid_vector(b))
+    b = acb_mat_as_rhs(b)
+    checks.check_equal(a.shape[-2], _rhs_rows_like(b, a), "acb_mat.solve.inner")
+    a_mid = _mid_matrix(a)
+    b_mid = _mid_rhs(b)
+    vector_rhs = b_mid.ndim == a_mid.ndim - 1
+    x = jnp.linalg.solve(a_mid, b_mid[..., None] if vector_rhs else b_mid)
+    if vector_rhs:
+        x = x[..., 0]
     out = mat_common.box_from_point(x)
-    finite = jnp.all(mat_common.complex_is_finite(x), axis=-1)
+    finite = _finite_mask_from_point(x)
     return jnp.where(finite[..., None, None], out, mat_common.full_box_like(out))
 
 
@@ -290,17 +482,22 @@ def acb_mat_norm_inf_rigorous(a: jax.Array) -> jax.Array:
 
 def acb_mat_triangular_solve(a: jax.Array, b: jax.Array, *, lower: bool, unit_diagonal: bool = False) -> jax.Array:
     a = acb_mat_as_matrix(a)
-    b = acb_mat_as_vector(b)
-    checks.check_equal(a.shape[-2], b.shape[-2], "acb_mat.triangular_solve.inner")
+    b = acb_mat_as_rhs(b)
+    checks.check_equal(a.shape[-2], _rhs_rows_like(b, a), "acb_mat.triangular_solve.inner")
+    a_mid = _mid_matrix(a)
+    b_mid = _mid_rhs(b)
+    vector_rhs = b_mid.ndim == a_mid.ndim - 1
     x = lax.linalg.triangular_solve(
-        _mid_matrix(a),
-        _mid_vector(b),
+        a_mid,
+        b_mid[..., None] if vector_rhs else b_mid,
         left_side=True,
         lower=lower,
         unit_diagonal=unit_diagonal,
     )
+    if vector_rhs:
+        x = x[..., 0]
     out = mat_common.box_from_point(x)
-    finite = jnp.all(mat_common.complex_is_finite(x), axis=-1)
+    finite = _finite_mask_from_point(x)
     return jnp.where(finite[..., None, None], out, mat_common.full_box_like(out))
 
 
@@ -330,6 +527,48 @@ def acb_mat_lu_basic(a: jax.Array) -> tuple[jax.Array, jax.Array, jax.Array]:
     return acb_mat_lu(a)
 
 
+def acb_mat_dense_lu_solve_plan_prepare(a: jax.Array) -> mat_common.DenseLUSolvePlan:
+    p, l, u = acb_mat_lu(a)
+    return mat_common.DenseLUSolvePlan(p=p, l=l, u=u, rows=int(acb_mat_as_matrix(a).shape[-3]), algebra="acb")
+
+
+def acb_mat_dense_lu_solve_plan_prepare_prec(
+    a: jax.Array,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> mat_common.DenseLUSolvePlan:
+    p, l, u = acb_mat_lu_prec(a, prec_bits=prec_bits)
+    return mat_common.DenseLUSolvePlan(p=p, l=l, u=u, rows=int(acb_mat_as_matrix(a).shape[-3]), algebra="acb")
+
+
+def acb_mat_lu_solve(
+    plan: mat_common.DenseLUSolvePlan | tuple[jax.Array, jax.Array, jax.Array],
+    b: jax.Array,
+) -> jax.Array:
+    plan = mat_common.as_dense_lu_solve_plan(plan, algebra="acb", label="acb_mat.lu_solve")
+    p = acb_mat_as_matrix(plan.p)
+    l = acb_mat_as_matrix(plan.l)
+    u = acb_mat_as_matrix(plan.u)
+    b = acb_mat_as_rhs(b)
+    checks.check_equal(plan.rows, _rhs_rows_like(b, p), "acb_mat.lu_solve.inner")
+    pb = _apply_perm_rhs(p, b)
+    y = acb_mat_triangular_solve(l, pb, lower=True, unit_diagonal=True)
+    return acb_mat_triangular_solve(u, y, lower=False, unit_diagonal=False)
+
+
+def acb_mat_lu_solve_basic(
+    plan: mat_common.DenseLUSolvePlan | tuple[jax.Array, jax.Array, jax.Array],
+    b: jax.Array,
+) -> jax.Array:
+    return acb_mat_lu_solve(plan, b)
+
+
+def acb_mat_dense_lu_solve_plan_apply(
+    plan: mat_common.DenseLUSolvePlan | tuple[jax.Array, jax.Array, jax.Array],
+    b: jax.Array,
+) -> jax.Array:
+    return acb_mat_lu_solve(plan, b)
+
+
 def acb_mat_qr(a: jax.Array) -> tuple[jax.Array, jax.Array]:
     a = acb_mat_as_matrix(a)
     q, r = jnp.linalg.qr(_mid_matrix(a))
@@ -338,6 +577,30 @@ def acb_mat_qr(a: jax.Array) -> tuple[jax.Array, jax.Array]:
 
 def acb_mat_qr_basic(a: jax.Array) -> tuple[jax.Array, jax.Array]:
     return acb_mat_qr(a)
+
+
+def acb_mat_permutation_matrix_rigorous(perm: jax.Array, *, dtype: jnp.dtype = jnp.float64) -> jax.Array:
+    return acb_mat_permutation_matrix(perm, dtype=dtype)
+
+
+def acb_mat_transpose_rigorous(a: jax.Array) -> jax.Array:
+    return acb_mat_transpose(a)
+
+
+def acb_mat_conjugate_transpose_rigorous(a: jax.Array) -> jax.Array:
+    return acb_mat_conjugate_transpose(a)
+
+
+def acb_mat_submatrix_rigorous(a: jax.Array, row_start: int, row_stop: int, col_start: int, col_stop: int) -> jax.Array:
+    return acb_mat_submatrix(a, row_start, row_stop, col_start, col_stop)
+
+
+def acb_mat_diag_rigorous(a: jax.Array) -> jax.Array:
+    return acb_mat_diag(a)
+
+
+def acb_mat_diag_matrix_rigorous(d: jax.Array) -> jax.Array:
+    return acb_mat_diag_matrix(d)
 
 
 @partial(jax.jit, static_argnames=("prec_bits",))
@@ -507,6 +770,73 @@ def acb_mat_matvec_cached_apply_batch_padded(cache: jax.Array, x: jax.Array, *, 
     return acb_mat_matvec_cached_apply(*call_args)
 
 
+def acb_mat_matvec_cached_prepare_batch_fixed(a: jax.Array) -> jax.Array:
+    return acb_mat_matvec_cached_prepare(a)
+
+
+def acb_mat_matvec_cached_prepare_batch_padded(a: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = kh.pad_mixed_batch_args_repeat_last((a,), pad_to=pad_to)
+    return acb_mat_matvec_cached_prepare(*call_args)
+
+
+def acb_mat_solve_batch_fixed(a: jax.Array, b: jax.Array) -> jax.Array:
+    return acb_mat_solve(a, b)
+
+
+def acb_mat_solve_batch_padded(a: jax.Array, b: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = kh.pad_mixed_batch_args_repeat_last((a, b), pad_to=pad_to)
+    return acb_mat_solve(*call_args)
+
+
+def acb_mat_inv_batch_fixed(a: jax.Array) -> jax.Array:
+    return acb_mat_inv(a)
+
+
+def acb_mat_inv_batch_padded(a: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = kh.pad_mixed_batch_args_repeat_last((a,), pad_to=pad_to)
+    return acb_mat_inv(*call_args)
+
+
+def acb_mat_triangular_solve_batch_fixed(
+    a: jax.Array,
+    b: jax.Array,
+    *,
+    lower: bool,
+    unit_diagonal: bool = False,
+) -> jax.Array:
+    return acb_mat_triangular_solve(a, b, lower=lower, unit_diagonal=unit_diagonal)
+
+
+def acb_mat_triangular_solve_batch_padded(
+    a: jax.Array,
+    b: jax.Array,
+    *,
+    pad_to: int,
+    lower: bool,
+    unit_diagonal: bool = False,
+) -> jax.Array:
+    call_args, _ = kh.pad_mixed_batch_args_repeat_last((a, b), pad_to=pad_to)
+    return acb_mat_triangular_solve(*call_args, lower=lower, unit_diagonal=unit_diagonal)
+
+
+def acb_mat_lu_batch_fixed(a: jax.Array) -> tuple[jax.Array, jax.Array, jax.Array]:
+    return acb_mat_lu(a)
+
+
+def acb_mat_lu_batch_padded(a: jax.Array, *, pad_to: int) -> tuple[jax.Array, jax.Array, jax.Array]:
+    call_args, _ = kh.pad_mixed_batch_args_repeat_last((a,), pad_to=pad_to)
+    return acb_mat_lu(*call_args)
+
+
+def acb_mat_qr_batch_fixed(a: jax.Array) -> tuple[jax.Array, jax.Array]:
+    return acb_mat_qr(a)
+
+
+def acb_mat_qr_batch_padded(a: jax.Array, *, pad_to: int) -> tuple[jax.Array, jax.Array]:
+    call_args, _ = kh.pad_mixed_batch_args_repeat_last((a,), pad_to=pad_to)
+    return acb_mat_qr(*call_args)
+
+
 def acb_mat_det_batch_fixed(a: jax.Array) -> jax.Array:
     return acb_mat_det(a)
 
@@ -634,6 +964,102 @@ def acb_mat_matvec_cached_apply_batch_padded_prec(
     return acb_core.acb_box_round_prec(acb_mat_matvec_cached_apply_batch_padded(cache, x, pad_to=pad_to), prec_bits)
 
 
+def acb_mat_matvec_cached_prepare_batch_fixed_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_mat_matvec_cached_prepare_batch_fixed(a), prec_bits)
+
+
+def acb_mat_matvec_cached_prepare_batch_padded_prec(
+    a: jax.Array,
+    *,
+    pad_to: int,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_mat_matvec_cached_prepare_batch_padded(a, pad_to=pad_to), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def acb_mat_solve_batch_fixed_prec(a: jax.Array, b: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_mat_solve_batch_fixed(a, b), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits", "pad_to"))
+def acb_mat_solve_batch_padded_prec(a: jax.Array, b: jax.Array, *, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_mat_solve_batch_padded(a, b, pad_to=pad_to), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def acb_mat_inv_batch_fixed_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_mat_inv_batch_fixed(a), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits", "pad_to"))
+def acb_mat_inv_batch_padded_prec(a: jax.Array, *, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_mat_inv_batch_padded(a, pad_to=pad_to), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits", "lower", "unit_diagonal"))
+def acb_mat_triangular_solve_batch_fixed_prec(
+    a: jax.Array,
+    b: jax.Array,
+    *,
+    lower: bool,
+    unit_diagonal: bool = False,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return acb_core.acb_box_round_prec(
+        acb_mat_triangular_solve_batch_fixed(a, b, lower=lower, unit_diagonal=unit_diagonal),
+        prec_bits,
+    )
+
+
+@partial(jax.jit, static_argnames=("prec_bits", "pad_to", "lower", "unit_diagonal"))
+def acb_mat_triangular_solve_batch_padded_prec(
+    a: jax.Array,
+    b: jax.Array,
+    *,
+    pad_to: int,
+    lower: bool,
+    unit_diagonal: bool = False,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return acb_core.acb_box_round_prec(
+        acb_mat_triangular_solve_batch_padded(a, b, pad_to=pad_to, lower=lower, unit_diagonal=unit_diagonal),
+        prec_bits,
+    )
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def acb_mat_lu_batch_fixed_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> tuple[jax.Array, jax.Array, jax.Array]:
+    p, l, u = acb_mat_lu_batch_fixed(a)
+    return (
+        acb_core.acb_box_round_prec(p, prec_bits),
+        acb_core.acb_box_round_prec(l, prec_bits),
+        acb_core.acb_box_round_prec(u, prec_bits),
+    )
+
+
+@partial(jax.jit, static_argnames=("prec_bits", "pad_to"))
+def acb_mat_lu_batch_padded_prec(a: jax.Array, *, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS) -> tuple[jax.Array, jax.Array, jax.Array]:
+    p, l, u = acb_mat_lu_batch_padded(a, pad_to=pad_to)
+    return (
+        acb_core.acb_box_round_prec(p, prec_bits),
+        acb_core.acb_box_round_prec(l, prec_bits),
+        acb_core.acb_box_round_prec(u, prec_bits),
+    )
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def acb_mat_qr_batch_fixed_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> tuple[jax.Array, jax.Array]:
+    q, r = acb_mat_qr_batch_fixed(a)
+    return acb_core.acb_box_round_prec(q, prec_bits), acb_core.acb_box_round_prec(r, prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits", "pad_to"))
+def acb_mat_qr_batch_padded_prec(a: jax.Array, *, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS) -> tuple[jax.Array, jax.Array]:
+    q, r = acb_mat_qr_batch_padded(a, pad_to=pad_to)
+    return acb_core.acb_box_round_prec(q, prec_bits), acb_core.acb_box_round_prec(r, prec_bits)
+
+
 @partial(jax.jit, static_argnames=("prec_bits",))
 def acb_mat_det_batch_fixed_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return acb_core.acb_box_round_prec(acb_mat_det_batch_fixed(a), prec_bits)
@@ -692,6 +1118,186 @@ def acb_mat_norm_inf_batch_fixed_prec(a: jax.Array, prec_bits: int = di.DEFAULT_
 @partial(jax.jit, static_argnames=("prec_bits", "pad_to"))
 def acb_mat_norm_inf_batch_padded_prec(a: jax.Array, *, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return acb_core.acb_box_round_prec(acb_mat_norm_inf_batch_padded(a, pad_to=pad_to), prec_bits)
+
+
+def acb_mat_permutation_matrix_prec(
+    perm: jax.Array,
+    *,
+    dtype: jnp.dtype = jnp.float64,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_mat_permutation_matrix(perm, dtype=dtype), prec_bits)
+
+
+def acb_mat_transpose_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_mat_transpose(a), prec_bits)
+
+
+def acb_mat_conjugate_transpose_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_mat_conjugate_transpose(a), prec_bits)
+
+
+def acb_mat_submatrix_prec(
+    a: jax.Array,
+    row_start: int,
+    row_stop: int,
+    col_start: int,
+    col_stop: int,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_mat_submatrix(a, row_start, row_stop, col_start, col_stop), prec_bits)
+
+
+def acb_mat_diag_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_mat_diag(a), prec_bits)
+
+
+def acb_mat_diag_matrix_prec(d: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_mat_diag_matrix(d), prec_bits)
+
+
+def acb_mat_lu_solve_prec(
+    plan: mat_common.DenseLUSolvePlan | tuple[jax.Array, jax.Array, jax.Array],
+    b: jax.Array,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_mat_lu_solve(plan, b), prec_bits)
+
+
+def acb_mat_dense_lu_solve_plan_apply_prec(
+    plan: mat_common.DenseLUSolvePlan | tuple[jax.Array, jax.Array, jax.Array],
+    b: jax.Array,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_mat_dense_lu_solve_plan_apply(plan, b), prec_bits)
+
+
+def acb_mat_permutation_matrix_batch_fixed(perm: jax.Array, *, dtype: jnp.dtype = jnp.float64) -> jax.Array:
+    return acb_mat_permutation_matrix(perm, dtype=dtype)
+
+
+def acb_mat_permutation_matrix_batch_padded(perm: jax.Array, *, pad_to: int, dtype: jnp.dtype = jnp.float64) -> jax.Array:
+    call_args, _ = kh.pad_mixed_batch_args_repeat_last((perm,), pad_to=pad_to)
+    return acb_mat_permutation_matrix(*call_args, dtype=dtype)
+
+
+def acb_mat_transpose_batch_fixed(a: jax.Array) -> jax.Array:
+    return acb_mat_transpose(a)
+
+
+def acb_mat_transpose_batch_padded(a: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = kh.pad_mixed_batch_args_repeat_last((a,), pad_to=pad_to)
+    return acb_mat_transpose(*call_args)
+
+
+def acb_mat_conjugate_transpose_batch_fixed(a: jax.Array) -> jax.Array:
+    return acb_mat_conjugate_transpose(a)
+
+
+def acb_mat_conjugate_transpose_batch_padded(a: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = kh.pad_mixed_batch_args_repeat_last((a,), pad_to=pad_to)
+    return acb_mat_conjugate_transpose(*call_args)
+
+
+def acb_mat_diag_batch_fixed(a: jax.Array) -> jax.Array:
+    return acb_mat_diag(a)
+
+
+def acb_mat_diag_batch_padded(a: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = kh.pad_mixed_batch_args_repeat_last((a,), pad_to=pad_to)
+    return acb_mat_diag(*call_args)
+
+
+def acb_mat_diag_matrix_batch_fixed(d: jax.Array) -> jax.Array:
+    return acb_mat_diag_matrix(d)
+
+
+def acb_mat_diag_matrix_batch_padded(d: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = kh.pad_mixed_batch_args_repeat_last((d,), pad_to=pad_to)
+    return acb_mat_diag_matrix(*call_args)
+
+
+def acb_mat_lu_solve_batch_fixed(plan: mat_common.DenseLUSolvePlan | tuple[jax.Array, jax.Array, jax.Array], b: jax.Array) -> jax.Array:
+    return acb_mat_lu_solve(plan, b)
+
+
+def acb_mat_lu_solve_batch_padded(
+    plan: mat_common.DenseLUSolvePlan | tuple[jax.Array, jax.Array, jax.Array],
+    b: jax.Array,
+    *,
+    pad_to: int,
+) -> jax.Array:
+    call_args, _ = kh.pad_mixed_batch_args_repeat_last((plan, b), pad_to=pad_to)
+    return acb_mat_lu_solve(*call_args)
+
+
+def acb_mat_permutation_matrix_batch_fixed_prec(
+    perm: jax.Array,
+    *,
+    dtype: jnp.dtype = jnp.float64,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_mat_permutation_matrix_batch_fixed(perm, dtype=dtype), prec_bits)
+
+
+def acb_mat_permutation_matrix_batch_padded_prec(
+    perm: jax.Array,
+    *,
+    pad_to: int,
+    dtype: jnp.dtype = jnp.float64,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_mat_permutation_matrix_batch_padded(perm, pad_to=pad_to, dtype=dtype), prec_bits)
+
+
+def acb_mat_transpose_batch_fixed_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_mat_transpose_batch_fixed(a), prec_bits)
+
+
+def acb_mat_transpose_batch_padded_prec(a: jax.Array, *, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_mat_transpose_batch_padded(a, pad_to=pad_to), prec_bits)
+
+
+def acb_mat_conjugate_transpose_batch_fixed_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_mat_conjugate_transpose_batch_fixed(a), prec_bits)
+
+
+def acb_mat_conjugate_transpose_batch_padded_prec(a: jax.Array, *, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_mat_conjugate_transpose_batch_padded(a, pad_to=pad_to), prec_bits)
+
+
+def acb_mat_diag_batch_fixed_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_mat_diag_batch_fixed(a), prec_bits)
+
+
+def acb_mat_diag_batch_padded_prec(a: jax.Array, *, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_mat_diag_batch_padded(a, pad_to=pad_to), prec_bits)
+
+
+def acb_mat_diag_matrix_batch_fixed_prec(d: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_mat_diag_matrix_batch_fixed(d), prec_bits)
+
+
+def acb_mat_diag_matrix_batch_padded_prec(d: jax.Array, *, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_mat_diag_matrix_batch_padded(d, pad_to=pad_to), prec_bits)
+
+
+def acb_mat_lu_solve_batch_fixed_prec(
+    plan: mat_common.DenseLUSolvePlan | tuple[jax.Array, jax.Array, jax.Array],
+    b: jax.Array,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_mat_lu_solve_batch_fixed(plan, b), prec_bits)
+
+
+def acb_mat_lu_solve_batch_padded_prec(
+    plan: mat_common.DenseLUSolvePlan | tuple[jax.Array, jax.Array, jax.Array],
+    b: jax.Array,
+    *,
+    pad_to: int,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_mat_lu_solve_batch_padded(plan, b, pad_to=pad_to), prec_bits)
 
 
 def acb_mat_2x2_det(a: jax.Array) -> jax.Array:
@@ -780,6 +1386,12 @@ __all__ = [
     "acb_mat_shape",
     "acb_mat_zero",
     "acb_mat_identity",
+    "acb_mat_block_assemble",
+    "acb_mat_block_diag",
+    "acb_mat_block_extract",
+    "acb_mat_block_row",
+    "acb_mat_block_col",
+    "acb_mat_block_matmul",
     "acb_mat_matmul",
     "acb_mat_matmul_basic",
     "acb_mat_matvec",
@@ -787,6 +1399,8 @@ __all__ = [
     "acb_mat_banded_matvec",
     "acb_mat_banded_matvec_basic",
     "acb_mat_matvec_cached_prepare",
+    "acb_mat_dense_matvec_plan_prepare",
+    "acb_mat_dense_matvec_plan_apply",
     "acb_mat_matvec_cached_apply",
     "acb_mat_solve",
     "acb_mat_solve_basic",
@@ -818,6 +1432,8 @@ __all__ = [
     "acb_mat_matmul_prec",
     "acb_mat_matvec_prec",
     "acb_mat_banded_matvec_prec",
+    "acb_mat_matvec_cached_prepare_prec",
+    "acb_mat_dense_matvec_plan_prepare_prec",
     "acb_mat_matvec_cached_apply_prec",
     "acb_mat_solve_prec",
     "acb_mat_inv_prec",
@@ -851,8 +1467,20 @@ __all__ = [
     "acb_mat_matvec_batch_padded",
     "acb_mat_banded_matvec_batch_fixed",
     "acb_mat_banded_matvec_batch_padded",
+    "acb_mat_matvec_cached_prepare_batch_fixed",
+    "acb_mat_matvec_cached_prepare_batch_padded",
     "acb_mat_matvec_cached_apply_batch_fixed",
     "acb_mat_matvec_cached_apply_batch_padded",
+    "acb_mat_solve_batch_fixed",
+    "acb_mat_solve_batch_padded",
+    "acb_mat_inv_batch_fixed",
+    "acb_mat_inv_batch_padded",
+    "acb_mat_triangular_solve_batch_fixed",
+    "acb_mat_triangular_solve_batch_padded",
+    "acb_mat_lu_batch_fixed",
+    "acb_mat_lu_batch_padded",
+    "acb_mat_qr_batch_fixed",
+    "acb_mat_qr_batch_padded",
     "acb_mat_det_batch_fixed",
     "acb_mat_det_batch_padded",
     "acb_mat_trace_batch_fixed",
@@ -871,8 +1499,20 @@ __all__ = [
     "acb_mat_matvec_batch_padded_prec",
     "acb_mat_banded_matvec_batch_fixed_prec",
     "acb_mat_banded_matvec_batch_padded_prec",
+    "acb_mat_matvec_cached_prepare_batch_fixed_prec",
+    "acb_mat_matvec_cached_prepare_batch_padded_prec",
     "acb_mat_matvec_cached_apply_batch_fixed_prec",
     "acb_mat_matvec_cached_apply_batch_padded_prec",
+    "acb_mat_solve_batch_fixed_prec",
+    "acb_mat_solve_batch_padded_prec",
+    "acb_mat_inv_batch_fixed_prec",
+    "acb_mat_inv_batch_padded_prec",
+    "acb_mat_triangular_solve_batch_fixed_prec",
+    "acb_mat_triangular_solve_batch_padded_prec",
+    "acb_mat_lu_batch_fixed_prec",
+    "acb_mat_lu_batch_padded_prec",
+    "acb_mat_qr_batch_fixed_prec",
+    "acb_mat_qr_batch_padded_prec",
     "acb_mat_det_batch_fixed_prec",
     "acb_mat_det_batch_padded_prec",
     "acb_mat_trace_batch_fixed_prec",

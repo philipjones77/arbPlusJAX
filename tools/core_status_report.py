@@ -272,7 +272,7 @@ def main() -> None:
     parser.add_argument(
         "--status-only",
         action="store_true",
-        help="Only write docs/reports/core_function_status.md. Skip header-based missing reports.",
+        help="Only write docs/status/reports/core_function_status.md. Skip header-based missing reports.",
     )
     args = parser.parse_args()
 

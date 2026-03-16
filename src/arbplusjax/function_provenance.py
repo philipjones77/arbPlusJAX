@@ -533,9 +533,9 @@ def _notes(category: str, leaf: str, module: str) -> str:
 def _references(category: str, module: str, base_name: str) -> tuple[str, ...]:
     refs = ["docs/references/inventory/function_list.md"]
     if base_name in CORE_TIGHTNESS:
-        refs.append("docs/reports/custom_core_status.md")
+        refs.append("docs/status/reports/custom_core_status.md")
     elif category == "arb_like" and module in {"arb_core", "acb_core"}:
-        refs.append("docs/reports/core_function_status.md")
+        refs.append("docs/status/reports/core_function_status.md")
     elif category == "alternative" and "boost" in module:
         refs.append("docs/implementation/external/boost_hypgeom.md")
     elif category == "alternative" and "cusf" in module.lower():
@@ -1000,12 +1000,12 @@ def render_registry_summary() -> str:
         f"Summary: `entries={total}`, `arb_like={arb_like}`, `alternative={alternative}`, `new={new}`.",
         "",
         "See the split reports for the actual registry tables:",
-        "- `docs/reports/arb_like_functions.md`",
-        "- `docs/reports/alternative_functions.md`",
-        "- `docs/reports/new_functions.md`",
-        "- `docs/reports/function_implementation_index.md`",
+        "- `docs/status/reports/arb_like_functions.md`",
+        "- `docs/status/reports/alternative_functions.md`",
+        "- `docs/status/reports/new_functions.md`",
+        "- `docs/status/reports/function_implementation_index.md`",
         "",
-        "See `docs/function_naming.md` for the naming and provenance policy.",
+        "See `docs/standards/function_naming.md` for the naming and provenance policy.",
         "",
     ]
     return "\n".join(lines)

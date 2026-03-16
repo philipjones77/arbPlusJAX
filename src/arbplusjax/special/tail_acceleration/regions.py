@@ -11,6 +11,8 @@ def choose_tail_method(
     oscillation_level: float | None,
     derivatives_required: bool,
 ) -> str:
+    if requested_method == "mpfallback":
+        requested_method = "high_precision_refine"
     if requested_method != "auto":
         return requested_method
     if has_recurrence and not derivatives_required and (oscillation_level or 0.0) <= 0.5:

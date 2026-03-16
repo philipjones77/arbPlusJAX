@@ -76,6 +76,10 @@ def _arb_mat_point_vector(x: jax.Array) -> jax.Array:
     return di.midpoint(mat_common.as_interval_vector(x, "point_wrappers.arb_mat_point_vector"))
 
 
+def _arb_mat_point_rhs(x: jax.Array) -> jax.Array:
+    return di.midpoint(mat_common.as_interval_rhs(x, "point_wrappers.arb_mat_point_rhs"))
+
+
 def _arb_mat_point_2x2(a: jax.Array) -> jax.Array:
     return di.midpoint(mat_common.as_interval_mat_2x2(a, "point_wrappers.arb_mat_point_2x2"))
 
@@ -86,6 +90,10 @@ def _acb_mat_point_matrix(a: jax.Array) -> jax.Array:
 
 def _acb_mat_point_vector(x: jax.Array) -> jax.Array:
     return acb_core.acb_midpoint(mat_common.as_box_vector(x, "point_wrappers.acb_mat_point_vector"))
+
+
+def _acb_mat_point_rhs(x: jax.Array) -> jax.Array:
+    return acb_core.acb_midpoint(mat_common.as_box_rhs(x, "point_wrappers.acb_mat_point_rhs"))
 
 
 def _acb_mat_point_2x2(a: jax.Array) -> jax.Array:
@@ -104,6 +112,102 @@ def arb_mat_zero_point(n: int, *, dtype: jnp.dtype = jnp.float64) -> jax.Array:
 
 def arb_mat_identity_point(n: int, *, dtype: jnp.dtype = jnp.float64) -> jax.Array:
     return jnp.eye(n, dtype=dtype)
+
+
+def arb_mat_permutation_matrix_point(perm: jax.Array, *, dtype: jnp.dtype = jnp.float64) -> jax.Array:
+    perm = jnp.asarray(perm, dtype=jnp.int32)
+    return jnp.eye(perm.shape[-1], dtype=dtype)[perm]
+
+
+@partial(jax.jit, static_argnames=())
+def arb_mat_transpose_point(a: jax.Array) -> jax.Array:
+    return jnp.swapaxes(_arb_mat_point_matrix(a), -2, -1)
+
+
+@partial(jax.jit, static_argnames=("row_start", "row_stop", "col_start", "col_stop"))
+def arb_mat_submatrix_point(a: jax.Array, row_start: int, row_stop: int, col_start: int, col_stop: int) -> jax.Array:
+    return _arb_mat_point_matrix(a)[..., row_start:row_stop, col_start:col_stop]
+
+
+@partial(jax.jit, static_argnames=())
+def arb_mat_diag_point(a: jax.Array) -> jax.Array:
+    a_mid = _arb_mat_point_matrix(a)
+    idx = jnp.arange(a_mid.shape[-1])
+    return a_mid[..., idx, idx]
+
+
+@partial(jax.jit, static_argnames=())
+def arb_mat_diag_matrix_point(d: jax.Array) -> jax.Array:
+    d_mid = _arb_mat_point_vector(d)
+    eye = jnp.eye(d_mid.shape[-1], dtype=d_mid.dtype)
+    return eye * d_mid[..., None, :]
+
+
+def arb_mat_block_assemble_point(block_rows) -> jax.Array:
+    checks.check(len(block_rows) > 0, "point_wrappers.arb_mat_block_assemble_point.rows")
+    row_chunks = []
+    for row in block_rows:
+        row_chunks.append(jnp.concatenate([_arb_mat_point_matrix(block) for block in row], axis=-1))
+    return jnp.concatenate(row_chunks, axis=-2)
+
+
+def arb_mat_block_diag_point(blocks) -> jax.Array:
+    checks.check(len(blocks) > 0, "point_wrappers.arb_mat_block_diag_point.blocks")
+    matrices = [_arb_mat_point_matrix(block) for block in blocks]
+    row_sizes = [int(block.shape[-2]) for block in matrices]
+    col_sizes = [int(block.shape[-1]) for block in matrices]
+    dtype = matrices[0].dtype
+    rows = []
+    for i, block in enumerate(matrices):
+        row = []
+        for j in range(len(matrices)):
+            if i == j:
+                row.append(block)
+            else:
+                row.append(jnp.zeros(block.shape[:-2] + (row_sizes[i], col_sizes[j]), dtype=dtype))
+        rows.append(tuple(row))
+    return arb_mat_block_assemble_point(tuple(rows))
+
+
+def arb_mat_block_extract_point(a: jax.Array, row_block_sizes, col_block_sizes, row_block: int, col_block: int) -> jax.Array:
+    a_mid = _arb_mat_point_matrix(a)
+    row_offsets = [0]
+    for size in row_block_sizes:
+        row_offsets.append(row_offsets[-1] + int(size))
+    col_offsets = [0]
+    for size in col_block_sizes:
+        col_offsets.append(col_offsets[-1] + int(size))
+    return a_mid[..., row_offsets[row_block] : row_offsets[row_block + 1], col_offsets[col_block] : col_offsets[col_block + 1]]
+
+
+def arb_mat_block_row_point(a: jax.Array, row_block_sizes, row_block: int) -> jax.Array:
+    a_mid = _arb_mat_point_matrix(a)
+    offsets = [0]
+    for size in row_block_sizes:
+        offsets.append(offsets[-1] + int(size))
+    return a_mid[..., offsets[row_block] : offsets[row_block + 1], :]
+
+
+def arb_mat_block_col_point(a: jax.Array, col_block_sizes, col_block: int) -> jax.Array:
+    a_mid = _arb_mat_point_matrix(a)
+    offsets = [0]
+    for size in col_block_sizes:
+        offsets.append(offsets[-1] + int(size))
+    return a_mid[..., :, offsets[col_block] : offsets[col_block + 1]]
+
+
+def arb_mat_block_matmul_point(a_blocks, b_blocks) -> jax.Array:
+    out_rows = []
+    for i, a_row in enumerate(a_blocks):
+        out_row = []
+        for j in range(len(b_blocks[0])):
+            total = None
+            for k in range(len(a_row)):
+                prod = arb_mat_matmul_point(a_row[k], b_blocks[k][j])
+                total = prod if total is None else total + prod
+            out_row.append(total)
+        out_rows.append(tuple(out_row))
+    return arb_mat_block_assemble_point(tuple(out_rows))
 
 
 @partial(jax.jit, static_argnames=())
@@ -134,9 +238,12 @@ def arb_mat_banded_matvec_point(a: jax.Array, x: jax.Array, *, lower_bandwidth: 
 @partial(jax.jit, static_argnames=())
 def arb_mat_solve_point(a: jax.Array, b: jax.Array) -> jax.Array:
     a_mid = _arb_mat_point_matrix(a)
-    b_mid = _arb_mat_point_vector(b)
-    checks.check_equal(a_mid.shape[-1], b_mid.shape[-1], "point_wrappers.arb_mat_solve_point.inner")
-    return jnp.linalg.solve(a_mid, b_mid)
+    b_mid = _arb_mat_point_rhs(b)
+    rows = b_mid.shape[-1] if b_mid.ndim == a_mid.ndim - 1 else b_mid.shape[-2]
+    checks.check_equal(a_mid.shape[-1], rows, "point_wrappers.arb_mat_solve_point.inner")
+    vector_rhs = b_mid.ndim == a_mid.ndim - 1
+    out = jnp.linalg.solve(a_mid, b_mid[..., None] if vector_rhs else b_mid)
+    return out[..., 0] if vector_rhs else out
 
 
 @partial(jax.jit, static_argnames=())
@@ -172,9 +279,12 @@ def arb_mat_norm_inf_point(a: jax.Array) -> jax.Array:
 @partial(jax.jit, static_argnames=("lower", "unit_diagonal"))
 def arb_mat_triangular_solve_point(a: jax.Array, b: jax.Array, *, lower: bool, unit_diagonal: bool = False) -> jax.Array:
     a_mid = _arb_mat_point_matrix(a)
-    b_mid = _arb_mat_point_vector(b)
-    checks.check_equal(a_mid.shape[-1], b_mid.shape[-1], "point_wrappers.arb_mat_triangular_solve_point.inner")
-    return lax.linalg.triangular_solve(a_mid, b_mid, left_side=True, lower=lower, unit_diagonal=unit_diagonal)
+    b_mid = _arb_mat_point_rhs(b)
+    rows = b_mid.shape[-1] if b_mid.ndim == a_mid.ndim - 1 else b_mid.shape[-2]
+    checks.check_equal(a_mid.shape[-1], rows, "point_wrappers.arb_mat_triangular_solve_point.inner")
+    vector_rhs = b_mid.ndim == a_mid.ndim - 1
+    out = lax.linalg.triangular_solve(a_mid, b_mid[..., None] if vector_rhs else b_mid, left_side=True, lower=lower, unit_diagonal=unit_diagonal)
+    return out[..., 0] if vector_rhs else out
 
 
 @partial(jax.jit, static_argnames=())
@@ -192,6 +302,34 @@ def arb_mat_lu_point(a: jax.Array) -> tuple[jax.Array, jax.Array, jax.Array]:
 @partial(jax.jit, static_argnames=())
 def arb_mat_qr_point(a: jax.Array) -> tuple[jax.Array, jax.Array]:
     return jnp.linalg.qr(_arb_mat_point_matrix(a))
+
+
+def arb_mat_dense_lu_solve_plan_prepare_point(a: jax.Array) -> mat_common.DenseLUSolvePlan:
+    p, l, u = arb_mat_lu_point(a)
+    return mat_common.DenseLUSolvePlan(p=p, l=l, u=u, rows=int(p.shape[-1]), algebra="arb")
+
+
+def arb_mat_lu_solve_point(plan: mat_common.DenseLUSolvePlan | tuple[jax.Array, jax.Array, jax.Array], b: jax.Array) -> jax.Array:
+    plan = mat_common.as_dense_lu_solve_plan(plan, algebra="arb", label="point_wrappers.arb_mat_lu_solve_point")
+    p_mid = _arb_mat_point_matrix(plan.p)
+    l_mid = _arb_mat_point_matrix(plan.l)
+    u_mid = _arb_mat_point_matrix(plan.u)
+    b_mid = _arb_mat_point_rhs(b)
+    vector_rhs = b_mid.ndim == p_mid.ndim - 1
+    pb = jnp.einsum("...ij,...j->...i", p_mid, b_mid) if vector_rhs else jnp.matmul(p_mid, b_mid)
+    y = lax.linalg.triangular_solve(
+        l_mid,
+        pb[..., None] if vector_rhs else pb,
+        left_side=True,
+        lower=True,
+        unit_diagonal=True,
+    )
+    out = lax.linalg.triangular_solve(u_mid, y, left_side=True, lower=False, unit_diagonal=False)
+    return out[..., 0] if vector_rhs else out
+
+
+def arb_mat_dense_lu_solve_plan_apply_point(plan: mat_common.DenseLUSolvePlan | tuple[jax.Array, jax.Array, jax.Array], b: jax.Array) -> jax.Array:
+    return arb_mat_lu_solve_point(plan, b)
 
 
 @partial(jax.jit, static_argnames=())
@@ -334,6 +472,33 @@ def arb_mat_matvec_cached_apply_batch_padded_point(cache: jax.Array, x: jax.Arra
     return arb_mat_matvec_cached_apply_point(*call_args)
 
 
+def arb_mat_transpose_batch_fixed_point(a: jax.Array) -> jax.Array:
+    return arb_mat_transpose_point(a)
+
+
+def arb_mat_transpose_batch_padded_point(a: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((a,), pad_to)
+    return arb_mat_transpose_point(*call_args)
+
+
+def arb_mat_diag_batch_fixed_point(a: jax.Array) -> jax.Array:
+    return arb_mat_diag_point(a)
+
+
+def arb_mat_diag_batch_padded_point(a: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((a,), pad_to)
+    return arb_mat_diag_point(*call_args)
+
+
+def arb_mat_diag_matrix_batch_fixed_point(d: jax.Array) -> jax.Array:
+    return arb_mat_diag_matrix_point(d)
+
+
+def arb_mat_diag_matrix_batch_padded_point(d: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((d,), pad_to)
+    return arb_mat_diag_matrix_point(*call_args)
+
+
 @partial(jax.jit, static_argnames=())
 def acb_mat_matmul_point(a: jax.Array, b: jax.Array) -> jax.Array:
     a_mid = _acb_mat_point_matrix(a)
@@ -362,9 +527,12 @@ def acb_mat_banded_matvec_point(a: jax.Array, x: jax.Array, *, lower_bandwidth: 
 @partial(jax.jit, static_argnames=())
 def acb_mat_solve_point(a: jax.Array, b: jax.Array) -> jax.Array:
     a_mid = _acb_mat_point_matrix(a)
-    b_mid = _acb_mat_point_vector(b)
-    checks.check_equal(a_mid.shape[-1], b_mid.shape[-1], "point_wrappers.acb_mat_solve_point.inner")
-    return jnp.linalg.solve(a_mid, b_mid)
+    b_mid = _acb_mat_point_rhs(b)
+    rows = b_mid.shape[-1] if b_mid.ndim == a_mid.ndim - 1 else b_mid.shape[-2]
+    checks.check_equal(a_mid.shape[-1], rows, "point_wrappers.acb_mat_solve_point.inner")
+    vector_rhs = b_mid.ndim == a_mid.ndim - 1
+    out = jnp.linalg.solve(a_mid, b_mid[..., None] if vector_rhs else b_mid)
+    return out[..., 0] if vector_rhs else out
 
 
 @partial(jax.jit, static_argnames=())
@@ -385,9 +553,12 @@ def acb_mat_trace_point(a: jax.Array) -> jax.Array:
 @partial(jax.jit, static_argnames=("lower", "unit_diagonal"))
 def acb_mat_triangular_solve_point(a: jax.Array, b: jax.Array, *, lower: bool, unit_diagonal: bool = False) -> jax.Array:
     a_mid = _acb_mat_point_matrix(a)
-    b_mid = _acb_mat_point_vector(b)
-    checks.check_equal(a_mid.shape[-1], b_mid.shape[-1], "point_wrappers.acb_mat_triangular_solve_point.inner")
-    return lax.linalg.triangular_solve(a_mid, b_mid, left_side=True, lower=lower, unit_diagonal=unit_diagonal)
+    b_mid = _acb_mat_point_rhs(b)
+    rows = b_mid.shape[-1] if b_mid.ndim == a_mid.ndim - 1 else b_mid.shape[-2]
+    checks.check_equal(a_mid.shape[-1], rows, "point_wrappers.acb_mat_triangular_solve_point.inner")
+    vector_rhs = b_mid.ndim == a_mid.ndim - 1
+    out = lax.linalg.triangular_solve(a_mid, b_mid[..., None] if vector_rhs else b_mid, left_side=True, lower=lower, unit_diagonal=unit_diagonal)
+    return out[..., 0] if vector_rhs else out
 
 
 @partial(jax.jit, static_argnames=())
@@ -405,6 +576,34 @@ def acb_mat_lu_point(a: jax.Array) -> tuple[jax.Array, jax.Array, jax.Array]:
 @partial(jax.jit, static_argnames=())
 def acb_mat_qr_point(a: jax.Array) -> tuple[jax.Array, jax.Array]:
     return jnp.linalg.qr(_acb_mat_point_matrix(a))
+
+
+def acb_mat_dense_lu_solve_plan_prepare_point(a: jax.Array) -> mat_common.DenseLUSolvePlan:
+    p, l, u = acb_mat_lu_point(a)
+    return mat_common.DenseLUSolvePlan(p=p, l=l, u=u, rows=int(p.shape[-1]), algebra="acb")
+
+
+def acb_mat_lu_solve_point(plan: mat_common.DenseLUSolvePlan | tuple[jax.Array, jax.Array, jax.Array], b: jax.Array) -> jax.Array:
+    plan = mat_common.as_dense_lu_solve_plan(plan, algebra="acb", label="point_wrappers.acb_mat_lu_solve_point")
+    p_mid = _acb_mat_point_matrix(plan.p)
+    l_mid = _acb_mat_point_matrix(plan.l)
+    u_mid = _acb_mat_point_matrix(plan.u)
+    b_mid = _acb_mat_point_rhs(b)
+    vector_rhs = b_mid.ndim == p_mid.ndim - 1
+    pb = jnp.einsum("...ij,...j->...i", p_mid, b_mid) if vector_rhs else jnp.matmul(p_mid, b_mid)
+    y = lax.linalg.triangular_solve(
+        l_mid,
+        pb[..., None] if vector_rhs else pb,
+        left_side=True,
+        lower=True,
+        unit_diagonal=True,
+    )
+    out = lax.linalg.triangular_solve(u_mid, y, left_side=True, lower=False, unit_diagonal=False)
+    return out[..., 0] if vector_rhs else out
+
+
+def acb_mat_dense_lu_solve_plan_apply_point(plan: mat_common.DenseLUSolvePlan | tuple[jax.Array, jax.Array, jax.Array], b: jax.Array) -> jax.Array:
+    return acb_mat_lu_solve_point(plan, b)
 
 
 @partial(jax.jit, static_argnames=())
@@ -528,6 +727,107 @@ def acb_mat_identity_point(n: int, *, dtype: jnp.dtype = jnp.float64) -> jax.Arr
     return jnp.eye(n, dtype=jnp.result_type(dtype, jnp.complex64))
 
 
+def acb_mat_permutation_matrix_point(perm: jax.Array, *, dtype: jnp.dtype = jnp.float64) -> jax.Array:
+    perm = jnp.asarray(perm, dtype=jnp.int32)
+    return jnp.eye(perm.shape[-1], dtype=jnp.result_type(dtype, jnp.complex64))[perm]
+
+
+@partial(jax.jit, static_argnames=())
+def acb_mat_transpose_point(a: jax.Array) -> jax.Array:
+    return jnp.swapaxes(_acb_mat_point_matrix(a), -2, -1)
+
+
+@partial(jax.jit, static_argnames=())
+def acb_mat_conjugate_transpose_point(a: jax.Array) -> jax.Array:
+    return jnp.swapaxes(jnp.conj(_acb_mat_point_matrix(a)), -2, -1)
+
+
+@partial(jax.jit, static_argnames=("row_start", "row_stop", "col_start", "col_stop"))
+def acb_mat_submatrix_point(a: jax.Array, row_start: int, row_stop: int, col_start: int, col_stop: int) -> jax.Array:
+    return _acb_mat_point_matrix(a)[..., row_start:row_stop, col_start:col_stop]
+
+
+@partial(jax.jit, static_argnames=())
+def acb_mat_diag_point(a: jax.Array) -> jax.Array:
+    a_mid = _acb_mat_point_matrix(a)
+    idx = jnp.arange(a_mid.shape[-1])
+    return a_mid[..., idx, idx]
+
+
+@partial(jax.jit, static_argnames=())
+def acb_mat_diag_matrix_point(d: jax.Array) -> jax.Array:
+    d_mid = _acb_mat_point_vector(d)
+    eye = jnp.eye(d_mid.shape[-1], dtype=d_mid.dtype)
+    return eye * d_mid[..., None, :]
+
+
+def acb_mat_block_assemble_point(block_rows) -> jax.Array:
+    checks.check(len(block_rows) > 0, "point_wrappers.acb_mat_block_assemble_point.rows")
+    row_chunks = []
+    for row in block_rows:
+        row_chunks.append(jnp.concatenate([_acb_mat_point_matrix(block) for block in row], axis=-1))
+    return jnp.concatenate(row_chunks, axis=-2)
+
+
+def acb_mat_block_diag_point(blocks) -> jax.Array:
+    checks.check(len(blocks) > 0, "point_wrappers.acb_mat_block_diag_point.blocks")
+    matrices = [_acb_mat_point_matrix(block) for block in blocks]
+    row_sizes = [int(block.shape[-2]) for block in matrices]
+    col_sizes = [int(block.shape[-1]) for block in matrices]
+    dtype = matrices[0].dtype
+    rows = []
+    for i, block in enumerate(matrices):
+        row = []
+        for j in range(len(matrices)):
+            if i == j:
+                row.append(block)
+            else:
+                row.append(jnp.zeros(block.shape[:-2] + (row_sizes[i], col_sizes[j]), dtype=dtype))
+        rows.append(tuple(row))
+    return acb_mat_block_assemble_point(tuple(rows))
+
+
+def acb_mat_block_extract_point(a: jax.Array, row_block_sizes, col_block_sizes, row_block: int, col_block: int) -> jax.Array:
+    a_mid = _acb_mat_point_matrix(a)
+    row_offsets = [0]
+    for size in row_block_sizes:
+        row_offsets.append(row_offsets[-1] + int(size))
+    col_offsets = [0]
+    for size in col_block_sizes:
+        col_offsets.append(col_offsets[-1] + int(size))
+    return a_mid[..., row_offsets[row_block] : row_offsets[row_block + 1], col_offsets[col_block] : col_offsets[col_block + 1]]
+
+
+def acb_mat_block_row_point(a: jax.Array, row_block_sizes, row_block: int) -> jax.Array:
+    a_mid = _acb_mat_point_matrix(a)
+    offsets = [0]
+    for size in row_block_sizes:
+        offsets.append(offsets[-1] + int(size))
+    return a_mid[..., offsets[row_block] : offsets[row_block + 1], :]
+
+
+def acb_mat_block_col_point(a: jax.Array, col_block_sizes, col_block: int) -> jax.Array:
+    a_mid = _acb_mat_point_matrix(a)
+    offsets = [0]
+    for size in col_block_sizes:
+        offsets.append(offsets[-1] + int(size))
+    return a_mid[..., :, offsets[col_block] : offsets[col_block + 1]]
+
+
+def acb_mat_block_matmul_point(a_blocks, b_blocks) -> jax.Array:
+    out_rows = []
+    for i, a_row in enumerate(a_blocks):
+        out_row = []
+        for j in range(len(b_blocks[0])):
+            total = None
+            for k in range(len(a_row)):
+                prod = acb_mat_matmul_point(a_row[k], b_blocks[k][j])
+                total = prod if total is None else total + prod
+            out_row.append(total)
+        out_rows.append(tuple(out_row))
+    return acb_mat_block_assemble_point(tuple(out_rows))
+
+
 @partial(jax.jit, static_argnames=())
 def acb_mat_norm_fro_point(a: jax.Array) -> jax.Array:
     return jnp.linalg.norm(_acb_mat_point_matrix(a), ord="fro", axis=(-2, -1))
@@ -568,6 +868,42 @@ def acb_mat_norm_inf_batch_fixed_point(a: jax.Array) -> jax.Array:
 def acb_mat_norm_inf_batch_padded_point(a: jax.Array, *, pad_to: int) -> jax.Array:
     call_args, _ = _pad_args_repeat_last((a,), pad_to)
     return acb_mat_norm_inf_point(*call_args)
+
+
+def acb_mat_transpose_batch_fixed_point(a: jax.Array) -> jax.Array:
+    return acb_mat_transpose_point(a)
+
+
+def acb_mat_transpose_batch_padded_point(a: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((a,), pad_to)
+    return acb_mat_transpose_point(*call_args)
+
+
+def acb_mat_conjugate_transpose_batch_fixed_point(a: jax.Array) -> jax.Array:
+    return acb_mat_conjugate_transpose_point(a)
+
+
+def acb_mat_conjugate_transpose_batch_padded_point(a: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((a,), pad_to)
+    return acb_mat_conjugate_transpose_point(*call_args)
+
+
+def acb_mat_diag_batch_fixed_point(a: jax.Array) -> jax.Array:
+    return acb_mat_diag_point(a)
+
+
+def acb_mat_diag_batch_padded_point(a: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((a,), pad_to)
+    return acb_mat_diag_point(*call_args)
+
+
+def acb_mat_diag_matrix_batch_fixed_point(d: jax.Array) -> jax.Array:
+    return acb_mat_diag_matrix_point(d)
+
+
+def acb_mat_diag_matrix_batch_padded_point(d: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((d,), pad_to)
+    return acb_mat_diag_matrix_point(*call_args)
 
 
 def _real_laguerre_l_scalar(n: int, m: jax.Array, x: jax.Array) -> jax.Array:

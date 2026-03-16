@@ -1,17 +1,27 @@
-Last updated: 2026-03-01T00:00:00Z
+Last updated: 2026-03-14T12:00:00Z
 
 # Documentation
 
-This folder is organized by purpose (similar to `docs_continuous` style): governance at top level, implementation notes under `implementation/`, references under `references/`, and generated status reports under `reports/`.
+This tree follows the governance layout in [documentation_governance.md](/home/phili/projects/arbplusJAX/docs/documentation_governance.md).
 
-- See `architecture.md` for the overall system layout and execution modes.
-- See `benchmarks.md` and `benchmark_process.md` for benchmark backends, sweeps, and reporting workflow.
-- See `engineering_policy.md` for the repo-wide implementation contract and engineering-status methodology.
-- See `reports/hypgeom_status.md` for the staged current-state matrix covering canonical and alternative hypergeometric families.
-- See `reports/hypgeom_compile_probe.md` and `reports/hypgeom_compile_probe_rigorous.md` for second-tranche compile-count probes.
-- See `reports/hypgeom_mode_benchmark_smoke.md` for the current staged padded-batch smoke benchmark across selected hypergeometric families.
-- See `results/benchmarks/bessel_compile_probe_float32/bessel_compile_probe.md` for the current canonical Bessel padded-core compile probe.
-- See `implementation/modules/hypgeom.md` for current hypergeometric scope and approximations.
-- See `implementation/modules/jrb_mat.md` and `implementation/modules/jcb_mat.md` for the Jones-labeled matrix-function subsystem scaffold.
-- See `implementation/external/cusf_compat.md` for the separate `cusf_*` compatibility implementation lineage and mapping.
-- Use these notes as the source of truth for accuracy and parity expectations.
+Primary entry documents:
+- [architecture.md](/home/phili/projects/arbplusJAX/docs/architecture.md)
+- [documentation_governance.md](/home/phili/projects/arbplusJAX/docs/documentation_governance.md)
+- [project_overview.md](/home/phili/projects/arbplusJAX/docs/project_overview.md)
+- [index.md](/home/phili/projects/arbplusJAX/docs/index.md)
+
+Section map:
+- [governance](/home/phili/projects/arbplusJAX/docs/governance)
+- [standards](/home/phili/projects/arbplusJAX/docs/standards)
+- [specs](/home/phili/projects/arbplusJAX/docs/specs)
+- [objects](/home/phili/projects/arbplusJAX/docs/objects)
+- [theory](/home/phili/projects/arbplusJAX/docs/theory)
+- [implementation](/home/phili/projects/arbplusJAX/docs/implementation)
+- [status](/home/phili/projects/arbplusJAX/docs/status)
+
+Common entry points:
+- platform/run workflow: [run_platform.md](/home/phili/projects/arbplusJAX/docs/implementation/run_platform.md)
+- benchmark workflow: [benchmarks.md](/home/phili/projects/arbplusJAX/docs/implementation/benchmarks.md)
+- benchmark process: [benchmark_process.md](/home/phili/projects/arbplusJAX/docs/implementation/benchmark_process.md)
+- roadmap and active TODOs: [todo.md](/home/phili/projects/arbplusJAX/docs/status/todo.md)
+- generated status reports: [reports/README.md](/home/phili/projects/arbplusJAX/docs/status/reports/README.md)

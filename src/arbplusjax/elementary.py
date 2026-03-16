@@ -3,6 +3,8 @@ from __future__ import annotations
 import jax
 import jax.numpy as jnp
 
+from . import jax_precision
+
 jax.config.update("jax_enable_x64", True)
 
 # Central constants
@@ -151,13 +153,7 @@ def logsubexp(a: jax.Array, b: jax.Array) -> jax.Array:
 
 
 def logsumexp(v: jax.Array, axis: int = -1, keepdims: bool = False) -> jax.Array:
-    vv = jnp.asarray(v)
-    m = jnp.max(vv, axis=axis, keepdims=True)
-    s = jnp.sum(jnp.exp(vv - m), axis=axis, keepdims=True)
-    out = m + jnp.log(s)
-    if keepdims:
-        return out
-    return jnp.squeeze(out, axis=axis)
+    return jax_precision.safe_logsumexp(v, axis=axis, keepdims=keepdims)
 
 
 def log1mexp(x: jax.Array) -> jax.Array:

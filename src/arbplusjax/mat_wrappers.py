@@ -30,8 +30,11 @@ def _point_name(name: str) -> str:
 def _make_wrapper(name: str, base_fn: Callable[..., jax.Array], kernel_fn: Callable[..., jax.Array]) -> Callable[..., jax.Array]:
     is_acb = name.startswith("acb_")
     point_fn = getattr(point_wrappers, _point_name(name), None)
+    exact_rigorous_fn = getattr(acb_mat if is_acb else arb_mat, f"{_kernel_name(name)}_rigorous", None)
 
     def rig_fn(*args, prec_bits: int, **kwargs):
+        if callable(exact_rigorous_fn):
+            return exact_rigorous_fn(*args, **kwargs)
         if is_acb:
             if name.startswith("acb_mat_det"):
                 return acb_mat.acb_mat_det_rigorous(*args, **kwargs)
@@ -112,18 +115,51 @@ def _make_batch_mode_padded(name: str) -> Callable[..., jax.Array]:
 
 
 for _base in (
+    "arb_mat_permutation_matrix",
+    "arb_mat_transpose",
+    "arb_mat_submatrix",
+    "arb_mat_diag",
+    "arb_mat_diag_matrix",
     "arb_mat_matmul",
     "arb_mat_matvec",
+    "arb_mat_banded_matvec",
+    "arb_mat_matvec_cached_prepare",
     "arb_mat_matvec_cached_apply",
+    "arb_mat_solve",
+    "arb_mat_inv",
+    "arb_mat_triangular_solve",
+    "arb_mat_lu",
+    "arb_mat_lu_solve",
+    "arb_mat_qr",
     "arb_mat_det",
     "arb_mat_trace",
     "arb_mat_sqr",
+    "arb_mat_norm_fro",
+    "arb_mat_norm_1",
+    "arb_mat_norm_inf",
+    "acb_mat_permutation_matrix",
+    "acb_mat_transpose",
+    "acb_mat_conjugate_transpose",
+    "acb_mat_submatrix",
+    "acb_mat_diag",
+    "acb_mat_diag_matrix",
     "acb_mat_matmul",
     "acb_mat_matvec",
+    "acb_mat_banded_matvec",
+    "acb_mat_matvec_cached_prepare",
     "acb_mat_matvec_cached_apply",
+    "acb_mat_solve",
+    "acb_mat_inv",
+    "acb_mat_triangular_solve",
+    "acb_mat_lu",
+    "acb_mat_lu_solve",
+    "acb_mat_qr",
     "acb_mat_det",
     "acb_mat_trace",
     "acb_mat_sqr",
+    "acb_mat_norm_fro",
+    "acb_mat_norm_1",
+    "acb_mat_norm_inf",
 ):
     _fixed = _make_batch_mode_fixed(_base)
     _padded = _make_batch_mode_padded(_base)

@@ -15,6 +15,9 @@ from typing import Any
 import numpy as np
 import platform
 
+from tools.runtime_manifest import collect_runtime_manifest
+from tools.runtime_manifest import write_runtime_manifest
+
 REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
@@ -543,6 +546,8 @@ def main() -> int:
         stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
         base_outdir = Path("results") / "benchmarks" / f"run_{stamp}"
     base_outdir.mkdir(parents=True, exist_ok=True)
+    manifest = collect_runtime_manifest(REPO_ROOT, jax_mode=os.getenv("JAX_PLATFORMS", "auto"), python_path=sys.executable)
+    write_runtime_manifest(base_outdir, manifest)
 
     if args.c_ref_dir:
         c_ref_dir = Path(args.c_ref_dir)

@@ -1,6 +1,7 @@
 import jax
 import jax.numpy as jnp
 
+from arbplusjax import api
 from arbplusjax import arb_mat
 from arbplusjax import double_interval as di
 
@@ -108,6 +109,130 @@ def test_nxn_matvec_cached_and_sqr():
     _check(bool(jnp.allclose(di.midpoint(sq), a_mid @ a_mid)))
 
 
+def test_cached_prepare_prec_and_batch_helpers():
+    a = jnp.array(
+        [
+            [
+                [[1.0, 1.0], [2.0, 2.0]],
+                [[0.0, 0.0], [3.0, 3.0]],
+            ],
+            [
+                [[2.0, 2.0], [0.0, 0.0]],
+                [[1.0, 1.0], [4.0, 4.0]],
+            ],
+        ],
+        dtype=jnp.float64,
+    )
+
+    fixed = arb_mat.arb_mat_matvec_cached_prepare_batch_fixed(a)
+    padded = arb_mat.arb_mat_matvec_cached_prepare_batch_padded(a, pad_to=4)
+    fixed_prec = arb_mat.arb_mat_matvec_cached_prepare_batch_fixed_prec(a, prec_bits=53)
+
+    _check(fixed.shape == (2, 2, 2, 2))
+    _check(padded.shape == (4, 2, 2, 2))
+    _check(fixed_prec.shape == (2, 2, 2, 2))
+    _check(bool(jnp.allclose(di.midpoint(fixed), di.midpoint(a))))
+
+
+def test_dense_matvec_plan_prepare_and_apply():
+    a = jnp.array(
+        [
+            [[1.0, 1.0], [2.0, 2.0]],
+            [[0.0, 0.0], [3.0, 3.0]],
+        ],
+        dtype=jnp.float64,
+    )
+    x = jnp.array([[1.0, 1.0], [2.0, 2.0]], dtype=jnp.float64)
+
+    plan = arb_mat.arb_mat_dense_matvec_plan_prepare(a)
+    out = arb_mat.arb_mat_dense_matvec_plan_apply(plan, x)
+
+    _check(plan.rows == 2)
+    _check(plan.cols == 2)
+    _check(plan.algebra == "arb")
+    _check(bool(jnp.allclose(di.midpoint(out), di.midpoint(a) @ di.midpoint(x))))
+
+
+def test_dense_lu_plan_matrix_rhs_and_structure_helpers():
+    a = jnp.array(
+        [
+            [[4.0, 4.0], [1.0, 1.0], [0.0, 0.0]],
+            [[2.0, 2.0], [3.0, 3.0], [1.0, 1.0]],
+            [[0.0, 0.0], [1.0, 1.0], [2.0, 2.0]],
+        ],
+        dtype=jnp.float64,
+    )
+    x = jnp.array(
+        [
+            [[1.0, 1.0], [0.0, 0.0]],
+            [[2.0, 2.0], [1.0, 1.0]],
+            [[-1.0, -1.0], [3.0, 3.0]],
+        ],
+        dtype=jnp.float64,
+    )
+    rhs = di.interval(di.midpoint(a) @ di.midpoint(x), di.midpoint(a) @ di.midpoint(x))
+    plan = arb_mat.arb_mat_dense_lu_solve_plan_prepare(a)
+    sol = arb_mat.arb_mat_dense_lu_solve_plan_apply(plan, rhs)
+    p = arb_mat.arb_mat_permutation_matrix(jnp.array([2, 0, 1], dtype=jnp.int32))
+    t = arb_mat.arb_mat_transpose(a)
+    d = arb_mat.arb_mat_diag(a)
+    dm = arb_mat.arb_mat_diag_matrix(d)
+    sub = arb_mat.arb_mat_submatrix(a, 0, 2, 1, 3)
+
+    a_mid = di.midpoint(a)
+    x_mid = di.midpoint(x)
+
+    _check(sol.shape == (3, 2, 2))
+    _check(plan.rows == 3)
+    _check(plan.algebra == "arb")
+    _check(bool(jnp.allclose(di.midpoint(sol), x_mid)))
+    _check(bool(jnp.allclose(di.midpoint(p), jnp.eye(3)[jnp.array([2, 0, 1])])))
+    _check(bool(jnp.allclose(di.midpoint(t), a_mid.T)))
+    _check(bool(jnp.allclose(di.midpoint(d), jnp.diag(a_mid))))
+    _check(bool(jnp.allclose(di.midpoint(dm), jnp.diag(jnp.diag(a_mid)))))
+    _check(bool(jnp.allclose(di.midpoint(sub), a_mid[:2, 1:3])))
+
+
+def test_diag_matrix_preserves_interval_width():
+    d = jnp.array(
+        [
+            [0.9, 1.1],
+            [1.8, 2.2],
+            [-0.3, 0.4],
+        ],
+        dtype=jnp.float64,
+    )
+    dm = arb_mat.arb_mat_diag_matrix(d)
+    idx = jnp.arange(3)
+
+    _check(dm.shape == (3, 3, 2))
+    _check(bool(jnp.allclose(dm[idx, idx, :], d)))
+    _check(bool(jnp.allclose(dm[..., 0, 1, :], jnp.zeros((2,), dtype=jnp.float64))))
+
+
+def test_block_structure_helpers():
+    a11 = di.interval(jnp.array([[1.0, 2.0], [3.0, 4.0]], dtype=jnp.float64), jnp.array([[1.0, 2.0], [3.0, 4.0]], dtype=jnp.float64))
+    a12 = di.interval(jnp.array([[5.0], [6.0]], dtype=jnp.float64), jnp.array([[5.0], [6.0]], dtype=jnp.float64))
+    a21 = di.interval(jnp.array([[7.0, 8.0]], dtype=jnp.float64), jnp.array([[7.0, 8.0]], dtype=jnp.float64))
+    a22 = di.interval(jnp.array([[9.0]], dtype=jnp.float64), jnp.array([[9.0]], dtype=jnp.float64))
+    assembled = arb_mat.arb_mat_block_assemble(((a11, a12), (a21, a22)))
+    block_diag = arb_mat.arb_mat_block_diag((a11, a22))
+    extracted = arb_mat.arb_mat_block_extract(assembled, (2, 1), (2, 1), 1, 0)
+    row = arb_mat.arb_mat_block_row(assembled, (2, 1), 0)
+    col = arb_mat.arb_mat_block_col(assembled, (2, 1), 1)
+    product = arb_mat.arb_mat_block_matmul(((a11, a12),), ((a11, a12), (a21, a22)))
+
+    assembled_mid = jnp.array([[1.0, 2.0, 5.0], [3.0, 4.0, 6.0], [7.0, 8.0, 9.0]], dtype=jnp.float64)
+    block_diag_mid = jnp.array([[1.0, 2.0, 0.0], [3.0, 4.0, 0.0], [0.0, 0.0, 9.0]], dtype=jnp.float64)
+
+    _check(bool(jnp.allclose(di.midpoint(assembled), assembled_mid)))
+    _check(bool(jnp.allclose(di.midpoint(block_diag), block_diag_mid)))
+    _check(bool(jnp.allclose(di.midpoint(extracted), jnp.array([[7.0, 8.0]], dtype=jnp.float64))))
+    _check(bool(jnp.allclose(di.midpoint(row), assembled_mid[:2, :])))
+    _check(bool(jnp.allclose(di.midpoint(col), assembled_mid[:, 2:3])))
+    _check(bool(jnp.allclose(di.midpoint(product), assembled_mid[:2, :] @ assembled_mid)))
+
+
 def test_nxn_triangular_solve_and_lu():
     a = jnp.array(
         [
@@ -209,3 +334,61 @@ def test_norms_and_batch_helpers():
     _check(bool(jnp.allclose(di.midpoint(one), jnp.linalg.norm(mid, ord=1))))
     _check(bool(jnp.allclose(di.midpoint(infn), jnp.linalg.norm(mid, ord=jnp.inf))))
     _check(batch_fro.shape == (2, 2))
+
+
+def test_batch_solve_inv_triangular_lu_qr_helpers_and_api():
+    a = jnp.array(
+        [
+            [
+                [[2.0, 2.0], [1.0, 1.0], [0.0, 0.0]],
+                [[0.0, 0.0], [3.0, 3.0], [1.0, 1.0]],
+                [[1.0, 1.0], [0.0, 0.0], [4.0, 4.0]],
+            ],
+            [
+                [[3.0, 3.0], [0.0, 0.0], [1.0, 1.0]],
+                [[1.0, 1.0], [2.0, 2.0], [0.0, 0.0]],
+                [[0.0, 0.0], [1.0, 1.0], [2.0, 2.0]],
+            ],
+        ],
+        dtype=jnp.float64,
+    )
+    x = jnp.array(
+        [
+            [[1.0, 1.0], [2.0, 2.0], [3.0, 3.0]],
+            [[-1.0, -1.0], [0.5, 0.5], [2.0, 2.0]],
+        ],
+        dtype=jnp.float64,
+    )
+    rhs = arb_mat.arb_mat_matvec_batch_fixed(a, x)
+    lower_a = jnp.tril(a)
+
+    solve = arb_mat.arb_mat_solve_batch_fixed(a, rhs)
+    inv = arb_mat.arb_mat_inv_batch_fixed(a)
+    tri = arb_mat.arb_mat_triangular_solve_batch_fixed(lower_a, rhs, lower=True)
+    p, l, u = arb_mat.arb_mat_lu_batch_fixed(a)
+    q, r = arb_mat.arb_mat_qr_batch_fixed(a)
+
+    _check(solve.shape == (2, 3, 2))
+    _check(inv.shape == (2, 3, 3, 2))
+    _check(tri.shape == (2, 3, 2))
+    _check(p.shape == (2, 3, 3, 2))
+    _check(l.shape == (2, 3, 3, 2))
+    _check(u.shape == (2, 3, 3, 2))
+    _check(q.shape == (2, 3, 3, 2))
+    _check(r.shape == (2, 3, 3, 2))
+    _check(bool(jnp.allclose(di.midpoint(solve), di.midpoint(x))))
+
+    solve_api = api.eval_interval_batch("arb_mat_solve", a, rhs, mode="basic")
+    inv_api = api.eval_interval_batch("arb_mat_inv", a, mode="basic")
+    tri_api = api.eval_interval_batch("arb_mat_triangular_solve", lower_a, rhs, mode="basic", lower=True)
+    lu_api = api.eval_interval_batch("arb_mat_lu", a, mode="basic")
+    qr_api = api.eval_interval_batch("arb_mat_qr", a, mode="basic")
+
+    _check(bool(jnp.allclose(di.midpoint(solve_api), di.midpoint(solve))))
+    _check(bool(jnp.allclose(di.midpoint(inv_api), di.midpoint(inv))))
+    _check(bool(jnp.allclose(di.midpoint(tri_api), di.midpoint(tri))))
+    _check(bool(jnp.allclose(di.midpoint(lu_api[0]), di.midpoint(p))))
+    _check(bool(jnp.allclose(di.midpoint(lu_api[1]), di.midpoint(l))))
+    _check(bool(jnp.allclose(di.midpoint(lu_api[2]), di.midpoint(u))))
+    _check(bool(jnp.allclose(di.midpoint(qr_api[0]), di.midpoint(q))))
+    _check(bool(jnp.allclose(di.midpoint(qr_api[1]), di.midpoint(r))))

@@ -1,0 +1,20 @@
+{
+  "folders": [
+    {
+      "path": "."
+    }
+  ],
+  "settings": {
+    "chatgpt.openOnStartup": true,
+    "cmake.ignoreCMakeListsMissing": true,
+    "python.defaultInterpreterPath": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+    "python.testing.pytestEnabled": true,
+    "python.testing.pytestArgs": [
+      "tests"
+    ],
+    "python.analysis.extraPaths": [
+      "${workspaceFolder}/src"
+    ],
+    "terminal.integrated.defaultProfile.windows": "PowerShell"
+  }
+}

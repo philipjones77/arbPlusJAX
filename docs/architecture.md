@@ -67,13 +67,14 @@ Mode dispatch is centralized in `wrappers_common.py` and used by `*_wrappers.py`
 
 ## Results and Benchmarking
 
-- `results/`: benchmark logs and test runs, including timestamps.
+- `outputs/`: canonical governed output root going forward.
+- `results/`: legacy benchmark logs and test runs retained for compatibility.
 - `tools/`: scripts for comparisons and audits.
 - `benchmarks/bench_harness.py`: uses `arbplusjax.api` to resolve interval/point modes for consistency.
 
 ## Function Registry
 
-See `docs/references/inventory/function_list.md` for the current public/point/interval function lists.
+See [function_catalog.md](/home/phili/projects/arbplusJAX/docs/objects/function_catalog.md) and the generated reports in [reports/README.md](/home/phili/projects/arbplusJAX/docs/status/reports/README.md) for the current public and implementation registries.
 
 ## Archived Migration
 

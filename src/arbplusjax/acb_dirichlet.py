@@ -10,8 +10,8 @@ Provenance:
 - classification: new
 - base_names: dirichlet_zeta, dirichlet_eta
 - module lineage: repo-original Dirichlet helper family
-- naming policy: see docs/function_naming.md
-- registry report: see docs/reports/function_implementation_index.md
+- naming policy: see docs/standards/function_naming.md
+- registry report: see docs/status/reports/function_implementation_index.md
 """
 
 from functools import partial
@@ -28,8 +28,8 @@ PROVENANCE = {
     "classification": "new",
     "base_names": ("dirichlet_zeta", "dirichlet_eta"),
     "module_lineage": "repo-original Dirichlet helper family",
-    "naming_policy": "docs/function_naming.md",
-    "registry_report": "docs/reports/function_implementation_index.md",
+    "naming_policy": "docs/standards/function_naming.md",
+    "registry_report": "docs/status/reports/function_implementation_index.md",
 }
 
 

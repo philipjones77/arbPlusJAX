@@ -38,8 +38,8 @@ Last updated: 2026-02-25T03:51:38Z
 - Differentiable w.r.t. midpoint parameters for smooth subdomains.
 - Truncation counts and mode switches are static JIT args.
 - Current staged status and smoke benchmark:
-  - [hypgeom_status.md](/home/phili/projects/arbplusJAX/docs/reports/hypgeom_status.md)
-  - [hypgeom_mode_benchmark_smoke.md](/home/phili/projects/arbplusJAX/docs/reports/hypgeom_mode_benchmark_smoke.md)
+  - [hypgeom_status.md](/home/phili/projects/arbplusJAX/docs/status/reports/hypgeom_status.md)
+  - [hypgeom_mode_benchmark_smoke.md](/home/phili/projects/arbplusJAX/docs/status/reports/hypgeom_mode_benchmark_smoke.md)
 
 ## Notes
 

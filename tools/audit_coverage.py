@@ -4,8 +4,9 @@ import ast
 import csv
 import os
 import re
+import subprocess
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Dict, List, Set, Tuple
 
@@ -99,6 +100,53 @@ def _scan_c_headers() -> Set[str]:
     return names
 
 
+def _git_show_text(spec: str) -> str:
+    try:
+        completed = subprocess.run(
+            ["git", "show", spec],
+            cwd=str(JAX_ROOT),
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except Exception:
+        return ""
+    return completed.stdout
+
+
+def _parse_missing_from_audit_text(text: str) -> Set[str]:
+    names: Set[str] = set()
+    in_missing = False
+    for line in text.splitlines():
+        if line.strip() == "## Missing C functions in JAX":
+            in_missing = True
+            continue
+        if in_missing and line.startswith("## "):
+            break
+        if in_missing and line.startswith("- "):
+            names.add(line[2:].strip())
+    return names
+
+
+def _parse_in_c_from_targets_text(text: str) -> Set[str]:
+    names: Set[str] = set()
+    if not text.strip():
+        return names
+    reader = csv.DictReader(text.splitlines())
+    for row in reader:
+        if row.get("in_c", "").strip().lower() == "yes":
+            fn = row.get("function", "").strip()
+            if fn:
+                names.add(fn)
+    return names
+
+
+def _fallback_c_inventory_from_git() -> Set[str]:
+    audit_text = _git_show_text("HEAD~1:docs/audit.md")
+    targets_text = _git_show_text("HEAD~1:tests/targets.csv")
+    return _parse_missing_from_audit_text(audit_text) | _parse_in_c_from_targets_text(targets_text)
+
+
 def _scan_jax_defs() -> Dict[str, JaxDef]:
     defs: Dict[str, JaxDef] = {}
     for path in JAX_SRC.glob("*.py"):
@@ -144,11 +192,31 @@ def _scan_mpmath_names() -> Set[str]:
     return names
 
 
+def _scan_jax_scipy_names() -> Set[str]:
+    names: Set[str] = set()
+    try:
+        import jax.scipy as jsp  # type: ignore
+    except Exception:
+        return names
+
+    for attr in ("special", "linalg", "stats", "fft"):
+        mod = getattr(jsp, attr, None)
+        if mod is None:
+            continue
+        for name in dir(mod):
+            if not name.startswith("_"):
+                names.add(name)
+    return names
+
+
 def main() -> None:
     c_names = _scan_c_headers()
+    if not c_names:
+        c_names = _fallback_c_inventory_from_git()
     jax_defs = _scan_jax_defs()
     tests_text = _scan_tests_text()
     mpmath_names = _scan_mpmath_names()
+    jax_scipy_names = _scan_jax_scipy_names()
 
     jax_funcs = set(jax_defs.keys())
     c_missing = sorted(n for n in c_names if n not in jax_funcs)
@@ -161,7 +229,7 @@ def main() -> None:
 
     untested = sorted(n for n in jax_funcs if n not in tested)
 
-    timestamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+    timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     results_dir = JAX_ROOT / "results"
     results_dir.mkdir(exist_ok=True)
     audit_md = results_dir / f"audit_{timestamp}.md"
@@ -221,17 +289,6 @@ def main() -> None:
     # docs
     docs_audit = JAX_ROOT / "docs" / "audit.md"
     docs_audit.write_text(audit_md.read_text(encoding="utf-8"), encoding="utf-8")
-
-    todo = JAX_ROOT / "docs" / "todo.md"
-    with todo.open("w", encoding="utf-8") as f:
-        f.write("# TODO\n\n")
-        f.write("## Missing C implementations\n\n")
-        for name in c_missing:
-            f.write(f"- {name}\n")
-        f.write("\n## Untested JAX functions\n\n")
-        for name in untested:
-            f.write(f"- {name}\n")
-
 
 if __name__ == "__main__":
     main()

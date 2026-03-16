@@ -10,6 +10,7 @@ import jax.numpy as jnp
 from .diagnostics import TailEvaluationDiagnostics
 from .fallback_mp import mp_tail_integral_fallback
 from .quadrature import finite_panel_tail_quadrature
+from .quadrature import panel_quadrature
 from .recurrence import TailRatioRecurrence, ratio_recurrence_estimate
 from .regions import choose_tail_method, recurrence_is_available
 from .sequence import aitken_delta_squared, wynn_epsilon
@@ -39,6 +40,7 @@ class TailIntegralProblem:
     panel_width: float = 0.25
     max_panels: int = 128
     samples_per_panel: int = 32
+    quadrature_rule: str = "simpson"
     recurrence: TailRatioRecurrence | None = None
     derivative_metadata: TailDerivativeMetadata = TailDerivativeMetadata()
     regime_metadata: TailRegimeMetadata = TailRegimeMetadata()
@@ -68,30 +70,37 @@ def evaluate_tail_integral(
             panel_width=problem.panel_width,
             max_panels=problem.max_panels,
             samples_per_panel=problem.samples_per_panel,
+            quadrature_rule=problem.quadrature_rule,
         )
-    elif chosen_method == "mpfallback":
+    elif chosen_method == "high_precision_refine":
         value, diagnostics = mp_tail_integral_fallback(
             problem.integrand,
             problem.lower_limit,
             panel_width=problem.panel_width,
             max_panels=problem.max_panels,
             samples_per_panel=problem.samples_per_panel,
+            quadrature_rule=problem.quadrature_rule,
         )
         value = jnp.asarray(value, dtype=jnp.float64)
     elif chosen_method == "recurrence":
         if problem.recurrence is None:
             raise ValueError("recurrence method requested but no recurrence metadata is attached.")
-        value = jnp.asarray(ratio_recurrence_estimate(problem.recurrence, n_terms=problem.max_panels), dtype=jnp.float64)
+        value, recurrence_diagnostics = ratio_recurrence_estimate(
+            problem.recurrence,
+            n_terms=problem.max_panels,
+            return_diagnostics=True,
+        )
+        value = jnp.asarray(value, dtype=jnp.float64)
         diagnostics = TailEvaluationDiagnostics(
             method="recurrence",
             chunk_count=0,
             panel_count=0,
-            recurrence_steps=problem.max_panels,
-            estimated_tail_remainder=jnp.abs(value) * jnp.asarray(1e-8, dtype=jnp.float64),
-            instability_flags=(),
+            recurrence_steps=recurrence_diagnostics.recurrence_steps,
+            estimated_tail_remainder=recurrence_diagnostics.estimated_remainder,
+            instability_flags=recurrence_diagnostics.instability_flags,
             fallback_used=False,
-            precision_warning=False,
-            note=problem.recurrence.note,
+            precision_warning=bool(recurrence_diagnostics.instability_flags),
+            note=recurrence_diagnostics.note,
         )
     elif chosen_method in {"aitken", "wynn"}:
         base_value, base_diagnostics = finite_panel_tail_quadrature(
@@ -100,6 +109,7 @@ def evaluate_tail_integral(
             panel_width=problem.panel_width,
             max_panels=problem.max_panels,
             samples_per_panel=problem.samples_per_panel,
+            quadrature_rule=problem.quadrature_rule,
             method=chosen_method,
             note="Sequence acceleration scaffold built from cumulative panel sums.",
         )
@@ -118,7 +128,10 @@ def evaluate_tail_integral(
             note=base_diagnostics.note,
         )
     else:
-        raise ValueError("method must be one of: auto, quadrature, aitken, wynn, recurrence, mpfallback")
+        raise ValueError(
+            "method must be one of: auto, quadrature, aitken, wynn, recurrence, high_precision_refine"
+            " (mpfallback is accepted as a compatibility alias)"
+        )
 
     if return_diagnostics:
         return value, diagnostics
@@ -127,14 +140,19 @@ def evaluate_tail_integral(
 
 def _panel_partial_sums(problem: TailIntegralProblem) -> jnp.ndarray:
     lower = jnp.asarray(problem.lower_limit, dtype=jnp.float64)
-    sample_offsets = jnp.linspace(0.0, problem.panel_width, problem.samples_per_panel, dtype=jnp.float64)
     panel_indices = jnp.arange(problem.max_panels, dtype=jnp.int32)
 
     def panel_step(total, panel_index):
         start = lower + jnp.asarray(panel_index, dtype=jnp.float64) * jnp.asarray(problem.panel_width, dtype=jnp.float64)
-        grid = start + sample_offsets
-        vals = jax.vmap(problem.integrand)(grid)
-        total = total + jnp.trapezoid(vals, grid)
+        end = start + jnp.asarray(problem.panel_width, dtype=jnp.float64)
+        panel_val, _ = panel_quadrature(
+            problem.integrand,
+            start,
+            end,
+            samples_per_panel=problem.samples_per_panel,
+            quadrature_rule=problem.quadrature_rule,
+        )
+        total = total + panel_val
         return total, total
 
     _, partials = lax.scan(panel_step, jnp.asarray(0.0, dtype=jnp.float64), panel_indices)

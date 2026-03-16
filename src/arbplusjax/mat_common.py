@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 import jax
 import jax.numpy as jnp
 
@@ -8,6 +10,41 @@ from . import checks
 from . import double_interval as di
 
 jax.config.update("jax_enable_x64", True)
+
+
+@jax.tree_util.register_pytree_node_class
+@dataclass(frozen=True)
+class DenseMatvecPlan:
+    matrix: jax.Array
+    rows: int
+    cols: int
+    algebra: str
+
+    def tree_flatten(self):
+        return (self.matrix,), {"rows": self.rows, "cols": self.cols, "algebra": self.algebra}
+
+    @classmethod
+    def tree_unflatten(cls, aux_data, children):
+        (matrix,) = children
+        return cls(matrix=matrix, rows=aux_data["rows"], cols=aux_data["cols"], algebra=aux_data["algebra"])
+
+
+@jax.tree_util.register_pytree_node_class
+@dataclass(frozen=True)
+class DenseLUSolvePlan:
+    p: jax.Array
+    l: jax.Array
+    u: jax.Array
+    rows: int
+    algebra: str
+
+    def tree_flatten(self):
+        return (self.p, self.l, self.u), {"rows": self.rows, "algebra": self.algebra}
+
+    @classmethod
+    def tree_unflatten(cls, aux_data, children):
+        p, l, u = children
+        return cls(p=p, l=l, u=u, rows=aux_data["rows"], algebra=aux_data["algebra"])
 
 
 def as_interval_mat_2x2(x: jax.Array, label: str) -> jax.Array:
@@ -31,6 +68,13 @@ def as_interval_vector(x: jax.Array, label: str) -> jax.Array:
     return arr
 
 
+def as_interval_rhs(x: jax.Array, label: str) -> jax.Array:
+    arr = di.as_interval(x)
+    checks.check(arr.ndim >= 2, f"{label}.ndim")
+    checks.check_equal(arr.shape[-1], 2, f"{label}.tail")
+    return arr
+
+
 def as_box_mat_2x2(x: jax.Array, label: str) -> jax.Array:
     arr = acb_core.as_acb_box(x)
     checks.check_tail_shape(arr, (2, 2, 4), label)
@@ -46,6 +90,13 @@ def as_box_matrix(x: jax.Array, label: str) -> jax.Array:
 
 
 def as_box_vector(x: jax.Array, label: str) -> jax.Array:
+    arr = acb_core.as_acb_box(x)
+    checks.check(arr.ndim >= 2, f"{label}.ndim")
+    checks.check_equal(arr.shape[-1], 4, f"{label}.tail")
+    return arr
+
+
+def as_box_rhs(x: jax.Array, label: str) -> jax.Array:
     arr = acb_core.as_acb_box(x)
     checks.check(arr.ndim >= 2, f"{label}.ndim")
     checks.check_equal(arr.shape[-1], 4, f"{label}.tail")
@@ -202,13 +253,88 @@ def box_det_3x3(a: jax.Array) -> jax.Array:
     return acb_core.acb_sub(pos, neg)
 
 
+def as_dense_matvec_plan(plan: DenseMatvecPlan | jax.Array, *, algebra: str, label: str) -> DenseMatvecPlan:
+    if isinstance(plan, DenseMatvecPlan):
+        checks.check(plan.algebra == algebra, f"{label}.algebra")
+        return plan
+    if algebra == "arb":
+        matrix = as_interval_matrix(plan, label)
+    elif algebra == "acb":
+        matrix = as_box_matrix(plan, label)
+    else:
+        raise ValueError("algebra must be one of: arb, acb")
+    return DenseMatvecPlan(matrix=matrix, rows=int(matrix.shape[-3]), cols=int(matrix.shape[-2]), algebra=algebra)
+
+
+def as_dense_lu_solve_plan(plan: DenseLUSolvePlan | tuple[jax.Array, jax.Array, jax.Array], *, algebra: str, label: str) -> DenseLUSolvePlan:
+    if isinstance(plan, DenseLUSolvePlan):
+        checks.check(plan.algebra == algebra, f"{label}.algebra")
+        return plan
+    checks.check(isinstance(plan, tuple) and len(plan) == 3, f"{label}.tuple")
+    p, l, u = plan
+    if algebra == "arb":
+        p = as_interval_matrix(p, f"{label}.p")
+        l = as_interval_matrix(l, f"{label}.l")
+        u = as_interval_matrix(u, f"{label}.u")
+    elif algebra == "acb":
+        p = as_box_matrix(p, f"{label}.p")
+        l = as_box_matrix(l, f"{label}.l")
+        u = as_box_matrix(u, f"{label}.u")
+    else:
+        raise ValueError("algebra must be one of: arb, acb")
+    checks.check_equal(p.shape[-3], l.shape[-3], f"{label}.rows")
+    checks.check_equal(p.shape[-3], u.shape[-3], f"{label}.rows_u")
+    return DenseLUSolvePlan(p=p, l=l, u=u, rows=int(p.shape[-3]), algebra=algebra)
+
+
+def estimator_mean(probes: jax.Array, coerce_probes, integrand_fn) -> jax.Array:
+    coerced = coerce_probes(probes)
+    vals = jax.vmap(integrand_fn)(coerced)
+    return jnp.mean(vals)
+
+
+def action_with_diagnostics(action_fn, diagnostics_fn, x: jax.Array):
+    y = action_fn(x)
+    diag = diagnostics_fn(x)
+    return y, diag
+
+
+def estimator_with_diagnostics(
+    probes: jax.Array,
+    *,
+    coerce_probes,
+    estimator_fn,
+    diagnostics_fn,
+    algorithm_code: int,
+    steps: int | None = None,
+    basis_dim: int | None = None,
+):
+    coerced = coerce_probes(probes)
+    value = estimator_fn(coerced)
+    first = coerced[0]
+    diag = diagnostics_fn(first)
+    diag = diag._replace(
+        algorithm_code=jnp.asarray(algorithm_code, dtype=jnp.int32),
+        probe_count=jnp.asarray(coerced.shape[0], dtype=jnp.int32),
+    )
+    if steps is not None:
+        diag = diag._replace(steps=jnp.asarray(steps, dtype=jnp.int32))
+    if basis_dim is not None:
+        diag = diag._replace(basis_dim=jnp.asarray(basis_dim, dtype=jnp.int32))
+    return value, diag
+
+
 __all__ = [
+    "DenseMatvecPlan",
+    "DenseLUSolvePlan",
     "as_interval_mat_2x2",
     "as_interval_matrix",
     "as_interval_vector",
+    "as_interval_rhs",
     "as_box_mat_2x2",
     "as_box_matrix",
     "as_box_vector",
+    "as_box_rhs",
     "full_interval_like",
     "full_box_like",
     "interval_from_point",
@@ -220,6 +346,11 @@ __all__ = [
     "box_sum",
     "interval_trace",
     "box_trace",
+    "as_dense_matvec_plan",
+    "as_dense_lu_solve_plan",
+    "estimator_mean",
+    "action_with_diagnostics",
+    "estimator_with_diagnostics",
     "interval_det_2x2",
     "box_det_2x2",
     "interval_det_3x3",

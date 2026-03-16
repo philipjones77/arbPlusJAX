@@ -10,8 +10,8 @@ Provenance:
 - classification: arb_like
 - base_names: calc_integrate_line, calc_integrate, calc_integrate_gl_auto_deg, calc_integrate_taylor
 - module lineage: Arb/FLINT-style calc/integration surface
-- naming policy: see docs/function_naming.md
-- registry report: see docs/reports/function_implementation_index.md
+- naming policy: see docs/standards/function_naming.md
+- registry report: see docs/status/reports/function_implementation_index.md
 """
 
 from functools import lru_cache, partial
@@ -39,8 +39,8 @@ PROVENANCE = {
         "calc_integrate_taylor",
     ),
     "module_lineage": "Arb/FLINT-style calc/integration surface",
-    "naming_policy": "docs/function_naming.md",
-    "registry_report": "docs/reports/function_implementation_index.md",
+    "naming_policy": "docs/standards/function_naming.md",
+    "registry_report": "docs/status/reports/function_implementation_index.md",
 }
 
 _POINT_EVALS = {

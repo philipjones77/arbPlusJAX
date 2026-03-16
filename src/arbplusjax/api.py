@@ -30,6 +30,9 @@ from .kernel_helpers import (
 )
 from . import point_wrappers
 from .public_metadata import PublicFunctionMetadata, build_public_metadata_registry
+from . import scb_block_mat
+from . import scb_mat
+from . import scb_vblock_mat
 from .special.tail_acceleration import (
     TailDerivativeMetadata,
     TailEvaluationDiagnostics,
@@ -39,12 +42,39 @@ from .special.tail_acceleration import (
     evaluate_tail_integral,
 )
 from .special.bessel import (
+    incomplete_bessel_i as _incomplete_bessel_i_impl,
+    incomplete_bessel_i_argument_derivative,
+    incomplete_bessel_i_derivative,
+    incomplete_bessel_i_point as _incomplete_bessel_i_point_impl,
+    incomplete_bessel_i_upper_limit_derivative,
     incomplete_bessel_k as _incomplete_bessel_k_impl,
     incomplete_bessel_k_argument_derivative,
     incomplete_bessel_k_derivative,
     incomplete_bessel_k_lower_limit_derivative,
     incomplete_bessel_k_point as _incomplete_bessel_k_point_impl,
 )
+from .special.gamma import (
+    incomplete_gamma_lower as _incomplete_gamma_lower_impl,
+    incomplete_gamma_lower_argument_derivative as _incomplete_gamma_lower_argument_derivative_impl,
+    incomplete_gamma_lower_derivative as _incomplete_gamma_lower_derivative_impl,
+    incomplete_gamma_lower_parameter_derivative as _incomplete_gamma_lower_parameter_derivative_impl,
+    incomplete_gamma_lower_point as _incomplete_gamma_lower_point_impl,
+    incomplete_gamma_upper as _incomplete_gamma_upper_impl,
+    incomplete_gamma_upper_argument_derivative as _incomplete_gamma_upper_argument_derivative_impl,
+    incomplete_gamma_upper_derivative as _incomplete_gamma_upper_derivative_impl,
+    incomplete_gamma_upper_parameter_derivative as _incomplete_gamma_upper_parameter_derivative_impl,
+    incomplete_gamma_upper_point as _incomplete_gamma_upper_point_impl,
+)
+from .special.laplace_bessel import (
+    laplace_bessel_k_tail as _laplace_bessel_k_tail_impl,
+    laplace_bessel_k_tail_derivative as _laplace_bessel_k_tail_derivative_impl,
+    laplace_bessel_k_tail_lambda_derivative as _laplace_bessel_k_tail_lambda_derivative_impl,
+    laplace_bessel_k_tail_lower_limit_derivative as _laplace_bessel_k_tail_lower_limit_derivative_impl,
+    laplace_bessel_k_tail_point as _laplace_bessel_k_tail_point_impl,
+)
+from . import srb_mat
+from . import srb_block_mat
+from . import srb_vblock_mat
 
 # Public API for optimized calls.
 # - eval_point: point-only kernels (fastest, no bounds)
@@ -178,8 +208,20 @@ _DIRECT_INTERVAL_BASIC_BATCH_FASTPATHS = {
     "acb_calc_integrate_line": (acb_calc.acb_calc_integrate_line_batch_fixed_prec, acb_calc.acb_calc_integrate_line_batch_padded_prec),
     "acb_calc.acb_calc_integrate_line": (acb_calc.acb_calc_integrate_line_batch_fixed_prec, acb_calc.acb_calc_integrate_line_batch_padded_prec),
     "arb_mat_matmul": (arb_mat.arb_mat_matmul_batch_fixed_prec, arb_mat.arb_mat_matmul_batch_padded_prec),
+    "arb_mat_permutation_matrix": (arb_mat.arb_mat_permutation_matrix_batch_fixed_prec, arb_mat.arb_mat_permutation_matrix_batch_padded_prec),
+    "arb_mat_transpose": (arb_mat.arb_mat_transpose_batch_fixed_prec, arb_mat.arb_mat_transpose_batch_padded_prec),
+    "arb_mat_diag": (arb_mat.arb_mat_diag_batch_fixed_prec, arb_mat.arb_mat_diag_batch_padded_prec),
+    "arb_mat_diag_matrix": (arb_mat.arb_mat_diag_matrix_batch_fixed_prec, arb_mat.arb_mat_diag_matrix_batch_padded_prec),
     "arb_mat_matvec": (arb_mat.arb_mat_matvec_batch_fixed_prec, arb_mat.arb_mat_matvec_batch_padded_prec),
+    "arb_mat_banded_matvec": (arb_mat.arb_mat_banded_matvec_batch_fixed_prec, arb_mat.arb_mat_banded_matvec_batch_padded_prec),
+    "arb_mat_matvec_cached_prepare": (arb_mat.arb_mat_matvec_cached_prepare_batch_fixed_prec, arb_mat.arb_mat_matvec_cached_prepare_batch_padded_prec),
     "arb_mat_matvec_cached_apply": (arb_mat.arb_mat_matvec_cached_apply_batch_fixed_prec, arb_mat.arb_mat_matvec_cached_apply_batch_padded_prec),
+    "arb_mat_solve": (arb_mat.arb_mat_solve_batch_fixed_prec, arb_mat.arb_mat_solve_batch_padded_prec),
+    "arb_mat_inv": (arb_mat.arb_mat_inv_batch_fixed_prec, arb_mat.arb_mat_inv_batch_padded_prec),
+    "arb_mat_triangular_solve": (arb_mat.arb_mat_triangular_solve_batch_fixed_prec, arb_mat.arb_mat_triangular_solve_batch_padded_prec),
+    "arb_mat_lu": (arb_mat.arb_mat_lu_batch_fixed_prec, arb_mat.arb_mat_lu_batch_padded_prec),
+    "arb_mat_lu_solve": (arb_mat.arb_mat_lu_solve_batch_fixed_prec, arb_mat.arb_mat_lu_solve_batch_padded_prec),
+    "arb_mat_qr": (arb_mat.arb_mat_qr_batch_fixed_prec, arb_mat.arb_mat_qr_batch_padded_prec),
     "arb_mat_det": (arb_mat.arb_mat_det_batch_fixed_prec, arb_mat.arb_mat_det_batch_padded_prec),
     "arb_mat_trace": (arb_mat.arb_mat_trace_batch_fixed_prec, arb_mat.arb_mat_trace_batch_padded_prec),
     "arb_mat_sqr": (arb_mat.arb_mat_sqr_batch_fixed_prec, arb_mat.arb_mat_sqr_batch_padded_prec),
@@ -187,8 +229,21 @@ _DIRECT_INTERVAL_BASIC_BATCH_FASTPATHS = {
     "arb_mat_norm_1": (arb_mat.arb_mat_norm_1_batch_fixed_prec, arb_mat.arb_mat_norm_1_batch_padded_prec),
     "arb_mat_norm_inf": (arb_mat.arb_mat_norm_inf_batch_fixed_prec, arb_mat.arb_mat_norm_inf_batch_padded_prec),
     "acb_mat_matmul": (acb_mat.acb_mat_matmul_batch_fixed_prec, acb_mat.acb_mat_matmul_batch_padded_prec),
+    "acb_mat_permutation_matrix": (acb_mat.acb_mat_permutation_matrix_batch_fixed_prec, acb_mat.acb_mat_permutation_matrix_batch_padded_prec),
+    "acb_mat_transpose": (acb_mat.acb_mat_transpose_batch_fixed_prec, acb_mat.acb_mat_transpose_batch_padded_prec),
+    "acb_mat_conjugate_transpose": (acb_mat.acb_mat_conjugate_transpose_batch_fixed_prec, acb_mat.acb_mat_conjugate_transpose_batch_padded_prec),
+    "acb_mat_diag": (acb_mat.acb_mat_diag_batch_fixed_prec, acb_mat.acb_mat_diag_batch_padded_prec),
+    "acb_mat_diag_matrix": (acb_mat.acb_mat_diag_matrix_batch_fixed_prec, acb_mat.acb_mat_diag_matrix_batch_padded_prec),
     "acb_mat_matvec": (acb_mat.acb_mat_matvec_batch_fixed_prec, acb_mat.acb_mat_matvec_batch_padded_prec),
+    "acb_mat_banded_matvec": (acb_mat.acb_mat_banded_matvec_batch_fixed_prec, acb_mat.acb_mat_banded_matvec_batch_padded_prec),
+    "acb_mat_matvec_cached_prepare": (acb_mat.acb_mat_matvec_cached_prepare_batch_fixed_prec, acb_mat.acb_mat_matvec_cached_prepare_batch_padded_prec),
     "acb_mat_matvec_cached_apply": (acb_mat.acb_mat_matvec_cached_apply_batch_fixed_prec, acb_mat.acb_mat_matvec_cached_apply_batch_padded_prec),
+    "acb_mat_solve": (acb_mat.acb_mat_solve_batch_fixed_prec, acb_mat.acb_mat_solve_batch_padded_prec),
+    "acb_mat_inv": (acb_mat.acb_mat_inv_batch_fixed_prec, acb_mat.acb_mat_inv_batch_padded_prec),
+    "acb_mat_triangular_solve": (acb_mat.acb_mat_triangular_solve_batch_fixed_prec, acb_mat.acb_mat_triangular_solve_batch_padded_prec),
+    "acb_mat_lu": (acb_mat.acb_mat_lu_batch_fixed_prec, acb_mat.acb_mat_lu_batch_padded_prec),
+    "acb_mat_lu_solve": (acb_mat.acb_mat_lu_solve_batch_fixed_prec, acb_mat.acb_mat_lu_solve_batch_padded_prec),
+    "acb_mat_qr": (acb_mat.acb_mat_qr_batch_fixed_prec, acb_mat.acb_mat_qr_batch_padded_prec),
     "acb_mat_det": (acb_mat.acb_mat_det_batch_fixed_prec, acb_mat.acb_mat_det_batch_padded_prec),
     "acb_mat_trace": (acb_mat.acb_mat_trace_batch_fixed_prec, acb_mat.acb_mat_trace_batch_padded_prec),
     "acb_mat_sqr": (acb_mat.acb_mat_sqr_batch_fixed_prec, acb_mat.acb_mat_sqr_batch_padded_prec),
@@ -220,8 +275,20 @@ _DIRECT_INTERVAL_MODE_BATCH_FASTPATHS = {
     "acb_calc_integrate_line": (acb_calc.acb_calc_integrate_line_batch_fixed_rigorous, acb_calc.acb_calc_integrate_line_batch_padded_rigorous),
     "acb_calc.acb_calc_integrate_line": (acb_calc.acb_calc_integrate_line_batch_fixed_rigorous, acb_calc.acb_calc_integrate_line_batch_padded_rigorous),
     "arb_mat_matmul": (mat_wrappers.arb_mat_matmul_batch_fixed_mode, mat_wrappers.arb_mat_matmul_batch_padded_mode),
+    "arb_mat_permutation_matrix": (mat_wrappers.arb_mat_permutation_matrix_batch_fixed_mode, mat_wrappers.arb_mat_permutation_matrix_batch_padded_mode),
+    "arb_mat_transpose": (mat_wrappers.arb_mat_transpose_batch_fixed_mode, mat_wrappers.arb_mat_transpose_batch_padded_mode),
+    "arb_mat_diag": (mat_wrappers.arb_mat_diag_batch_fixed_mode, mat_wrappers.arb_mat_diag_batch_padded_mode),
+    "arb_mat_diag_matrix": (mat_wrappers.arb_mat_diag_matrix_batch_fixed_mode, mat_wrappers.arb_mat_diag_matrix_batch_padded_mode),
     "arb_mat_matvec": (mat_wrappers.arb_mat_matvec_batch_fixed_mode, mat_wrappers.arb_mat_matvec_batch_padded_mode),
+    "arb_mat_banded_matvec": (mat_wrappers.arb_mat_banded_matvec_batch_fixed_mode, mat_wrappers.arb_mat_banded_matvec_batch_padded_mode),
+    "arb_mat_matvec_cached_prepare": (mat_wrappers.arb_mat_matvec_cached_prepare_batch_fixed_mode, mat_wrappers.arb_mat_matvec_cached_prepare_batch_padded_mode),
     "arb_mat_matvec_cached_apply": (mat_wrappers.arb_mat_matvec_cached_apply_batch_fixed_mode, mat_wrappers.arb_mat_matvec_cached_apply_batch_padded_mode),
+    "arb_mat_solve": (mat_wrappers.arb_mat_solve_batch_fixed_mode, mat_wrappers.arb_mat_solve_batch_padded_mode),
+    "arb_mat_inv": (mat_wrappers.arb_mat_inv_batch_fixed_mode, mat_wrappers.arb_mat_inv_batch_padded_mode),
+    "arb_mat_triangular_solve": (mat_wrappers.arb_mat_triangular_solve_batch_fixed_mode, mat_wrappers.arb_mat_triangular_solve_batch_padded_mode),
+    "arb_mat_lu": (mat_wrappers.arb_mat_lu_batch_fixed_mode, mat_wrappers.arb_mat_lu_batch_padded_mode),
+    "arb_mat_lu_solve": (mat_wrappers.arb_mat_lu_solve_batch_fixed_mode, mat_wrappers.arb_mat_lu_solve_batch_padded_mode),
+    "arb_mat_qr": (mat_wrappers.arb_mat_qr_batch_fixed_mode, mat_wrappers.arb_mat_qr_batch_padded_mode),
     "arb_mat_det": (mat_wrappers.arb_mat_det_batch_fixed_mode, mat_wrappers.arb_mat_det_batch_padded_mode),
     "arb_mat_trace": (mat_wrappers.arb_mat_trace_batch_fixed_mode, mat_wrappers.arb_mat_trace_batch_padded_mode),
     "arb_mat_sqr": (mat_wrappers.arb_mat_sqr_batch_fixed_mode, mat_wrappers.arb_mat_sqr_batch_padded_mode),
@@ -229,8 +296,21 @@ _DIRECT_INTERVAL_MODE_BATCH_FASTPATHS = {
     "arb_mat_norm_1": (mat_wrappers.arb_mat_norm_1_batch_fixed_mode, mat_wrappers.arb_mat_norm_1_batch_padded_mode),
     "arb_mat_norm_inf": (mat_wrappers.arb_mat_norm_inf_batch_fixed_mode, mat_wrappers.arb_mat_norm_inf_batch_padded_mode),
     "acb_mat_matmul": (mat_wrappers.acb_mat_matmul_batch_fixed_mode, mat_wrappers.acb_mat_matmul_batch_padded_mode),
+    "acb_mat_permutation_matrix": (mat_wrappers.acb_mat_permutation_matrix_batch_fixed_mode, mat_wrappers.acb_mat_permutation_matrix_batch_padded_mode),
+    "acb_mat_transpose": (mat_wrappers.acb_mat_transpose_batch_fixed_mode, mat_wrappers.acb_mat_transpose_batch_padded_mode),
+    "acb_mat_conjugate_transpose": (mat_wrappers.acb_mat_conjugate_transpose_batch_fixed_mode, mat_wrappers.acb_mat_conjugate_transpose_batch_padded_mode),
+    "acb_mat_diag": (mat_wrappers.acb_mat_diag_batch_fixed_mode, mat_wrappers.acb_mat_diag_batch_padded_mode),
+    "acb_mat_diag_matrix": (mat_wrappers.acb_mat_diag_matrix_batch_fixed_mode, mat_wrappers.acb_mat_diag_matrix_batch_padded_mode),
     "acb_mat_matvec": (mat_wrappers.acb_mat_matvec_batch_fixed_mode, mat_wrappers.acb_mat_matvec_batch_padded_mode),
+    "acb_mat_banded_matvec": (mat_wrappers.acb_mat_banded_matvec_batch_fixed_mode, mat_wrappers.acb_mat_banded_matvec_batch_padded_mode),
+    "acb_mat_matvec_cached_prepare": (mat_wrappers.acb_mat_matvec_cached_prepare_batch_fixed_mode, mat_wrappers.acb_mat_matvec_cached_prepare_batch_padded_mode),
     "acb_mat_matvec_cached_apply": (mat_wrappers.acb_mat_matvec_cached_apply_batch_fixed_mode, mat_wrappers.acb_mat_matvec_cached_apply_batch_padded_mode),
+    "acb_mat_solve": (mat_wrappers.acb_mat_solve_batch_fixed_mode, mat_wrappers.acb_mat_solve_batch_padded_mode),
+    "acb_mat_inv": (mat_wrappers.acb_mat_inv_batch_fixed_mode, mat_wrappers.acb_mat_inv_batch_padded_mode),
+    "acb_mat_triangular_solve": (mat_wrappers.acb_mat_triangular_solve_batch_fixed_mode, mat_wrappers.acb_mat_triangular_solve_batch_padded_mode),
+    "acb_mat_lu": (mat_wrappers.acb_mat_lu_batch_fixed_mode, mat_wrappers.acb_mat_lu_batch_padded_mode),
+    "acb_mat_lu_solve": (mat_wrappers.acb_mat_lu_solve_batch_fixed_mode, mat_wrappers.acb_mat_lu_solve_batch_padded_mode),
+    "acb_mat_qr": (mat_wrappers.acb_mat_qr_batch_fixed_mode, mat_wrappers.acb_mat_qr_batch_padded_mode),
     "acb_mat_det": (mat_wrappers.acb_mat_det_batch_fixed_mode, mat_wrappers.acb_mat_det_batch_padded_mode),
     "acb_mat_trace": (mat_wrappers.acb_mat_trace_batch_fixed_mode, mat_wrappers.acb_mat_trace_batch_padded_mode),
     "acb_mat_sqr": (mat_wrappers.acb_mat_sqr_batch_fixed_mode, mat_wrappers.acb_mat_sqr_batch_padded_mode),
@@ -671,8 +751,12 @@ _POINT_FUNCS = {
     "besselj": point_wrappers.arb_bessel_j_point,
     "bessely": point_wrappers.arb_bessel_y_point,
     "besseli": point_wrappers.arb_bessel_i_point,
+    "incomplete_bessel_i": _incomplete_bessel_i_point_impl,
     "besselk": point_wrappers.arb_bessel_k_point,
     "incomplete_bessel_k": _incomplete_bessel_k_point_impl,
+    "incomplete_gamma_lower": _incomplete_gamma_lower_point_impl,
+    "incomplete_gamma_upper": _incomplete_gamma_upper_point_impl,
+    "laplace_bessel_k_tail": _laplace_bessel_k_tail_point_impl,
     "cuda_besselk": cubesselk.cuda_besselk_point,
     "arb_calc_integrate_line": arb_calc.arb_calc_integrate_line_point,
     "acb_calc_integrate_line": acb_calc.acb_calc_integrate_line_point,
@@ -682,9 +766,168 @@ _POINT_FUNCS = {
 
 _POINT_FUNCS.update(
     {
+        "srb_mat_shape": srb_mat.srb_mat_shape,
+        "srb_mat_nnz": srb_mat.srb_mat_nnz,
+        "srb_mat_zero": srb_mat.srb_mat_zero,
+        "srb_mat_identity": srb_mat.srb_mat_identity,
+        "srb_mat_permutation_matrix": srb_mat.srb_mat_permutation_matrix,
+        "srb_mat_diag": srb_mat.srb_mat_diag,
+        "srb_mat_diag_matrix": srb_mat.srb_mat_diag_matrix,
+        "srb_mat_trace": srb_mat.srb_mat_trace,
+        "srb_mat_norm_fro": srb_mat.srb_mat_norm_fro,
+        "srb_mat_norm_1": srb_mat.srb_mat_norm_1,
+        "srb_mat_norm_inf": srb_mat.srb_mat_norm_inf,
+        "srb_mat_submatrix": srb_mat.srb_mat_submatrix,
+        "srb_mat_to_dense": srb_mat.srb_mat_to_dense,
+        "srb_mat_transpose": srb_mat.srb_mat_transpose,
+        "srb_mat_scale": srb_mat.srb_mat_scale,
+        "srb_mat_add": srb_mat.srb_mat_add,
+        "srb_mat_sub": srb_mat.srb_mat_sub,
+        "srb_mat_matvec": srb_mat.srb_mat_matvec,
+        "srb_mat_matvec_cached_prepare": srb_mat.srb_mat_matvec_cached_prepare,
+        "srb_mat_matvec_cached_apply": srb_mat.srb_mat_matvec_cached_apply,
+        "srb_mat_matmul_dense_rhs": srb_mat.srb_mat_matmul_dense_rhs,
+        "srb_mat_matmul_sparse": srb_mat.srb_mat_matmul_sparse,
+        "srb_mat_triangular_solve": srb_mat.srb_mat_triangular_solve,
+        "srb_mat_lu": srb_mat.srb_mat_lu,
+        "srb_mat_lu_solve": srb_mat.srb_mat_lu_solve,
+        "srb_mat_qr": srb_mat.srb_mat_qr,
+        "srb_mat_qr_r": srb_mat.srb_mat_qr_r,
+        "srb_mat_qr_apply_q": srb_mat.srb_mat_qr_apply_q,
+        "srb_mat_qr_explicit_q": srb_mat.srb_mat_qr_explicit_q,
+        "srb_mat_qr_solve": srb_mat.srb_mat_qr_solve,
+        "srb_mat_solve": srb_mat.srb_mat_solve,
+        "srb_block_mat_shape": srb_block_mat.srb_block_mat_shape,
+        "srb_block_mat_block_shape": srb_block_mat.srb_block_mat_block_shape,
+        "srb_block_mat_nnzb": srb_block_mat.srb_block_mat_nnzb,
+        "srb_block_mat_coo": srb_block_mat.srb_block_mat_coo,
+        "srb_block_mat_csr": srb_block_mat.srb_block_mat_csr,
+        "srb_block_mat_from_dense_coo": srb_block_mat.srb_block_mat_from_dense_coo,
+        "srb_block_mat_from_dense_csr": srb_block_mat.srb_block_mat_from_dense_csr,
+        "srb_block_mat_coo_to_csr": srb_block_mat.srb_block_mat_coo_to_csr,
+        "srb_block_mat_csr_to_coo": srb_block_mat.srb_block_mat_csr_to_coo,
+        "srb_block_mat_to_dense": srb_block_mat.srb_block_mat_to_dense,
+        "srb_block_mat_transpose": srb_block_mat.srb_block_mat_transpose,
+        "srb_block_mat_matvec": srb_block_mat.srb_block_mat_matvec,
+        "srb_block_mat_matvec_cached_prepare": srb_block_mat.srb_block_mat_matvec_cached_prepare,
+        "srb_block_mat_matvec_cached_apply": srb_block_mat.srb_block_mat_matvec_cached_apply,
+        "srb_block_mat_matvec_with_diagnostics": srb_block_mat.srb_block_mat_matvec_with_diagnostics,
+        "srb_block_mat_matvec_cached_apply_with_diagnostics": srb_block_mat.srb_block_mat_matvec_cached_apply_with_diagnostics,
+        "srb_block_mat_matmul_dense_rhs": srb_block_mat.srb_block_mat_matmul_dense_rhs,
+        "srb_block_mat_triangular_solve": srb_block_mat.srb_block_mat_triangular_solve,
+        "srb_block_mat_solve": srb_block_mat.srb_block_mat_solve,
+        "srb_block_mat_solve_with_diagnostics": srb_block_mat.srb_block_mat_solve_with_diagnostics,
+        "srb_vblock_mat_shape": srb_vblock_mat.srb_vblock_mat_shape,
+        "srb_vblock_mat_block_sizes": srb_vblock_mat.srb_vblock_mat_block_sizes,
+        "srb_vblock_mat_nnzb": srb_vblock_mat.srb_vblock_mat_nnzb,
+        "srb_vblock_mat_coo": srb_vblock_mat.srb_vblock_mat_coo,
+        "srb_vblock_mat_csr": srb_vblock_mat.srb_vblock_mat_csr,
+        "srb_vblock_mat_from_dense_coo": srb_vblock_mat.srb_vblock_mat_from_dense_coo,
+        "srb_vblock_mat_from_dense_csr": srb_vblock_mat.srb_vblock_mat_from_dense_csr,
+        "srb_vblock_mat_coo_to_csr": srb_vblock_mat.srb_vblock_mat_coo_to_csr,
+        "srb_vblock_mat_csr_to_coo": srb_vblock_mat.srb_vblock_mat_csr_to_coo,
+        "srb_vblock_mat_to_dense": srb_vblock_mat.srb_vblock_mat_to_dense,
+        "srb_vblock_mat_matvec": srb_vblock_mat.srb_vblock_mat_matvec,
+        "srb_vblock_mat_matvec_cached_prepare": srb_vblock_mat.srb_vblock_mat_matvec_cached_prepare,
+        "srb_vblock_mat_matvec_cached_apply": srb_vblock_mat.srb_vblock_mat_matvec_cached_apply,
+        "srb_vblock_mat_matvec_with_diagnostics": srb_vblock_mat.srb_vblock_mat_matvec_with_diagnostics,
+        "srb_vblock_mat_matvec_cached_apply_with_diagnostics": srb_vblock_mat.srb_vblock_mat_matvec_cached_apply_with_diagnostics,
+        "srb_vblock_mat_matmul_dense_rhs": srb_vblock_mat.srb_vblock_mat_matmul_dense_rhs,
+        "srb_vblock_mat_triangular_solve": srb_vblock_mat.srb_vblock_mat_triangular_solve,
+        "srb_vblock_mat_lu": srb_vblock_mat.srb_vblock_mat_lu,
+        "srb_vblock_mat_lu_solve": srb_vblock_mat.srb_vblock_mat_lu_solve,
+        "srb_vblock_mat_lu_with_diagnostics": srb_vblock_mat.srb_vblock_mat_lu_with_diagnostics,
+        "srb_vblock_mat_qr": srb_vblock_mat.srb_vblock_mat_qr,
+        "srb_vblock_mat_qr_solve": srb_vblock_mat.srb_vblock_mat_qr_solve,
+        "srb_vblock_mat_qr_with_diagnostics": srb_vblock_mat.srb_vblock_mat_qr_with_diagnostics,
+        "srb_vblock_mat_solve": srb_vblock_mat.srb_vblock_mat_solve,
+        "srb_vblock_mat_solve_with_diagnostics": srb_vblock_mat.srb_vblock_mat_solve_with_diagnostics,
+        "scb_mat_shape": scb_mat.scb_mat_shape,
+        "scb_mat_nnz": scb_mat.scb_mat_nnz,
+        "scb_mat_zero": scb_mat.scb_mat_zero,
+        "scb_mat_identity": scb_mat.scb_mat_identity,
+        "scb_mat_permutation_matrix": scb_mat.scb_mat_permutation_matrix,
+        "scb_mat_diag": scb_mat.scb_mat_diag,
+        "scb_mat_diag_matrix": scb_mat.scb_mat_diag_matrix,
+        "scb_mat_trace": scb_mat.scb_mat_trace,
+        "scb_mat_norm_fro": scb_mat.scb_mat_norm_fro,
+        "scb_mat_norm_1": scb_mat.scb_mat_norm_1,
+        "scb_mat_norm_inf": scb_mat.scb_mat_norm_inf,
+        "scb_mat_submatrix": scb_mat.scb_mat_submatrix,
+        "scb_mat_to_dense": scb_mat.scb_mat_to_dense,
+        "scb_mat_transpose": scb_mat.scb_mat_transpose,
+        "scb_mat_conjugate_transpose": scb_mat.scb_mat_conjugate_transpose,
+        "scb_mat_scale": scb_mat.scb_mat_scale,
+        "scb_mat_add": scb_mat.scb_mat_add,
+        "scb_mat_sub": scb_mat.scb_mat_sub,
+        "scb_mat_matvec": scb_mat.scb_mat_matvec,
+        "scb_mat_matvec_cached_prepare": scb_mat.scb_mat_matvec_cached_prepare,
+        "scb_mat_matvec_cached_apply": scb_mat.scb_mat_matvec_cached_apply,
+        "scb_mat_matmul_dense_rhs": scb_mat.scb_mat_matmul_dense_rhs,
+        "scb_mat_matmul_sparse": scb_mat.scb_mat_matmul_sparse,
+        "scb_mat_triangular_solve": scb_mat.scb_mat_triangular_solve,
+        "scb_mat_lu": scb_mat.scb_mat_lu,
+        "scb_mat_lu_solve": scb_mat.scb_mat_lu_solve,
+        "scb_mat_qr": scb_mat.scb_mat_qr,
+        "scb_mat_qr_r": scb_mat.scb_mat_qr_r,
+        "scb_mat_qr_apply_q": scb_mat.scb_mat_qr_apply_q,
+        "scb_mat_qr_explicit_q": scb_mat.scb_mat_qr_explicit_q,
+        "scb_mat_qr_solve": scb_mat.scb_mat_qr_solve,
+        "scb_mat_solve": scb_mat.scb_mat_solve,
+        "scb_block_mat_shape": scb_block_mat.scb_block_mat_shape,
+        "scb_block_mat_block_shape": scb_block_mat.scb_block_mat_block_shape,
+        "scb_block_mat_nnzb": scb_block_mat.scb_block_mat_nnzb,
+        "scb_block_mat_coo": scb_block_mat.scb_block_mat_coo,
+        "scb_block_mat_csr": scb_block_mat.scb_block_mat_csr,
+        "scb_block_mat_from_dense_coo": scb_block_mat.scb_block_mat_from_dense_coo,
+        "scb_block_mat_from_dense_csr": scb_block_mat.scb_block_mat_from_dense_csr,
+        "scb_block_mat_coo_to_csr": scb_block_mat.scb_block_mat_coo_to_csr,
+        "scb_block_mat_csr_to_coo": scb_block_mat.scb_block_mat_csr_to_coo,
+        "scb_block_mat_to_dense": scb_block_mat.scb_block_mat_to_dense,
+        "scb_block_mat_transpose": scb_block_mat.scb_block_mat_transpose,
+        "scb_block_mat_matvec": scb_block_mat.scb_block_mat_matvec,
+        "scb_block_mat_matvec_cached_prepare": scb_block_mat.scb_block_mat_matvec_cached_prepare,
+        "scb_block_mat_matvec_cached_apply": scb_block_mat.scb_block_mat_matvec_cached_apply,
+        "scb_block_mat_matvec_with_diagnostics": scb_block_mat.scb_block_mat_matvec_with_diagnostics,
+        "scb_block_mat_matvec_cached_apply_with_diagnostics": scb_block_mat.scb_block_mat_matvec_cached_apply_with_diagnostics,
+        "scb_block_mat_matmul_dense_rhs": scb_block_mat.scb_block_mat_matmul_dense_rhs,
+        "scb_block_mat_triangular_solve": scb_block_mat.scb_block_mat_triangular_solve,
+        "scb_block_mat_solve": scb_block_mat.scb_block_mat_solve,
+        "scb_block_mat_solve_with_diagnostics": scb_block_mat.scb_block_mat_solve_with_diagnostics,
+        "scb_vblock_mat_shape": scb_vblock_mat.scb_vblock_mat_shape,
+        "scb_vblock_mat_block_sizes": scb_vblock_mat.scb_vblock_mat_block_sizes,
+        "scb_vblock_mat_nnzb": scb_vblock_mat.scb_vblock_mat_nnzb,
+        "scb_vblock_mat_coo": scb_vblock_mat.scb_vblock_mat_coo,
+        "scb_vblock_mat_csr": scb_vblock_mat.scb_vblock_mat_csr,
+        "scb_vblock_mat_from_dense_coo": scb_vblock_mat.scb_vblock_mat_from_dense_coo,
+        "scb_vblock_mat_from_dense_csr": scb_vblock_mat.scb_vblock_mat_from_dense_csr,
+        "scb_vblock_mat_coo_to_csr": scb_vblock_mat.scb_vblock_mat_coo_to_csr,
+        "scb_vblock_mat_csr_to_coo": scb_vblock_mat.scb_vblock_mat_csr_to_coo,
+        "scb_vblock_mat_to_dense": scb_vblock_mat.scb_vblock_mat_to_dense,
+        "scb_vblock_mat_matvec": scb_vblock_mat.scb_vblock_mat_matvec,
+        "scb_vblock_mat_matvec_cached_prepare": scb_vblock_mat.scb_vblock_mat_matvec_cached_prepare,
+        "scb_vblock_mat_matvec_cached_apply": scb_vblock_mat.scb_vblock_mat_matvec_cached_apply,
+        "scb_vblock_mat_matvec_with_diagnostics": scb_vblock_mat.scb_vblock_mat_matvec_with_diagnostics,
+        "scb_vblock_mat_matvec_cached_apply_with_diagnostics": scb_vblock_mat.scb_vblock_mat_matvec_cached_apply_with_diagnostics,
+        "scb_vblock_mat_matmul_dense_rhs": scb_vblock_mat.scb_vblock_mat_matmul_dense_rhs,
+        "scb_vblock_mat_triangular_solve": scb_vblock_mat.scb_vblock_mat_triangular_solve,
+        "scb_vblock_mat_lu": scb_vblock_mat.scb_vblock_mat_lu,
+        "scb_vblock_mat_lu_solve": scb_vblock_mat.scb_vblock_mat_lu_solve,
+        "scb_vblock_mat_lu_with_diagnostics": scb_vblock_mat.scb_vblock_mat_lu_with_diagnostics,
+        "scb_vblock_mat_qr": scb_vblock_mat.scb_vblock_mat_qr,
+        "scb_vblock_mat_qr_solve": scb_vblock_mat.scb_vblock_mat_qr_solve,
+        "scb_vblock_mat_qr_with_diagnostics": scb_vblock_mat.scb_vblock_mat_qr_with_diagnostics,
+        "scb_vblock_mat_solve": scb_vblock_mat.scb_vblock_mat_solve,
+        "scb_vblock_mat_solve_with_diagnostics": scb_vblock_mat.scb_vblock_mat_solve_with_diagnostics,
         "arb_mat_matmul": point_wrappers.arb_mat_matmul_point,
         "arb_mat_zero": point_wrappers.arb_mat_zero_point,
         "arb_mat_identity": point_wrappers.arb_mat_identity_point,
+        "arb_mat_block_assemble": point_wrappers.arb_mat_block_assemble_point,
+        "arb_mat_block_diag": point_wrappers.arb_mat_block_diag_point,
+        "arb_mat_block_extract": point_wrappers.arb_mat_block_extract_point,
+        "arb_mat_block_row": point_wrappers.arb_mat_block_row_point,
+        "arb_mat_block_col": point_wrappers.arb_mat_block_col_point,
+        "arb_mat_block_matmul": point_wrappers.arb_mat_block_matmul_point,
         "arb_mat_matvec": point_wrappers.arb_mat_matvec_point,
         "arb_mat_matvec_cached_prepare": point_wrappers.arb_mat_matvec_cached_prepare_point,
         "arb_mat_matvec_cached_apply": point_wrappers.arb_mat_matvec_cached_apply_point,
@@ -706,6 +949,12 @@ _POINT_FUNCS.update(
         "acb_mat_matmul": point_wrappers.acb_mat_matmul_point,
         "acb_mat_zero": point_wrappers.acb_mat_zero_point,
         "acb_mat_identity": point_wrappers.acb_mat_identity_point,
+        "acb_mat_block_assemble": point_wrappers.acb_mat_block_assemble_point,
+        "acb_mat_block_diag": point_wrappers.acb_mat_block_diag_point,
+        "acb_mat_block_extract": point_wrappers.acb_mat_block_extract_point,
+        "acb_mat_block_row": point_wrappers.acb_mat_block_row_point,
+        "acb_mat_block_col": point_wrappers.acb_mat_block_col_point,
+        "acb_mat_block_matmul": point_wrappers.acb_mat_block_matmul_point,
         "acb_mat_matvec": point_wrappers.acb_mat_matvec_point,
         "acb_mat_matvec_cached_prepare": point_wrappers.acb_mat_matvec_cached_prepare_point,
         "acb_mat_matvec_cached_apply": point_wrappers.acb_mat_matvec_cached_apply_point,
@@ -729,6 +978,26 @@ _POINT_FUNCS.update(
 
 _DIRECT_POINT_BATCH_FASTPATHS.update(
     {
+        "srb_mat_matvec": (srb_mat.srb_mat_matvec_batch_fixed, srb_mat.srb_mat_matvec_batch_padded),
+        "srb_mat_matvec_cached_apply": (srb_mat.srb_mat_matvec_cached_apply_batch_fixed, srb_mat.srb_mat_matvec_cached_apply_batch_padded),
+        "srb_mat_solve": (srb_mat.srb_mat_solve_batch_fixed, srb_mat.srb_mat_solve_batch_padded),
+        "srb_mat_triangular_solve": (srb_mat.srb_mat_triangular_solve_batch_fixed, srb_mat.srb_mat_triangular_solve_batch_padded),
+        "srb_block_mat_matvec": (srb_block_mat.srb_block_mat_matvec_batch_fixed, srb_block_mat.srb_block_mat_matvec_batch_padded),
+        "srb_block_mat_matvec_cached_apply": (srb_block_mat.srb_block_mat_matvec_cached_apply_batch_fixed, srb_block_mat.srb_block_mat_matvec_cached_apply_batch_padded),
+        "srb_block_mat_solve": (srb_block_mat.srb_block_mat_solve_batch_fixed, srb_block_mat.srb_block_mat_solve_batch_padded),
+        "srb_vblock_mat_matvec": (srb_vblock_mat.srb_vblock_mat_matvec_batch_fixed, srb_vblock_mat.srb_vblock_mat_matvec_batch_padded),
+        "srb_vblock_mat_matvec_cached_apply": (srb_vblock_mat.srb_vblock_mat_matvec_cached_apply_batch_fixed, srb_vblock_mat.srb_vblock_mat_matvec_cached_apply_batch_padded),
+        "srb_vblock_mat_solve": (srb_vblock_mat.srb_vblock_mat_solve_batch_fixed, srb_vblock_mat.srb_vblock_mat_solve_batch_padded),
+        "scb_mat_matvec": (scb_mat.scb_mat_matvec_batch_fixed, scb_mat.scb_mat_matvec_batch_padded),
+        "scb_mat_matvec_cached_apply": (scb_mat.scb_mat_matvec_cached_apply_batch_fixed, scb_mat.scb_mat_matvec_cached_apply_batch_padded),
+        "scb_mat_solve": (scb_mat.scb_mat_solve_batch_fixed, scb_mat.scb_mat_solve_batch_padded),
+        "scb_mat_triangular_solve": (scb_mat.scb_mat_triangular_solve_batch_fixed, scb_mat.scb_mat_triangular_solve_batch_padded),
+        "scb_block_mat_matvec": (scb_block_mat.scb_block_mat_matvec_batch_fixed, scb_block_mat.scb_block_mat_matvec_batch_padded),
+        "scb_block_mat_matvec_cached_apply": (scb_block_mat.scb_block_mat_matvec_cached_apply_batch_fixed, scb_block_mat.scb_block_mat_matvec_cached_apply_batch_padded),
+        "scb_block_mat_solve": (scb_block_mat.scb_block_mat_solve_batch_fixed, scb_block_mat.scb_block_mat_solve_batch_padded),
+        "scb_vblock_mat_matvec": (scb_vblock_mat.scb_vblock_mat_matvec_batch_fixed, scb_vblock_mat.scb_vblock_mat_matvec_batch_padded),
+        "scb_vblock_mat_matvec_cached_apply": (scb_vblock_mat.scb_vblock_mat_matvec_cached_apply_batch_fixed, scb_vblock_mat.scb_vblock_mat_matvec_cached_apply_batch_padded),
+        "scb_vblock_mat_solve": (scb_vblock_mat.scb_vblock_mat_solve_batch_fixed, scb_vblock_mat.scb_vblock_mat_solve_batch_padded),
         "arb_mat_matmul": (point_wrappers.arb_mat_matmul_batch_fixed_point, point_wrappers.arb_mat_matmul_batch_padded_point),
         "arb_mat_matvec": (point_wrappers.arb_mat_matvec_batch_fixed_point, point_wrappers.arb_mat_matvec_batch_padded_point),
         "arb_mat_matvec_cached_apply": (
@@ -833,6 +1102,10 @@ for _name, _entry in _HYPGEOM_POINT_BATCH_ALIASES.items():
 
 # Use the generic vmapped batch path for scalar incomplete-tail kernels.
 _DIRECT_POINT_BATCH_FASTPATHS.pop("incomplete_bessel_k", None)
+_DIRECT_POINT_BATCH_FASTPATHS.pop("incomplete_bessel_i", None)
+_DIRECT_POINT_BATCH_FASTPATHS.pop("incomplete_gamma_lower", None)
+_DIRECT_POINT_BATCH_FASTPATHS.pop("incomplete_gamma_upper", None)
+_DIRECT_POINT_BATCH_FASTPATHS.pop("laplace_bessel_k_tail", None)
 
 
 _INTERVAL_FUNCS = {
@@ -863,8 +1136,12 @@ _INTERVAL_FUNCS = {
     "besselj": baseline_wrappers.arb_bessel_j_mp,
     "bessely": baseline_wrappers.arb_bessel_y_mp,
     "besseli": baseline_wrappers.arb_bessel_i_mp,
+    "incomplete_bessel_i": _incomplete_bessel_i_impl,
     "besselk": baseline_wrappers.arb_bessel_k_mp,
     "incomplete_bessel_k": _incomplete_bessel_k_impl,
+    "incomplete_gamma_lower": _incomplete_gamma_lower_impl,
+    "incomplete_gamma_upper": _incomplete_gamma_upper_impl,
+    "laplace_bessel_k_tail": _laplace_bessel_k_tail_impl,
     "cuda_besselk": cubesselk.cuda_besselk,
 }
 
@@ -899,7 +1176,11 @@ _MODULE_NAMES = (
     "hypgeom",
     "mag",
     "partitions",
+    "scb_block_mat",
+    "scb_vblock_mat",
     "special.bessel",
+    "srb_block_mat",
+    "srb_vblock_mat",
     "shahen_double_gamma",
 )
 
@@ -1377,7 +1658,29 @@ __all__ = [
     "eval_interval_batch",
     "eval_interval_batch_chunked",
     "tail_integral",
+    "tail_integral_batch",
     "tail_integral_accelerated",
+    "tail_integral_accelerated_batch",
+    "incomplete_gamma_lower",
+    "incomplete_gamma_lower_argument_derivative",
+    "incomplete_gamma_lower_batch",
+    "incomplete_gamma_lower_derivative",
+    "incomplete_gamma_lower_parameter_derivative",
+    "incomplete_gamma_upper",
+    "incomplete_gamma_upper_argument_derivative",
+    "incomplete_gamma_upper_batch",
+    "incomplete_gamma_upper_derivative",
+    "incomplete_gamma_upper_parameter_derivative",
+    "laplace_bessel_k_tail",
+    "laplace_bessel_k_tail_batch",
+    "laplace_bessel_k_tail_derivative",
+    "laplace_bessel_k_tail_lambda_derivative",
+    "laplace_bessel_k_tail_lower_limit_derivative",
+    "incomplete_bessel_i",
+    "incomplete_bessel_i_batch",
+    "incomplete_bessel_i_derivative",
+    "incomplete_bessel_i_argument_derivative",
+    "incomplete_bessel_i_upper_limit_derivative",
     "incomplete_bessel_k",
     "incomplete_bessel_k_batch",
     "incomplete_bessel_k_derivative",
@@ -1435,6 +1738,24 @@ def tail_integral(
     return evaluate_tail_integral(problem, method="quadrature", return_diagnostics=return_diagnostics)
 
 
+def tail_integral_batch(
+    integrand_or_problem,
+    lower_limit,
+    *,
+    panel_width: float = 0.25,
+    max_panels: int = 128,
+    samples_per_panel: int = 32,
+):
+    fn = lambda a: tail_integral(
+        integrand_or_problem,
+        a,
+        panel_width=panel_width,
+        max_panels=max_panels,
+        samples_per_panel=samples_per_panel,
+    )
+    return jax.vmap(fn)(lower_limit)
+
+
 def tail_integral_accelerated(
     integrand_or_problem,
     lower_limit: jax.Array | float | None = None,
@@ -1459,6 +1780,418 @@ def tail_integral_accelerated(
         regime_metadata=regime_metadata,
     )
     return evaluate_tail_integral(problem, method=method, return_diagnostics=return_diagnostics)
+
+
+def tail_integral_accelerated_batch(
+    integrand_or_problem,
+    lower_limit,
+    *,
+    method: str = "auto",
+    panel_width: float = 0.25,
+    max_panels: int = 128,
+    samples_per_panel: int = 32,
+    recurrence: TailRatioRecurrence | None = None,
+    derivative_metadata: TailDerivativeMetadata | None = None,
+    regime_metadata: TailRegimeMetadata | None = None,
+):
+    fn = lambda a: tail_integral_accelerated(
+        integrand_or_problem,
+        a,
+        method=method,
+        panel_width=panel_width,
+        max_panels=max_panels,
+        samples_per_panel=samples_per_panel,
+        recurrence=recurrence,
+        derivative_metadata=derivative_metadata,
+        regime_metadata=regime_metadata,
+    )
+    return jax.vmap(fn)(lower_limit)
+
+
+def incomplete_bessel_i(
+    nu,
+    z,
+    upper_limit,
+    *,
+    mode: str = "point",
+    prec_bits: int | None = None,
+    dps: int | None = None,
+    method: str = "quadrature",
+    panel_count: int = 128,
+    samples_per_panel: int = 16,
+    return_diagnostics: bool = False,
+):
+    return _incomplete_bessel_i_impl(
+        nu,
+        z,
+        upper_limit,
+        mode=mode,
+        prec_bits=prec_bits,
+        dps=dps,
+        method=method,
+        panel_count=panel_count,
+        samples_per_panel=samples_per_panel,
+        return_diagnostics=return_diagnostics,
+    )
+
+
+def incomplete_gamma_upper(
+    s,
+    z,
+    *,
+    mode: str = "point",
+    prec_bits: int | None = None,
+    dps: int | None = None,
+    regularized: bool = False,
+    method: str = "quadrature",
+    panel_width: float = 0.125,
+    max_panels: int = 160,
+    samples_per_panel: int = 24,
+    return_diagnostics: bool = False,
+):
+    return _incomplete_gamma_upper_impl(
+        s,
+        z,
+        mode=mode,
+        prec_bits=prec_bits,
+        dps=dps,
+        regularized=regularized,
+        method=method,
+        panel_width=panel_width,
+        max_panels=max_panels,
+        samples_per_panel=samples_per_panel,
+        return_diagnostics=return_diagnostics,
+    )
+
+
+def incomplete_gamma_upper_batch(
+    s,
+    z,
+    *,
+    mode: str = "point",
+    prec_bits: int | None = None,
+    dps: int | None = None,
+    regularized: bool = False,
+    method: str = "quadrature",
+    panel_width: float = 0.125,
+    max_panels: int = 160,
+    samples_per_panel: int = 24,
+):
+    fn = lambda a, b: incomplete_gamma_upper(
+        a,
+        b,
+        mode=mode,
+        prec_bits=prec_bits,
+        dps=dps,
+        regularized=regularized,
+        method=method,
+        panel_width=panel_width,
+        max_panels=max_panels,
+        samples_per_panel=samples_per_panel,
+    )
+    return jax.vmap(fn)(s, z)
+
+
+def incomplete_gamma_lower(
+    s,
+    z,
+    *,
+    mode: str = "point",
+    prec_bits: int | None = None,
+    dps: int | None = None,
+    regularized: bool = False,
+    method: str = "quadrature",
+    panel_width: float = 0.125,
+    max_panels: int = 160,
+    samples_per_panel: int = 24,
+    return_diagnostics: bool = False,
+):
+    return _incomplete_gamma_lower_impl(
+        s,
+        z,
+        mode=mode,
+        prec_bits=prec_bits,
+        dps=dps,
+        regularized=regularized,
+        method=method,
+        panel_width=panel_width,
+        max_panels=max_panels,
+        samples_per_panel=samples_per_panel,
+        return_diagnostics=return_diagnostics,
+    )
+
+
+def incomplete_gamma_lower_batch(
+    s,
+    z,
+    *,
+    mode: str = "point",
+    prec_bits: int | None = None,
+    dps: int | None = None,
+    regularized: bool = False,
+    method: str = "quadrature",
+    panel_width: float = 0.125,
+    max_panels: int = 160,
+    samples_per_panel: int = 24,
+):
+    fn = lambda a, b: incomplete_gamma_lower(
+        a,
+        b,
+        mode=mode,
+        prec_bits=prec_bits,
+        dps=dps,
+        regularized=regularized,
+        method=method,
+        panel_width=panel_width,
+        max_panels=max_panels,
+        samples_per_panel=samples_per_panel,
+    )
+    return jax.vmap(fn)(s, z)
+
+
+def incomplete_gamma_upper_argument_derivative(
+    s,
+    z,
+    *,
+    regularized: bool = False,
+):
+    return _incomplete_gamma_upper_argument_derivative_impl(s, z, regularized=regularized)
+
+
+def incomplete_gamma_upper_parameter_derivative(
+    s,
+    z,
+    *,
+    regularized: bool = False,
+    method: str = "quadrature",
+    panel_width: float = 0.125,
+    max_panels: int = 160,
+    samples_per_panel: int = 24,
+):
+    return _incomplete_gamma_upper_parameter_derivative_impl(
+        s,
+        z,
+        regularized=regularized,
+        method=method,
+        panel_width=panel_width,
+        max_panels=max_panels,
+        samples_per_panel=samples_per_panel,
+    )
+
+
+def incomplete_gamma_upper_derivative(
+    s,
+    z,
+    *,
+    respect_to: str = "z",
+    regularized: bool = False,
+    method: str = "quadrature",
+    panel_width: float = 0.125,
+    max_panels: int = 160,
+    samples_per_panel: int = 24,
+):
+    return _incomplete_gamma_upper_derivative_impl(
+        s,
+        z,
+        respect_to=respect_to,
+        regularized=regularized,
+        method=method,
+        panel_width=panel_width,
+        max_panels=max_panels,
+        samples_per_panel=samples_per_panel,
+    )
+
+
+def incomplete_gamma_lower_argument_derivative(
+    s,
+    z,
+    *,
+    regularized: bool = False,
+):
+    return _incomplete_gamma_lower_argument_derivative_impl(s, z, regularized=regularized)
+
+
+def incomplete_gamma_lower_parameter_derivative(
+    s,
+    z,
+    *,
+    regularized: bool = False,
+    method: str = "quadrature",
+    panel_width: float = 0.125,
+    max_panels: int = 160,
+    samples_per_panel: int = 24,
+):
+    return _incomplete_gamma_lower_parameter_derivative_impl(
+        s,
+        z,
+        regularized=regularized,
+        method=method,
+        panel_width=panel_width,
+        max_panels=max_panels,
+        samples_per_panel=samples_per_panel,
+    )
+
+
+def incomplete_gamma_lower_derivative(
+    s,
+    z,
+    *,
+    respect_to: str = "z",
+    regularized: bool = False,
+    method: str = "quadrature",
+    panel_width: float = 0.125,
+    max_panels: int = 160,
+    samples_per_panel: int = 24,
+):
+    return _incomplete_gamma_lower_derivative_impl(
+        s,
+        z,
+        respect_to=respect_to,
+        regularized=regularized,
+        method=method,
+        panel_width=panel_width,
+        max_panels=max_panels,
+        samples_per_panel=samples_per_panel,
+    )
+
+
+def laplace_bessel_k_tail(
+    nu,
+    z,
+    lam,
+    lower_limit,
+    *,
+    mode: str = "point",
+    prec_bits: int | None = None,
+    dps: int | None = None,
+    method: str = "quadrature",
+    panel_width: float = 0.125,
+    max_panels: int = 160,
+    samples_per_panel: int = 24,
+    return_diagnostics: bool = False,
+):
+    return _laplace_bessel_k_tail_impl(
+        nu,
+        z,
+        lam,
+        lower_limit,
+        mode=mode,
+        prec_bits=prec_bits,
+        dps=dps,
+        method=method,
+        panel_width=panel_width,
+        max_panels=max_panels,
+        samples_per_panel=samples_per_panel,
+        return_diagnostics=return_diagnostics,
+    )
+
+
+def laplace_bessel_k_tail_batch(
+    nu,
+    z,
+    lam,
+    lower_limit,
+    *,
+    mode: str = "point",
+    prec_bits: int | None = None,
+    dps: int | None = None,
+    method: str = "quadrature",
+    panel_width: float = 0.125,
+    max_panels: int = 160,
+    samples_per_panel: int = 24,
+):
+    fn = lambda a, b, c, d: laplace_bessel_k_tail(
+        a,
+        b,
+        c,
+        d,
+        mode=mode,
+        prec_bits=prec_bits,
+        dps=dps,
+        method=method,
+        panel_width=panel_width,
+        max_panels=max_panels,
+        samples_per_panel=samples_per_panel,
+    )
+    return jax.vmap(fn)(nu, z, lam, lower_limit)
+
+
+def laplace_bessel_k_tail_lower_limit_derivative(nu, z, lam, lower_limit):
+    return _laplace_bessel_k_tail_lower_limit_derivative_impl(nu, z, lam, lower_limit)
+
+
+def laplace_bessel_k_tail_lambda_derivative(
+    nu,
+    z,
+    lam,
+    lower_limit,
+    *,
+    method: str = "quadrature",
+    panel_width: float = 0.125,
+    max_panels: int = 160,
+    samples_per_panel: int = 24,
+):
+    return _laplace_bessel_k_tail_lambda_derivative_impl(
+        nu,
+        z,
+        lam,
+        lower_limit,
+        method=method,
+        panel_width=panel_width,
+        max_panels=max_panels,
+        samples_per_panel=samples_per_panel,
+    )
+
+
+def laplace_bessel_k_tail_derivative(
+    nu,
+    z,
+    lam,
+    lower_limit,
+    *,
+    respect_to: str = "lambda",
+    method: str = "quadrature",
+    panel_width: float = 0.125,
+    max_panels: int = 160,
+    samples_per_panel: int = 24,
+):
+    return _laplace_bessel_k_tail_derivative_impl(
+        nu,
+        z,
+        lam,
+        lower_limit,
+        respect_to=respect_to,
+        method=method,
+        panel_width=panel_width,
+        max_panels=max_panels,
+        samples_per_panel=samples_per_panel,
+    )
+
+
+def incomplete_bessel_i_batch(
+    nu,
+    z,
+    upper_limit,
+    *,
+    mode: str = "point",
+    prec_bits: int | None = None,
+    dps: int | None = None,
+    method: str = "quadrature",
+    panel_count: int = 128,
+    samples_per_panel: int = 16,
+):
+    fn = lambda a, b, c: incomplete_bessel_i(
+        a,
+        b,
+        c,
+        mode=mode,
+        prec_bits=prec_bits,
+        dps=dps,
+        method=method,
+        panel_count=panel_count,
+        samples_per_panel=samples_per_panel,
+    )
+    return jax.vmap(fn)(nu, z, upper_limit)
 
 
 def incomplete_bessel_k(
@@ -1551,7 +2284,29 @@ def _PUBLIC_METADATA_REGISTRY() -> dict[str, PublicFunctionMetadata]:
     combined_registry.update(_INTERVAL_FUNCS)
     combined_registry.update(_POINT_FUNCS)
     combined_registry["tail_integral"] = tail_integral
+    combined_registry["tail_integral_batch"] = tail_integral_batch
     combined_registry["tail_integral_accelerated"] = tail_integral_accelerated
+    combined_registry["tail_integral_accelerated_batch"] = tail_integral_accelerated_batch
+    combined_registry["incomplete_gamma_lower"] = incomplete_gamma_lower
+    combined_registry["incomplete_gamma_lower_argument_derivative"] = incomplete_gamma_lower_argument_derivative
+    combined_registry["incomplete_gamma_lower_batch"] = incomplete_gamma_lower_batch
+    combined_registry["incomplete_gamma_lower_derivative"] = incomplete_gamma_lower_derivative
+    combined_registry["incomplete_gamma_lower_parameter_derivative"] = incomplete_gamma_lower_parameter_derivative
+    combined_registry["incomplete_gamma_upper"] = incomplete_gamma_upper
+    combined_registry["incomplete_gamma_upper_argument_derivative"] = incomplete_gamma_upper_argument_derivative
+    combined_registry["incomplete_gamma_upper_batch"] = incomplete_gamma_upper_batch
+    combined_registry["incomplete_gamma_upper_derivative"] = incomplete_gamma_upper_derivative
+    combined_registry["incomplete_gamma_upper_parameter_derivative"] = incomplete_gamma_upper_parameter_derivative
+    combined_registry["laplace_bessel_k_tail"] = laplace_bessel_k_tail
+    combined_registry["laplace_bessel_k_tail_batch"] = laplace_bessel_k_tail_batch
+    combined_registry["laplace_bessel_k_tail_derivative"] = laplace_bessel_k_tail_derivative
+    combined_registry["laplace_bessel_k_tail_lambda_derivative"] = laplace_bessel_k_tail_lambda_derivative
+    combined_registry["laplace_bessel_k_tail_lower_limit_derivative"] = laplace_bessel_k_tail_lower_limit_derivative
+    combined_registry["incomplete_bessel_i"] = incomplete_bessel_i
+    combined_registry["incomplete_bessel_i_batch"] = incomplete_bessel_i_batch
+    combined_registry["incomplete_bessel_i_derivative"] = incomplete_bessel_i_derivative
+    combined_registry["incomplete_bessel_i_argument_derivative"] = incomplete_bessel_i_argument_derivative
+    combined_registry["incomplete_bessel_i_upper_limit_derivative"] = incomplete_bessel_i_upper_limit_derivative
     combined_registry["incomplete_bessel_k"] = incomplete_bessel_k
     combined_registry["incomplete_bessel_k_batch"] = incomplete_bessel_k_batch
     combined_registry["incomplete_bessel_k_derivative"] = incomplete_bessel_k_derivative

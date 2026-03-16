@@ -1,14 +1,14 @@
-Last updated: 2026-03-07T00:00:00Z
+Last updated: 2026-03-14T00:00:00Z
 
 # jcb_mat
 
 ## Role
 
-`jcb_mat` is the Jones-labeled subsystem for new complex matrix-function work.
+`jcb_mat` is the Jones-labeled subsystem for complex matrix-free JAX algorithms.
 
 It is separate from [acb_mat](/home/phili/projects/arbplusJAX/src/arbplusjax/acb_mat.py):
 - `acb_mat`: canonical Arb/FLINT-style JAX extension surface for complex box matrices
-- `jcb_mat`: new matrix-function subsystem for contour-integral, Schur, and rational-Krylov style algorithms
+- `jcb_mat`: operator-style matrix-free subsystem for Arnoldi actions, trace estimators, and AD-aware large-scale complex workflows
 
 ## Layout Contracts
 
@@ -54,6 +54,30 @@ Precision/JIT entry points:
 - `jcb_mat_triangular_solve_basic_jit`
 - `jcb_mat_lu_basic_jit`
 
+Matrix-free operator and Krylov layer:
+- `jcb_mat_dense_operator(a)`
+- `jcb_mat_dense_operator_adjoint(a)`
+- `jcb_mat_operator_apply_point(matvec, x)`
+- `jcb_mat_operator_apply_basic(matvec, x)`
+- `jcb_mat_poly_action_point(matvec, x, coefficients)`
+- `jcb_mat_expm_action_point(matvec, x, terms=...)`
+- `jcb_mat_expm_action_arnoldi_restarted_point(matvec, x, steps=..., restarts=..., adjoint_matvec=...)`
+- `jcb_mat_expm_action_arnoldi_block_point(matvec, xs, steps=..., restarts=..., adjoint_matvec=...)`
+- `jcb_mat_expm_action_arnoldi_restarted_with_diagnostics_point(matvec, x, steps=..., restarts=..., adjoint_matvec=...)`
+- `jcb_mat_arnoldi_hessenberg_point(matvec, x, steps)`
+- `jcb_mat_arnoldi_diagnostics_point(matvec, x, steps, used_adjoint=...)`
+- `jcb_mat_funm_action_arnoldi_point(matvec, x, dense_funm, steps, adjoint_matvec=...)`
+- `jcb_mat_funm_action_arnoldi_with_diagnostics_point(matvec, x, dense_funm, steps, adjoint_matvec=...)`
+- `jcb_mat_funm_integrand_arnoldi_point(matvec, x, dense_funm, steps, adjoint_matvec=...)`
+- `jcb_mat_trace_integrand_point(matvec, x, adjoint_matvec=...)`
+- `jcb_mat_funm_trace_integrand_arnoldi_point(matvec, x, scalar_fun, steps, adjoint_matvec=...)`
+- `jcb_mat_trace_estimator_point(matvec, probes, adjoint_matvec=...)`
+- `jcb_mat_trace_estimator_with_diagnostics_point(matvec, probes, adjoint_matvec=...)`
+- `jcb_mat_logdet_slq_point(matvec, probes, steps, adjoint_matvec=...)`
+- `jcb_mat_logdet_slq_with_diagnostics_point(matvec, probes, steps, adjoint_matvec=...)`
+- `jcb_mat_rademacher_probes_like(x, key=..., num=...)`
+- `jcb_mat_normal_probes_like(x, key=..., num=...)`
+
 ## Current Methodology
 
 Point:
@@ -69,6 +93,47 @@ Basic:
 This means:
 - `matmul_basic` and `matvec_basic` are genuine complex-box substrate operations
 - `solve_basic` is currently a first substrate implementation, not yet a final rigorous box-linear-solve path
+
+Matrix-free layer:
+- Arnoldi is implemented in pure JAX with fixed-shape scan state and explicit projected orthogonalisation.
+- The primary contract is action-first and operator-first, not dense matrix-function construction.
+- restarted Krylov support now exists for the matrix-free `expm` action path via repeated scaled-action application
+- block right-hand-side support now exists for the restarted `expm` action path through a batched matrix-free wrapper
+- Backward support now exists for the input/probe vector pathways through custom VJPs on:
+  - `jcb_mat_funm_action_arnoldi_point`
+  - `jcb_mat_funm_integrand_arnoldi_point`
+  - `jcb_mat_trace_integrand_point`
+- Complex backward paths require `adjoint_matvec` whenever the operator is not self-adjoint.
+- Estimator gradients flow through those custom VJPs, so `trace_estimator_point` and `logdet_slq_point` are probe-differentiable without tracing naively through the Arnoldi loop state.
+
+## Diagnostics And Benchmarks
+
+Current correctness coverage:
+- [test_jcb_mat_chassis.py](/home/phili/projects/arbplusJAX/tests/test_jcb_mat_chassis.py)
+- includes operator apply, polynomial action, `expm` action, Arnoldi exact diagonal cases, trace/logdet estimators, and backward probe-gradient checks
+
+Current benchmark coverage:
+- [benchmark_matrix_free_krylov.py](/home/phili/projects/arbplusJAX/benchmarks/benchmark_matrix_free_krylov.py)
+- current report: [matrix_free_krylov_benchmark.md](/home/phili/projects/arbplusJAX/docs/status/reports/matrix_free_krylov_benchmark.md)
+
+Current diagnostic contract:
+- structured diagnostics now exist via `JcbMatKrylovDiagnostics`
+- current fields include:
+  - algorithm code
+  - steps
+  - basis dimension
+  - restart count
+  - initial norm `beta0`
+  - tail norm
+  - breakdown flag
+  - adjoint-usage flag
+  - gradient-support flag
+  - probe count
+- the current diagnostic surface also includes:
+  - explicit `adjoint_matvec` threading for complex backward correctness
+  - explicit forward-action vs backward-gradient timing in the benchmark runner
+  - explicit test coverage for exact diagonal cases before using the same path in stochastic estimators
+  - verified hot-path implementation remains inside JAX execution: no SciPy calls, no NumPy host kernels, no callback ops, and no Python loops in the Krylov core
 
 ## Not Yet Implemented
 
@@ -86,4 +151,4 @@ Planned lower-level substrate:
 
 - obey repo dtype, batching, and AD rules
 - keep matrix substrate separate from the canonical Arb-like `acb_mat` namespace
-- make the substrate reusable for contour-integral and rational-Krylov matrix-function algorithms
+- make the substrate reusable for matrix-free Arnoldi, stochastic trace estimation, and later RF77-facing operator workflows

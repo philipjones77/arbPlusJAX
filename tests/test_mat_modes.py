@@ -135,6 +135,34 @@ def test_matrix_cached_matvec_and_sqr_modes():
     _check(bool(jnp.all(di.contains(sq_rig, sq_basic))))
 
 
+def test_matrix_cached_prepare_modes_and_batch_api():
+    a = jnp.array(
+        [
+            [
+                [[2.0, 2.0], [1.0, 1.0]],
+                [[0.0, 0.0], [3.0, 3.0]],
+            ],
+            [
+                [[1.0, 1.0], [0.0, 0.0]],
+                [[0.0, 0.0], [4.0, 4.0]],
+            ],
+        ],
+        dtype=jnp.float64,
+    )
+
+    point = api.eval_point_batch("arb_mat_matvec_cached_prepare", a)
+    basic = api.eval_interval_batch("arb_mat_matvec_cached_prepare", a, mode="basic", prec_bits=53)
+    adaptive = api.eval_interval_batch("arb_mat_matvec_cached_prepare", a, mode="adaptive", prec_bits=53)
+    rigorous = api.eval_interval_batch("arb_mat_matvec_cached_prepare", a, mode="rigorous", prec_bits=53)
+
+    _check(point.shape == (2, 2, 2))
+    _check(basic.shape == (2, 2, 2, 2))
+    _check(adaptive.shape == (2, 2, 2, 2))
+    _check(rigorous.shape == (2, 2, 2, 2))
+    _check(bool(jnp.allclose(point, di.midpoint(a))))
+    _check(bool(jnp.all(di.contains(rigorous, basic))))
+
+
 def test_matrix_norm_modes_and_point_api():
     a = jnp.array(
         [
@@ -189,3 +217,82 @@ def test_matrix_batch_fastpaths_and_constructors():
     _check(dets.shape == (2, 2))
     _check(fros.shape == (2,))
     _check(bool(jnp.allclose(fros, jnp.linalg.norm(di.midpoint(batch), ord="fro", axis=(-2, -1)))))
+
+
+def test_matrix_structure_and_lu_solve_modes():
+    a = jnp.array(
+        [
+            [[4.0, 4.0], [1.0, 1.0]],
+            [[2.0, 2.0], [3.0, 3.0]],
+        ],
+        dtype=jnp.float64,
+    )
+    x = jnp.array(
+        [
+            [[1.0, 1.0], [0.0, 0.0]],
+            [[2.0, 2.0], [1.0, 1.0]],
+        ],
+        dtype=jnp.float64,
+    )
+    rhs = api.eval_interval("arb_mat_matmul", a, x, mode="basic")
+    p, l, u = api.eval_interval("arb_mat_lu", a, mode="basic")
+    sol = api.eval_interval("arb_mat_lu_solve", (p, l, u), rhs, mode="basic")
+    t_point = api.eval_point("arb_mat_transpose", a)
+    d_basic = api.eval_interval("arb_mat_diag", a, mode="basic")
+    dm_point = api.eval_point("arb_mat_diag_matrix", api.eval_interval("arb_mat_diag", a, mode="basic"))
+
+    a_mid = di.midpoint(a)
+    x_mid = di.midpoint(x)
+
+    _check(bool(jnp.allclose(di.midpoint(sol), x_mid)))
+    _check(bool(jnp.allclose(t_point, a_mid.T)))
+    _check(bool(jnp.allclose(di.midpoint(d_basic), jnp.diag(a_mid))))
+    _check(bool(jnp.allclose(dm_point, jnp.diag(jnp.diag(a_mid)))))
+
+
+def test_structure_rigorous_modes_are_exact_transforms():
+    a = jnp.array(
+        [
+            [[0.9, 1.1], [1.8, 2.2]],
+            [[-0.4, 0.5], [2.9, 3.1]],
+        ],
+        dtype=jnp.float64,
+    )
+    t_rig = api.eval_interval("arb_mat_transpose", a, mode="rigorous", prec_bits=53)
+    d_rig = api.eval_interval("arb_mat_diag", a, mode="rigorous", prec_bits=53)
+    dm_rig = api.eval_interval("arb_mat_diag_matrix", d_rig, mode="rigorous", prec_bits=53)
+
+    _check(bool(jnp.allclose(t_rig, jnp.swapaxes(a, -3, -2))))
+    _check(bool(jnp.allclose(d_rig, jnp.stack([a[0, 0, :], a[1, 1, :]], axis=0))))
+    _check(bool(jnp.allclose(dm_rig[jnp.arange(2), jnp.arange(2), :], d_rig)))
+
+
+def test_block_structure_modes_are_exact_transforms():
+    a11 = jnp.array([[[1.0, 1.0], [2.0, 2.0]], [[3.0, 3.0], [4.0, 4.0]]], dtype=jnp.float64)
+    a12 = jnp.array([[[5.0, 5.0]], [[6.0, 6.0]]], dtype=jnp.float64)
+    a21 = jnp.array([[[7.0, 7.0], [8.0, 8.0]]], dtype=jnp.float64)
+    a22 = jnp.array([[[9.0, 9.0]]], dtype=jnp.float64)
+    assembled_basic = api.eval_interval("arb_mat_block_assemble", ((a11, a12), (a21, a22)), mode="basic")
+    diag_rig = api.eval_interval("arb_mat_block_diag", (a11, a22), mode="rigorous", prec_bits=53)
+    extracted = api.eval_interval("arb_mat_block_extract", assembled_basic, (2, 1), (2, 1), 1, 0, mode="rigorous", prec_bits=53)
+
+    expected = jnp.array(
+        [
+            [[1.0, 1.0], [2.0, 2.0], [5.0, 5.0]],
+            [[3.0, 3.0], [4.0, 4.0], [6.0, 6.0]],
+            [[7.0, 7.0], [8.0, 8.0], [9.0, 9.0]],
+        ],
+        dtype=jnp.float64,
+    )
+    expected_diag = jnp.array(
+        [
+            [[1.0, 1.0], [2.0, 2.0], [0.0, 0.0]],
+            [[3.0, 3.0], [4.0, 4.0], [0.0, 0.0]],
+            [[0.0, 0.0], [0.0, 0.0], [9.0, 9.0]],
+        ],
+        dtype=jnp.float64,
+    )
+
+    _check(bool(jnp.allclose(assembled_basic, expected)))
+    _check(bool(jnp.allclose(diag_rig, expected_diag)))
+    _check(bool(jnp.allclose(extracted, expected[2:, :2, :])))

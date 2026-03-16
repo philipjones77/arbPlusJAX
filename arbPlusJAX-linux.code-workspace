@@ -1,0 +1,20 @@
+{
+  "folders": [
+    {
+      "path": "."
+    }
+  ],
+  "settings": {
+    "chatgpt.openOnStartup": true,
+    "cmake.ignoreCMakeListsMissing": true,
+    "python.defaultInterpreterPath": "/home/phili/miniforge3/envs/jax/bin/python",
+    "python.testing.pytestEnabled": true,
+    "python.testing.pytestArgs": [
+      "tests"
+    ],
+    "python.analysis.extraPaths": [
+      "${workspaceFolder}/src"
+    ],
+    "terminal.integrated.defaultProfile.linux": "bash"
+  }
+}

@@ -18,6 +18,17 @@ def incomplete_bessel_k_integrand(nu, z):
     return integrand
 
 
+def incomplete_bessel_i_angular_integrand(nu, z):
+    nu_v = jnp.asarray(nu, dtype=jnp.float64)
+    z_v = jnp.asarray(z, dtype=jnp.float64)
+
+    def integrand(theta: jax.Array) -> jax.Array:
+        tv = jnp.asarray(theta, dtype=jnp.float64)
+        return jnp.exp(z_v * jnp.cos(tv)) * jnp.cos(nu_v * tv)
+
+    return integrand
+
+
 def build_incomplete_bessel_k_problem(
     nu,
     z,
@@ -33,6 +44,7 @@ def build_incomplete_bessel_k_problem(
         panel_width=panel_width,
         max_panels=max_panels,
         samples_per_panel=samples_per_panel,
+        quadrature_rule="simpson",
         derivative_metadata=TailDerivativeMetadata(
             argument_derivative=True,
             lower_limit_derivative=True,
