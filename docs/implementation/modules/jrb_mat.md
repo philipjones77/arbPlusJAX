@@ -1,4 +1,4 @@
-Last updated: 2026-03-14T00:00:00Z
+Last updated: 2026-03-17T18:15:00Z
 
 # jrb_mat
 
@@ -88,6 +88,8 @@ Matrix-free operator and Krylov layer:
 - `jrb_mat_logdet_leja_hutchpp_with_diagnostics_point(...)`
 - `jrb_mat_bcoo_logdet_leja_hutchpp_point(a, sketch_probes, residual_probes, ...)`
 - `jrb_mat_bcoo_logdet_leja_hutchpp_with_diagnostics_point(a, sketch_probes, residual_probes, ...)`
+- `jrb_mat_bcoo_inverse_diagonal_point(a, overlap=..., block_size=..., correction_probes=...)`
+- `jrb_mat_bcoo_inverse_diagonal_with_diagnostics_point(...)`
 - `jrb_mat_rademacher_probes_like(x, key=..., num=...)`
 - `jrb_mat_normal_probes_like(x, key=..., num=...)`
 
@@ -112,10 +114,15 @@ Matrix-free layer:
 - `funm_action` and quadratic-form pathways are action-first. They target `f(A)b`, trace estimators, and SLQ-style `logdet`, not dense `logm(A)`.
 - sparse SPD operators can now be wired through JAX `BCOO` closures directly, and fixed-pattern gather/segment-sum operator closures exist for later parameter-differentiable sparse work
 - the adjacent sparse point layer (`srb_mat`) now supports callable left preconditioners on the `cg` path, which is the immediate hook for Jacobi or other simple JAX-native preconditioners in outer RF77 workflows
-- sparse SPD logdet now also has a Leja-interpolation route: `log(A)v` is approximated by Newton interpolation on Leja points over a supplied spectral interval, and the trace is estimated with Hutch++
+- sparse SPD logdet now also has a Leja-interpolation route: `log(A)v` is approximated by Newton interpolation on a transformed Leja interval, and the trace is estimated with Hutch++
 - that Leja route now supports adaptive truncation through `max_degree`, `min_degree`, `rtol`, and `atol`
+- the Leja setup is now centralized in shared helpers: spectral scaling, transformed-node coefficient generation, and Newton action evaluation all reuse the same path
+- coordinate-aligned probe vectors now take an exact shortcut when the sparse action reveals a positive scalar eigenpair, which stabilizes diagonal and basis-aligned sparse trace/logdet cases without pretending they consumed a full adaptive Leja budget
 - for sparse `BCOO` inputs, conservative Gershgorin spectral bounds are available directly from the sparse structure, and a multi-start short-Lanczos heuristic can narrow the interpolation interval in point mode
 - a sparse `BCOO` convenience wrapper now combines operator construction, automatic bound selection, adaptive Leja action evaluation, and Hutch++ trace estimation in one entry point
+- sparse inverse-diagonal estimation now has a first JAX-native selected-inversion-style entry point: contiguous seed blocks are expanded by overlap hops, local inverse rows are formed on the overlap blocks, and an optional stochastic correction estimates the residual diagonal through full-operator solves
+- the local selected-inverse rows are also reused as a JAX-native left preconditioner for the correction solves
+- this current selected-inversion subset is point-mode only and currently targets `diag(A^{-1})`; selected off-diagonal entries and `tr(A^{-1} dA)`-style surfaces remain future work
 - restarted Krylov support now exists for the matrix-free `expm` action path via repeated scaled-action application
 - block right-hand-side support now exists for the restarted `expm` action path through a batched matrix-free wrapper
 - Backward support now exists for the input/probe vector pathways through custom VJPs on:
@@ -131,6 +138,8 @@ Current correctness coverage:
 - includes operator apply, polynomial action, `expm` action, Lanczos exact diagonal cases, trace/logdet estimators, and backward probe-gradient checks
 - [test_jrb_mat_logdet_contracts.py](/home/phili/projects/arbplusJAX/tests/test_jrb_mat_logdet_contracts.py)
 - adds SLQ/logdet sanity contracts for diagonal exactness, eigen-tail sensitivity, probe-budget variance, reproducibility/dtype stability, sparse Leja+Hutch++ diagonal exactness, and the new auto-bounds adaptive-degree sparse diagonal contract
+- [test_jrb_mat_selected_inverse.py](/home/phili/projects/arbplusJAX/tests/test_jrb_mat_selected_inverse.py)
+- adds selected-inverse contracts for sparse diagonal exactness, full-overlap inverse-diagonal exactness, and stochastic-correction improvement over the local-only estimate
 
 Current benchmark coverage:
 - [benchmark_matrix_free_krylov.py](/home/phili/projects/arbplusJAX/benchmarks/benchmark_matrix_free_krylov.py)
@@ -153,6 +162,8 @@ Current diagnostic contract:
   - gradient-support flag
   - probe count
 - for Leja plus Hutch++ runs, `steps` records the used polynomial degree on the representative probe and `tail_norm` records the last Newton increment norm
+- `algorithm_code = 3` denotes the ordinary Leja plus Hutch++ path
+- `algorithm_code = 4` denotes the exact coordinate/eigenvector shortcut on the representative probe; in that case `steps = 1`
 - the current diagnostic surface also includes:
   - explicit requirement that operator callbacks are pure-JAX and fixed-shape
   - explicit distinction between forward action timing and backward gradient timing in the benchmark runner

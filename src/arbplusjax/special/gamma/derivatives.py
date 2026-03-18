@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from jax import lax
 import jax.numpy as jnp
-from jax.scipy.special import gammaln
 
 from .incomplete_gamma import incomplete_gamma_lower_integrand, incomplete_gamma_upper_integrand
 
@@ -10,7 +10,7 @@ def incomplete_gamma_upper_argument_derivative(s, z, *, regularized: bool = Fals
     integrand = incomplete_gamma_upper_integrand(s)
     value = -integrand(z)
     if regularized:
-        value = value / jnp.exp(gammaln(jnp.asarray(s, dtype=jnp.float64)))
+        value = value / jnp.exp(lax.lgamma(jnp.asarray(s, dtype=jnp.float64)))
     return value
 
 
@@ -18,7 +18,7 @@ def incomplete_gamma_lower_argument_derivative(s, z, *, regularized: bool = Fals
     integrand = incomplete_gamma_lower_integrand(s)
     value = integrand(z)
     if regularized:
-        value = value / jnp.exp(gammaln(jnp.asarray(s, dtype=jnp.float64)))
+        value = value / jnp.exp(lax.lgamma(jnp.asarray(s, dtype=jnp.float64)))
     return value
 
 

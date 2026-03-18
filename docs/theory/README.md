@@ -23,3 +23,6 @@ This section collects mathematical background and derivation notes for the inter
 - [Sparse Symmetric Leja Plus Hutch++ Log-Det](/home/phili/projects/arbplusJAX/docs/theory/sparse_symmetric_leja_hutchpp_logdet.md)
   - Documents the sparse SPD `BCOO` log-determinant path in `jrb_mat`.
   - States the Newton-Leja action formula, Hutch++ trace estimator, adaptive stop rule, and sparse spectral-bound strategy.
+- [Sparse Selected Inversion by Domain Decomposition](/home/phili/projects/arbplusJAX/docs/theory/sparse_selected_inversion_domain_decomposition.md)
+  - Records the complementary sparse inverse-diagonal and selected-inverse direction suggested by `parsinv`.
+  - States the overlap-domain decomposition idea, stochastic correction role, and the proposed JAX-native translation.

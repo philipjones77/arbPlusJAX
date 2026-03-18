@@ -300,6 +300,29 @@ def test_arnoldi_funm_action_has_custom_vjp_wrt_input_vector():
     _check(bool(jnp.allclose(g, expected, rtol=1e-6, atol=1e-6)))
 
 
+def test_arnoldi_funm_action_custom_vjp_matches_under_jit_grad():
+    a = _mat2(2.0 + 0.0j, 0.0 + 0.0j, 0.0 + 0.0j, 1.0 + 1.0j)
+    op = jcb_mat.jcb_mat_dense_operator(a)
+    adj = jcb_mat.jcb_mat_dense_operator_adjoint(a)
+
+    def dense_exp(m):
+        vals, vecs = jnp.linalg.eig(m)
+        inv = jnp.linalg.inv(vecs)
+        return vecs @ jnp.diag(jnp.exp(vals)) @ inv
+
+    def loss(t):
+        x = _vec2(t + 0.0j, -2.0 + 1.0j)
+        y = jcb_mat.jcb_mat_funm_action_arnoldi_point(op, x, dense_exp, 2, adj)
+        return jnp.real(jnp.sum(acb_core.acb_midpoint(y)))
+
+    arg = jnp.asarray(1.0, dtype=jnp.float64)
+    eager = jax.grad(loss)(arg)
+    jitted = jax.jit(jax.grad(loss))(arg)
+
+    _check(bool(jnp.isfinite(jitted)))
+    _check(bool(jnp.allclose(eager, jitted, rtol=1e-12, atol=1e-12)))
+
+
 def test_trace_and_logdet_estimators_have_probe_gradients():
     a = _mat2(2.0 + 0.0j, 0.0 + 0.0j, 0.0 + 0.0j, 1.0 + 1.0j)
     op = jcb_mat.jcb_mat_dense_operator(a)

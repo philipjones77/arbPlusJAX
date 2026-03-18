@@ -7,7 +7,6 @@ import jax.numpy as jnp
 
 from . import checks
 
-jax.config.update("jax_enable_x64", True)
 
 DEFAULT_PREC_BITS = 53
 

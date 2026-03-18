@@ -12,7 +12,6 @@ from . import checks
 from . import iterative_solvers
 from . import sparse_common as sc
 
-jax.config.update("jax_enable_x64", True)
 
 
 class ScbBlockMatPointDiagnostics(NamedTuple):

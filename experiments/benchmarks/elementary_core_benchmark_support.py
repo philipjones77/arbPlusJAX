@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 import json
+import platform
 import math
 import os
 import resource
@@ -30,7 +31,10 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(1, str(REPO_ROOT))
 
 from tools.reference_backends import apply_reference_env
+from tools.reference_backends import boost_root
+from tools.reference_backends import reference_prefix
 from tools.reference_backends import flint_root
+from tools.reference_backends import wolfram_linux_dir
 
 apply_reference_env(REPO_ROOT)
 
@@ -201,6 +205,50 @@ def render_table(table: Any, *, max_rows: int = 20) -> Any:
 
 def backend_status_frame():
     return _make_table([{"backend": s.name, "available": s.available, "detail": s.detail} for s in detect_backends()])
+
+
+def backend_resolution_frame():
+    rows = [
+        {"item": "repo_root", "value": str(REPO_ROOT)},
+        {"item": "output_dir", "value": str(OUTPUT_DIR)},
+        {"item": "ref_prefix", "value": str(reference_prefix())},
+        {"item": "flint_root", "value": str(flint_root()) if flint_root() is not None else ""},
+        {"item": "boost_root", "value": str(boost_root()) if boost_root() is not None else ""},
+        {"item": "boost_ref_cmd", "value": os.getenv("BOOST_REF_CMD", "")},
+        {"item": "wolfram_linux_dir", "value": str(wolfram_linux_dir()) if wolfram_linux_dir() is not None else ""},
+        {"item": "arb_c_ref_dir", "value": str(bench_harness._auto_detect_c_ref_dir(REPO_ROOT) or "")},
+    ]
+    return _make_table(rows)
+
+
+def runtime_version_frame():
+    rows: list[dict[str, Any]] = [
+        {"component": "python", "version": platform.python_version()},
+        {"component": "platform", "version": platform.platform()},
+        {"component": "machine", "version": platform.machine()},
+    ]
+    try:
+        import importlib.metadata as metadata
+
+        for pkg in ("jax", "jaxlib", "numpy", "scipy", "mpmath", "pandas"):
+            try:
+                version = metadata.version(pkg)
+            except metadata.PackageNotFoundError:
+                version = ""
+            rows.append({"component": pkg, "version": version})
+    except Exception:
+        pass
+
+    try:
+        rows.append({"component": "jax_default_backend", "version": jax.default_backend()})
+        rows.append({"component": "jax_devices", "version": ", ".join(d.platform for d in jax.devices())})
+    except Exception:
+        pass
+
+    if _wolfram_available():
+        rows.append({"component": "mathematica", "version": _wolfram_detail()})
+
+    return _make_table(rows)
 
 
 @lru_cache(maxsize=None)
@@ -557,7 +605,10 @@ def _elementary_reference(case: ElementaryCase, sample: Any) -> dict[str, np.nda
                 "log_sin_pi": lambda t: mp.log(mp.sin(mp.pi * t)),
             }
             if case.name in mapping:
-                refs["mpmath"] = np.asarray([complex(mapping[case.name](float(t))) for t in x], dtype=np.complex128 if case.name in {"exp_pi_i"} else np.float64)
+                refs["mpmath"] = np.asarray([
+                    complex(mapping[case.name](float(t) if not isinstance(t, complex) else t))
+                    for t in x
+                ], dtype=np.complex128 if case.name in {"exp_pi_i"} else np.float64)
     return refs
 
 

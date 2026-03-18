@@ -3,7 +3,8 @@ from __future__ import annotations
 import jax
 import jax.numpy as jnp
 
-jax.config.update("jax_enable_x64", True)
+from .precision import enable_jax_x64, jax_x64_context, jax_x64_enabled, set_jax_x64
+
 
 
 def reduction_dtype(x: jax.Array) -> jnp.dtype:
@@ -77,6 +78,10 @@ def all_finite(x: jax.Array) -> jax.Array:
 
 
 __all__ = [
+    "enable_jax_x64",
+    "set_jax_x64",
+    "jax_x64_enabled",
+    "jax_x64_context",
     "reduction_dtype",
     "safe_sum",
     "safe_mean",

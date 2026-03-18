@@ -177,9 +177,12 @@ def _lanczos_step_reortho(matvec, params, i, val):
     """Lanczos step with full reorthogonalization."""
     (v1, offdiag, v0), (vectors, diags, offdiags) = val
     ((v1, offdiag), diag), v0 = _lanczos_step_apply(matvec, v1, offdiag, v0, *params), v1
-    
-    # Full reorthogonalization
-    v1 = v1 - vectors[:i+1].T @ (vectors[:i+1] @ v1)
+
+    # Full reorthogonalization with a static-shape mask so jit/grad paths do not
+    # depend on dynamic slicing inside the `fori_loop`.
+    active = (jnp.arange(vectors.shape[0]) <= i).astype(vectors.dtype)
+    coeffs = (vectors @ v1) * active
+    v1 = v1 - vectors.T @ coeffs
 
     # Store results
     vectors = vectors.at[i + 1].set(v1)
@@ -767,10 +770,14 @@ def low_rank_preconditioner(cholesky: Callable, /) -> Callable:
             V = chol.T / jnp.sqrt(s)
             v_scaled = v / s
 
-            # Cholesky decompose the capacitance matrix and solve
+            # Cholesky-decompose the capacitance matrix and solve using public
+            # JAX linear algebra rather than JAX SciPy helpers.
             eye_n = jnp.eye(n, dtype=chol.dtype)
-            chol_cap = jax.scipy.linalg.cho_factor(eye_n + V @ U)
-            sol = jax.scipy.linalg.cho_solve(chol_cap, V @ v_scaled)
+            chol_cap = jnp.linalg.cholesky(eye_n + V @ U)
+            rhs = V @ v_scaled
+            sol = lax.linalg.triangular_solve(chol_cap, rhs[:, None], left_side=True, lower=True)
+            sol = lax.linalg.triangular_solve(chol_cap.T.conj(), sol, left_side=True, lower=False)
+            sol = jnp.squeeze(sol, axis=-1)
             return v_scaled - U @ sol
 
         # Block differentiation through preconditioner (non-differentiable)

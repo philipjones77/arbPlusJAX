@@ -9,7 +9,6 @@ from jax import lax
 from . import double_interval as di
 from . import elementary as el
 
-jax.config.update("jax_enable_x64", True)
 
 _PI = el.PI
 _HALF_PI = el.HALF_PI

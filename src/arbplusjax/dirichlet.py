@@ -8,7 +8,6 @@ import jax.numpy as jnp
 from . import arb_core
 from . import double_interval as di
 
-jax.config.update("jax_enable_x64", True)
 
 
 def _full_interval_like(x: jax.Array) -> jax.Array:

@@ -9,7 +9,6 @@ import jax.numpy as jnp
 from . import double_interval as di
 from . import acb_core
 
-jax.config.update("jax_enable_x64", True)
 
 
 def taylor_series_unary_real(fn, x0: jax.Array, length: int) -> jax.Array:

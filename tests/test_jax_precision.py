@@ -37,3 +37,10 @@ def test_safe_logsumexp_matches_high_precision_path():
 
     _check(got.dtype == jnp.float64)
     _check(bool(jnp.allclose(got, expected, rtol=1e-8, atol=1e-8)))
+
+
+def test_jax_x64_context_restores_runtime_flag():
+    before = jax_precision.jax_x64_enabled()
+    with jax_precision.jax_x64_context(False):
+        _check(jax_precision.jax_x64_enabled() is False)
+    _check(jax_precision.jax_x64_enabled() is before)

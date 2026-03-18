@@ -7,13 +7,11 @@ import jax
 from jax import lax
 import jax.numpy as jnp
 from jax import ops
-from jax.experimental import sparse as jsparse
 
 from . import checks
 from . import iterative_solvers
 from . import sparse_common as sc
 
-jax.config.update("jax_enable_x64", True)
 
 
 class ScbMatPointDiagnostics(NamedTuple):
@@ -170,11 +168,7 @@ def scb_mat_from_dense_csr(a: jax.Array, *, tol: float = 0.0) -> sc.SparseCSR:
 
 
 def scb_mat_from_dense_bcoo(a: jax.Array, *, tol: float = 0.0) -> sc.SparseBCOO:
-    bcoo = jsparse.BCOO.fromdense(_as_complex_matrix(a, "scb_mat.from_dense_bcoo"), nse=None)
-    if tol > 0.0:
-        mask = jnp.abs(bcoo.data) > tol
-        bcoo = jsparse.BCOO((bcoo.data[mask], bcoo.indices[mask]), shape=bcoo.shape)
-    return sc.bcoo_to_sparse_bcoo(bcoo, algebra="scb")
+    return sc.dense_to_sparse_bcoo(_as_complex_matrix(a, "scb_mat.from_dense_bcoo"), algebra="scb", tol=tol)
 
 
 def scb_mat_diag(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
@@ -367,8 +361,7 @@ def scb_mat_csr_to_dense(x: sc.SparseCSR) -> jax.Array:
 
 
 def scb_mat_bcoo_to_dense(x: sc.SparseBCOO) -> jax.Array:
-    x = sc.as_sparse_bcoo(x, algebra="scb", label="scb_mat.bcoo_to_dense")
-    return jsparse.BCOO((x.data, x.indices), shape=(x.rows, x.cols)).todense()
+    return sc.sparse_bcoo_to_dense(x, algebra="scb", label="scb_mat.bcoo_to_dense")
 
 
 def scb_mat_to_dense(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
@@ -413,13 +406,12 @@ def scb_mat_bcoo_to_coo(x: sc.SparseBCOO) -> sc.SparseCOO:
     return scb_mat_coo(x.data, x.indices[:, 0], x.indices[:, 1], shape=(x.rows, x.cols))
 
 
-def _as_bcoo(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, *, label: str) -> jsparse.BCOO:
+def _as_bcoo(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, *, label: str) -> sc.SparseBCOO:
     if isinstance(x, sc.SparseBCOO):
-        x = sc.as_sparse_bcoo(x, algebra="scb", label=label)
-        return jsparse.BCOO((x.data, x.indices), shape=(x.rows, x.cols))
+        return sc.as_sparse_bcoo(x, algebra="scb", label=label)
     if isinstance(x, sc.SparseCOO):
         x = sc.as_sparse_coo(x, algebra="scb", label=label)
-        return jsparse.BCOO((x.data, jnp.stack([x.row, x.col], axis=-1)), shape=(x.rows, x.cols))
+        return sc.coo_to_bcoo(x)
     return _as_bcoo(scb_mat_csr_to_coo(x), label=label)
 
 
@@ -492,7 +484,7 @@ def scb_mat_matvec(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, v: jax.Array)
     if isinstance(x, sc.SparseBCOO):
         x = sc.as_sparse_bcoo(x, algebra="scb", label="scb_mat.matvec.bcoo")
         checks.check_equal(x.cols, v.shape[0], "scb_mat.matvec.inner")
-        return jsparse.BCOO((x.data, x.indices), shape=(x.rows, x.cols)) @ v
+        return sc.sparse_bcoo_matvec(x, v, algebra="scb", label="scb_mat.matvec.bcoo")
     raise TypeError("expected SparseCOO, SparseCSR, or SparseBCOO")
 
 
@@ -512,7 +504,7 @@ def scb_mat_matmul_dense_rhs(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, b: 
     if isinstance(x, sc.SparseBCOO):
         x = sc.as_sparse_bcoo(x, algebra="scb", label="scb_mat.matmul_dense_rhs.bcoo")
         checks.check_equal(x.cols, b.shape[0], "scb_mat.matmul_dense_rhs.inner")
-        return jsparse.BCOO((x.data, x.indices), shape=(x.rows, x.cols)) @ b
+        return sc.sparse_bcoo_matmul_dense_rhs(x, b, algebra="scb", label="scb_mat.matmul_dense_rhs.bcoo")
     raise TypeError("expected SparseCOO, SparseCSR, or SparseBCOO")
 
 
@@ -531,10 +523,7 @@ def scb_mat_scale(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, alpha: jax.Arr
 def scb_mat_add(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, y: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> sc.SparseBCOO:
     xb = _as_bcoo(x, label="scb_mat.add.x")
     yb = _as_bcoo(y, label="scb_mat.add.y")
-    checks.check_equal(xb.shape[0], yb.shape[0], "scb_mat.add.rows")
-    checks.check_equal(xb.shape[1], yb.shape[1], "scb_mat.add.cols")
-    out = xb + yb
-    return sc.bcoo_to_sparse_bcoo(out, algebra="scb")
+    return sc.sparse_bcoo_add(xb, yb, algebra="scb", label="scb_mat.add")
 
 
 def scb_mat_sub(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, y: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> sc.SparseBCOO:
@@ -544,9 +533,7 @@ def scb_mat_sub(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, y: sc.SparseCOO 
 def scb_mat_matmul_sparse(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, y: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> sc.SparseBCOO:
     xb = _as_bcoo(x, label="scb_mat.matmul_sparse.x")
     yb = _as_bcoo(y, label="scb_mat.matmul_sparse.y")
-    checks.check_equal(xb.shape[1], yb.shape[0], "scb_mat.matmul_sparse.inner")
-    out = xb @ yb
-    return sc.bcoo_to_sparse_bcoo(out, algebra="scb")
+    return sc.sparse_bcoo_matmul_sparse(xb, yb, algebra="scb", label="scb_mat.matmul_sparse")
 
 
 def scb_mat_triangular_solve(
@@ -578,10 +565,13 @@ def scb_mat_solve(
 ) -> jax.Array:
     x = _as_bcoo(x, label="scb_mat.solve")
     b = _as_complex_rhs(b, "scb_mat.solve")
-    checks.check_equal(x.shape[1], b.shape[0], "scb_mat.solve.inner")
+    checks.check_equal(x.cols, b.shape[0], "scb_mat.solve.inner")
+    if x.rows <= 16:
+        dense = sc.sparse_bcoo_to_dense(x, algebra="scb", label="scb_mat.solve.dense")
+        return jnp.linalg.solve(dense, b)
 
     def matvec(v):
-        return x @ v
+        return sc.sparse_bcoo_matvec(x, v, algebra="scb", label="scb_mat.solve.apply")
 
     def solve_vec(rhs, guess):
         if method == "cg":
@@ -670,7 +660,7 @@ def scb_mat_matvec_cached_prepare(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO
         return sc.SparseMatvecPlan(storage="csr", payload=(x.data, x.indices, row_ids), rows=x.rows, cols=x.cols, algebra="scb")
     if isinstance(x, sc.SparseBCOO):
         x = sc.as_sparse_bcoo(x, algebra="scb", label="scb_mat.matvec_cached_prepare")
-        return sc.SparseMatvecPlan(storage="bcoo", payload=jsparse.BCOO((x.data, x.indices), shape=(x.rows, x.cols)), rows=x.rows, cols=x.cols, algebra="scb")
+        return sc.SparseMatvecPlan(storage="bcoo", payload=x, rows=x.rows, cols=x.cols, algebra="scb")
     raise TypeError("expected SparseCOO, SparseCSR, or SparseBCOO")
 
 
@@ -684,7 +674,7 @@ def scb_mat_matvec_cached_apply(plan: sc.SparseMatvecPlan, v: jax.Array) -> jax.
     if plan.storage == "csr":
         data, indices, row_ids = plan.payload
         return ops.segment_sum(data * v[indices], row_ids, num_segments=plan.rows)
-    return plan.payload @ v
+    return sc.sparse_bcoo_matvec(plan.payload, v, algebra="scb", label="scb_mat.matvec_cached_apply.bcoo")
 
 
 def scb_mat_matvec_batch_fixed(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, vs: jax.Array) -> jax.Array:

@@ -3,10 +3,22 @@ from __future__ import annotations
 from contextlib import contextmanager
 from math import ceil, log10
 
+import jax
 import jax.numpy as jnp
 
 _DPS = 50
 _PREC_BITS = 53
+
+
+def enable_jax_x64() -> None:
+    jax.config.update("jax_enable_x64", True)
+
+def set_jax_x64(enabled: bool) -> None:
+    jax.config.update("jax_enable_x64", bool(enabled))
+
+
+def jax_x64_enabled() -> bool:
+    return bool(jax.config.read("jax_enable_x64"))
 
 
 def dps_to_bits(dps: int) -> int:
@@ -53,6 +65,32 @@ def workprec(prec_bits: int):
         set_prec_bits(old)
 
 
+@contextmanager
+def jax_x64_context(enabled: bool = True):
+    old = jax_x64_enabled()
+    set_jax_x64(enabled)
+    try:
+        yield
+    finally:
+        set_jax_x64(old)
+
+
 def eps_from_dps(dps: int | None = None) -> jnp.ndarray:
     bits = dps_to_bits(_DPS if dps is None else dps)
     return jnp.exp2(-jnp.float64(bits))
+
+
+__all__ = [
+    "enable_jax_x64",
+    "set_jax_x64",
+    "jax_x64_enabled",
+    "jax_x64_context",
+    "dps_to_bits",
+    "set_dps",
+    "set_prec_bits",
+    "get_dps",
+    "get_prec_bits",
+    "workdps",
+    "workprec",
+    "eps_from_dps",
+]

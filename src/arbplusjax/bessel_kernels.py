@@ -7,7 +7,6 @@ import jax.numpy as jnp
 from . import barnesg
 from . import elementary as el
 
-jax.config.update("jax_enable_x64", True)
 
 _BESSEL_REAL_TERMS = 80
 _BESSEL_COMPLEX_TERMS = 60

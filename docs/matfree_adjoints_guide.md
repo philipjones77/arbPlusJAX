@@ -172,7 +172,7 @@ def matvec(v):
 # Use efficient Lanczos
 lanczos = matfree_adjoints.lanczos_tridiag(
     matvec,
-    krylov_depth=50,
+    50,
     reortho="full",
     custom_vjp=True
 )
@@ -182,8 +182,9 @@ def expm_action(v):
     (basis, (diag, offdiag)), _ = lanczos(v)
     # Build tridiagonal matrix
     T = jnp.diag(diag) + jnp.diag(offdiag, 1) + jnp.diag(offdiag, -1)
-    # Compute exp(T)
-    exp_T = jax.scipy.linalg.expm(T)
+    # Compute exp(T) via dense eigendecomposition
+    eigvals, eigvecs = jnp.linalg.eigh(T)
+    exp_T = eigvecs @ jnp.diag(jnp.exp(eigvals)) @ eigvecs.T
     # Project back
     e1 = jnp.zeros(len(diag))
     e1 = e1.at[0].set(1.0)
@@ -206,7 +207,7 @@ def matvec(v):
 # Use efficient Arnoldi
 arnoldi = matfree_adjoints.arnoldi_hessenberg(
     matvec,
-    krylov_depth=50,
+    50,
     reortho="full",
     custom_vjp=True
 )

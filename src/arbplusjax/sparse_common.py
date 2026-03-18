@@ -3,12 +3,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import jax
-from jax.experimental import sparse as jsparse
 import jax.numpy as jnp
 
 from . import checks
 
-jax.config.update("jax_enable_x64", True)
 
 
 @jax.tree_util.register_pytree_node_class
@@ -361,12 +359,100 @@ def csr_row_ids(indptr: jax.Array, *, rows: int, nnz: int) -> jax.Array:
     return jnp.repeat(jnp.arange(rows, dtype=indptr.dtype), counts, total_repeat_length=nnz)
 
 
-def coo_to_bcoo(x: SparseCOO) -> jsparse.BCOO:
-    return jsparse.BCOO((x.data, jnp.stack([x.row, x.col], axis=-1)), shape=(x.rows, x.cols))
+def coo_to_bcoo(x: SparseCOO) -> SparseBCOO:
+    x = as_sparse_coo(x, algebra=x.algebra, label="sparse_common.coo_to_bcoo")
+    return SparseBCOO(
+        data=x.data,
+        indices=jnp.stack([x.row, x.col], axis=-1),
+        rows=x.rows,
+        cols=x.cols,
+        algebra=x.algebra,
+    )
 
 
-def bcoo_to_sparse_bcoo(x: jsparse.BCOO, *, algebra: str) -> SparseBCOO:
-    return SparseBCOO(data=x.data, indices=x.indices, rows=int(x.shape[0]), cols=int(x.shape[1]), algebra=algebra)
+def bcoo_to_sparse_bcoo(x: SparseBCOO, *, algebra: str) -> SparseBCOO:
+    x = as_sparse_bcoo(x, algebra=x.algebra, label="sparse_common.bcoo_to_sparse_bcoo")
+    return SparseBCOO(data=x.data, indices=x.indices, rows=x.rows, cols=x.cols, algebra=algebra)
+
+
+def dense_to_sparse_bcoo(a: jax.Array, *, algebra: str, tol: float = 0.0) -> SparseBCOO:
+    arr = jnp.asarray(a)
+    mask = jnp.abs(arr) > jnp.asarray(tol, dtype=arr.dtype)
+    row, col = jnp.nonzero(mask, size=int(mask.size), fill_value=-1)
+    valid = row >= 0
+    data = arr[row, col][valid]
+    indices = jnp.stack([row[valid], col[valid]], axis=-1)
+    return SparseBCOO(
+        data=data,
+        indices=jnp.asarray(indices, dtype=jnp.int32),
+        rows=int(arr.shape[0]),
+        cols=int(arr.shape[1]),
+        algebra=algebra,
+    )
+
+
+def scipy_csr_to_sparse_bcoo(csr, *, algebra: str, dtype=None) -> SparseBCOO:
+    coo = csr.tocoo()
+    target_dtype = dtype if dtype is not None else coo.data.dtype
+    data = jnp.asarray(coo.data, dtype=target_dtype)
+    indices = jnp.stack(
+        [
+            jnp.asarray(coo.row, dtype=jnp.int32),
+            jnp.asarray(coo.col, dtype=jnp.int32),
+        ],
+        axis=-1,
+    )
+    return SparseBCOO(
+        data=data,
+        indices=indices,
+        rows=int(coo.shape[0]),
+        cols=int(coo.shape[1]),
+        algebra=algebra,
+    )
+
+
+def sparse_bcoo_to_dense(x: SparseBCOO, *, algebra: str, label: str) -> jax.Array:
+    x = as_sparse_bcoo(x, algebra=algebra, label=label)
+    out = jnp.zeros((x.rows, x.cols), dtype=x.data.dtype)
+    return out.at[(x.indices[:, 0], x.indices[:, 1])].add(x.data)
+
+
+def sparse_bcoo_matvec(x: SparseBCOO, v: jax.Array, *, algebra: str, label: str) -> jax.Array:
+    x = as_sparse_bcoo(x, algebra=algebra, label=label)
+    vv = jnp.asarray(v, dtype=x.data.dtype)
+    checks.check_equal(x.cols, vv.shape[0], f"{label}.inner")
+    contrib = x.data * vv[x.indices[:, 1]]
+    return jax.ops.segment_sum(contrib, x.indices[:, 0], num_segments=x.rows)
+
+
+def sparse_bcoo_matmul_dense_rhs(x: SparseBCOO, b: jax.Array, *, algebra: str, label: str) -> jax.Array:
+    x = as_sparse_bcoo(x, algebra=algebra, label=label)
+    bb = jnp.asarray(b, dtype=x.data.dtype)
+    checks.check_equal(x.cols, bb.shape[0], f"{label}.inner")
+    contrib = x.data[:, None] * bb[x.indices[:, 1], :]
+    return jax.ops.segment_sum(contrib, x.indices[:, 0], num_segments=x.rows)
+
+
+def sparse_bcoo_add(x: SparseBCOO, y: SparseBCOO, *, algebra: str, label: str) -> SparseBCOO:
+    x = as_sparse_bcoo(x, algebra=algebra, label=f"{label}.x")
+    y = as_sparse_bcoo(y, algebra=algebra, label=f"{label}.y")
+    checks.check_equal(x.rows, y.rows, f"{label}.rows")
+    checks.check_equal(x.cols, y.cols, f"{label}.cols")
+    data = jnp.concatenate([x.data, y.data], axis=0)
+    indices = jnp.concatenate([x.indices, y.indices], axis=0)
+    return SparseBCOO(data=data, indices=indices, rows=x.rows, cols=x.cols, algebra=algebra)
+
+
+def sparse_bcoo_matmul_sparse(x: SparseBCOO, y: SparseBCOO, *, algebra: str, label: str) -> SparseBCOO:
+    x = as_sparse_bcoo(x, algebra=algebra, label=f"{label}.x")
+    y = as_sparse_bcoo(y, algebra=algebra, label=f"{label}.y")
+    checks.check_equal(x.cols, y.rows, f"{label}.inner")
+    product = sparse_bcoo_to_dense(x, algebra=algebra, label=f"{label}.x_dense") @ sparse_bcoo_to_dense(
+        y,
+        algebra=algebra,
+        label=f"{label}.y_dense",
+    )
+    return dense_to_sparse_bcoo(product, algebra=algebra)
 
 
 def as_sparse_matvec_plan(x: SparseMatvecPlan, *, algebra: str, label: str) -> SparseMatvecPlan:
@@ -480,4 +566,11 @@ __all__ = [
     "csr_row_ids",
     "coo_to_bcoo",
     "bcoo_to_sparse_bcoo",
+    "dense_to_sparse_bcoo",
+    "scipy_csr_to_sparse_bcoo",
+    "sparse_bcoo_to_dense",
+    "sparse_bcoo_matvec",
+    "sparse_bcoo_matmul_dense_rhs",
+    "sparse_bcoo_add",
+    "sparse_bcoo_matmul_sparse",
 ]

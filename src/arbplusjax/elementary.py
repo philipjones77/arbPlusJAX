@@ -5,7 +5,6 @@ import jax.numpy as jnp
 
 from . import jax_precision
 
-jax.config.update("jax_enable_x64", True)
 
 # Central constants
 PI = jnp.float64(3.1415926535897932384626433832795028841971)

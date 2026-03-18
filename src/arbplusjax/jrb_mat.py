@@ -30,17 +30,18 @@ Provenance:
 
 from functools import partial
 from typing import NamedTuple
+import numpy as np
 
 import jax
 from jax import lax
 import jax.numpy as jnp
-from jax.experimental import sparse as jsparse
 
 from . import checks
 from . import double_interval as di
+from . import iterative_solvers
 from . import mat_common
+from . import sparse_common
 
-jax.config.update("jax_enable_x64", True)
 
 PROVENANCE = {
     "classification": "new",
@@ -62,6 +63,19 @@ class JrbMatKrylovDiagnostics(NamedTuple):
     used_adjoint: jax.Array
     gradient_supported: jax.Array
     probe_count: jax.Array
+
+
+class JrbMatSelectedInverseDiagnostics(NamedTuple):
+    algorithm_code: jax.Array
+    partition_count: jax.Array
+    overlap: jax.Array
+    block_size: jax.Array
+    max_local_size: jax.Array
+    mean_local_size: jax.Array
+    correction_probe_count: jax.Array
+    correction_used: jax.Array
+    converged_probe_count: jax.Array
+    final_residual_max: jax.Array
 
 
 def jrb_mat_as_interval_matrix(a: jax.Array) -> jax.Array:
@@ -328,25 +342,37 @@ def jrb_mat_dense_operator_adjoint(a: jax.Array):
     return matvec
 
 
-def jrb_mat_bcoo_operator(a: jsparse.BCOO):
-    """Return a matrix-free midpoint matvec closure for a real JAX BCOO matrix."""
-    checks.check(len(a.shape) == 2, "jrb_mat.bcoo_operator.rank")
+def jrb_mat_bcoo_operator(a: sparse_common.SparseBCOO):
+    """Return a matrix-free midpoint matvec closure for a real sparse BCOO matrix."""
+    a = sparse_common.as_sparse_bcoo(a, algebra="jrb", label="jrb_mat.bcoo_operator")
 
     def matvec(v: jax.Array) -> jax.Array:
         vv = _jrb_operator_vector(v)
-        return jnp.asarray(a @ vv, dtype=jnp.float64)
+        return jnp.asarray(
+            sparse_common.sparse_bcoo_matvec(a, vv, algebra="jrb", label="jrb_mat.bcoo_operator.apply"),
+            dtype=jnp.float64,
+        )
 
     return matvec
 
 
-def jrb_mat_bcoo_operator_adjoint(a: jsparse.BCOO):
-    """Return the adjoint matrix-free midpoint matvec closure for a real JAX BCOO matrix."""
-    checks.check(len(a.shape) == 2, "jrb_mat.bcoo_operator_adjoint.rank")
-    at = a.transpose()
+def jrb_mat_bcoo_operator_adjoint(a: sparse_common.SparseBCOO):
+    """Return the adjoint matrix-free midpoint matvec closure for a real sparse BCOO matrix."""
+    a = sparse_common.as_sparse_bcoo(a, algebra="jrb", label="jrb_mat.bcoo_operator_adjoint")
+    at = sparse_common.SparseBCOO(
+        data=a.data,
+        indices=a.indices[:, ::-1],
+        rows=a.cols,
+        cols=a.rows,
+        algebra="jrb",
+    )
 
     def matvec(v: jax.Array) -> jax.Array:
         vv = _jrb_operator_vector(v)
-        return jnp.asarray(at @ vv, dtype=jnp.float64)
+        return jnp.asarray(
+            sparse_common.sparse_bcoo_matvec(at, vv, algebra="jrb", label="jrb_mat.bcoo_operator_adjoint.apply"),
+            dtype=jnp.float64,
+        )
 
     return matvec
 
@@ -368,19 +394,19 @@ def jrb_mat_bcoo_parametric_operator(indices: jax.Array, *, shape: tuple[int, in
 
 
 def jrb_mat_scipy_csr_operator(csr):
-    """Return a matrix-free midpoint matvec closure for a SciPy CSR matrix via JAX BCOO."""
-    bcoo = jsparse.BCOO.from_scipy_sparse(csr)
+    """Return a matrix-free midpoint matvec closure for a SciPy CSR matrix via SparseBCOO."""
+    bcoo = sparse_common.scipy_csr_to_sparse_bcoo(csr, algebra="jrb", dtype=jnp.float64)
     return jrb_mat_bcoo_operator(bcoo)
 
 
-def jrb_mat_bcoo_gershgorin_bounds(a: jsparse.BCOO, *, eps: float = 1e-12) -> tuple[jax.Array, jax.Array]:
+def jrb_mat_bcoo_gershgorin_bounds(a: sparse_common.SparseBCOO, *, eps: float = 1e-12) -> tuple[jax.Array, jax.Array]:
     """Return conservative Gershgorin spectral bounds for a real sparse matrix."""
-    checks.check(len(a.shape) == 2, "jrb_mat.bcoo_gershgorin_bounds.rank")
-    checks.check_equal(a.shape[0], a.shape[1], "jrb_mat.bcoo_gershgorin_bounds.square")
+    a = sparse_common.as_sparse_bcoo(a, algebra="jrb", label="jrb_mat.bcoo_gershgorin_bounds")
+    checks.check_equal(a.rows, a.cols, "jrb_mat.bcoo_gershgorin_bounds.square")
     rows = jnp.asarray(a.indices[:, 0], dtype=jnp.int32)
     cols = jnp.asarray(a.indices[:, 1], dtype=jnp.int32)
     data = jnp.asarray(a.data, dtype=jnp.float64)
-    n = int(a.shape[0])
+    n = int(a.rows)
     abs_row_sum = jax.ops.segment_sum(jnp.abs(data), rows, n)
     diag = jax.ops.segment_sum(jnp.where(rows == cols, data, 0.0), rows, n)
     radii = abs_row_sum - jnp.abs(diag)
@@ -393,7 +419,7 @@ def jrb_mat_bcoo_gershgorin_bounds(a: jsparse.BCOO, *, eps: float = 1e-12) -> tu
 
 
 def jrb_mat_bcoo_spectral_bounds_adaptive(
-    a: jsparse.BCOO,
+    a: sparse_common.SparseBCOO,
     *,
     steps: int = 16,
     safety_margin: float = 1.25,
@@ -404,10 +430,10 @@ def jrb_mat_bcoo_spectral_bounds_adaptive(
     This estimator is intended for the point-mode Leja path. It is narrower than raw
     Gershgorin in many cases, but it is not a rigorous enclosure certificate.
     """
-    checks.check(len(a.shape) == 2, "jrb_mat.bcoo_spectral_bounds_adaptive.rank")
-    checks.check_equal(a.shape[0], a.shape[1], "jrb_mat.bcoo_spectral_bounds_adaptive.square")
+    a = sparse_common.as_sparse_bcoo(a, algebra="jrb", label="jrb_mat.bcoo_spectral_bounds_adaptive")
+    checks.check_equal(a.rows, a.cols, "jrb_mat.bcoo_spectral_bounds_adaptive.square")
     g_lower, g_upper = jrb_mat_bcoo_gershgorin_bounds(a, eps=eps)
-    n = int(a.shape[0])
+    n = int(a.rows)
     k = max(1, min(int(steps), n))
     scale = jnp.sqrt(jnp.asarray(float(n), dtype=jnp.float64))
     starts = jnp.stack(
@@ -441,6 +467,202 @@ def jrb_mat_bcoo_spectral_bounds_adaptive(
     lower = jnp.maximum(local_eps, jnp.minimum(g_lower, heuristic_lower))
     upper = jnp.maximum(lower + local_eps, jnp.minimum(g_upper, heuristic_upper))
     return lower, upper
+
+
+def _jrb_partition_contiguous_blocks(n: int, block_size: int) -> list[np.ndarray]:
+    if block_size <= 0:
+        raise ValueError("block_size must be > 0")
+    return [
+        np.arange(start, min(start + block_size, n), dtype=np.int32)
+        for start in range(0, n, block_size)
+    ]
+
+
+def _jrb_bcoo_host_graph_payload(a: sparse_common.SparseBCOO) -> tuple[list[dict[int, float]], list[set[int]]]:
+    idx = np.asarray(jax.device_get(a.indices), dtype=np.int32)
+    data = np.asarray(jax.device_get(a.data), dtype=np.float64)
+    rows = [dict() for _ in range(int(a.rows))]
+    adj = [set((i,)) for i in range(int(a.rows))]
+    for (r, c), val in zip(idx, data, strict=False):
+        if val == 0.0:
+            continue
+        rows[int(r)][int(c)] = rows[int(r)].get(int(c), 0.0) + float(val)
+        adj[int(r)].add(int(c))
+        adj[int(c)].add(int(r))
+    return rows, adj
+
+
+def _jrb_expand_overlap(seed_rows: np.ndarray, adjacency: list[set[int]], overlap: int) -> np.ndarray:
+    visited = set(int(i) for i in np.asarray(seed_rows, dtype=np.int32))
+    frontier = set(visited)
+    for _ in range(int(overlap)):
+        next_frontier: set[int] = set()
+        for node in frontier:
+            next_frontier.update(adjacency[node])
+        next_frontier.difference_update(visited)
+        if not next_frontier:
+            break
+        visited.update(next_frontier)
+        frontier = next_frontier
+    return np.asarray(sorted(visited), dtype=np.int32)
+
+
+def _jrb_prepare_selected_inverse_rows_bcoo(
+    a: sparse_common.SparseBCOO,
+    *,
+    overlap: int,
+    block_size: int,
+) -> tuple[jax.Array, jax.Array, jax.Array, int, float]:
+    rows_payload, adjacency = _jrb_bcoo_host_graph_payload(a)
+    partitions = _jrb_partition_contiguous_blocks(int(a.rows), int(block_size))
+    local_nodes_per_part = [_jrb_expand_overlap(part, adjacency, int(overlap)) for part in partitions]
+    max_local_size = max(int(nodes.shape[0]) for nodes in local_nodes_per_part)
+    mean_local_size = float(np.mean([int(nodes.shape[0]) for nodes in local_nodes_per_part]))
+    num_parts = len(partitions)
+
+    local_blocks = np.tile(np.eye(max_local_size, dtype=np.float64), (num_parts, 1, 1))
+    local_nodes_padded = np.zeros((num_parts, max_local_size), dtype=np.int32)
+    seed_local_pos_padded = -np.ones((num_parts, int(block_size)), dtype=np.int32)
+
+    for part_idx, (seed_rows, local_nodes) in enumerate(zip(partitions, local_nodes_per_part, strict=False)):
+        k_local = int(local_nodes.shape[0])
+        local_pos = {int(g): i for i, g in enumerate(local_nodes.tolist())}
+        block = np.zeros((k_local, k_local), dtype=np.float64)
+        for global_row in local_nodes.tolist():
+            row_pos = local_pos[int(global_row)]
+            for global_col, value in rows_payload[int(global_row)].items():
+                col_pos = local_pos.get(int(global_col))
+                if col_pos is not None:
+                    block[row_pos, col_pos] += float(value)
+        local_blocks[part_idx, :k_local, :k_local] = block
+        local_nodes_padded[part_idx, :k_local] = local_nodes
+        for seed_pos, global_row in enumerate(seed_rows.tolist()):
+            seed_local_pos_padded[part_idx, seed_pos] = local_pos[int(global_row)]
+
+    batched_blocks = jnp.asarray(local_blocks, dtype=jnp.float64)
+    inv_blocks = jax.vmap(jnp.linalg.inv)(batched_blocks)
+    inv_blocks_host = np.asarray(jax.device_get(inv_blocks), dtype=np.float64)
+
+    row_cols = np.zeros((int(a.rows), max_local_size), dtype=np.int32)
+    row_vals = np.zeros((int(a.rows), max_local_size), dtype=np.float64)
+    diag_est = np.zeros((int(a.rows),), dtype=np.float64)
+
+    for part_idx, (seed_rows, local_nodes) in enumerate(zip(partitions, local_nodes_per_part, strict=False)):
+        k_local = int(local_nodes.shape[0])
+        local_cols = local_nodes_padded[part_idx, :k_local]
+        for seed_offset, global_row in enumerate(seed_rows.tolist()):
+            local_row = int(seed_local_pos_padded[part_idx, seed_offset])
+            vals = inv_blocks_host[part_idx, local_row, :k_local]
+            row_cols[int(global_row), :k_local] = local_cols
+            row_vals[int(global_row), :k_local] = vals
+            diag_est[int(global_row)] = vals[local_row]
+
+    return (
+        jnp.asarray(row_cols, dtype=jnp.int32),
+        jnp.asarray(row_vals, dtype=jnp.float64),
+        jnp.asarray(diag_est, dtype=jnp.float64),
+        max_local_size,
+        mean_local_size,
+    )
+
+
+def _jrb_selected_inverse_row_apply(row_cols: jax.Array, row_vals: jax.Array, v: jax.Array) -> jax.Array:
+    vv = jnp.asarray(v, dtype=jnp.float64)
+    return jnp.sum(row_vals * vv[row_cols], axis=1)
+
+
+def jrb_mat_bcoo_inverse_diagonal_point(
+    a: sparse_common.SparseBCOO,
+    *,
+    overlap: int = 1,
+    block_size: int = 16,
+    correction_probes: int = 0,
+    key: jax.Array | None = None,
+    tol: float = 1e-6,
+    atol: float = 0.0,
+    maxiter: int | None = None,
+) -> jax.Array:
+    value, _ = jrb_mat_bcoo_inverse_diagonal_with_diagnostics_point(
+        a,
+        overlap=overlap,
+        block_size=block_size,
+        correction_probes=correction_probes,
+        key=key,
+        tol=tol,
+        atol=atol,
+        maxiter=maxiter,
+    )
+    return value
+
+
+def jrb_mat_bcoo_inverse_diagonal_with_diagnostics_point(
+    a: sparse_common.SparseBCOO,
+    *,
+    overlap: int = 1,
+    block_size: int = 16,
+    correction_probes: int = 0,
+    key: jax.Array | None = None,
+    tol: float = 1e-6,
+    atol: float = 0.0,
+    maxiter: int | None = None,
+) -> tuple[jax.Array, JrbMatSelectedInverseDiagnostics]:
+    """Estimate diag(A^{-1}) for sparse SPD matrices via local selected inverse rows plus stochastic correction."""
+    a = sparse_common.as_sparse_bcoo(a, algebra="jrb", label="jrb_mat.bcoo_inverse_diagonal")
+    checks.check_equal(a.rows, a.cols, "jrb_mat.bcoo_inverse_diagonal.square")
+    checks.check(int(overlap) >= 0, "jrb_mat.bcoo_inverse_diagonal.overlap")
+    checks.check(int(block_size) > 0, "jrb_mat.bcoo_inverse_diagonal.block_size")
+    checks.check(int(correction_probes) >= 0, "jrb_mat.bcoo_inverse_diagonal.correction_probes")
+
+    row_cols, row_vals, local_diag, max_local_size, mean_local_size = _jrb_prepare_selected_inverse_rows_bcoo(
+        a,
+        overlap=int(overlap),
+        block_size=int(block_size),
+    )
+    matvec = jrb_mat_bcoo_operator(a)
+    approx_apply = lambda v: _jrb_selected_inverse_row_apply(row_cols, row_vals, v)
+    n = int(a.rows)
+
+    correction_used = int(correction_probes) > 0
+    converged_probe_count = 0
+    final_residual_max = 0.0
+    if correction_used:
+        solve_key = jax.random.PRNGKey(0) if key is None else key
+        probes = jax.random.rademacher(solve_key, (int(correction_probes), n), dtype=jnp.float64)
+
+        def solve_probe(rhs):
+            x, info = iterative_solvers.cg(
+                matvec,
+                rhs,
+                tol=tol,
+                atol=atol,
+                maxiter=maxiter,
+                M=approx_apply,
+            )
+            return x, info["converged"], info["residuals"][-1]
+
+        xs, converged_flags, final_residuals = jax.vmap(solve_probe)(probes)
+        approx_xs = jax.vmap(approx_apply)(probes)
+        correction = jnp.mean(probes * (xs - approx_xs), axis=0)
+        diag_est = local_diag + correction
+        converged_probe_count = int(jnp.sum(converged_flags).item())
+        final_residual_max = float(jnp.max(final_residuals).item())
+    else:
+        diag_est = local_diag
+
+    partition_count = (n + int(block_size) - 1) // int(block_size)
+    diagnostics = JrbMatSelectedInverseDiagnostics(
+        algorithm_code=jnp.asarray(5, dtype=jnp.int32),
+        partition_count=jnp.asarray(partition_count, dtype=jnp.int32),
+        overlap=jnp.asarray(int(overlap), dtype=jnp.int32),
+        block_size=jnp.asarray(int(block_size), dtype=jnp.int32),
+        max_local_size=jnp.asarray(max_local_size, dtype=jnp.int32),
+        mean_local_size=jnp.asarray(mean_local_size, dtype=jnp.float64),
+        correction_probe_count=jnp.asarray(int(correction_probes), dtype=jnp.int32),
+        correction_used=jnp.asarray(correction_used),
+        converged_probe_count=jnp.asarray(converged_probe_count, dtype=jnp.int32),
+        final_residual_max=jnp.asarray(final_residual_max, dtype=jnp.float64),
+    )
+    return jnp.asarray(diag_est, dtype=jnp.float64), diagnostics
 
 
 def jrb_mat_operator_apply_point(matvec, x: jax.Array) -> jax.Array:
@@ -491,6 +713,19 @@ def _jrb_leja_points_interval_point(
     return selected
 
 
+def _jrb_log_leja_scaling_params(
+    spectral_bounds: tuple[float | jax.Array, float | jax.Array],
+) -> tuple[jax.Array, jax.Array, jax.Array, jax.Array]:
+    lower, upper = spectral_bounds
+    eps = jnp.asarray(1e-12, dtype=jnp.float64)
+    alpha_scale = jnp.maximum(jnp.asarray(lower, dtype=jnp.float64), eps)
+    scaled_lower = jnp.asarray(1.0, dtype=jnp.float64)
+    scaled_upper = jnp.maximum(jnp.asarray(upper, dtype=jnp.float64) / alpha_scale, scaled_lower + eps)
+    center = 0.5 * (scaled_lower + scaled_upper)
+    gamma = jnp.maximum(0.25 * (scaled_upper - scaled_lower), eps)
+    return alpha_scale, center, gamma, scaled_upper
+
+
 def _jrb_newton_divided_differences_point(nodes: jax.Array, scalar_fun) -> jax.Array:
     coeffs = jnp.asarray(scalar_fun(nodes), dtype=jnp.float64)
     degree = int(nodes.shape[0])
@@ -501,12 +736,99 @@ def _jrb_newton_divided_differences_point(nodes: jax.Array, scalar_fun) -> jax.A
     return coeffs
 
 
-def _jrb_funm_action_newton_point(matvec, x: jax.Array, nodes: jax.Array, coeffs: jax.Array) -> jax.Array:
+def _jrb_log_leja_coefficients_point(
+    nodes: jax.Array,
+    center: jax.Array,
+    gamma: jax.Array,
+) -> jax.Array:
+    nodes = jnp.asarray(nodes, dtype=jnp.float64)
+    center = jnp.asarray(center, dtype=jnp.float64)
+    gamma = jnp.asarray(gamma, dtype=jnp.float64)
+    floor = jnp.asarray(1e-30, dtype=jnp.float64)
+    return _jrb_newton_divided_differences_point(
+        nodes,
+        lambda t: jnp.log(jnp.maximum(center + gamma * t, floor)),
+    )
+
+
+def _jrb_log_leja_setup_point(
+    spectral_bounds: tuple[float | jax.Array, float | jax.Array],
+    degree: int,
+    *,
+    candidate_count: int,
+) -> tuple[jax.Array, jax.Array, jax.Array, jax.Array, jax.Array]:
+    alpha_scale, center, gamma, _ = _jrb_log_leja_scaling_params(spectral_bounds)
+    nodes = _jrb_leja_points_interval_point(
+        jnp.asarray(-2.0, dtype=jnp.float64),
+        jnp.asarray(2.0, dtype=jnp.float64),
+        degree,
+        candidate_count=candidate_count,
+    )
+    coeffs = _jrb_log_leja_coefficients_point(nodes, center, gamma)
+    return alpha_scale, center, gamma, nodes, coeffs
+
+
+def _jrb_log_action_coordinate_shortcut_point(
+    matvec,
+    x: jax.Array,
+    *,
+    rtol: float,
+    atol: float,
+) -> tuple[jax.Array, jax.Array]:
     x = jrb_mat_as_interval_vector(x)
     basis = _jrb_mid_vector(x)
-    acc = coeffs[0] * basis
+    zeros = _jrb_point_interval(jnp.zeros_like(basis))
+    tiny = jnp.asarray(1e-30, dtype=jnp.float64)
+    local_rtol = jnp.asarray(rtol, dtype=jnp.float64)
+    local_atol = jnp.asarray(atol, dtype=jnp.float64)
+    abs_basis = jnp.abs(basis)
+    pivot = jnp.argmax(abs_basis)
+    dominant = abs_basis[pivot]
+    off_norm = jnp.linalg.norm(basis.at[pivot].set(0.0))
+    coordinate_scale = local_atol + local_rtol * jnp.maximum(dominant, jnp.asarray(1.0, dtype=jnp.float64))
+    looks_coordinate = off_norm <= coordinate_scale
+
+    def no_shortcut(_):
+        return zeros, jnp.asarray(False)
+
+    def maybe_shortcut(_):
+        norm_sq = jnp.real(jnp.vdot(basis, basis))
+
+        def zero_branch(__):
+            return zeros, jnp.asarray(True)
+
+        def eigen_branch(__):
+            applied = jnp.asarray(matvec(_jrb_point_interval(basis)), dtype=jnp.float64)
+            basis_norm = jnp.sqrt(norm_sq)
+            rayleigh = jnp.real(jnp.vdot(basis, applied)) / norm_sq
+            residual = applied - rayleigh * basis
+            residual_norm = jnp.linalg.norm(residual)
+            scale = local_atol + local_rtol * jnp.maximum(
+                jnp.linalg.norm(applied),
+                jnp.maximum(jnp.abs(rayleigh) * basis_norm, jnp.asarray(1.0, dtype=jnp.float64)),
+            )
+            use_shortcut = jnp.logical_and(rayleigh > 0.0, residual_norm <= scale)
+            exact = _jrb_point_interval(jnp.log(jnp.maximum(rayleigh, tiny)) * basis)
+            return exact, use_shortcut
+
+        return lax.cond(norm_sq <= tiny, zero_branch, eigen_branch, operand=None)
+
+    return lax.cond(looks_coordinate, maybe_shortcut, no_shortcut, operand=None)
+
+
+def _jrb_funm_action_newton_point(
+    x: jax.Array,
+    nodes: jax.Array,
+    coeffs: jax.Array,
+    step_fn,
+    *,
+    constant_shift: jax.Array = jnp.asarray(0.0, dtype=jnp.float64),
+) -> jax.Array:
+    x = jrb_mat_as_interval_vector(x)
+    basis = _jrb_mid_vector(x)
+    acc = (constant_shift + coeffs[0]) * basis
     for k in range(1, int(coeffs.shape[0])):
-        basis = jnp.asarray(matvec(_jrb_point_interval(basis)), dtype=jnp.float64) - nodes[k - 1] * basis
+        basis = step_fn(basis, nodes[k - 1])
         acc = acc + coeffs[k] * basis
     out = _jrb_point_interval(acc)
     finite = jnp.all(jnp.isfinite(acc), axis=-1)
@@ -514,14 +836,15 @@ def _jrb_funm_action_newton_point(matvec, x: jax.Array, nodes: jax.Array, coeffs
 
 
 def _jrb_funm_action_newton_adaptive_point(
-    matvec,
     x: jax.Array,
     nodes: jax.Array,
     coeffs: jax.Array,
+    step_fn,
     *,
     min_degree: int,
     rtol: float,
     atol: float,
+    constant_shift: jax.Array = jnp.asarray(0.0, dtype=jnp.float64),
 ) -> tuple[jax.Array, jax.Array, jax.Array]:
     x = jrb_mat_as_interval_vector(x)
     degree = int(coeffs.shape[0])
@@ -529,7 +852,7 @@ def _jrb_funm_action_newton_adaptive_point(
         raise ValueError("degree must be > 0")
     min_degree = max(1, min(int(min_degree), degree))
     basis0 = _jrb_mid_vector(x)
-    acc0 = coeffs[0] * basis0
+    acc0 = (constant_shift + coeffs[0]) * basis0
     tail0 = jnp.linalg.norm(acc0)
     local_rtol = jnp.asarray(rtol, dtype=jnp.float64)
     local_atol = jnp.asarray(atol, dtype=jnp.float64)
@@ -538,7 +861,7 @@ def _jrb_funm_action_newton_adaptive_point(
         basis, acc, used_degree, tail_norm, done = carry
 
         def compute(_):
-            next_basis = jnp.asarray(matvec(_jrb_point_interval(basis)), dtype=jnp.float64) - nodes[k - 1] * basis
+            next_basis = step_fn(basis, nodes[k - 1])
             term = coeffs[k] * next_basis
             next_acc = acc + term
             next_tail = jnp.linalg.norm(term)
@@ -581,23 +904,34 @@ def jrb_mat_log_action_leja_point(
     total_degree = int(max_degree) if max_degree is not None else int(degree)
     if total_degree <= 0:
         raise ValueError("degree must be > 0")
-    lower, upper = spectral_bounds
-    lower = jnp.maximum(jnp.asarray(lower, dtype=jnp.float64), jnp.asarray(1e-12, dtype=jnp.float64))
-    upper = jnp.maximum(jnp.asarray(upper, dtype=jnp.float64), lower + jnp.asarray(1e-12, dtype=jnp.float64))
-    nodes = _jrb_leja_points_interval_point(lower, upper, total_degree, candidate_count=candidate_count)
-    coeffs = _jrb_newton_divided_differences_point(nodes, jnp.log)
-    if max_degree is not None:
-        value, _, _ = _jrb_funm_action_newton_adaptive_point(
-            matvec,
-            x,
-            nodes,
-            coeffs,
-            min_degree=min_degree,
-            rtol=rtol,
-            atol=atol,
-        )
-        return value
-    return _jrb_funm_action_newton_point(matvec, x, nodes, coeffs)
+    exact_value, use_shortcut = _jrb_log_action_coordinate_shortcut_point(matvec, x, rtol=rtol, atol=atol)
+    alpha_scale, center, gamma, nodes, coeffs = _jrb_log_leja_setup_point(
+        spectral_bounds,
+        total_degree,
+        candidate_count=candidate_count,
+    )
+
+    def step_fn(basis, node):
+        applied = jnp.asarray(matvec(_jrb_point_interval(basis)), dtype=jnp.float64) / alpha_scale
+        return (applied - center * basis) / gamma - node * basis
+
+    def leja_branch(_):
+        shift = jnp.log(alpha_scale)
+        if max_degree is not None:
+            value, _, _ = _jrb_funm_action_newton_adaptive_point(
+                x,
+                nodes,
+                coeffs,
+                step_fn,
+                min_degree=min_degree,
+                rtol=rtol,
+                atol=atol,
+                constant_shift=shift,
+            )
+            return value
+        return _jrb_funm_action_newton_point(x, nodes, coeffs, step_fn, constant_shift=shift)
+
+    return lax.cond(use_shortcut, lambda _: exact_value, leja_branch, operand=None)
 
 
 def jrb_mat_log_action_leja_with_diagnostics_point(
@@ -615,32 +949,51 @@ def jrb_mat_log_action_leja_with_diagnostics_point(
     total_degree = int(max_degree) if max_degree is not None else int(degree)
     if total_degree <= 0:
         raise ValueError("degree must be > 0")
-    lower, upper = spectral_bounds
-    lower = jnp.maximum(jnp.asarray(lower, dtype=jnp.float64), jnp.asarray(1e-12, dtype=jnp.float64))
-    upper = jnp.maximum(jnp.asarray(upper, dtype=jnp.float64), lower + jnp.asarray(1e-12, dtype=jnp.float64))
-    nodes = _jrb_leja_points_interval_point(lower, upper, total_degree, candidate_count=candidate_count)
-    coeffs = _jrb_newton_divided_differences_point(nodes, jnp.log)
-    if max_degree is not None:
-        value, used_degree, tail_norm = _jrb_funm_action_newton_adaptive_point(
-            matvec,
-            x,
-            nodes,
-            coeffs,
-            min_degree=min_degree,
-            rtol=rtol,
-            atol=atol,
-        )
-    else:
-        value = _jrb_funm_action_newton_point(matvec, x, nodes, coeffs)
+    exact_value, use_shortcut = _jrb_log_action_coordinate_shortcut_point(matvec, x, rtol=rtol, atol=atol)
+    alpha_scale, center, gamma, nodes, coeffs = _jrb_log_leja_setup_point(
+        spectral_bounds,
+        total_degree,
+        candidate_count=candidate_count,
+    )
+
+    def step_fn(basis, node):
+        applied = jnp.asarray(matvec(_jrb_point_interval(basis)), dtype=jnp.float64) / alpha_scale
+        return (applied - center * basis) / gamma - node * basis
+
+    def exact_branch(_):
+        return exact_value, jnp.asarray(1, dtype=jnp.int32), jnp.asarray(0.0, dtype=jnp.float64)
+
+    def leja_branch(_):
+        shift = jnp.log(alpha_scale)
+        if max_degree is not None:
+            return _jrb_funm_action_newton_adaptive_point(
+                x,
+                nodes,
+                coeffs,
+                step_fn,
+                min_degree=min_degree,
+                rtol=rtol,
+                atol=atol,
+                constant_shift=shift,
+            )
+        value = _jrb_funm_action_newton_point(x, nodes, coeffs, step_fn, constant_shift=shift)
         used_degree = jnp.asarray(total_degree, dtype=jnp.int32)
         basis = _jrb_mid_vector(x)
-        tail = coeffs[0] * basis
+        tail = (shift + coeffs[0]) * basis
         for k in range(1, total_degree):
-            basis = jnp.asarray(matvec(_jrb_point_interval(basis)), dtype=jnp.float64) - nodes[k - 1] * basis
+            basis = step_fn(basis, nodes[k - 1])
             tail = coeffs[k] * basis
         tail_norm = jnp.linalg.norm(tail)
+        return value, used_degree, tail_norm
+
+    value, used_degree, tail_norm = lax.cond(use_shortcut, exact_branch, leja_branch, operand=None)
+    algorithm_code = jnp.where(
+        use_shortcut,
+        jnp.asarray(4, dtype=jnp.int32),
+        jnp.asarray(3, dtype=jnp.int32),
+    )
     diag = JrbMatKrylovDiagnostics(
-        algorithm_code=jnp.asarray(3, dtype=jnp.int32),
+        algorithm_code=algorithm_code,
         steps=jnp.asarray(used_degree, dtype=jnp.int32),
         basis_dim=jnp.asarray(used_degree, dtype=jnp.int32),
         restart_count=jnp.asarray(0, dtype=jnp.int32),
@@ -758,7 +1111,10 @@ def jrb_mat_logdet_leja_hutchpp_with_diagnostics_point(
         used_steps = jnp.asarray(max_degree if max_degree is not None else degree, dtype=jnp.int32)
         tail_norm = jnp.asarray(0.0, dtype=jnp.float64)
     diag = JrbMatKrylovDiagnostics(
-        algorithm_code=jnp.asarray(3, dtype=jnp.int32),
+        algorithm_code=jnp.asarray(
+            action_diag.algorithm_code if reference.shape[0] > 0 else 3,
+            dtype=jnp.int32,
+        ),
         steps=jnp.asarray(used_steps, dtype=jnp.int32),
         basis_dim=jnp.asarray(used_steps, dtype=jnp.int32),
         restart_count=jnp.asarray(0, dtype=jnp.int32),
@@ -776,7 +1132,7 @@ def jrb_mat_logdet_leja_hutchpp_with_diagnostics_point(
 
 
 def jrb_mat_bcoo_logdet_leja_hutchpp_point(
-    a: jsparse.BCOO,
+    a: sparse_common.SparseBCOO,
     sketch_probes: jax.Array,
     residual_probes: jax.Array,
     *,
@@ -814,7 +1170,7 @@ def jrb_mat_bcoo_logdet_leja_hutchpp_point(
 
 
 def jrb_mat_bcoo_logdet_leja_hutchpp_with_diagnostics_point(
-    a: jsparse.BCOO,
+    a: sparse_common.SparseBCOO,
     sketch_probes: jax.Array,
     residual_probes: jax.Array,
     *,
@@ -1282,6 +1638,8 @@ jrb_mat_expm_action_basic_jit = jax.jit(jrb_mat_expm_action_basic, static_argnam
 
 __all__ = [
     "PROVENANCE",
+    "JrbMatKrylovDiagnostics",
+    "JrbMatSelectedInverseDiagnostics",
     "jrb_mat_as_interval_matrix",
     "jrb_mat_as_interval_vector",
     "jrb_mat_shape",
@@ -1346,6 +1704,8 @@ __all__ = [
     "jrb_mat_logdet_leja_hutchpp_with_diagnostics_point",
     "jrb_mat_bcoo_logdet_leja_hutchpp_point",
     "jrb_mat_bcoo_logdet_leja_hutchpp_with_diagnostics_point",
+    "jrb_mat_bcoo_inverse_diagonal_point",
+    "jrb_mat_bcoo_inverse_diagonal_with_diagnostics_point",
     "jrb_mat_rademacher_probes_like",
     "jrb_mat_normal_probes_like",
     "jrb_mat_matmul_basic_prec",

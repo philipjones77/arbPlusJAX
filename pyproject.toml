@@ -8,10 +8,17 @@ version = "1.1.0"
 description = "JAX-first Arb migration workspace with C parity tooling."
 requires-python = ">=3.10"
 dependencies = [
-  "jax>=0.4.35",
+  "jax>=0.4.35,<0.9; python_version < '3.11'",
+  "jax>=0.4.35; python_version >= '3.11'",
   "numpy>=1.26",
   "scipy>=1.10",
   "pytest>=8.0",
+]
+
+[project.optional-dependencies]
+petsc = [
+  "petsc4py",
+  "slepc4py",
 ]
 
 [tool.setuptools]

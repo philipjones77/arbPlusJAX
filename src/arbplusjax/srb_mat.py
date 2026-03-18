@@ -7,13 +7,11 @@ import jax
 from jax import lax
 import jax.numpy as jnp
 from jax import ops
-from jax.experimental import sparse as jsparse
 
 from . import checks
 from . import sparse_common as sc
 from . import iterative_solvers
 
-jax.config.update("jax_enable_x64", True)
 
 
 class SrbMatPointDiagnostics(NamedTuple):
@@ -171,11 +169,7 @@ def srb_mat_from_dense_csr(a: jax.Array, *, tol: float = 0.0) -> sc.SparseCSR:
 
 
 def srb_mat_from_dense_bcoo(a: jax.Array, *, tol: float = 0.0) -> sc.SparseBCOO:
-    bcoo = jsparse.BCOO.fromdense(_as_real_matrix(a, "srb_mat.from_dense_bcoo"), nse=None)
-    if tol > 0.0:
-        mask = jnp.abs(bcoo.data) > tol
-        bcoo = jsparse.BCOO((bcoo.data[mask], bcoo.indices[mask]), shape=bcoo.shape)
-    return sc.bcoo_to_sparse_bcoo(bcoo, algebra="srb")
+    return sc.dense_to_sparse_bcoo(_as_real_matrix(a, "srb_mat.from_dense_bcoo"), algebra="srb", tol=tol)
 
 
 def srb_mat_diag(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
@@ -246,51 +240,21 @@ def _dense_sparse_lu_partial_pivot(a: jax.Array) -> tuple[jax.Array, jax.Array, 
     u = jnp.array(a, copy=True)
     l = jnp.eye(n, dtype=a.dtype)
     perm = jnp.arange(n, dtype=jnp.int32)
-
-
-    def body_fun(k, vals):
-        u, l, perm = vals
-        # Use masking to get abs_col = abs(u[:, k])
-        abs_col = jnp.abs(u[:, k])
-        masked_col = jnp.where(jnp.arange(n) < k, -jnp.inf, abs_col)
-        pivot = jnp.argmax(masked_col)
-        # Swap rows in u
+    for k in range(n):
+        pivot = int(k + jnp.argmax(jnp.abs(u[k:, k])))
         u = _swap_rows_dense(u, k, pivot)
-        # Swap rows in l (only first k columns)
-        l = jax.lax.cond(
-            (k > 0) & (pivot != k),
-            lambda l_: l_.at[[k, pivot], :k].set(l_[jnp.array([pivot, k]), :k]),
-            lambda l_: l_,
-            l
-        )
-        # Swap permutation
+        if k > 0 and pivot != k:
+            l_k = l[k, :k]
+            l_p = l[pivot, :k]
+            l = l.at[k, :k].set(l_p)
+            l = l.at[pivot, :k].set(l_k)
         perm = _swap_perm(perm, k, pivot)
         pivot_value = u[k, k]
-        def update_lu(args):
-            u, l = args
-            # Use masking for u[k+1:, k]
-            mask = (jnp.arange(n) > k)
-            factors = jnp.where(mask, u[:, k] / pivot_value, 0.0)
-            l = l.at[:, k].set(jnp.where(mask, factors, l[:, k]))
-            # Use masking for u[k+1:, k:]
-            row_mask = (jnp.arange(n) > k)
-            col_mask = (jnp.arange(n) >= k)
-            row_idx = jnp.arange(n)[:, None]
-            col_idx = jnp.arange(n)[None, :]
-            update_mask = (row_mask[:, None] & col_mask[None, :])
-            update = u - (factors[:, None] * u[k, :][None, :]) * update_mask
-            u = jnp.where(update_mask, update, u)
-            u = u.at[:, k].set(jnp.where(mask, 0.0, u[:, k]))
-            return u, l
-        u, l = jax.lax.cond(
-            k + 1 < n,
-            update_lu,
-            lambda args: args,
-            (u, l)
-        )
-        return (u, l, perm)
-
-    u, l, perm = jax.lax.fori_loop(0, n, body_fun, (u, l, perm))
+        if k + 1 < n:
+            factors = u[k + 1 :, k] / pivot_value
+            l = l.at[k + 1 :, k].set(factors)
+            u = u.at[k + 1 :, k:].set(u[k + 1 :, k:] - factors[:, None] * u[k, k:][None, :])
+            u = u.at[k + 1 :, k].set(0.0)
     return perm, l, u
 
 
@@ -398,8 +362,7 @@ def srb_mat_csr_to_dense(x: sc.SparseCSR) -> jax.Array:
 
 
 def srb_mat_bcoo_to_dense(x: sc.SparseBCOO) -> jax.Array:
-    x = sc.as_sparse_bcoo(x, algebra="srb", label="srb_mat.bcoo_to_dense")
-    return jsparse.BCOO((x.data, x.indices), shape=(x.rows, x.cols)).todense()
+    return sc.sparse_bcoo_to_dense(x, algebra="srb", label="srb_mat.bcoo_to_dense")
 
 
 def srb_mat_to_dense(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
@@ -444,13 +407,12 @@ def srb_mat_bcoo_to_coo(x: sc.SparseBCOO) -> sc.SparseCOO:
     return srb_mat_coo(x.data, x.indices[:, 0], x.indices[:, 1], shape=(x.rows, x.cols))
 
 
-def _as_bcoo(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, *, label: str) -> jsparse.BCOO:
+def _as_bcoo(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, *, label: str) -> sc.SparseBCOO:
     if isinstance(x, sc.SparseBCOO):
-        x = sc.as_sparse_bcoo(x, algebra="srb", label=label)
-        return jsparse.BCOO((x.data, x.indices), shape=(x.rows, x.cols))
+        return sc.as_sparse_bcoo(x, algebra="srb", label=label)
     if isinstance(x, sc.SparseCOO):
         x = sc.as_sparse_coo(x, algebra="srb", label=label)
-        return jsparse.BCOO((x.data, jnp.stack([x.row, x.col], axis=-1)), shape=(x.rows, x.cols))
+        return sc.coo_to_bcoo(x)
     return _as_bcoo(srb_mat_csr_to_coo(x), label=label)
 
 
@@ -514,7 +476,7 @@ def srb_mat_matvec(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, v: jax.Array)
     if isinstance(x, sc.SparseBCOO):
         x = sc.as_sparse_bcoo(x, algebra="srb", label="srb_mat.matvec.bcoo")
         checks.check_equal(x.cols, v.shape[0], "srb_mat.matvec.inner")
-        return jsparse.BCOO((x.data, x.indices), shape=(x.rows, x.cols)) @ v
+        return sc.sparse_bcoo_matvec(x, v, algebra="srb", label="srb_mat.matvec.bcoo")
     raise TypeError("expected SparseCOO, SparseCSR, or SparseBCOO")
 
 
@@ -534,7 +496,7 @@ def srb_mat_matmul_dense_rhs(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, b: 
     if isinstance(x, sc.SparseBCOO):
         x = sc.as_sparse_bcoo(x, algebra="srb", label="srb_mat.matmul_dense_rhs.bcoo")
         checks.check_equal(x.cols, b.shape[0], "srb_mat.matmul_dense_rhs.inner")
-        return jsparse.BCOO((x.data, x.indices), shape=(x.rows, x.cols)) @ b
+        return sc.sparse_bcoo_matmul_dense_rhs(x, b, algebra="srb", label="srb_mat.matmul_dense_rhs.bcoo")
     raise TypeError("expected SparseCOO, SparseCSR, or SparseBCOO")
 
 
@@ -553,10 +515,7 @@ def srb_mat_scale(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, alpha: jax.Arr
 def srb_mat_add(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, y: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> sc.SparseBCOO:
     xb = _as_bcoo(x, label="srb_mat.add.x")
     yb = _as_bcoo(y, label="srb_mat.add.y")
-    checks.check_equal(xb.shape[0], yb.shape[0], "srb_mat.add.rows")
-    checks.check_equal(xb.shape[1], yb.shape[1], "srb_mat.add.cols")
-    out = xb + yb
-    return sc.bcoo_to_sparse_bcoo(out, algebra="srb")
+    return sc.sparse_bcoo_add(xb, yb, algebra="srb", label="srb_mat.add")
 
 
 def srb_mat_sub(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, y: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> sc.SparseBCOO:
@@ -566,9 +525,7 @@ def srb_mat_sub(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, y: sc.SparseCOO 
 def srb_mat_matmul_sparse(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, y: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> sc.SparseBCOO:
     xb = _as_bcoo(x, label="srb_mat.matmul_sparse.x")
     yb = _as_bcoo(y, label="srb_mat.matmul_sparse.y")
-    checks.check_equal(xb.shape[1], yb.shape[0], "srb_mat.matmul_sparse.inner")
-    out = xb @ yb
-    return sc.bcoo_to_sparse_bcoo(out, algebra="srb")
+    return sc.sparse_bcoo_matmul_sparse(xb, yb, algebra="srb", label="srb_mat.matmul_sparse")
 
 
 def srb_mat_triangular_solve(
@@ -600,10 +557,13 @@ def srb_mat_solve(
 ) -> jax.Array:
     x = _as_bcoo(x, label="srb_mat.solve")
     b = _as_real_rhs(b, "srb_mat.solve")
-    checks.check_equal(x.shape[1], b.shape[0], "srb_mat.solve.inner")
+    checks.check_equal(x.cols, b.shape[0], "srb_mat.solve.inner")
+    if x.rows <= 16:
+        dense = sc.sparse_bcoo_to_dense(x, algebra="srb", label="srb_mat.solve.dense")
+        return jnp.linalg.solve(dense, b)
 
     def matvec(v):
-        return x @ v
+        return sc.sparse_bcoo_matvec(x, v, algebra="srb", label="srb_mat.solve.apply")
 
     def solve_vec(rhs, guess):
         if method == "cg":
@@ -692,7 +652,7 @@ def srb_mat_matvec_cached_prepare(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO
         return sc.SparseMatvecPlan(storage="csr", payload=(x.data, x.indices, row_ids), rows=x.rows, cols=x.cols, algebra="srb")
     if isinstance(x, sc.SparseBCOO):
         x = sc.as_sparse_bcoo(x, algebra="srb", label="srb_mat.matvec_cached_prepare")
-        return sc.SparseMatvecPlan(storage="bcoo", payload=jsparse.BCOO((x.data, x.indices), shape=(x.rows, x.cols)), rows=x.rows, cols=x.cols, algebra="srb")
+        return sc.SparseMatvecPlan(storage="bcoo", payload=x, rows=x.rows, cols=x.cols, algebra="srb")
     raise TypeError("expected SparseCOO, SparseCSR, or SparseBCOO")
 
 
@@ -706,7 +666,7 @@ def srb_mat_matvec_cached_apply(plan: sc.SparseMatvecPlan, v: jax.Array) -> jax.
     if plan.storage == "csr":
         data, indices, row_ids = plan.payload
         return ops.segment_sum(data * v[indices], row_ids, num_segments=plan.rows)
-    return plan.payload @ v
+    return sc.sparse_bcoo_matvec(plan.payload, v, algebra="srb", label="srb_mat.matvec_cached_apply.bcoo")
 
 
 def srb_mat_matvec_batch_fixed(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, vs: jax.Array) -> jax.Array:

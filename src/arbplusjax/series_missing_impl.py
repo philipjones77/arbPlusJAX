@@ -13,7 +13,6 @@ from . import hypgeom
 from . import coeffs
 from . import elementary as el
 
-jax.config.update('jax_enable_x64', True)
 
 def _full_interval_coeffs(length: int) -> jax.Array:
     return jnp.tile(jnp.array([-jnp.inf, jnp.inf], dtype=jnp.float64), (length, 1))

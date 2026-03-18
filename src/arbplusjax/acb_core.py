@@ -9,11 +9,11 @@ from jax import lax
 from . import double_interval as di
 from . import arb_core
 from . import acb_dirichlet
+from . import barnesg
 from . import elementary as el
 from . import hypgeom
 from . import checks
 
-jax.config.update("jax_enable_x64", True)
 
 
 def as_acb_box(x: jax.Array) -> jax.Array:
@@ -713,6 +713,62 @@ def acb_digamma(x: jax.Array) -> jax.Array:
 
 
 @jax.jit
+def acb_barnes_g(x: jax.Array) -> jax.Array:
+    box = as_acb_box(x)
+    re = acb_real(box)
+    im = acb_imag(box)
+    re_lo, re_hi = re[0], re[1]
+    im_lo, im_hi = im[0], im[1]
+    cross_pole = (im_lo <= 0.0) & (im_hi >= 0.0) & ((jnp.ceil(-re_hi) <= jnp.floor(-re_lo)) & (jnp.floor(-re_lo) >= 0.0))
+    half = jnp.asarray(0.5, dtype=re.dtype)
+    corners = jnp.asarray(
+        [
+            re_lo + 1j * im_lo,
+            re_lo + 1j * im_hi,
+            re_hi + 1j * im_lo,
+            re_hi + 1j * im_hi,
+            half * (re_lo + re_hi) + 1j * half * (im_lo + im_hi),
+        ],
+        dtype=_complex_dtype_for_box(box),
+    )
+    vals = jax.vmap(barnesg.barnesg_complex)(corners)
+    finite = jnp.all(jnp.isfinite(jnp.real(vals))) & jnp.all(jnp.isfinite(jnp.imag(vals)))
+    out = acb_box(
+        di.interval(di._below(jnp.min(jnp.real(vals))), di._above(jnp.max(jnp.real(vals)))),
+        di.interval(di._below(jnp.min(jnp.imag(vals))), di._above(jnp.max(jnp.imag(vals)))),
+    )
+    return jnp.where(cross_pole | (~finite), _full_box_like(box), out)
+
+
+@jax.jit
+def acb_log_barnes_g(x: jax.Array) -> jax.Array:
+    box = as_acb_box(x)
+    re = acb_real(box)
+    im = acb_imag(box)
+    re_lo, re_hi = re[0], re[1]
+    im_lo, im_hi = im[0], im[1]
+    cross_pole = (im_lo <= 0.0) & (im_hi >= 0.0) & ((jnp.ceil(-re_hi) <= jnp.floor(-re_lo)) & (jnp.floor(-re_lo) >= 0.0))
+    half = jnp.asarray(0.5, dtype=re.dtype)
+    corners = jnp.asarray(
+        [
+            re_lo + 1j * im_lo,
+            re_lo + 1j * im_hi,
+            re_hi + 1j * im_lo,
+            re_hi + 1j * im_hi,
+            half * (re_lo + re_hi) + 1j * half * (im_lo + im_hi),
+        ],
+        dtype=_complex_dtype_for_box(box),
+    )
+    vals = jax.vmap(barnesg.log_barnesg)(corners)
+    finite = jnp.all(jnp.isfinite(jnp.real(vals))) & jnp.all(jnp.isfinite(jnp.imag(vals)))
+    out = acb_box(
+        di.interval(di._below(jnp.min(jnp.real(vals))), di._above(jnp.max(jnp.real(vals)))),
+        di.interval(di._below(jnp.min(jnp.imag(vals))), di._above(jnp.max(jnp.imag(vals)))),
+    )
+    return jnp.where(cross_pole | (~finite), _full_box_like(box), out)
+
+
+@jax.jit
 def acb_zeta(x: jax.Array) -> jax.Array:
     return acb_dirichlet.acb_dirichlet_zeta(as_acb_box(x))
 
@@ -1160,6 +1216,16 @@ def acb_log_sin_pi_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> 
 @partial(jax.jit, static_argnames=("prec_bits",))
 def acb_digamma_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return _acb_round_output(acb_digamma(x), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def acb_barnes_g_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _acb_round_output(acb_barnes_g(x), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def acb_log_barnes_g_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return _acb_round_output(acb_log_barnes_g(x), prec_bits)
 
 
 @partial(jax.jit, static_argnames=("prec_bits",))
@@ -1728,6 +1794,10 @@ __all__ = [
 
 __all__.extend(
     [
+        "acb_barnes_g",
+        "acb_log_barnes_g",
+        "acb_barnes_g_prec",
+        "acb_log_barnes_g_prec",
         "acb_asin",
         "acb_acos",
         "acb_atan",

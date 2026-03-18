@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 
 
@@ -374,6 +375,8 @@ MANUAL_FUNCTION_ENTRIES: tuple[FunctionEntry, ...] = tuple(
 
 
 def _parse_section(header: str) -> list[str]:
+    if not INVENTORY_PATH.exists():
+        return _fallback_section(header)
     text = INVENTORY_PATH.read_text(encoding="utf-8")
     section = text.split(header, 1)[1]
     items: list[str] = []
@@ -383,6 +386,20 @@ def _parse_section(header: str) -> list[str]:
         if line.startswith("- `") and line.endswith("`"):
             items.append(line[3:-1])
     return items
+
+
+@lru_cache(maxsize=None)
+def _fallback_section(header: str) -> list[str]:
+    from . import api
+
+    rows = api.list_public_function_metadata()
+    if header == "## Point Functions":
+        return sorted(entry.name for entry in rows if entry.point_support)
+    if header == "## Interval Functions":
+        return sorted(entry.name for entry in rows if entry.interval_support)
+    if header == "## Public Functions":
+        return sorted(entry.name for entry in rows)
+    raise KeyError(header)
 
 
 def point_functions() -> set[str]:
@@ -545,6 +562,7 @@ def _references(category: str, module: str, base_name: str) -> tuple[str, ...]:
     return tuple(refs)
 
 
+@lru_cache(maxsize=1)
 def build_entries() -> list[FunctionEntry]:
     points = point_functions()
     intervals = interval_functions()
@@ -893,6 +911,7 @@ def _engineering_note(row: ImplementationEntry) -> str:
     return "Generated conservative default from lineage and mode surface."
 
 
+@lru_cache(maxsize=1)
 def build_implementation_entries() -> list[ImplementationEntry]:
     points = point_functions()
     intervals = interval_functions()

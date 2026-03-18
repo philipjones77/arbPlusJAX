@@ -8,6 +8,7 @@ from arbplusjax import (
     arb_calc,
     barnesg,
     boost_hypgeom,
+    capability_registry as cr,
     cubesselk,
     cusf_compat,
     double_gamma,
@@ -25,6 +26,7 @@ def test_function_provenance_reports_are_current():
         REPO_ROOT / "docs" / "function_naming.md": fpr.render_policy(),
         REPO_ROOT / "docs" / "engineering_policy.md": fpr.render_engineering_policy(),
         REPO_ROOT / "docs" / "reports" / "function_provenance_registry.md": fpr.render_registry_summary(),
+        REPO_ROOT / "docs" / "reports" / "function_capability_registry.json": cr.render_capability_registry_json(),
         REPO_ROOT / "docs" / "reports" / "function_implementation_index.md": fpr.render_implementation_index(),
         REPO_ROOT / "docs" / "reports" / "function_engineering_status.md": fpr.render_engineering_status(),
         REPO_ROOT / "docs" / "reports" / "arb_like_functions.md": fpr.render_report("arb_like", "Arb-like Functions"),
@@ -101,3 +103,12 @@ def test_noncanonical_modules_expose_provenance_metadata():
         assert "classification" in data
         assert "naming_policy" in data
         assert "registry_report" in data
+
+
+def test_capability_registry_marks_downstream_kernel_aliases():
+    registry = cr.build_capability_registry()
+    downstream = registry["downstream_kernels"]
+    assert "loggamma" in downstream
+    assert downstream["loggamma"]["public_name"] == "arb_lgamma"
+    assert downstream["loggamma"]["complex_public_name"] == "acb_lgamma"
+    assert downstream["incomplete_bessel_k"]["capability"]["downstream_supported"] is True

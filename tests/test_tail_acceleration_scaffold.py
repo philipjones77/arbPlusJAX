@@ -1,5 +1,5 @@
+from jax import lax
 import jax.numpy as jnp
-from jax.scipy.special import erfc
 
 from arbplusjax import api
 from arbplusjax.special.tail_acceleration.quadrature import finite_interval_quadrature
@@ -71,7 +71,7 @@ def test_tail_integral_gaussian_tail_matches_erfc_reference():
         max_panels=180,
         samples_per_panel=16,
     )
-    expected = 0.5 * jnp.sqrt(jnp.pi) * erfc(lower)
+    expected = 0.5 * jnp.sqrt(jnp.pi) * lax.erfc(lower)
 
     assert jnp.isclose(value, expected, rtol=5e-3, atol=5e-4)
 

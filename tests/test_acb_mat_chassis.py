@@ -282,7 +282,8 @@ def test_nxn_triangular_solve_and_lu():
     _check(p.shape == (3, 3, 4))
     _check(l.shape == (3, 3, 4))
     _check(u.shape == (3, 3, 4))
-    _check(bool(jnp.allclose(acb_core.acb_midpoint(sol), jax.scipy.linalg.solve_triangular(a_mid, b_mid, lower=True))))
+    ref = jax.lax.linalg.triangular_solve(a_mid, b_mid[..., None], left_side=True, lower=True)
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(sol), jnp.squeeze(ref, axis=-1))))
     _check(bool(jnp.allclose(acb_core.acb_midpoint(p) @ a_mid, acb_core.acb_midpoint(l) @ acb_core.acb_midpoint(u))))
 
 

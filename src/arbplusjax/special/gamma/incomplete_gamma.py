@@ -4,7 +4,7 @@ from functools import partial
 
 import jax
 import jax.numpy as jnp
-from jax.scipy.special import gammaln
+from jax import lax
 
 from ... import double_interval as di
 from ..tail_acceleration import (
@@ -285,7 +285,7 @@ def _incomplete_gamma_upper_point_base(
     )
     value, diagnostics = evaluate_tail_integral(problem, method=method, return_diagnostics=True)
     if regularized:
-        value = value / jnp.exp(gammaln(jnp.asarray(s, dtype=jnp.float64)))
+        value = value / jnp.exp(lax.lgamma(jnp.asarray(s, dtype=jnp.float64)))
     if return_diagnostics:
         return value, diagnostics
     return value
@@ -312,7 +312,7 @@ def _incomplete_gamma_lower_point_base(
         samples_per_panel=samples_per_panel,
         return_diagnostics=True,
     )
-    gamma_s = jnp.exp(gammaln(jnp.asarray(s, dtype=jnp.float64)))
+    gamma_s = jnp.exp(lax.lgamma(jnp.asarray(s, dtype=jnp.float64)))
     value = gamma_s - upper_value
     if regularized:
         value = value / gamma_s

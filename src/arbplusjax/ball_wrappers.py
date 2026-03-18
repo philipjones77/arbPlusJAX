@@ -18,7 +18,6 @@ from . import elementary as el
 from . import hypgeom as _hypgeom
 from . import sampling_helpers as sh
 
-jax.config.update("jax_enable_x64", True)
 
 
 def _gamma_real(x: jax.Array) -> jax.Array:

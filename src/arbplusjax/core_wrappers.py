@@ -13,7 +13,6 @@ from . import double_interval as di
 from . import elementary as el
 from . import wrappers_common as wc
 
-jax.config.update("jax_enable_x64", True)
 
 
 def _resolve_prec_bits(dps: int | None, prec_bits: int | None) -> int:
@@ -365,7 +364,7 @@ def _dispatch(
     args: tuple,
     kwargs: dict,
 ) -> jax.Array:
-    return wc.dispatch_mode(impl, base_fn, rig_fn, adapt_fn, is_acb, prec_bits, args, kwargs)
+    return wc.dispatch_mode(impl, None, base_fn, rig_fn, adapt_fn, is_acb, prec_bits, args, kwargs)
 
 
 def _make_wrapper(name: str, base_fn: Callable[..., jax.Array]) -> Callable[..., jax.Array]:

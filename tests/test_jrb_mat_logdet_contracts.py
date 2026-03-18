@@ -3,10 +3,10 @@ import json
 import jax
 import jax.numpy as jnp
 from jax import random
-from jax.experimental import sparse as jsparse
 
 from arbplusjax import double_interval as di
 from arbplusjax import jrb_mat
+from arbplusjax import sparse_common
 
 from tests._test_checks import _check
 
@@ -42,6 +42,16 @@ def _slq_logdet(mat: jax.Array, key: jax.Array, num_probes: int, steps: int, dty
     op = _dense_operator(a)
     probes = _rademacher_probes(key, num_probes, a.shape[0], dtype=dtype)
     return jrb_mat.jrb_mat_logdet_slq_point(op, probes, steps)
+
+
+def _check_leja_step_contract(diag_info, min_steps: int, max_steps: int) -> None:
+    steps = int(diag_info.steps)
+    algorithm_code = int(diag_info.algorithm_code)
+    if algorithm_code == 4:
+        _check(steps == 1)
+        return
+    _check(steps >= min_steps)
+    _check(steps <= max_steps)
 
 
 def test_slq_logdet_small_diagonal_exactness_contract():
@@ -112,7 +122,7 @@ def test_slq_logdet_reproducibility_and_dtype_stability_contract():
 def test_leja_hutchpp_sparse_diagonal_exactness_contract():
     diag = jnp.asarray([0.4, 0.8, 1.5, 3.0], dtype=jnp.float64)
     dense = jnp.diag(diag)
-    bcoo = jsparse.BCOO.fromdense(dense)
+    bcoo = sparse_common.dense_to_sparse_bcoo(dense, algebra="jrb")
     op = jrb_mat.jrb_mat_bcoo_operator(bcoo)
     bounds = jrb_mat.jrb_mat_bcoo_gershgorin_bounds(bcoo)
     sketch = jnp.stack([_point_interval(row) for row in jnp.eye(diag.shape[0], dtype=jnp.float64)], axis=0)
@@ -131,7 +141,7 @@ def test_leja_hutchpp_sparse_diagonal_exactness_contract():
 
 def test_leja_hutchpp_sparse_diagonal_auto_bounds_and_adaptive_degree_contract():
     diag = jnp.asarray([0.4, 0.8, 1.5, 3.0], dtype=jnp.float64)
-    bcoo = jsparse.BCOO.fromdense(jnp.diag(diag))
+    bcoo = sparse_common.dense_to_sparse_bcoo(jnp.diag(diag), algebra="jrb")
     sketch = jnp.stack([_point_interval(row) for row in jnp.eye(diag.shape[0], dtype=jnp.float64)], axis=0)
     residual = jnp.zeros((0, diag.shape[0], 2), dtype=jnp.float64)
     est, diag_info = jrb_mat.jrb_mat_bcoo_logdet_leja_hutchpp_with_diagnostics_point(
@@ -146,5 +156,45 @@ def test_leja_hutchpp_sparse_diagonal_auto_bounds_and_adaptive_degree_contract()
     )
     exact = jnp.sum(jnp.log(diag))
     _check(bool(jnp.allclose(est, exact, rtol=1e-6, atol=1e-6)))
-    _check(int(diag_info.steps) >= 4)
-    _check(int(diag_info.steps) <= 20)
+    _check_leja_step_contract(diag_info, 4, 20)
+
+
+def test_leja_log_action_sparse_diagonal_coordinate_shortcut_contract():
+    diag = jnp.asarray([1e-8, 1e-4, 1e-2, 1.0, 10.0], dtype=jnp.float64)
+    bcoo = sparse_common.dense_to_sparse_bcoo(jnp.diag(diag), algebra="jrb")
+    op = jrb_mat.jrb_mat_bcoo_operator(bcoo)
+    x = _point_interval(jnp.asarray([1.0, 0.0, 0.0, 0.0, 0.0], dtype=jnp.float64))
+    value, diag_info = jrb_mat.jrb_mat_log_action_leja_with_diagnostics_point(
+        op,
+        x,
+        degree=24,
+        max_degree=48,
+        min_degree=8,
+        spectral_bounds=jrb_mat.jrb_mat_bcoo_gershgorin_bounds(bcoo),
+        candidate_count=128,
+    )
+    expected = jnp.asarray([jnp.log(diag[0]), 0.0, 0.0, 0.0, 0.0], dtype=jnp.float64)
+    _check(bool(jnp.allclose(di.midpoint(value), expected, rtol=1e-12, atol=1e-12)))
+    _check(int(diag_info.algorithm_code) == 4)
+    _check(int(diag_info.steps) == 1)
+
+
+def test_leja_hutchpp_sparse_wide_spectrum_diagonal_contract():
+    diag = jnp.asarray([1e-8, 1e-4, 1e-2, 1.0, 10.0], dtype=jnp.float64)
+    bcoo = sparse_common.dense_to_sparse_bcoo(jnp.diag(diag), algebra="jrb")
+    sketch = jnp.stack([_point_interval(row) for row in jnp.eye(diag.shape[0], dtype=jnp.float64)], axis=0)
+    residual = jnp.zeros((0, diag.shape[0], 2), dtype=jnp.float64)
+
+    est, diag_info = jrb_mat.jrb_mat_bcoo_logdet_leja_hutchpp_with_diagnostics_point(
+        bcoo,
+        sketch,
+        residual,
+        degree=24,
+        max_degree=48,
+        min_degree=8,
+        candidate_count=128,
+        bounds_steps=6,
+    )
+    exact = jnp.sum(jnp.log(diag))
+    _check(bool(jnp.allclose(est, exact, rtol=1e-6, atol=1e-6)))
+    _check_leja_step_contract(diag_info, 8, 48)

@@ -8,7 +8,6 @@ import jax
 from . import dft
 from . import wrappers_common as wc
 
-jax.config.update("jax_enable_x64", True)
 
 _ACB_DFT_ALIAS_PRECS = {
     "acb_dft_bluestein_prec",
@@ -142,7 +141,7 @@ def _make_wrapper(name: str, base_fn: Callable[..., jax.Array], kernel_fn: Calla
 
     def wrapper(*args, impl: str = "basic", dps: int | None = None, prec_bits: int | None = None, **kwargs):
         pb = wc.resolve_prec_bits(dps, prec_bits)
-        return wc.dispatch_mode(impl, base_fn, rig_fn, adapt_fn, is_acb, pb, args, kwargs)
+        return wc.dispatch_mode(impl, None, base_fn, rig_fn, adapt_fn, is_acb, pb, args, kwargs)
 
     wrapper.__name__ = _mode_name(name)
     wrapper.__doc__ = f"Mode-dispatched wrapper around {name}. impl: basic|rigorous|adaptive."

@@ -27,8 +27,13 @@ from . import precision
 from . import checks
 from . import elementary as el
 from . import kernel_helpers as kh
+from .special.gamma import (
+    IFJBarnesDoubleGammaDiagnostics,
+    barnesdoublegamma_ifj as _barnesdoublegamma_ifj,
+    barnesdoublegamma_ifj_diagnostics as _barnesdoublegamma_ifj_diagnostics,
+    log_barnesdoublegamma_ifj as _log_barnesdoublegamma_ifj,
+)
 
-jax.config.update("jax_enable_x64", True)
 
 PROVENANCE = {
     "classification": "alternative",
@@ -257,6 +262,55 @@ def bdg_normalizeddoublegamma(w: jax.Array, beta: jax.Array, prec_bits: int = di
     return jnp.exp(bdg_log_normalizeddoublegamma(w, beta, prec_bits))
 
 
+def ifj_log_barnesdoublegamma(
+    z: jax.Array,
+    tau: jax.Array,
+    *,
+    dps: int = 50,
+    max_m_cap: int = 1024,
+    return_diagnostics: bool = False,
+) -> jax.Array | tuple[jax.Array, IFJBarnesDoubleGammaDiagnostics]:
+    return _log_barnesdoublegamma_ifj(
+        z,
+        tau,
+        dps=dps,
+        max_m_cap=max_m_cap,
+        return_diagnostics=return_diagnostics,
+    )
+
+
+def ifj_barnesdoublegamma(
+    z: jax.Array,
+    tau: jax.Array,
+    *,
+    dps: int = 50,
+    max_m_cap: int = 1024,
+    return_diagnostics: bool = False,
+) -> jax.Array | tuple[jax.Array, IFJBarnesDoubleGammaDiagnostics]:
+    return _barnesdoublegamma_ifj(
+        z,
+        tau,
+        dps=dps,
+        max_m_cap=max_m_cap,
+        return_diagnostics=return_diagnostics,
+    )
+
+
+def ifj_barnesdoublegamma_diagnostics(
+    z: jax.Array,
+    tau: jax.Array,
+    *,
+    dps: int = 50,
+    max_m_cap: int = 1024,
+) -> IFJBarnesDoubleGammaDiagnostics:
+    return _barnesdoublegamma_ifj_diagnostics(
+        z,
+        tau,
+        dps=dps,
+        max_m_cap=max_m_cap,
+    )
+
+
 def bdg_double_sine(z: jax.Array, b: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     cdt = el.complex_dtype_from(z, b)
     rdt = el.real_dtype_from_complex_dtype(cdt)
@@ -472,6 +526,7 @@ def bdg_interval_log_barnesdoublegamma_mode(
     from . import ball_wrappers
     return wc.dispatch_mode(
         impl,
+        None,
         lambda zz, tt, prec_bits: bdg_interval_log_barnesdoublegamma(zz, tt, prec_bits=prec_bits),
         lambda zz, tt, prec_bits: ball_wrappers.bdg_interval_log_barnesdoublegamma(zz, tt, prec_bits=prec_bits),
         lambda zz, tt, prec_bits: ball_wrappers.bdg_interval_log_barnesdoublegamma_adaptive(zz, tt, prec_bits=prec_bits),
@@ -493,6 +548,7 @@ def bdg_interval_barnesdoublegamma_mode(
     from . import ball_wrappers
     return wc.dispatch_mode(
         impl,
+        None,
         lambda zz, tt, prec_bits: bdg_interval_barnesdoublegamma(zz, tt, prec_bits=prec_bits),
         lambda zz, tt, prec_bits: ball_wrappers.bdg_interval_barnesdoublegamma(zz, tt, prec_bits=prec_bits),
         lambda zz, tt, prec_bits: ball_wrappers.bdg_interval_barnesdoublegamma_adaptive(zz, tt, prec_bits=prec_bits),
@@ -508,6 +564,7 @@ def bdg_interval_log_barnesgamma2_mode(w: jax.Array, beta: jax.Array, impl: str 
     from . import ball_wrappers
     return wc.dispatch_mode(
         impl,
+        None,
         lambda ww, bb, prec_bits: bdg_interval_log_barnesgamma2(ww, bb, prec_bits=prec_bits),
         lambda ww, bb, prec_bits: ball_wrappers.bdg_interval_log_barnesgamma2(ww, bb, prec_bits=prec_bits),
         lambda ww, bb, prec_bits: ball_wrappers.bdg_interval_log_barnesgamma2_adaptive(ww, bb, prec_bits=prec_bits),
@@ -523,6 +580,7 @@ def bdg_interval_barnesgamma2_mode(w: jax.Array, beta: jax.Array, impl: str = "b
     from . import ball_wrappers
     return wc.dispatch_mode(
         impl,
+        None,
         lambda ww, bb, prec_bits: bdg_interval_barnesgamma2(ww, bb, prec_bits=prec_bits),
         lambda ww, bb, prec_bits: ball_wrappers.bdg_interval_barnesgamma2(ww, bb, prec_bits=prec_bits),
         lambda ww, bb, prec_bits: ball_wrappers.bdg_interval_barnesgamma2_adaptive(ww, bb, prec_bits=prec_bits),
@@ -538,6 +596,7 @@ def bdg_interval_log_normalizeddoublegamma_mode(w: jax.Array, beta: jax.Array, i
     from . import ball_wrappers
     return wc.dispatch_mode(
         impl,
+        None,
         lambda ww, bb, prec_bits: bdg_interval_log_normalizeddoublegamma(ww, bb, prec_bits=prec_bits),
         lambda ww, bb, prec_bits: ball_wrappers.bdg_interval_log_normalizeddoublegamma(ww, bb, prec_bits=prec_bits),
         lambda ww, bb, prec_bits: ball_wrappers.bdg_interval_log_normalizeddoublegamma_adaptive(ww, bb, prec_bits=prec_bits),
@@ -553,6 +612,7 @@ def bdg_interval_normalizeddoublegamma_mode(w: jax.Array, beta: jax.Array, impl:
     from . import ball_wrappers
     return wc.dispatch_mode(
         impl,
+        None,
         lambda ww, bb, prec_bits: bdg_interval_normalizeddoublegamma(ww, bb, prec_bits=prec_bits),
         lambda ww, bb, prec_bits: ball_wrappers.bdg_interval_normalizeddoublegamma(ww, bb, prec_bits=prec_bits),
         lambda ww, bb, prec_bits: ball_wrappers.bdg_interval_normalizeddoublegamma_adaptive(ww, bb, prec_bits=prec_bits),
@@ -574,6 +634,7 @@ def bdg_complex_log_barnesdoublegamma_mode(
     from . import ball_wrappers
     return wc.dispatch_mode(
         impl,
+        None,
         lambda zz, tt, prec_bits: bdg_complex_log_barnesdoublegamma(zz, tt, prec_bits=prec_bits),
         lambda zz, tt, prec_bits: ball_wrappers.bdg_complex_log_barnesdoublegamma(zz, tt, prec_bits=prec_bits),
         lambda zz, tt, prec_bits: ball_wrappers.bdg_complex_log_barnesdoublegamma_adaptive(zz, tt, prec_bits=prec_bits),
@@ -589,6 +650,7 @@ def bdg_complex_barnesdoublegamma_mode(z: jax.Array, tau: jax.Array, impl: str =
     from . import ball_wrappers
     return wc.dispatch_mode(
         impl,
+        None,
         lambda zz, tt, prec_bits: bdg_complex_barnesdoublegamma(zz, tt, prec_bits=prec_bits),
         lambda zz, tt, prec_bits: ball_wrappers.bdg_complex_barnesdoublegamma(zz, tt, prec_bits=prec_bits),
         lambda zz, tt, prec_bits: ball_wrappers.bdg_complex_barnesdoublegamma_adaptive(zz, tt, prec_bits=prec_bits),
@@ -604,6 +666,7 @@ def bdg_complex_log_barnesgamma2_mode(w: jax.Array, beta: jax.Array, impl: str =
     from . import ball_wrappers
     return wc.dispatch_mode(
         impl,
+        None,
         lambda ww, bb, prec_bits: bdg_complex_log_barnesgamma2(ww, bb, prec_bits=prec_bits),
         lambda ww, bb, prec_bits: ball_wrappers.bdg_complex_log_barnesgamma2(ww, bb, prec_bits=prec_bits),
         lambda ww, bb, prec_bits: ball_wrappers.bdg_complex_log_barnesgamma2_adaptive(ww, bb, prec_bits=prec_bits),
@@ -619,6 +682,7 @@ def bdg_complex_barnesgamma2_mode(w: jax.Array, beta: jax.Array, impl: str = "ba
     from . import ball_wrappers
     return wc.dispatch_mode(
         impl,
+        None,
         lambda ww, bb, prec_bits: bdg_complex_barnesgamma2(ww, bb, prec_bits=prec_bits),
         lambda ww, bb, prec_bits: ball_wrappers.bdg_complex_barnesgamma2(ww, bb, prec_bits=prec_bits),
         lambda ww, bb, prec_bits: ball_wrappers.bdg_complex_barnesgamma2_adaptive(ww, bb, prec_bits=prec_bits),
@@ -634,6 +698,7 @@ def bdg_complex_log_normalizeddoublegamma_mode(w: jax.Array, beta: jax.Array, im
     from . import ball_wrappers
     return wc.dispatch_mode(
         impl,
+        None,
         lambda ww, bb, prec_bits: bdg_complex_log_normalizeddoublegamma(ww, bb, prec_bits=prec_bits),
         lambda ww, bb, prec_bits: ball_wrappers.bdg_complex_log_normalizeddoublegamma(ww, bb, prec_bits=prec_bits),
         lambda ww, bb, prec_bits: ball_wrappers.bdg_complex_log_normalizeddoublegamma_adaptive(ww, bb, prec_bits=prec_bits),
@@ -649,6 +714,7 @@ def bdg_complex_normalizeddoublegamma_mode(w: jax.Array, beta: jax.Array, impl: 
     from . import ball_wrappers
     return wc.dispatch_mode(
         impl,
+        None,
         lambda ww, bb, prec_bits: bdg_complex_normalizeddoublegamma(ww, bb, prec_bits=prec_bits),
         lambda ww, bb, prec_bits: ball_wrappers.bdg_complex_normalizeddoublegamma(ww, bb, prec_bits=prec_bits),
         lambda ww, bb, prec_bits: ball_wrappers.bdg_complex_normalizeddoublegamma_adaptive(ww, bb, prec_bits=prec_bits),
@@ -664,6 +730,7 @@ def bdg_complex_double_sine_mode(z: jax.Array, b: jax.Array, impl: str = "basic"
     from . import ball_wrappers
     return wc.dispatch_mode(
         impl,
+        None,
         lambda zz, bb, prec_bits: bdg_complex_double_sine(zz, bb, prec_bits=prec_bits),
         lambda zz, bb, prec_bits: ball_wrappers.bdg_complex_double_sine(zz, bb, prec_bits=prec_bits),
         lambda zz, bb, prec_bits: ball_wrappers.bdg_complex_double_sine_adaptive(zz, bb, prec_bits=prec_bits),
@@ -675,12 +742,16 @@ def bdg_complex_double_sine_mode(z: jax.Array, b: jax.Array, impl: str = "basic"
 
 
 __all__ = [
+    "IFJBarnesDoubleGammaDiagnostics",
     "bdg_log_barnesdoublegamma",
     "bdg_barnesdoublegamma",
     "bdg_log_barnesgamma2",
     "bdg_barnesgamma2",
     "bdg_log_normalizeddoublegamma",
     "bdg_normalizeddoublegamma",
+    "ifj_log_barnesdoublegamma",
+    "ifj_barnesdoublegamma",
+    "ifj_barnesdoublegamma_diagnostics",
     "bdg_double_sine",
     "bdg_complex_log_barnesdoublegamma",
     "bdg_complex_barnesdoublegamma",

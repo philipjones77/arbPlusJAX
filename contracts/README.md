@@ -1,7 +1,22 @@
-Last updated: 2026-03-14T12:00:00Z
+Last updated: 2026-03-17T00:00:00Z
 
 # Contracts
 
 This directory is reserved for binding runtime and API guarantees.
 
 Operational obligations should go here rather than under `docs/`.
+
+## Active contract set
+
+- [public_api_mode_contract.md](/home/phili/projects/arbplusJAX/contracts/public_api_mode_contract.md)
+- [dtype_and_precision_contract.md](/home/phili/projects/arbplusJAX/contracts/dtype_and_precision_contract.md)
+- [stable_kernel_subset_contract.md](/home/phili/projects/arbplusJAX/contracts/stable_kernel_subset_contract.md)
+- [sparse_layout_operator_contract.md](/home/phili/projects/arbplusJAX/contracts/sparse_layout_operator_contract.md)
+- [capability_registry_contract.md](/home/phili/projects/arbplusJAX/contracts/capability_registry_contract.md)
+
+## Scope
+
+These contracts apply to the currently stabilized repo surface.
+
+- They do not promise that every experimental module is frozen.
+- They do define the current guarantees we expect downstream code to rely on.

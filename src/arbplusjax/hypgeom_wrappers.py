@@ -10,7 +10,6 @@ from . import ball_wrappers
 from . import hypgeom
 from . import wrappers_common as wc
 
-jax.config.update("jax_enable_x64", True)
 
 
 def _wrap_ball(fn):
@@ -452,7 +451,7 @@ def _make_wrapper(name: str) -> Callable[..., jax.Array]:
             except Exception:
                 return base_bound(*a_args, prec_bits=prec_bits, **a_kwargs)
 
-        return wc.dispatch_mode(impl, base_bound, rig_fn, adapt_fn, is_acb, pb, args, dynamic_kwargs)
+        return wc.dispatch_mode(impl, None, base_bound, rig_fn, adapt_fn, is_acb, pb, args, dynamic_kwargs)
 
     wrapper.__name__ = name.replace("_prec", "_mode")
     wrapper.__doc__ = f"Mode-dispatched wrapper around {name}. impl: basic|rigorous|adaptive."

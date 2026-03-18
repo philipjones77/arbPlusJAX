@@ -26,7 +26,6 @@ from . import double_interval as di
 from . import elementary as el
 from . import kernel_helpers as kh
 
-jax.config.update("jax_enable_x64", True)
 
 PROVENANCE = {
     "classification": "arb_like",

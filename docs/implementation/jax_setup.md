@@ -9,7 +9,7 @@ This document describes how the JAX implementation is structured and the pattern
 - `src/arbplusjax/`: primary JAX implementation.
 - `tests/`: chassis and parity tests.
 - `tools/`: parity/benchmark scripts.
-- `docs/`: theory + implementation notes.
+- `docs/`: theory, implementation, and practical notes.
 
 ## Core design rules
 

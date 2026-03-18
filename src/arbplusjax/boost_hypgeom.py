@@ -27,7 +27,6 @@ from . import point_wrappers
 from . import precision
 from . import wrappers_common as wc
 
-jax.config.update("jax_enable_x64", True)
 
 PROVENANCE = {
     "classification": "alternative",

@@ -172,9 +172,9 @@ mpmath computes:
 \]
 at arbitrary precision `mp.dps` or `mp.prec`, but **does not** produce enclosures unless you use the interval context `mp.iv`.
 
-### 6) jax.special
+### 6) JAX point intrinsics
 
-`jax.scipy.special` functions are standard floating‑point evaluations with dtype‑level precision (float32/float64). No enclosure, no error bounds.
+Public JAX point intrinsics such as `jax.lax` and `jax.numpy` are standard floating-point evaluations with dtype-level precision (float32/float64). No enclosure, no error bounds.
 
 ## Data types
 
@@ -344,7 +344,7 @@ Use these references to document per-function behavior in audits or module notes
 - Series helper utilities and gaps: `src/arbplusjax/series_missing_impl.py`, `src/arbplusjax/series_utils.py`
 
 ### SciPy / JAX SciPy
-- No special wrappers; used via `scipy.special` and `jax.scipy.special` for point values only.
+- External comparison only; benchmark and reference surfaces may use `scipy.special` and `jax.scipy.special`, but runtime implementation code should not depend on them.
 
 ### mpmath
 - Point evaluation with `mp.mp.dps`; intervals only with `mp.iv`.

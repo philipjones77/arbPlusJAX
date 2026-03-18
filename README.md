@@ -8,7 +8,7 @@ Implementation of arb for JAX.
 - `tests/`: chassis + parity tests.
 - `benchmarks/`: benchmark and cross-backend comparison scripts.
 - `tools/`: utility scripts (packaging, benchmark runner/report tools).
-- `docs/`: theory and implementation notes.
+- `docs/`: theory, implementation, practical, and governance notes.
 - `contracts/`: binding runtime/API guarantees.
 - `examples/`: usage notebooks and experiments.
 - `experiments/`: exploratory work.
@@ -24,7 +24,7 @@ This repo remains the active development workspace and also serves as a repeatab
 - `tools/run_test_harness.py` is the dedicated test harness.
 - `tools/run_benchmarks.py` and `tools/run_harness_profile.py` are the benchmark runners.
 
-See [docs/implementation/run_platform.md](/home/phili/projects/arbplusJAX/docs/implementation/run_platform.md) and [tests/README.md](/home/phili/projects/arbplusJAX/tests/README.md) for the exact split.
+See [docs/practical/README.md](/home/phili/projects/arbplusJAX/docs/practical/README.md), [docs/implementation/run_platform.md](/home/phili/projects/arbplusJAX/docs/implementation/run_platform.md), and [tests/README.md](/home/phili/projects/arbplusJAX/tests/README.md) for the exact split.
 
 ## VS Code Workspace
 

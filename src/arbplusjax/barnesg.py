@@ -23,7 +23,6 @@ import jax.numpy as jnp
 from . import coeffs
 from . import elementary as el
 
-jax.config.update("jax_enable_x64", True)
 
 PROVENANCE = {
     "classification": "arb_like",

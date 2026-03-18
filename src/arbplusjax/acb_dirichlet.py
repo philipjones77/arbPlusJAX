@@ -22,7 +22,6 @@ import jax.numpy as jnp
 from . import acb_core
 from . import double_interval as di
 
-jax.config.update("jax_enable_x64", True)
 
 PROVENANCE = {
     "classification": "new",

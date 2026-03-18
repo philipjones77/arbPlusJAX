@@ -13,7 +13,6 @@ from jax import lax
 
 from . import jax_precision
 
-jax.config.update("jax_enable_x64", True)
 
 
 def _cg_step(carry, _):

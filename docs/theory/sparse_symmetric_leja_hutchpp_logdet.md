@@ -41,7 +41,7 @@ $$
 
 and then estimates the trace from repeated action evaluations.
 
-## 2. Newton-Leja Action Approximation
+## 2. Shifted Newton-Leja Action Approximation
 
 Let the spectral interval be bounded by
 
@@ -49,41 +49,93 @@ $$
 \sigma(A) \subseteq [a,b], \qquad 0 < a < b.
 $$
 
+The implementation first shifts by the lower spectral scale
+
+$$
+\alpha = \max(a, \varepsilon),
+\qquad
+\widetilde{A} = A / \alpha,
+$$
+
+so that the working spectral interval is approximately
+
+$$
+\sigma(\widetilde{A}) \subseteq [1, b / \alpha].
+$$
+
+This interval is then affinely mapped to the canonical Leja domain `[-2, 2]`:
+
+$$
+x = c + \Gamma t,
+\qquad
+c = \tfrac12 (1 + b / \alpha),
+\qquad
+\Gamma = \tfrac14 (b / \alpha - 1),
+\qquad
+t \in [-2, 2].
+$$
+
 Choose real Leja nodes
 
 $$
-\xi_0, \xi_1, \ldots, \xi_{m-1} \in [a,b].
+\xi_0, \xi_1, \ldots, \xi_{m-1} \in [-2,2].
 $$
 
-The scalar logarithm is interpolated in Newton form:
+The scalar logarithm is then interpolated in Newton form for the transformed scalar function
 
 $$
-p_{m-1}(x)
-= c_0 + c_1(x-\xi_0) + c_2(x-\xi_0)(x-\xi_1) + \cdots
-+ c_{m-1}\prod_{j=0}^{m-2}(x-\xi_j),
+g(t) = \log(c + \Gamma t).
 $$
 
-where the coefficients `c_k` are the divided differences of `\log(x)` at the nodes.
+The Newton interpolant is
 
-The matrix action is then evaluated by the same Newton basis recurrence:
+$$
+p_{m-1}(t)
+= d_0 + d_1(t-\xi_0) + d_2(t-\xi_0)(t-\xi_1) + \cdots
++ d_{m-1}\prod_{j=0}^{m-2}(t-\xi_j),
+$$
+
+where the coefficients `d_k` are the divided differences of `g(t)` at the transformed nodes.
+
+The matrix action is then evaluated by the transformed Newton basis recurrence:
 
 $$
 w_0 = v,
 $$
 
 $$
-w_k = (A - \xi_{k-1} I) w_{k-1}, \qquad k \ge 1,
+w_k =
+\left(
+\frac{\widetilde{A} - c I}{\Gamma} - \xi_{k-1} I
+\right) w_{k-1},
+\qquad k \ge 1,
 $$
 
 $$
-p_{m-1}(A) v = \sum_{k=0}^{m-1} c_k w_k.
+\log(A) v
+\approx
+\left(
+\log(\alpha) I + p_{m-1}\!\left(\frac{\widetilde{A} - c I}{\Gamma}\right)
+\right) v.
 $$
 
 In the current code:
 
-- `_jrb_leja_points_interval_point` builds a discrete real Leja sequence on `[a,b]`
-- `_jrb_newton_divided_differences_point` computes the divided differences of `\log`
+- `_jrb_log_leja_setup_point` centralizes the scale, transformed-node, and coefficient construction
+- `_jrb_newton_divided_differences_point` computes the divided differences of the transformed scalar function `g`
 - `_jrb_funm_action_newton_point` evaluates the fixed-degree Newton action
+
+### 2.1 Exact coordinate shortcut
+
+If the probe vector is coordinate-aligned and the operator action reveals that it is already a positive scalar eigenvector, the implementation takes the exact shortcut
+
+$$
+A v = \lambda v
+\quad \Longrightarrow \quad
+\log(A) v = \log(\lambda) v.
+$$
+
+This is used to stabilize diagonal and basis-aligned sparse cases without fabricating a larger adaptive Leja degree than was actually needed.
 
 ## 3. Adaptive Degree Stop Rule
 
@@ -232,6 +284,12 @@ The current diagnostics reuse `JrbMatKrylovDiagnostics`. For the Leja plus Hutch
 - `steps` records the used polynomial degree
 - `tail_norm` records the final Newton increment norm on the representative action probe
 - `probe_count` records sketch plus residual probes
+
+When the representative probe uses the exact coordinate/eigenvector shortcut:
+
+- `algorithm_code = 4`
+- `steps = 1`
+- `tail_norm = 0`
 
 This is enough to expose the adaptive stop depth and a lightweight tail-size indicator without adding a second diagnostics type.
 

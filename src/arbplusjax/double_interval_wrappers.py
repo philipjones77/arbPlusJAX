@@ -7,7 +7,6 @@ from . import double_interval as di
 from . import wrappers_common as wc
 from . import checks
 
-jax.config.update("jax_enable_x64", True)
 
 
 def _resolve_prec_bits(dps: int | None, prec_bits: int | None) -> int:

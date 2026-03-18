@@ -1,4 +1,4 @@
-Last updated: 2026-03-16T00:00:00Z
+Last updated: 2026-03-17T18:15:00Z
 
 # Matrix Logdet and Matrix-Function Landscape
 
@@ -22,6 +22,7 @@ The current frontier is a tradeoff space between:
 - Krylov / SLQ methods with correct reverse-mode gradients,
 - variance-reduced stochastic trace estimators such as Hutch++ and related sketches,
 - Leja-based polynomial approximations that reduce orthogonalisation cost,
+- sparse selected inversion and inverse-diagonal estimators based on overlap-domain decomposition,
 - structured FFT embeddings for stationary grid problems,
 - low-rank approximations and preconditioners such as pivoted Cholesky.
 
@@ -113,7 +114,50 @@ Practical interpretation:
 - use SLQ when you want a familiar Krylov baseline with custom VJP support and tighter connection to the existing matrix-free chassis,
 - use Leja + Hutch++ when orthogonalisation cost is the dominant bottleneck and a conservative spectral interval is available.
 
-## 4. Toeplitz and circulant embedding for stationary kernels
+## 4. Selected inversion for sparse precision matrices
+
+Sparse precision workflows often need quantities that are adjacent to, but not identical with, `logdet`:
+
+- `diag(Q^{-1})`
+- selected covariance entries
+- trace terms like `tr(Q^{-1} dQ)`
+
+For these targets, overlap-domain selected inversion is a distinct method family from both SLQ and Leja.
+
+The recent `parsinv` direction is especially relevant here:
+
+1. partition the sparse graph into subdomains,
+2. enlarge them with overlap,
+3. compute local inverse information on the overlap blocks,
+4. use stochastic correction for the missing global coupling.
+
+Relative to a pure global Krylov estimator, this shifts more work into:
+
+- local block structure,
+- overlap control,
+- selected inverse assembly,
+
+and less into direct approximation of `log(Q)` actions.
+
+Current repo status:
+
+- there is sparse SPD logdet support in `jrb_mat`,
+- there is now a first JAX-native sparse inverse-diagonal estimator in `jrb_mat`,
+- there is not yet a first-class sparse selected-inverse estimator on arbitrary patterns,
+- the `parsinv` paper/repository is therefore best treated as a design reference for a new complementary sparse estimator family.
+
+Practical interpretation:
+
+- use SLQ or Leja plus Hutch++ when the main target is `logdet(Q)`,
+- use selected inversion when the main target is marginal variances or `tr(Q^{-1} dQ)`-type quantities.
+
+Implementation direction:
+
+- keep the arbPlusJAX runtime JAX-native,
+- use `SparseBCOO`, matrix-free solves, local overlap block extraction, and batched JAX correction kernels,
+- treat PETSc/MPI/MUMPS as external reference tooling only.
+
+## 5. Toeplitz and circulant embedding for stationary kernels
 
 On regular grids with stationary covariance structure, a more specialised family of methods often dominates both generic Krylov and generic trace estimation:
 
@@ -148,7 +192,7 @@ This is likely the fastest route for:
 - very large FFT-friendly lattice models,
 - simulation-heavy RF77 workflows where the structure is explicit.
 
-## 5. Low-rank approximations and preconditioners
+## 6. Low-rank approximations and preconditioners
 
 Low-rank kernel approximations and preconditioners remain complementary rather than competing methods.
 
@@ -177,7 +221,7 @@ Practical AD note:
 - low-rank preconditioners are already conceptually aligned with the `matfree_adjoints.py` direction, but that module currently treats differentiation through the preconditioner itself conservatively rather than as a first-class public API,
 - external pivoted-Cholesky utilities such as TensorFlow Probability's JAX substrate are therefore a design reference for future native implementations rather than a current dependency target.
 
-## 6. Analytic VJPs, implicit adjoints, and preconditioned outer loops
+## 7. Analytic VJPs, implicit adjoints, and preconditioned outer loops
 
 For differentiable matrix functions, the right default remains:
 
@@ -198,7 +242,7 @@ That separation is important because it leaves room for future upgrades:
 - structured block preconditioners,
 - optional external sparse backends at the matvec boundary only.
 
-## 7. GPU sparse backends
+## 8. GPU sparse backends
 
 Classic sparse preconditioners such as:
 

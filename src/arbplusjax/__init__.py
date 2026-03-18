@@ -2,6 +2,10 @@ from __future__ import annotations
 
 import importlib
 
+from . import precision as _precision
+
+_precision.enable_jax_x64()
+
 __all__ = [
     "acb_calc",
     "acb_core",
@@ -20,6 +24,7 @@ __all__ = [
     "arf",
     "bernoulli",
     "ball_wrappers",
+    "backends",
     "baseline_wrappers",
     "boost_hypgeom",
     "bool_mat",
@@ -43,6 +48,7 @@ __all__ = [
     "iterative_solvers",
     "jcb_mat",
     "jrb_mat",
+    "mesh_spectral",
     "matfree_adjoints",
     "scb_block_mat",
     "scb_mat",
@@ -53,6 +59,7 @@ __all__ = [
     "sparse_common",
     "core_wrappers",
     "calc_wrappers",
+    "capability_registry",
     "mat_wrappers",
     "poly_wrappers",
     "modular_elliptic_wrappers",
@@ -60,6 +67,7 @@ __all__ = [
     "coeffs",
     "mag",
     "mp_mode",
+    "nufft",
     "point_wrappers",
     "api",
     "partitions",
@@ -67,7 +75,9 @@ __all__ = [
     "public_metadata",
     "runtime",
     "special",
+    "stable_kernels",
     "shahen_double_gamma",
+    "transform_common",
     "validation",
 ]
 

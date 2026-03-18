@@ -7,4 +7,5 @@ This section holds active TODOs, audits, and generated status reports.
 Primary entry points:
 - [todo.md](/home/phili/projects/arbplusJAX/docs/status/todo.md)
 - [audit.md](/home/phili/projects/arbplusJAX/docs/status/audit.md)
+- [function_gap_plan.md](/home/phili/projects/arbplusJAX/docs/status/function_gap_plan.md)
 - [reports/README.md](/home/phili/projects/arbplusJAX/docs/status/reports/README.md)

@@ -9,7 +9,6 @@ from . import acb_core
 from . import double_interval as di
 from . import checks
 
-jax.config.update("jax_enable_x64", True)
 
 
 def _full_box_like(x: jax.Array) -> jax.Array:

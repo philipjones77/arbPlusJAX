@@ -1,6 +1,6 @@
 import jax
+from jax import lax
 import jax.numpy as jnp
-from jax.scipy.special import gammainc, gammaincc, gammaln
 
 from arbplusjax import api
 
@@ -11,7 +11,7 @@ def test_incomplete_gamma_upper_matches_regularized_reference():
 
     value = api.incomplete_gamma_upper(s, z, mode="point", regularized=True, method="quadrature")
 
-    assert jnp.isclose(value, gammaincc(s, z), rtol=5e-3, atol=5e-4)
+    assert jnp.isclose(value, lax.igammac(s, z), rtol=5e-3, atol=5e-4)
 
 
 def test_incomplete_gamma_lower_matches_regularized_reference():
@@ -20,7 +20,7 @@ def test_incomplete_gamma_lower_matches_regularized_reference():
 
     value = api.incomplete_gamma_lower(s, z, mode="point", regularized=True, method="quadrature")
 
-    assert jnp.isclose(value, gammainc(s, z), rtol=5e-3, atol=5e-4)
+    assert jnp.isclose(value, lax.igamma(s, z), rtol=5e-3, atol=5e-4)
 
 
 def test_incomplete_gamma_auto_can_trigger_high_precision_refine():
@@ -58,7 +58,7 @@ def test_incomplete_gamma_complement_identity_holds():
 
     lower = api.incomplete_gamma_lower(s, z, mode="point", method="quadrature")
     upper = api.incomplete_gamma_upper(s, z, mode="point", method="quadrature")
-    gamma_s = jnp.exp(gammaln(s))
+    gamma_s = jnp.exp(lax.lgamma(s))
 
     assert jnp.isclose(lower + upper, gamma_s, rtol=5e-3, atol=5e-4)
 

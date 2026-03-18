@@ -5,7 +5,6 @@ import jax.numpy as jnp
 
 from . import checks
 
-jax.config.update("jax_enable_x64", True)
 
 
 def as_interval(x: jax.Array) -> jax.Array:

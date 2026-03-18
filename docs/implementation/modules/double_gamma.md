@@ -29,6 +29,14 @@ Mode-dispatched wrappers (basic / rigorous / adaptive):
 - `bdg_interval_*_mode` variants for the interval-valued real wrappers
 - `bdg_complex_*_mode` variants for the box-valued complex wrappers
 
+## Conventions
+
+- `bdg_barnesdoublegamma(z, τ)` is the BarnesDoubleGamma.jl-lineage `G(z; τ)` object used internally by this module. It should be treated as a lineage-specific Barnes/double-gamma normalization rather than as a repo-wide canonical Barnes-G symbol.
+- `bdg_barnesgamma2(w, β)` is the raw BarnesGamma2-family value derived from that `G(z; τ)` substrate after the change of variables `τ = β^{-2}`.
+- `β` is canonicalized to the regime `Re(β - β^{-1}) >= 0` by replacing `β` with `β^{-1}` when needed. Downstream callers should therefore treat `β` and `β^{-1}` as the same parameterization for this family.
+- `bdg_normalizeddoublegamma(w, β)` is defined by dividing `bdg_barnesgamma2(w, β)` by `bdg_barnesgamma2(Q/2, β)`, where `Q = β + β^{-1}`. This fixes the normalization `bdg_normalizeddoublegamma(Q/2, β) = 1`.
+- Because the normalization factor depends only on `β`, `bdg_normalizeddoublegamma` and `bdg_barnesgamma2` share the same shift ratios under `w -> w + β` and `w -> w + β^{-1}`. The contract tests enforce that convention directly.
+
 ## Core formulas
 
 We follow the product-formula approach used in BarnesDoubleGamma.jl (see references below). The main components are:

@@ -17,3 +17,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(1, str(REPO_ROOT))
 
 apply_reference_env(REPO_ROOT)
+
+from arbplusjax import precision
+
+precision.enable_jax_x64()

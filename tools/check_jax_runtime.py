@@ -35,7 +35,10 @@ def main() -> int:
 
     import jax
     import jax.numpy as jnp
-    jax.config.update("jax_enable_x64", True)
+
+    from arbplusjax import precision
+
+    precision.enable_jax_x64()
 
     payload = {
         "platform": jax.default_backend(),

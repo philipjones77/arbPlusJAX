@@ -7,11 +7,11 @@ Tests verify:
 """
 
 import jax
+from jax import lax
 import jax.numpy as jnp
 import jax.random as jr
 import pytest
 
-jax.config.update("jax_enable_x64", True)
 
 
 class TestLanczosTridiag:
@@ -29,9 +29,7 @@ class TestLanczosTridiag:
         def matvec(v):
             return A @ v
         
-        lanczos = matfree_adjoints.lanczos_tridiag(
-            matvec, krylov_depth=10, reortho="full", custom_vjp=True
-        )
+        lanczos = matfree_adjoints.lanczos_tridiag(matvec, 10, reortho="full", custom_vjp=True)
         
         v0 = jr.normal(jr.PRNGKey(123), (n,))
         (basis, (diags, offdiags)), (remainder, beta) = lanczos(v0)
@@ -57,9 +55,7 @@ class TestLanczosTridiag:
         def matvec(v):
             return A @ v
         
-        lanczos = matfree_adjoints.lanczos_tridiag(
-            matvec, krylov_depth=5, reortho="full", custom_vjp=True
-        )
+        lanczos = matfree_adjoints.lanczos_tridiag(matvec, 5, reortho="full", custom_vjp=True)
         
         def loss_fn(v):
             (basis, (diags, offdiags)), _ = lanczos(v)
@@ -97,14 +93,10 @@ class TestLanczosTridiag:
             return A @ v
         
         # With custom VJP
-        lanczos_custom = matfree_adjoints.lanczos_tridiag(
-            matvec, krylov_depth=8, reortho="full", custom_vjp=True
-        )
+        lanczos_custom = matfree_adjoints.lanczos_tridiag(matvec, 8, reortho="full", custom_vjp=True)
         
         # Without custom VJP
-        lanczos_standard = matfree_adjoints.lanczos_tridiag(
-            matvec, krylov_depth=8, reortho="full", custom_vjp=False
-        )
+        lanczos_standard = matfree_adjoints.lanczos_tridiag(matvec, 8, reortho="full", custom_vjp=False)
         
         v0 = jr.normal(jr.PRNGKey(888), (n,))
         
@@ -117,6 +109,34 @@ class TestLanczosTridiag:
         
         error = jnp.linalg.norm(grad_custom - grad_standard) / jnp.linalg.norm(grad_standard)
         assert error < 1e-6, f"Custom VJP differs from standard: {error}"
+
+    def test_lanczos_custom_vjp_gradient_is_stable_under_jit(self):
+        """Verify the custom-VJP path agrees under eager grad and jit(grad)."""
+        from arbplusjax import matfree_adjoints
+
+        n = 24
+        key = jr.PRNGKey(2026)
+        a_rand = jr.normal(key, (n, n))
+        a = (a_rand + a_rand.T) / 2
+
+        def matvec(v):
+            return a @ v
+
+        lanczos = matfree_adjoints.lanczos_tridiag(
+            matvec, 6, reortho="full", custom_vjp=True
+        )
+
+        def loss_fn(v):
+            (basis, (diags, offdiags)), _ = lanczos(v)
+            return jnp.sum(diags**2) + jnp.sum(offdiags**2) + jnp.sum(basis[0])
+
+        v0 = jr.normal(jr.PRNGKey(2027), (n,))
+        grad_eager = jax.grad(loss_fn)(v0)
+        grad_jitted = jax.jit(jax.grad(loss_fn))(v0)
+
+        assert jnp.all(jnp.isfinite(grad_jitted))
+        error = jnp.linalg.norm(grad_eager - grad_jitted) / jnp.linalg.norm(grad_eager)
+        assert error < 1e-10, f"jit(grad) differs from eager grad: {error}"
 
 
 class TestArnoldiHessenberg:
@@ -133,9 +153,7 @@ class TestArnoldiHessenberg:
         def matvec(v):
             return A @ v
         
-        arnoldi = matfree_adjoints.arnoldi_hessenberg(
-            matvec, krylov_depth=12, reortho="full", custom_vjp=True
-        )
+        arnoldi = matfree_adjoints.arnoldi_hessenberg(matvec, 12, reortho="full", custom_vjp=True)
         
         v0 = jr.normal(jr.PRNGKey(222), (n,))
         Q, H, v_out, norm = arnoldi(v0)
@@ -165,9 +183,7 @@ class TestArnoldiHessenberg:
         def matvec(v):
             return A @ v
         
-        arnoldi = matfree_adjoints.arnoldi_hessenberg(
-            matvec, krylov_depth=10, reortho="full", custom_vjp=True
-        )
+        arnoldi = matfree_adjoints.arnoldi_hessenberg(matvec, 10, reortho="full", custom_vjp=True)
         
         v0 = jr.normal(jr.PRNGKey(335), (n,)) + 1j * jr.normal(jr.PRNGKey(336), (n,))
         Q, H, v_out, norm = arnoldi(v0)
@@ -187,9 +203,7 @@ class TestArnoldiHessenberg:
         def matvec(v):
             return A @ v
         
-        arnoldi = matfree_adjoints.arnoldi_hessenberg(
-            matvec, krylov_depth=5, reortho="full", custom_vjp=True
-        )
+        arnoldi = matfree_adjoints.arnoldi_hessenberg(matvec, 5, reortho="full", custom_vjp=True)
         
         def loss_fn(v):
             Q, H, _, _ = arnoldi(v)
@@ -244,6 +258,39 @@ class TestHutchinsonTraceEstimator:
         # With 20 samples, expect ~10% relative error
         relative_error = jnp.abs(estimate - true_trace) / jnp.abs(true_trace)
         assert relative_error < 0.2, f"Trace estimate error: {relative_error}"
+
+    def test_hutchinson_custom_vjp_gradient_is_stable_under_jit(self):
+        """Verify the estimator custom-VJP path agrees under eager grad and jit(grad)."""
+        from arbplusjax import matfree_adjoints
+
+        n = 16
+        key = jr.PRNGKey(3030)
+        a_rand = jr.normal(key, (n, n))
+        a = a_rand.T @ a_rand + 0.25 * jnp.eye(n)
+
+        def integrand(v, shift):
+            return jnp.dot(v, (a + shift * jnp.eye(n)) @ v)
+
+        def sample_fun(key):
+            return jr.normal(key, (8, n))
+
+        trace_est = matfree_adjoints.hutchinson_trace_estimator(
+            integrand,
+            sample_fun,
+            use_custom_vjp=True,
+        )
+
+        key0 = jr.PRNGKey(4040)
+
+        def loss_fn(shift):
+            return trace_est(key0, shift)
+
+        shift0 = jnp.asarray(0.25, dtype=jnp.float64)
+        grad_eager = jax.grad(loss_fn)(shift0)
+        grad_jitted = jax.jit(jax.grad(loss_fn))(shift0)
+
+        assert jnp.isfinite(grad_jitted)
+        assert jnp.allclose(grad_eager, grad_jitted, rtol=0.0, atol=0.0)
 
 
 class TestCGSolver:
@@ -313,18 +360,20 @@ class TestMatrixFunctionQuadrature:
             return A @ v
         
         quadform = matfree_adjoints.lanczos_quadrature_spd(
-            matfun=jnp.exp,
-            krylov_depth=20,
-            matvec=matvec,
+            jnp.exp,
+            20,
+            matvec,
             reortho="full",
-            use_efficient_adjoint=True
+            use_efficient_adjoint=True,
         )
         
         v0 = jr.normal(jr.PRNGKey(1414), (n,))
         result = quadform(v0)
         
         # Compare with dense computation
-        result_dense = v0 @ jax.scipy.linalg.expm(A) @ v0
+        eigvals, eigvecs = jnp.linalg.eigh(A)
+        exp_a = eigvecs @ jnp.diag(jnp.exp(eigvals)) @ eigvecs.T
+        result_dense = v0 @ exp_a @ v0
         relative_error = jnp.abs(result - result_dense) / jnp.abs(result_dense)
         assert relative_error < 1e-4, f"Quadrature error: {relative_error}"
         
@@ -341,11 +390,11 @@ class TestMatrixFunctionQuadrature:
             return A @ v
         
         quadform = matfree_adjoints.lanczos_quadrature_spd(
-            matfun=jnp.exp,
-            krylov_depth=15,
-            matvec=matvec,
+            jnp.exp,
+            15,
+            matvec,
             reortho="full",
-            use_efficient_adjoint=True
+            use_efficient_adjoint=True,
         )
         
         v0 = jr.normal(jr.PRNGKey(1616), (n,))

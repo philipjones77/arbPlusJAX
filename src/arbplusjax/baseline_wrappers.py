@@ -10,7 +10,6 @@ from . import precision
 from . import ball_wrappers
 from . import checks
 
-jax.config.update("jax_enable_x64", True)
 
 
 def _mode_ok(mode: str) -> str:

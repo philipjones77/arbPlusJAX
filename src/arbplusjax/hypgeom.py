@@ -14,7 +14,6 @@ from . import bessel_kernels as bk
 from . import coeffs
 from . import elementary as el
 
-jax.config.update("jax_enable_x64", True)
 
 _HAS_HYP1F1 = False
 _HAS_HYP2F1 = False

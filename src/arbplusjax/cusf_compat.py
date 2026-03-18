@@ -21,7 +21,6 @@ from . import double_interval as di
 from . import hypgeom
 from . import hypgeom_wrappers
 
-jax.config.update("jax_enable_x64", True)
 
 PROVENANCE = {
     "classification": "alternative",

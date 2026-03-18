@@ -1,10 +1,10 @@
 import jax
 import jax.numpy as jnp
 import pytest
-from jax.experimental import sparse as jsparse
 
 from arbplusjax import double_interval as di
 from arbplusjax import jrb_mat
+from arbplusjax import sparse_common
 
 from tests._test_checks import _check
 
@@ -274,6 +274,27 @@ def test_lanczos_funm_action_has_custom_vjp_wrt_input_vector():
     _check(bool(jnp.allclose(g, expected, rtol=1e-6, atol=1e-6)))
 
 
+def test_lanczos_funm_action_custom_vjp_matches_under_jit_grad():
+    a = _mat2(2.0, 0.0, 0.0, 3.0)
+    op = jrb_mat.jrb_mat_dense_operator(a)
+
+    def dense_exp(m):
+        vals, vecs = jnp.linalg.eigh(m)
+        return vecs @ jnp.diag(jnp.exp(vals)) @ vecs.T
+
+    def loss(t):
+        x = _vec2(t, -2.0)
+        y = jrb_mat.jrb_mat_funm_action_lanczos_point(op, x, dense_exp, 2)
+        return jnp.sum(di.midpoint(y))
+
+    arg = jnp.asarray(1.0, dtype=jnp.float64)
+    eager = jax.grad(loss)(arg)
+    jitted = jax.jit(jax.grad(loss))(arg)
+
+    _check(bool(jnp.isfinite(jitted)))
+    _check(bool(jnp.allclose(eager, jitted, rtol=1e-12, atol=1e-12)))
+
+
 def test_trace_and_logdet_estimators_have_probe_gradients():
     a = _mat2(2.0, 0.0, 0.0, 3.0)
     op = jrb_mat.jrb_mat_dense_operator(a)
@@ -317,7 +338,7 @@ def test_sparse_bcoo_logdet_matches_exact_value_and_probe_gradient_is_finite():
         dtype=jnp.int32,
     )
     base_data = jnp.asarray([2.0, -0.5, -0.5, 3.0, -0.25, -0.25, 4.0], dtype=jnp.float64)
-    bcoo = jsparse.BCOO((base_data, indices), shape=(3, 3))
+    bcoo = sparse_common.SparseBCOO(data=base_data, indices=indices, rows=3, cols=3, algebra="jrb")
     matvec = jrb_mat.jrb_mat_bcoo_operator(bcoo)
 
     def loss(t):
@@ -354,7 +375,7 @@ def test_sparse_bcoo_leja_hutchpp_logdet_matches_exact_value():
         dtype=jnp.int32,
     )
     data = jnp.asarray([2.0, -0.25, -0.25, 3.0, -0.5, -0.5, 4.0], dtype=jnp.float64)
-    bcoo = jsparse.BCOO((data, indices), shape=(3, 3))
+    bcoo = sparse_common.SparseBCOO(data=data, indices=indices, rows=3, cols=3, algebra="jrb")
     matvec = jrb_mat.jrb_mat_bcoo_operator(bcoo)
     bounds = jrb_mat.jrb_mat_bcoo_gershgorin_bounds(bcoo)
     sketch = jnp.stack([
@@ -372,7 +393,9 @@ def test_sparse_bcoo_leja_hutchpp_logdet_matches_exact_value():
         spectral_bounds=bounds,
         candidate_count=96,
     )
-    exact = jnp.linalg.slogdet(jnp.asarray(bcoo.todense(), dtype=jnp.float64))[1]
+    exact = jnp.linalg.slogdet(
+        jnp.asarray(sparse_common.sparse_bcoo_to_dense(bcoo, algebra="jrb", label="test_jrb_mat_chassis.exact"), dtype=jnp.float64)
+    )[1]
     _check(bool(jnp.allclose(est, exact, rtol=1e-5, atol=1e-5)))
 
     value, diag = jrb_mat.jrb_mat_logdet_leja_hutchpp_with_diagnostics_point(
@@ -397,7 +420,7 @@ def test_sparse_bcoo_adaptive_bounds_and_auto_leja_logdet_match_exact_value():
         ],
         dtype=jnp.float64,
     )
-    bcoo = jsparse.BCOO.fromdense(dense)
+    bcoo = sparse_common.dense_to_sparse_bcoo(dense, algebra="jrb")
     exact_eigs = jnp.linalg.eigvalsh(dense)
     g_lower, g_upper = jrb_mat.jrb_mat_bcoo_gershgorin_bounds(bcoo)
     a_lower, a_upper = jrb_mat.jrb_mat_bcoo_spectral_bounds_adaptive(bcoo, steps=3)
@@ -439,7 +462,7 @@ def test_scipy_csr_operator_matches_bcoo_operator_when_available():
         dtype=jnp.float64,
     )
     csr = scipy.csr_matrix(dense)
-    bcoo = jsparse.BCOO.from_scipy_sparse(csr)
+    bcoo = sparse_common.scipy_csr_to_sparse_bcoo(csr, algebra="jrb", dtype=jnp.float64)
     x = jnp.stack([_exact_interval(1.0), _exact_interval(-2.0), _exact_interval(0.5)], axis=0)
 
     op_csr = jrb_mat.jrb_mat_scipy_csr_operator(csr)

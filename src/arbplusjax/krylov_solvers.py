@@ -12,7 +12,6 @@ from functools import partial
 
 from . import jax_precision
 
-jax.config.update("jax_enable_x64", True)
 
 
 def _norm(x: jax.Array) -> jax.Array:

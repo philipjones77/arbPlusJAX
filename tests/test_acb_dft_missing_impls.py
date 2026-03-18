@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import jax.numpy as jnp
+import numpy as np
 
 from arbplusjax import dft
 from arbplusjax import dft_wrappers
@@ -114,3 +115,15 @@ def test_acb_dft_missing_mode_wrappers():
         adapt = fn(*args, impl="adaptive", prec_bits=80)
         _check(_contains_box(rig, basic), f"{name} rigorous contains basic")
         _check(_contains_box(adapt, basic), f"{name} adaptive contains basic")
+
+
+def test_acb_prime_length_precomp_paths_match_main_fft():
+    x = _acb_vec(11)
+    precomp = dft.make_dft_precomp(11)
+    ref = dft.acb_dft(x)
+    got_bluestein = dft.acb_dft_bluestein_precomp(x, precomp=precomp)
+    got_main = dft.acb_dft_precomp(x, precomp=precomp)
+    got_rad2 = dft.acb_dft_rad2_precomp(x, precomp=precomp)
+    np.testing.assert_allclose(np.asarray(got_bluestein), np.asarray(ref), rtol=1e-12, atol=1e-12)
+    np.testing.assert_allclose(np.asarray(got_main), np.asarray(ref), rtol=1e-12, atol=1e-12)
+    np.testing.assert_allclose(np.asarray(got_rad2), np.asarray(ref), rtol=1e-12, atol=1e-12)

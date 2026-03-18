@@ -173,7 +173,9 @@ def example_matrix_exponential_action():
     
     # Compare with dense computation (for small matrix)
     if n <= 100:
-        result_dense = jax.scipy.linalg.expm(A) @ v0
+        eigvals, eigvecs = jnp.linalg.eigh(A)
+        exp_a = eigvecs @ jnp.diag(jnp.exp(eigvals)) @ eigvecs.T
+        result_dense = exp_a @ v0
         error = jnp.linalg.norm(result - result_dense) / jnp.linalg.norm(result_dense)
         print(f"Relative error vs dense: {error:.6e}")
     
@@ -230,7 +232,8 @@ def example_hutchinson_trace():
     
     # Compare with dense computation (for verification)
     if n <= 100:
-        trace_true = jnp.trace(jax.scipy.linalg.expm(A))
+        eigvals = jnp.linalg.eigvalsh(A)
+        trace_true = jnp.sum(jnp.exp(eigvals))
         error = jnp.abs(estimate - trace_true) / jnp.abs(trace_true)
         print(f"True trace: {trace_true:.6f}")
         print(f"Relative error: {error:.6e}")

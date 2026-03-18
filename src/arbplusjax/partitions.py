@@ -6,7 +6,6 @@ import jax
 from jax import lax
 import jax.numpy as jnp
 
-jax.config.update("jax_enable_x64", True)
 
 
 def _partitions_table_fixed(n_max: int) -> jax.Array:

@@ -3,7 +3,6 @@ from __future__ import annotations
 import jax
 import jax.numpy as jnp
 
-jax.config.update("jax_enable_x64", True)
 
 
 def fmpr_add(a: jax.Array, b: jax.Array) -> jax.Array:

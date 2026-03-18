@@ -2,12 +2,12 @@ import time
 
 import jax
 import jax.numpy as jnp
-from jax.experimental import sparse as jsparse
 
 from arbplusjax import acb_core
 from arbplusjax import double_interval as di
 from arbplusjax import jcb_mat
 from arbplusjax import jrb_mat
+from arbplusjax import sparse_common
 
 
 def _real_interval(x: jax.Array) -> jax.Array:
@@ -115,7 +115,7 @@ def run_sparse_real_parametric_case(steps: int = 12) -> dict[str, float]:
         jax.vmap(_real_interval)(2.0 * jnp.asarray([0.0, 0.0, 1.0, 0.0], dtype=jnp.float64)),
         jax.vmap(_real_interval)(2.0 * jnp.asarray([0.0, 0.0, 0.0, 1.0], dtype=jnp.float64)),
     ], axis=0)
-    bcoo = jsparse.BCOO((base_data, indices), shape=(4, 4))
+    bcoo = sparse_common.SparseBCOO(data=base_data, indices=indices, rows=4, cols=4, algebra="jrb")
     fixed_op = jrb_mat.jrb_mat_bcoo_operator(bcoo)
     bounds = jrb_mat.jrb_mat_bcoo_gershgorin_bounds(bcoo)
     sketch = probes
@@ -143,6 +143,21 @@ def run_sparse_real_parametric_case(steps: int = 12) -> dict[str, float]:
     )
     logdet_sparse_grad_fn = jax.jit(jax.grad(lambda ps: jrb_mat.jrb_mat_logdet_slq_point(fixed_op, ps, steps)))
     apply_fn = jax.jit(lambda x: jrb_mat.jrb_mat_operator_apply_point(fixed_op, x))
+    inverse_diag_local_fn = lambda: jrb_mat.jrb_mat_bcoo_inverse_diagonal_point(
+        bcoo,
+        overlap=0,
+        block_size=2,
+        correction_probes=0,
+    )
+    inverse_diag_corrected_fn = lambda: jrb_mat.jrb_mat_bcoo_inverse_diagonal_point(
+        bcoo,
+        overlap=0,
+        block_size=2,
+        correction_probes=32,
+        key=jax.random.PRNGKey(0),
+        tol=1e-7,
+        maxiter=16,
+    )
     vec = jax.vmap(_real_interval)(jnp.asarray([1.0, -1.0, 0.5, 2.0], dtype=jnp.float64))
 
     apply_time = _time_call(apply_fn, vec)
@@ -150,12 +165,16 @@ def run_sparse_real_parametric_case(steps: int = 12) -> dict[str, float]:
     logdet_leja_time = _time_call(logdet_leja_fn, sketch, residual)
     logdet_leja_auto_time = _time_call(logdet_leja_auto_fn, sketch, residual)
     logdet_grad_time = _time_call(logdet_sparse_grad_fn, probes)
+    inverse_diag_local_time = _time_call(inverse_diag_local_fn)
+    inverse_diag_corrected_time = _time_call(inverse_diag_corrected_fn)
     return {
         "sparse_real_apply_s": apply_time,
         "sparse_real_logdet_s": logdet_time,
         "sparse_real_logdet_leja_hutchpp_s": logdet_leja_time,
         "sparse_real_logdet_leja_hutchpp_auto_s": logdet_leja_auto_time,
         "sparse_real_logdet_grad_s": logdet_grad_time,
+        "sparse_real_inverse_diag_local_s": inverse_diag_local_time,
+        "sparse_real_inverse_diag_corrected_s": inverse_diag_corrected_time,
     }
 
 
