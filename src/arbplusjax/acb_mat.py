@@ -12,7 +12,6 @@ from . import double_interval as di
 from . import kernel_helpers as kh
 from . import mat_common
 
-jax.config.update("jax_enable_x64", True)
 
 
 def acb_mat_as_matrix(x: jax.Array) -> jax.Array:
@@ -69,6 +68,34 @@ def _mid_vector(x: jax.Array) -> jax.Array:
 def _mid_rhs(x: jax.Array) -> jax.Array:
     arr = acb_mat_as_rhs(x)
     return acb_core.acb_midpoint(arr)
+
+
+def _mid_hermitian_part(a: jax.Array) -> jax.Array:
+    return mat_common.complex_midpoint_hermitian_part(_mid_matrix(a))
+
+
+def _mid_is_hermitian(a: jax.Array) -> jax.Array:
+    return mat_common.complex_midpoint_is_hermitian(_mid_matrix(a))
+
+
+def _mid_cholesky(a: jax.Array) -> tuple[jax.Array, jax.Array]:
+    herm_mid = _mid_hermitian_part(a)
+    chol = jnp.linalg.cholesky(herm_mid)
+    ok = _mid_is_hermitian(a) & mat_common.lower_cholesky_finite(chol)
+    return chol, ok
+
+
+def _mid_hpd_solve(a: jax.Array, b: jax.Array) -> tuple[jax.Array, jax.Array]:
+    chol, ok = _mid_cholesky(a)
+    x = mat_common.lower_cholesky_solve(chol, _mid_rhs(b))
+    return x, ok
+
+
+def _mid_hpd_inv(a: jax.Array) -> tuple[jax.Array, jax.Array]:
+    chol, ok = _mid_cholesky(a)
+    eye = jnp.broadcast_to(jnp.eye(chol.shape[-1], dtype=chol.dtype), chol.shape)
+    inv = mat_common.lower_cholesky_solve(chol, eye)
+    return inv, ok
 
 
 def _rhs_rows_like(rhs: jax.Array, a: jax.Array) -> int:
@@ -139,8 +166,7 @@ def acb_mat_matvec_cached_prepare_prec(a: jax.Array, prec_bits: int = di.DEFAULT
 
 
 def acb_mat_dense_matvec_plan_prepare(a: jax.Array) -> mat_common.DenseMatvecPlan:
-    matrix = acb_mat_as_matrix(a)
-    return mat_common.DenseMatvecPlan(matrix=matrix, rows=int(matrix.shape[-3]), cols=int(matrix.shape[-2]), algebra="acb")
+    return mat_common.dense_matvec_plan_from_matrix(a, algebra="acb", label="acb_mat.dense_matvec_plan_prepare")
 
 
 def acb_mat_dense_matvec_plan_prepare_prec(
@@ -148,7 +174,7 @@ def acb_mat_dense_matvec_plan_prepare_prec(
     prec_bits: int = di.DEFAULT_PREC_BITS,
 ) -> mat_common.DenseMatvecPlan:
     matrix = acb_core.acb_box_round_prec(acb_mat_as_matrix(a), prec_bits)
-    return mat_common.DenseMatvecPlan(matrix=matrix, rows=int(matrix.shape[-3]), cols=int(matrix.shape[-2]), algebra="acb")
+    return mat_common.dense_matvec_plan_from_matrix(matrix, algebra="acb", label="acb_mat.dense_matvec_plan_prepare_prec")
 
 
 def acb_mat_matvec_cached_apply(cache: jax.Array, x: jax.Array) -> jax.Array:
@@ -178,6 +204,19 @@ def acb_mat_transpose(a: jax.Array) -> jax.Array:
 
 def acb_mat_conjugate_transpose(a: jax.Array) -> jax.Array:
     return acb_core.acb_conj(acb_mat_transpose(a))
+
+
+def acb_mat_hermitian_part(a: jax.Array) -> jax.Array:
+    return mat_common.box_from_point(_mid_hermitian_part(a))
+
+
+def acb_mat_is_hermitian(a: jax.Array) -> jax.Array:
+    return _mid_is_hermitian(a)
+
+
+def acb_mat_is_hpd(a: jax.Array) -> jax.Array:
+    _, ok = _mid_cholesky(a)
+    return ok
 
 
 def acb_mat_submatrix(a: jax.Array, row_start: int, row_stop: int, col_start: int, col_stop: int) -> jax.Array:
@@ -326,6 +365,104 @@ def acb_mat_banded_matvec_basic(a: jax.Array, x: jax.Array, *, lower_bandwidth: 
     return jnp.where(finite[..., None, None], out, mat_common.full_box_like(out))
 
 
+def acb_mat_cho(a: jax.Array) -> jax.Array:
+    a = acb_mat_as_matrix(a)
+    chol, ok = _mid_cholesky(a)
+    out = mat_common.box_from_point(chol)
+    return jnp.where(ok[..., None, None, None], out, mat_common.full_box_like(out))
+
+
+def acb_mat_cho_basic(a: jax.Array) -> jax.Array:
+    return acb_mat_cho(a)
+
+
+def acb_mat_ldl(a: jax.Array) -> tuple[jax.Array, jax.Array]:
+    a = acb_mat_as_matrix(a)
+    chol, ok = _mid_cholesky(a)
+    diag = jnp.diagonal(chol, axis1=-2, axis2=-1)
+    l = chol / diag[..., None, :]
+    d = jnp.real(diag * jnp.conj(diag))
+    l_out = mat_common.box_from_point(l)
+    d_out = mat_common.box_from_point(d)
+    mask_l = ok[..., None, None, None]
+    mask_d = ok[..., None, None]
+    return jnp.where(mask_l, l_out, mat_common.full_box_like(l_out)), jnp.where(mask_d, d_out, mat_common.full_box_like(d_out))
+
+
+def acb_mat_ldl_basic(a: jax.Array) -> tuple[jax.Array, jax.Array]:
+    return acb_mat_ldl(a)
+
+
+def acb_mat_dense_hpd_solve_plan_prepare(a: jax.Array) -> mat_common.DenseCholeskySolvePlan:
+    factor = acb_mat_cho(a)
+    return mat_common.dense_cholesky_solve_plan_from_factor(
+        factor,
+        algebra="acb",
+        structure="hermitian",
+        label="acb_mat.dense_hpd_solve_plan_prepare",
+    )
+
+
+def acb_mat_hpd_solve(
+    a_or_plan: mat_common.DenseCholeskySolvePlan | jax.Array,
+    b: jax.Array,
+) -> jax.Array:
+    if isinstance(a_or_plan, mat_common.DenseCholeskySolvePlan):
+        plan = mat_common.as_dense_cholesky_solve_plan(
+            a_or_plan,
+            algebra="acb",
+            structure="hermitian",
+            label="acb_mat.hpd_solve",
+        )
+    else:
+        plan = acb_mat_dense_hpd_solve_plan_prepare(a_or_plan)
+    factor = acb_mat_as_matrix(plan.factor)
+    b = acb_mat_as_rhs(b)
+    checks.check_equal(plan.rows, _rhs_rows_like(b, factor), "acb_mat.hpd_solve.inner")
+    x = mat_common.lower_cholesky_solve(_mid_matrix(factor), _mid_rhs(b))
+    out = mat_common.box_from_point(x)
+    finite = _finite_mask_from_point(x) & jnp.all(mat_common.box_is_finite(factor), axis=(-2, -1))
+    return jnp.where(finite[(...,) + (None,) * (out.ndim - finite.ndim)], out, mat_common.full_box_like(out))
+
+
+def acb_mat_hpd_solve_basic(
+    a_or_plan: mat_common.DenseCholeskySolvePlan | jax.Array,
+    b: jax.Array,
+) -> jax.Array:
+    return acb_mat_hpd_solve(a_or_plan, b)
+
+
+def acb_mat_dense_hpd_solve_plan_apply(
+    plan: mat_common.DenseCholeskySolvePlan | jax.Array,
+    b: jax.Array,
+) -> jax.Array:
+    return acb_mat_hpd_solve(plan, b)
+
+
+def acb_mat_hpd_inv(a_or_plan: mat_common.DenseCholeskySolvePlan | jax.Array) -> jax.Array:
+    if isinstance(a_or_plan, mat_common.DenseCholeskySolvePlan):
+        plan = mat_common.as_dense_cholesky_solve_plan(
+            a_or_plan,
+            algebra="acb",
+            structure="hermitian",
+            label="acb_mat.hpd_inv",
+        )
+    else:
+        plan = acb_mat_dense_hpd_solve_plan_prepare(a_or_plan)
+    factor = acb_mat_as_matrix(plan.factor)
+    inv_mid = mat_common.lower_cholesky_solve(
+        _mid_matrix(factor),
+        jnp.broadcast_to(jnp.eye(plan.rows, dtype=_mid_matrix(factor).dtype), _mid_matrix(factor).shape),
+    )
+    out = mat_common.box_from_point(inv_mid)
+    finite = jnp.all(mat_common.complex_is_finite(inv_mid), axis=(-2, -1)) & jnp.all(mat_common.box_is_finite(factor), axis=(-2, -1))
+    return jnp.where(finite[..., None, None, None], out, mat_common.full_box_like(out))
+
+
+def acb_mat_hpd_inv_basic(a_or_plan: mat_common.DenseCholeskySolvePlan | jax.Array) -> jax.Array:
+    return acb_mat_hpd_inv(a_or_plan)
+
+
 def acb_mat_solve(a: jax.Array, b: jax.Array) -> jax.Array:
     a = acb_mat_as_matrix(a)
     b = acb_mat_as_rhs(b)
@@ -333,9 +470,11 @@ def acb_mat_solve(a: jax.Array, b: jax.Array) -> jax.Array:
     a_mid = _mid_matrix(a)
     b_mid = _mid_rhs(b)
     vector_rhs = b_mid.ndim == a_mid.ndim - 1
-    x = jnp.linalg.solve(a_mid, b_mid[..., None] if vector_rhs else b_mid)
+    x_general = jnp.linalg.solve(a_mid, b_mid[..., None] if vector_rhs else b_mid)
     if vector_rhs:
-        x = x[..., 0]
+        x_general = x_general[..., 0]
+    x_hpd, hpd_ok = _mid_hpd_solve(a, b)
+    x = jnp.where(hpd_ok[(...,) + (None,) * (x_general.ndim - hpd_ok.ndim)], x_hpd, x_general)
     out = mat_common.box_from_point(x)
     finite = _finite_mask_from_point(x)
     return jnp.where(finite[..., None, None], out, mat_common.full_box_like(out))
@@ -347,7 +486,9 @@ def acb_mat_solve_basic(a: jax.Array, b: jax.Array) -> jax.Array:
 
 def acb_mat_inv(a: jax.Array) -> jax.Array:
     a = acb_mat_as_matrix(a)
-    inv = jnp.linalg.inv(_mid_matrix(a))
+    inv_general = jnp.linalg.inv(_mid_matrix(a))
+    inv_hpd, hpd_ok = _mid_hpd_inv(a)
+    inv = jnp.where(hpd_ok[..., None, None], inv_hpd, inv_general)
     out = mat_common.box_from_point(inv)
     finite = jnp.all(mat_common.complex_is_finite(inv), axis=(-2, -1))
     return jnp.where(finite[..., None, None, None], out, mat_common.full_box_like(out))
@@ -529,7 +670,7 @@ def acb_mat_lu_basic(a: jax.Array) -> tuple[jax.Array, jax.Array, jax.Array]:
 
 def acb_mat_dense_lu_solve_plan_prepare(a: jax.Array) -> mat_common.DenseLUSolvePlan:
     p, l, u = acb_mat_lu(a)
-    return mat_common.DenseLUSolvePlan(p=p, l=l, u=u, rows=int(acb_mat_as_matrix(a).shape[-3]), algebra="acb")
+    return mat_common.dense_lu_solve_plan_from_factors(p, l, u, algebra="acb", label="acb_mat.dense_lu_solve_plan_prepare")
 
 
 def acb_mat_dense_lu_solve_plan_prepare_prec(
@@ -537,7 +678,7 @@ def acb_mat_dense_lu_solve_plan_prepare_prec(
     prec_bits: int = di.DEFAULT_PREC_BITS,
 ) -> mat_common.DenseLUSolvePlan:
     p, l, u = acb_mat_lu_prec(a, prec_bits=prec_bits)
-    return mat_common.DenseLUSolvePlan(p=p, l=l, u=u, rows=int(acb_mat_as_matrix(a).shape[-3]), algebra="acb")
+    return mat_common.dense_lu_solve_plan_from_factors(p, l, u, algebra="acb", label="acb_mat.dense_lu_solve_plan_prepare_prec")
 
 
 def acb_mat_lu_solve(
@@ -603,6 +744,34 @@ def acb_mat_diag_matrix_rigorous(d: jax.Array) -> jax.Array:
     return acb_mat_diag_matrix(d)
 
 
+def acb_mat_hermitian_part_rigorous(a: jax.Array) -> jax.Array:
+    return acb_mat_hermitian_part(a)
+
+
+def acb_mat_is_hermitian_rigorous(a: jax.Array) -> jax.Array:
+    return acb_mat_is_hermitian(a)
+
+
+def acb_mat_is_hpd_rigorous(a: jax.Array) -> jax.Array:
+    return acb_mat_is_hpd(a)
+
+
+def acb_mat_cho_rigorous(a: jax.Array) -> jax.Array:
+    return acb_mat_cho(a)
+
+
+def acb_mat_ldl_rigorous(a: jax.Array) -> tuple[jax.Array, jax.Array]:
+    return acb_mat_ldl(a)
+
+
+def acb_mat_hpd_solve_rigorous(a_or_plan: mat_common.DenseCholeskySolvePlan | jax.Array, b: jax.Array) -> jax.Array:
+    return acb_mat_hpd_solve(a_or_plan, b)
+
+
+def acb_mat_hpd_inv_rigorous(a_or_plan: mat_common.DenseCholeskySolvePlan | jax.Array) -> jax.Array:
+    return acb_mat_hpd_inv(a_or_plan)
+
+
 @partial(jax.jit, static_argnames=("prec_bits",))
 def acb_mat_matmul_prec(a: jax.Array, b: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return acb_core.acb_box_round_prec(acb_mat_matmul(a, b), prec_bits)
@@ -631,6 +800,62 @@ def acb_mat_banded_matvec_prec(
 @partial(jax.jit, static_argnames=("prec_bits",))
 def acb_mat_matvec_cached_apply_prec(cache: jax.Array, x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return acb_core.acb_box_round_prec(acb_mat_matvec_cached_apply(cache, x), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def acb_mat_hermitian_part_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_mat_hermitian_part(a), prec_bits)
+
+
+def acb_mat_is_hermitian_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    del prec_bits
+    return acb_mat_is_hermitian(a)
+
+
+def acb_mat_is_hpd_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    del prec_bits
+    return acb_mat_is_hpd(a)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def acb_mat_cho_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_mat_cho(a), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def acb_mat_ldl_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> tuple[jax.Array, jax.Array]:
+    l, d = acb_mat_ldl(a)
+    return acb_core.acb_box_round_prec(l, prec_bits), acb_core.acb_box_round_prec(d, prec_bits)
+
+
+def acb_mat_dense_hpd_solve_plan_prepare_prec(
+    a: jax.Array,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> mat_common.DenseCholeskySolvePlan:
+    factor = acb_mat_cho_prec(a, prec_bits=prec_bits)
+    return mat_common.dense_cholesky_solve_plan_from_factor(
+        factor,
+        algebra="acb",
+        structure="hermitian",
+        label="acb_mat.dense_hpd_solve_plan_prepare_prec",
+    )
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def acb_mat_hpd_solve_prec(
+    a_or_plan: mat_common.DenseCholeskySolvePlan | jax.Array,
+    b: jax.Array,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_mat_hpd_solve(a_or_plan, b), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def acb_mat_hpd_inv_prec(
+    a_or_plan: mat_common.DenseCholeskySolvePlan | jax.Array,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_mat_hpd_inv(a_or_plan), prec_bits)
 
 
 @partial(jax.jit, static_argnames=("prec_bits",))
@@ -708,8 +933,13 @@ acb_mat_matmul_jit = jax.jit(acb_mat_matmul)
 acb_mat_matvec_jit = jax.jit(acb_mat_matvec)
 acb_mat_banded_matvec_jit = jax.jit(acb_mat_banded_matvec, static_argnames=("lower_bandwidth", "upper_bandwidth"))
 acb_mat_matvec_cached_apply_jit = jax.jit(acb_mat_matvec_cached_apply)
+acb_mat_hermitian_part_jit = jax.jit(acb_mat_hermitian_part)
 acb_mat_solve_jit = jax.jit(acb_mat_solve)
 acb_mat_inv_jit = jax.jit(acb_mat_inv)
+acb_mat_cho_jit = jax.jit(acb_mat_cho)
+acb_mat_ldl_jit = jax.jit(acb_mat_ldl)
+acb_mat_hpd_solve_jit = jax.jit(acb_mat_hpd_solve)
+acb_mat_hpd_inv_jit = jax.jit(acb_mat_hpd_inv)
 acb_mat_sqr_jit = jax.jit(acb_mat_sqr)
 acb_mat_det_jit = jax.jit(acb_mat_det)
 acb_mat_trace_jit = jax.jit(acb_mat_trace)
@@ -775,8 +1005,31 @@ def acb_mat_matvec_cached_prepare_batch_fixed(a: jax.Array) -> jax.Array:
 
 
 def acb_mat_matvec_cached_prepare_batch_padded(a: jax.Array, *, pad_to: int) -> jax.Array:
-    call_args, _ = kh.pad_mixed_batch_args_repeat_last((a,), pad_to=pad_to)
+    call_args, _ = mat_common.pad_batch_repeat_last((a,), pad_to=pad_to)
     return acb_mat_matvec_cached_prepare(*call_args)
+
+
+def acb_mat_dense_matvec_plan_prepare_batch_fixed(a: jax.Array) -> mat_common.DenseMatvecPlan:
+    return acb_mat_dense_matvec_plan_prepare(a)
+
+
+def acb_mat_dense_matvec_plan_prepare_batch_padded(a: jax.Array, *, pad_to: int) -> mat_common.DenseMatvecPlan:
+    call_args, _ = mat_common.pad_batch_repeat_last((a,), pad_to=pad_to)
+    return acb_mat_dense_matvec_plan_prepare(*call_args)
+
+
+def acb_mat_dense_matvec_plan_apply_batch_fixed(plan: mat_common.DenseMatvecPlan | jax.Array, x: jax.Array) -> jax.Array:
+    return acb_mat_dense_matvec_plan_apply(plan, x)
+
+
+def acb_mat_dense_matvec_plan_apply_batch_padded(
+    plan: mat_common.DenseMatvecPlan | jax.Array,
+    x: jax.Array,
+    *,
+    pad_to: int,
+) -> jax.Array:
+    (x_pad,), _ = mat_common.pad_batch_repeat_last((x,), pad_to=pad_to)
+    return acb_mat_dense_matvec_plan_apply(plan, x_pad)
 
 
 def acb_mat_solve_batch_fixed(a: jax.Array, b: jax.Array) -> jax.Array:
@@ -830,6 +1083,32 @@ def acb_mat_lu_batch_padded(a: jax.Array, *, pad_to: int) -> tuple[jax.Array, ja
 
 def acb_mat_qr_batch_fixed(a: jax.Array) -> tuple[jax.Array, jax.Array]:
     return acb_mat_qr(a)
+
+
+def acb_mat_dense_lu_solve_plan_prepare_batch_fixed(a: jax.Array) -> mat_common.DenseLUSolvePlan:
+    return acb_mat_dense_lu_solve_plan_prepare(a)
+
+
+def acb_mat_dense_lu_solve_plan_prepare_batch_padded(a: jax.Array, *, pad_to: int) -> mat_common.DenseLUSolvePlan:
+    call_args, _ = mat_common.pad_batch_repeat_last((a,), pad_to=pad_to)
+    return acb_mat_dense_lu_solve_plan_prepare(*call_args)
+
+
+def acb_mat_dense_lu_solve_plan_apply_batch_fixed(
+    plan: mat_common.DenseLUSolvePlan | tuple[jax.Array, jax.Array, jax.Array],
+    b: jax.Array,
+) -> jax.Array:
+    return acb_mat_dense_lu_solve_plan_apply(plan, b)
+
+
+def acb_mat_dense_lu_solve_plan_apply_batch_padded(
+    plan: mat_common.DenseLUSolvePlan | tuple[jax.Array, jax.Array, jax.Array],
+    b: jax.Array,
+    *,
+    pad_to: int,
+) -> jax.Array:
+    (b_pad,), _ = mat_common.pad_batch_repeat_last((b,), pad_to=pad_to)
+    return acb_mat_dense_lu_solve_plan_apply(plan, b_pad)
 
 
 def acb_mat_qr_batch_padded(a: jax.Array, *, pad_to: int) -> tuple[jax.Array, jax.Array]:
@@ -889,6 +1168,230 @@ def acb_mat_norm_inf_batch_fixed(a: jax.Array) -> jax.Array:
 def acb_mat_norm_inf_batch_padded(a: jax.Array, *, pad_to: int) -> jax.Array:
     call_args, _ = kh.pad_mixed_batch_args_repeat_last((a,), pad_to=pad_to)
     return acb_mat_norm_inf(*call_args)
+
+
+def acb_mat_hermitian_part_batch_fixed(a: jax.Array) -> jax.Array:
+    return acb_mat_hermitian_part(a)
+
+
+def acb_mat_hermitian_part_batch_padded(a: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = kh.pad_mixed_batch_args_repeat_last((a,), pad_to=pad_to)
+    return acb_mat_hermitian_part(*call_args)
+
+
+def acb_mat_is_hermitian_batch_fixed(a: jax.Array) -> jax.Array:
+    return acb_mat_is_hermitian(a)
+
+
+def acb_mat_is_hermitian_batch_padded(a: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = kh.pad_mixed_batch_args_repeat_last((a,), pad_to=pad_to)
+    return acb_mat_is_hermitian(*call_args)
+
+
+def acb_mat_is_hpd_batch_fixed(a: jax.Array) -> jax.Array:
+    return acb_mat_is_hpd(a)
+
+
+def acb_mat_is_hpd_batch_padded(a: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = kh.pad_mixed_batch_args_repeat_last((a,), pad_to=pad_to)
+    return acb_mat_is_hpd(*call_args)
+
+
+def acb_mat_cho_batch_fixed(a: jax.Array) -> jax.Array:
+    return acb_mat_cho(a)
+
+
+def acb_mat_cho_batch_padded(a: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = kh.pad_mixed_batch_args_repeat_last((a,), pad_to=pad_to)
+    return acb_mat_cho(*call_args)
+
+
+def acb_mat_ldl_batch_fixed(a: jax.Array) -> tuple[jax.Array, jax.Array]:
+    return acb_mat_ldl(a)
+
+
+def acb_mat_ldl_batch_padded(a: jax.Array, *, pad_to: int) -> tuple[jax.Array, jax.Array]:
+    call_args, _ = kh.pad_mixed_batch_args_repeat_last((a,), pad_to=pad_to)
+    return acb_mat_ldl(*call_args)
+
+
+def acb_mat_dense_hpd_solve_plan_prepare_batch_fixed(a: jax.Array) -> mat_common.DenseCholeskySolvePlan:
+    return acb_mat_dense_hpd_solve_plan_prepare(a)
+
+
+def acb_mat_dense_hpd_solve_plan_prepare_batch_padded(a: jax.Array, *, pad_to: int) -> mat_common.DenseCholeskySolvePlan:
+    call_args, _ = mat_common.pad_batch_repeat_last((a,), pad_to=pad_to)
+    return acb_mat_dense_hpd_solve_plan_prepare(*call_args)
+
+
+def acb_mat_hpd_solve_batch_fixed(a_or_plan: mat_common.DenseCholeskySolvePlan | jax.Array, b: jax.Array) -> jax.Array:
+    return acb_mat_hpd_solve(a_or_plan, b)
+
+
+def acb_mat_hpd_solve_batch_padded(
+    a_or_plan: mat_common.DenseCholeskySolvePlan | jax.Array,
+    b: jax.Array,
+    *,
+    pad_to: int,
+) -> jax.Array:
+    (b_pad,), _ = mat_common.pad_batch_repeat_last((b,), pad_to=pad_to)
+    return acb_mat_hpd_solve(a_or_plan, b_pad)
+
+
+def acb_mat_dense_hpd_solve_plan_apply_batch_fixed(
+    plan: mat_common.DenseCholeskySolvePlan | jax.Array,
+    b: jax.Array,
+) -> jax.Array:
+    return acb_mat_dense_hpd_solve_plan_apply(plan, b)
+
+
+def acb_mat_dense_hpd_solve_plan_apply_batch_padded(
+    plan: mat_common.DenseCholeskySolvePlan | jax.Array,
+    b: jax.Array,
+    *,
+    pad_to: int,
+) -> jax.Array:
+    (b_pad,), _ = mat_common.pad_batch_repeat_last((b,), pad_to=pad_to)
+    return acb_mat_dense_hpd_solve_plan_apply(plan, b_pad)
+
+
+def acb_mat_hpd_inv_batch_fixed(a_or_plan: mat_common.DenseCholeskySolvePlan | jax.Array) -> jax.Array:
+    return acb_mat_hpd_inv(a_or_plan)
+
+
+def acb_mat_hpd_inv_batch_padded(a_or_plan: mat_common.DenseCholeskySolvePlan | jax.Array, *, pad_to: int) -> jax.Array:
+    if isinstance(a_or_plan, mat_common.DenseCholeskySolvePlan):
+        return acb_mat_hpd_inv(a_or_plan)
+    call_args, _ = kh.pad_mixed_batch_args_repeat_last((a_or_plan,), pad_to=pad_to)
+    return acb_mat_hpd_inv(*call_args)
+
+
+def acb_mat_hermitian_part_batch_fixed_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_mat_hermitian_part_batch_fixed(a), prec_bits)
+
+
+def acb_mat_hermitian_part_batch_padded_prec(a: jax.Array, *, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_mat_hermitian_part_batch_padded(a, pad_to=pad_to), prec_bits)
+
+
+def acb_mat_is_hermitian_batch_fixed_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    del prec_bits
+    return acb_mat_is_hermitian_batch_fixed(a)
+
+
+def acb_mat_is_hermitian_batch_padded_prec(a: jax.Array, *, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    del prec_bits
+    return acb_mat_is_hermitian_batch_padded(a, pad_to=pad_to)
+
+
+def acb_mat_is_hpd_batch_fixed_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    del prec_bits
+    return acb_mat_is_hpd_batch_fixed(a)
+
+
+def acb_mat_is_hpd_batch_padded_prec(a: jax.Array, *, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    del prec_bits
+    return acb_mat_is_hpd_batch_padded(a, pad_to=pad_to)
+
+
+def acb_mat_cho_batch_fixed_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_mat_cho_batch_fixed(a), prec_bits)
+
+
+def acb_mat_cho_batch_padded_prec(a: jax.Array, *, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_mat_cho_batch_padded(a, pad_to=pad_to), prec_bits)
+
+
+def acb_mat_ldl_batch_fixed_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> tuple[jax.Array, jax.Array]:
+    l, d = acb_mat_ldl_batch_fixed(a)
+    return acb_core.acb_box_round_prec(l, prec_bits), acb_core.acb_box_round_prec(d, prec_bits)
+
+
+def acb_mat_ldl_batch_padded_prec(a: jax.Array, *, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS) -> tuple[jax.Array, jax.Array]:
+    l, d = acb_mat_ldl_batch_padded(a, pad_to=pad_to)
+    return acb_core.acb_box_round_prec(l, prec_bits), acb_core.acb_box_round_prec(d, prec_bits)
+
+
+def acb_mat_dense_hpd_solve_plan_prepare_batch_fixed_prec(
+    a: jax.Array,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> mat_common.DenseCholeskySolvePlan:
+    return acb_mat_dense_hpd_solve_plan_prepare_prec(a, prec_bits=prec_bits)
+
+
+def acb_mat_dense_hpd_solve_plan_prepare_batch_padded_prec(
+    a: jax.Array,
+    *,
+    pad_to: int,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> mat_common.DenseCholeskySolvePlan:
+    plan = acb_mat_dense_hpd_solve_plan_prepare_batch_padded(a, pad_to=pad_to)
+    return mat_common.dense_cholesky_solve_plan_from_factor(
+        acb_core.acb_box_round_prec(plan.factor, prec_bits),
+        algebra="acb",
+        structure="hermitian",
+        label="acb_mat.dense_hpd_solve_plan_prepare_batch_padded_prec",
+    )
+
+
+def acb_mat_hpd_solve_batch_fixed_prec(
+    a_or_plan: mat_common.DenseCholeskySolvePlan | jax.Array,
+    b: jax.Array,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_mat_hpd_solve_batch_fixed(a_or_plan, b), prec_bits)
+
+
+def acb_mat_hpd_solve_batch_padded_prec(
+    a_or_plan: mat_common.DenseCholeskySolvePlan | jax.Array,
+    b: jax.Array,
+    *,
+    pad_to: int,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_mat_hpd_solve_batch_padded(a_or_plan, b, pad_to=pad_to), prec_bits)
+
+
+def acb_mat_dense_hpd_solve_plan_apply_prec(
+    plan: mat_common.DenseCholeskySolvePlan | jax.Array,
+    b: jax.Array,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_mat_dense_hpd_solve_plan_apply(plan, b), prec_bits)
+
+
+def acb_mat_dense_hpd_solve_plan_apply_batch_fixed_prec(
+    plan: mat_common.DenseCholeskySolvePlan | jax.Array,
+    b: jax.Array,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_mat_dense_hpd_solve_plan_apply_batch_fixed(plan, b), prec_bits)
+
+
+def acb_mat_dense_hpd_solve_plan_apply_batch_padded_prec(
+    plan: mat_common.DenseCholeskySolvePlan | jax.Array,
+    b: jax.Array,
+    *,
+    pad_to: int,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_mat_dense_hpd_solve_plan_apply_batch_padded(plan, b, pad_to=pad_to), prec_bits)
+
+
+def acb_mat_hpd_inv_batch_fixed_prec(
+    a_or_plan: mat_common.DenseCholeskySolvePlan | jax.Array,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_mat_hpd_inv_batch_fixed(a_or_plan), prec_bits)
+
+
+def acb_mat_hpd_inv_batch_padded_prec(
+    a_or_plan: mat_common.DenseCholeskySolvePlan | jax.Array,
+    *,
+    pad_to: int,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_mat_hpd_inv_batch_padded(a_or_plan, pad_to=pad_to), prec_bits)
 
 
 @partial(jax.jit, static_argnames=("prec_bits",))
@@ -975,6 +1478,56 @@ def acb_mat_matvec_cached_prepare_batch_padded_prec(
     prec_bits: int = di.DEFAULT_PREC_BITS,
 ) -> jax.Array:
     return acb_core.acb_box_round_prec(acb_mat_matvec_cached_prepare_batch_padded(a, pad_to=pad_to), prec_bits)
+
+
+def acb_mat_dense_matvec_plan_prepare_batch_fixed_prec(
+    a: jax.Array,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> mat_common.DenseMatvecPlan:
+    return acb_mat_dense_matvec_plan_prepare_prec(a, prec_bits=prec_bits)
+
+
+def acb_mat_dense_matvec_plan_prepare_batch_padded_prec(
+    a: jax.Array,
+    *,
+    pad_to: int,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> mat_common.DenseMatvecPlan:
+    plan = acb_mat_dense_matvec_plan_prepare_batch_padded(a, pad_to=pad_to)
+    return mat_common.dense_matvec_plan_from_matrix(
+        acb_core.acb_box_round_prec(plan.matrix, prec_bits),
+        algebra="acb",
+        label="acb_mat.dense_matvec_plan_prepare_batch_padded_prec",
+    )
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def acb_mat_dense_matvec_plan_apply_prec(
+    plan: mat_common.DenseMatvecPlan | jax.Array,
+    x: jax.Array,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_mat_dense_matvec_plan_apply(plan, x), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def acb_mat_dense_matvec_plan_apply_batch_fixed_prec(
+    plan: mat_common.DenseMatvecPlan | jax.Array,
+    x: jax.Array,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_mat_dense_matvec_plan_apply_batch_fixed(plan, x), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits", "pad_to"))
+def acb_mat_dense_matvec_plan_apply_batch_padded_prec(
+    plan: mat_common.DenseMatvecPlan | jax.Array,
+    x: jax.Array,
+    *,
+    pad_to: int,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_mat_dense_matvec_plan_apply_batch_padded(plan, x, pad_to=pad_to), prec_bits)
 
 
 @partial(jax.jit, static_argnames=("prec_bits",))
@@ -1170,6 +1723,49 @@ def acb_mat_dense_lu_solve_plan_apply_prec(
     prec_bits: int = di.DEFAULT_PREC_BITS,
 ) -> jax.Array:
     return acb_core.acb_box_round_prec(acb_mat_dense_lu_solve_plan_apply(plan, b), prec_bits)
+
+
+def acb_mat_dense_lu_solve_plan_prepare_batch_fixed_prec(
+    a: jax.Array,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> mat_common.DenseLUSolvePlan:
+    return acb_mat_dense_lu_solve_plan_prepare_prec(a, prec_bits=prec_bits)
+
+
+def acb_mat_dense_lu_solve_plan_prepare_batch_padded_prec(
+    a: jax.Array,
+    *,
+    pad_to: int,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> mat_common.DenseLUSolvePlan:
+    plan = acb_mat_dense_lu_solve_plan_prepare_batch_padded(a, pad_to=pad_to)
+    return mat_common.dense_lu_solve_plan_from_factors(
+        acb_core.acb_box_round_prec(plan.p, prec_bits),
+        acb_core.acb_box_round_prec(plan.l, prec_bits),
+        acb_core.acb_box_round_prec(plan.u, prec_bits),
+        algebra="acb",
+        label="acb_mat.dense_lu_solve_plan_prepare_batch_padded_prec",
+    )
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def acb_mat_dense_lu_solve_plan_apply_batch_fixed_prec(
+    plan: mat_common.DenseLUSolvePlan | tuple[jax.Array, jax.Array, jax.Array],
+    b: jax.Array,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_mat_dense_lu_solve_plan_apply_batch_fixed(plan, b), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits", "pad_to"))
+def acb_mat_dense_lu_solve_plan_apply_batch_padded_prec(
+    plan: mat_common.DenseLUSolvePlan | tuple[jax.Array, jax.Array, jax.Array],
+    b: jax.Array,
+    *,
+    pad_to: int,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return acb_core.acb_box_round_prec(acb_mat_dense_lu_solve_plan_apply_batch_padded(plan, b, pad_to=pad_to), prec_bits)
 
 
 def acb_mat_permutation_matrix_batch_fixed(perm: jax.Array, *, dtype: jnp.dtype = jnp.float64) -> jax.Array:
@@ -1402,6 +1998,15 @@ __all__ = [
     "acb_mat_dense_matvec_plan_prepare",
     "acb_mat_dense_matvec_plan_apply",
     "acb_mat_matvec_cached_apply",
+    "acb_mat_hermitian_part",
+    "acb_mat_is_hermitian",
+    "acb_mat_is_hpd",
+    "acb_mat_cho",
+    "acb_mat_ldl",
+    "acb_mat_dense_hpd_solve_plan_prepare",
+    "acb_mat_hpd_solve",
+    "acb_mat_dense_hpd_solve_plan_apply",
+    "acb_mat_hpd_inv",
     "acb_mat_solve",
     "acb_mat_solve_basic",
     "acb_mat_inv",
@@ -1435,6 +2040,15 @@ __all__ = [
     "acb_mat_matvec_cached_prepare_prec",
     "acb_mat_dense_matvec_plan_prepare_prec",
     "acb_mat_matvec_cached_apply_prec",
+    "acb_mat_hermitian_part_prec",
+    "acb_mat_is_hermitian_prec",
+    "acb_mat_is_hpd_prec",
+    "acb_mat_cho_prec",
+    "acb_mat_ldl_prec",
+    "acb_mat_dense_hpd_solve_plan_prepare_prec",
+    "acb_mat_hpd_solve_prec",
+    "acb_mat_dense_hpd_solve_plan_apply_prec",
+    "acb_mat_hpd_inv_prec",
     "acb_mat_solve_prec",
     "acb_mat_inv_prec",
     "acb_mat_sqr_prec",
@@ -1450,8 +2064,13 @@ __all__ = [
     "acb_mat_matvec_jit",
     "acb_mat_banded_matvec_jit",
     "acb_mat_matvec_cached_apply_jit",
+    "acb_mat_hermitian_part_jit",
     "acb_mat_solve_jit",
     "acb_mat_inv_jit",
+    "acb_mat_cho_jit",
+    "acb_mat_ldl_jit",
+    "acb_mat_hpd_solve_jit",
+    "acb_mat_hpd_inv_jit",
     "acb_mat_sqr_jit",
     "acb_mat_det_jit",
     "acb_mat_trace_jit",
@@ -1471,6 +2090,24 @@ __all__ = [
     "acb_mat_matvec_cached_prepare_batch_padded",
     "acb_mat_matvec_cached_apply_batch_fixed",
     "acb_mat_matvec_cached_apply_batch_padded",
+    "acb_mat_hermitian_part_batch_fixed",
+    "acb_mat_hermitian_part_batch_padded",
+    "acb_mat_is_hermitian_batch_fixed",
+    "acb_mat_is_hermitian_batch_padded",
+    "acb_mat_is_hpd_batch_fixed",
+    "acb_mat_is_hpd_batch_padded",
+    "acb_mat_cho_batch_fixed",
+    "acb_mat_cho_batch_padded",
+    "acb_mat_ldl_batch_fixed",
+    "acb_mat_ldl_batch_padded",
+    "acb_mat_dense_hpd_solve_plan_prepare_batch_fixed",
+    "acb_mat_dense_hpd_solve_plan_prepare_batch_padded",
+    "acb_mat_hpd_solve_batch_fixed",
+    "acb_mat_hpd_solve_batch_padded",
+    "acb_mat_dense_hpd_solve_plan_apply_batch_fixed",
+    "acb_mat_dense_hpd_solve_plan_apply_batch_padded",
+    "acb_mat_hpd_inv_batch_fixed",
+    "acb_mat_hpd_inv_batch_padded",
     "acb_mat_solve_batch_fixed",
     "acb_mat_solve_batch_padded",
     "acb_mat_inv_batch_fixed",

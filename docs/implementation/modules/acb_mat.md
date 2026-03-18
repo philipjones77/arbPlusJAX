@@ -1,4 +1,4 @@
-Last updated: 2026-03-13T00:00:00Z
+Last updated: 2026-03-18T00:00:00Z
 
 # acb_mat
 
@@ -18,6 +18,10 @@ Implementation lives in `src/arbplusjax/acb_mat.py`. This module exposes direct 
   - `matmul`
   - `matvec`
   - cached `matvec` prepare/apply helpers
+  - Hermitian-part and HPD structure queries
+  - Hermitian Cholesky / LDL
+  - HPD-specialized solve/inverse
+  - HPD solve-plan prepare/apply
   - banded `matvec`
   - `solve`
   - `inv`
@@ -48,6 +52,10 @@ Implementation lives in `src/arbplusjax/acb_mat.py`. This module exposes direct 
   - `acb_mat_matmul(a, b)` / `acb_mat_matmul_basic(a, b)` / `acb_mat_matmul_prec(a, b)`
   - `acb_mat_matvec(a, x)` / `acb_mat_matvec_basic(a, x)` / `acb_mat_matvec_prec(a, x)`
   - `acb_mat_matvec_cached_prepare(a)` / `acb_mat_matvec_cached_apply(cache, x)`
+  - `acb_mat_hermitian_part(a)` / `acb_mat_is_hermitian(a)` / `acb_mat_is_hpd(a)`
+  - `acb_mat_cho(a)` / `acb_mat_ldl(a)`
+  - `acb_mat_hpd_solve(a_or_plan, b)` / `acb_mat_hpd_inv(a_or_plan)`
+  - `acb_mat_dense_hpd_solve_plan_prepare(a)` / `acb_mat_dense_hpd_solve_plan_apply(plan, b)`
   - `acb_mat_banded_matvec(a, x, lower_bandwidth=..., upper_bandwidth=...)`
   - `acb_mat_banded_matvec_basic(a, x, lower_bandwidth=..., upper_bandwidth=...)`
   - `acb_mat_solve(a, b)` / `acb_mat_solve_basic(a, b)` / `acb_mat_solve_prec(a, b)`
@@ -72,6 +80,9 @@ Implementation lives in `src/arbplusjax/acb_mat.py`. This module exposes direct 
 - matrix entries are interpreted as complex boxes
 - `matmul_basic`, `matvec_basic`, and `banded_matvec_basic` use box arithmetic directly
 - `matvec_cached_prepare` / `matvec_cached_apply` reuse the validated box layout and currently share the same arithmetic path as `matvec_basic`
+- `hermitian_part` is midpoint-based and exact for point boxes
+- `is_hermitian` / `is_hpd` are midpoint structural diagnostics used to auto-route `solve` and `inv`
+- `cho`, `ldl`, `hpd_solve`, and `hpd_inv` use midpoint Hermitian Cholesky on the Hermitian part, then outward boxing
 - `solve` and `solve_basic` both currently use midpoint solve plus outward boxing
 - `inv` and `inv_basic` both currently use midpoint inverse plus outward boxing
 - `sqr_basic` reuses direct box `matmul_basic(a, a)`
@@ -98,6 +109,7 @@ Implementation lives in `src/arbplusjax/acb_mat.py`. This module exposes direct 
 - legacy 2x2 specialized contract: `(..., 2, 2, 4)`
 - `zero(n)` and `identity(n)` construct point boxes from dense complex `jax.numpy` arrays
 - fixed and padded batch helpers exist for the main hot paths and are intended to reduce shape-driven recompilation
+- generic `solve` / `inv` now auto-select the HPD route when midpoint Hermitian checks pass, so structured dense cases reuse the cheaper factorization path automatically
 
 ## Formulas
 

@@ -1,6 +1,6 @@
 # Dense Matrix Surface Benchmark
 
-Date: 2026-03-15
+Date: 2026-03-18
 Status: active
 
 ## Scope
@@ -13,7 +13,11 @@ It focuses on:
 
 - direct solve
 - LU-reuse solve
+- SPD / HPD structured solve
+- SPD / HPD structured plan-reuse solve
+- dense matvec plan preparation
 - cached matvec
+- cached matvec padded batch apply
 - transpose / conjugate-transpose
 - diagonal extraction
 
@@ -25,44 +29,43 @@ It focuses on:
 
 ## Results
 
-### `n=16`, `warmup=1`, `runs=3`
+### `n=16`, `warmup=1`, `runs=1`
 
-- `arb_direct_solve_s`: `0.000121`
-- `arb_lu_reuse_s`: `0.000366`
-- `arb_cached_matvec_s`: `0.000044`
-- `arb_transpose_s`: `0.000024`
-- `arb_diag_s`: `0.000030`
-- `acb_direct_solve_s`: `0.000056`
-- `acb_lu_reuse_s`: `0.000086`
-- `acb_cached_matvec_s`: `0.000245`
-- `acb_transpose_s`: `0.000035`
-- `acb_conjugate_transpose_s`: `0.000058`
-- `acb_diag_s`: `0.000016`
-
-### `n=32`, `warmup=1`, `runs=3`
-
-- `arb_direct_solve_s`: `0.000249`
-- `arb_lu_reuse_s`: `0.000158`
-- `arb_cached_matvec_s`: `0.000238`
-- `arb_transpose_s`: `0.000036`
-- `arb_diag_s`: `0.000017`
-- `acb_direct_solve_s`: `0.000215`
-- `acb_lu_reuse_s`: `0.000087`
-- `acb_cached_matvec_s`: `0.000308`
-- `acb_transpose_s`: `0.000132`
-- `acb_conjugate_transpose_s`: `0.000076`
-- `acb_diag_s`: `0.000021`
+- `arb_direct_solve_s`: `0.000076`
+- `arb_lu_reuse_s`: `0.000163`
+- `arb_dense_plan_prepare_s`: `0.000035`
+- `arb_cached_matvec_s`: `0.000075`
+- `arb_cached_matvec_padded_s`: `0.003993`
+- `arb_spd_solve_s`: `0.000091`
+- `arb_spd_plan_solve_s`: `0.000063`
+- `arb_transpose_s`: `0.000038`
+- `arb_diag_s`: `0.000028`
+- `acb_direct_solve_s`: `0.000090`
+- `acb_lu_reuse_s`: `0.000157`
+- `acb_dense_plan_prepare_s`: `0.000023`
+- `acb_cached_matvec_s`: `0.000109`
+- `acb_cached_matvec_padded_s`: `0.015562`
+- `acb_hpd_solve_s`: `0.000112`
+- `acb_hpd_plan_solve_s`: `0.000057`
+- `acb_transpose_s`: `0.000070`
+- `acb_conjugate_transpose_s`: `0.000027`
+- `acb_diag_s`: `0.000027`
 
 ## Notes
 
-- The LU-reuse plan is not universally faster at very small sizes. On this CPU run, `arb_direct_solve` was still faster than LU-reuse at `n=16`.
-- By `n=32`, LU-reuse was already faster than direct solve for both `arb_mat` and `acb_mat`.
+- Dense plan preparation itself is cheap on CPU at this size; the dominant extra cost is padded batch apply, not plan construction.
+- The padded cached matvec path is materially slower than single-vector cached apply at `n=16`, which is expected because it trades raw latency for fixed-shape batching and reduced recompilation pressure.
+- The structured dense paths are now competitive with the generic direct solve and cheaper once a Cholesky plan is reused.
 - The current rigorous dense matrix layer is still wrapper/enclosure based for solve-like operations, but exact structural transforms now preserve interval/box information directly for:
   - permutation matrices
   - transpose / conjugate-transpose
+  - symmetric / Hermitian part extraction
   - submatrix extraction
   - diagonal extraction
   - diagonal-matrix construction
+  - dense matvec plan preparation
+  - dense LU-reuse plan preparation
+  - dense SPD / HPD plan preparation
 
 ## Related Surfaces
 
@@ -71,3 +74,5 @@ It focuses on:
   - [test_arb_mat_chassis.py](/home/phili/projects/arbplusJAX/tests/test_arb_mat_chassis.py)
   - [test_acb_mat_chassis.py](/home/phili/projects/arbplusJAX/tests/test_acb_mat_chassis.py)
   - [test_mat_modes.py](/home/phili/projects/arbplusJAX/tests/test_mat_modes.py)
+  - [test_dense_plan_modes.py](/home/phili/projects/arbplusJAX/tests/test_dense_plan_modes.py)
+  - [test_dense_structured_modes.py](/home/phili/projects/arbplusJAX/tests/test_dense_structured_modes.py)

@@ -18,7 +18,6 @@ from . import kernel_helpers as kh
 from . import mat_common
 from .kernel_helpers import scalarize_binary_complex, scalarize_unary_complex, vmap_complex_scalar
 
-jax.config.update("jax_enable_x64", True)
 
 
 # Point-only kernels (no interval or outward rounding)
@@ -304,9 +303,50 @@ def arb_mat_qr_point(a: jax.Array) -> tuple[jax.Array, jax.Array]:
     return jnp.linalg.qr(_arb_mat_point_matrix(a))
 
 
+@partial(jax.jit, static_argnames=())
+def arb_mat_symmetric_part_point(a: jax.Array) -> jax.Array:
+    a_mid = _arb_mat_point_matrix(a)
+    return 0.5 * (a_mid + jnp.swapaxes(a_mid, -2, -1))
+
+
+def arb_mat_is_symmetric_point(a: jax.Array) -> jax.Array:
+    return mat_common.real_midpoint_is_symmetric(_arb_mat_point_matrix(a))
+
+
+def arb_mat_is_spd_point(a: jax.Array) -> jax.Array:
+    chol = jnp.linalg.cholesky(arb_mat_symmetric_part_point(a))
+    return arb_mat_is_symmetric_point(a) & mat_common.lower_cholesky_finite(chol)
+
+
+@partial(jax.jit, static_argnames=())
+def arb_mat_cho_point(a: jax.Array) -> jax.Array:
+    return jnp.linalg.cholesky(arb_mat_symmetric_part_point(a))
+
+
+def arb_mat_ldl_point(a: jax.Array) -> tuple[jax.Array, jax.Array]:
+    chol = arb_mat_cho_point(a)
+    diag = jnp.diagonal(chol, axis1=-2, axis2=-1)
+    return chol / diag[..., None, :], diag * diag
+
+
 def arb_mat_dense_lu_solve_plan_prepare_point(a: jax.Array) -> mat_common.DenseLUSolvePlan:
     p, l, u = arb_mat_lu_point(a)
     return mat_common.DenseLUSolvePlan(p=p, l=l, u=u, rows=int(p.shape[-1]), algebra="arb")
+
+
+def arb_mat_dense_spd_solve_plan_prepare_point(a: jax.Array) -> mat_common.DenseCholeskySolvePlan:
+    factor = arb_mat_cho_point(a)
+    return mat_common.DenseCholeskySolvePlan(factor=factor, rows=int(factor.shape[-1]), algebra="arb", structure="symmetric")
+
+
+def arb_mat_dense_matvec_plan_prepare_point(a: jax.Array) -> mat_common.DenseMatvecPlan:
+    matrix = _arb_mat_point_matrix(a)
+    return mat_common.DenseMatvecPlan(matrix=matrix, rows=int(matrix.shape[-2]), cols=int(matrix.shape[-1]), algebra="arb")
+
+
+def arb_mat_dense_matvec_plan_apply_point(plan: mat_common.DenseMatvecPlan | jax.Array, x: jax.Array) -> jax.Array:
+    matrix = jnp.asarray(plan.matrix) if isinstance(plan, mat_common.DenseMatvecPlan) else _arb_mat_point_matrix(plan)
+    return jnp.einsum("...ij,...j->...i", matrix, _arb_mat_point_vector(x))
 
 
 def arb_mat_lu_solve_point(plan: mat_common.DenseLUSolvePlan | tuple[jax.Array, jax.Array, jax.Array], b: jax.Array) -> jax.Array:
@@ -330,6 +370,21 @@ def arb_mat_lu_solve_point(plan: mat_common.DenseLUSolvePlan | tuple[jax.Array, 
 
 def arb_mat_dense_lu_solve_plan_apply_point(plan: mat_common.DenseLUSolvePlan | tuple[jax.Array, jax.Array, jax.Array], b: jax.Array) -> jax.Array:
     return arb_mat_lu_solve_point(plan, b)
+
+
+def arb_mat_spd_solve_point(plan: mat_common.DenseCholeskySolvePlan | jax.Array, b: jax.Array) -> jax.Array:
+    factor = jnp.asarray(plan.factor) if isinstance(plan, mat_common.DenseCholeskySolvePlan) else arb_mat_cho_point(plan)
+    return mat_common.lower_cholesky_solve(factor, _arb_mat_point_rhs(b))
+
+
+def arb_mat_dense_spd_solve_plan_apply_point(plan: mat_common.DenseCholeskySolvePlan | jax.Array, b: jax.Array) -> jax.Array:
+    return arb_mat_spd_solve_point(plan, b)
+
+
+def arb_mat_spd_inv_point(plan: mat_common.DenseCholeskySolvePlan | jax.Array) -> jax.Array:
+    factor = jnp.asarray(plan.factor) if isinstance(plan, mat_common.DenseCholeskySolvePlan) else arb_mat_cho_point(plan)
+    eye = jnp.broadcast_to(jnp.eye(factor.shape[-1], dtype=factor.dtype), factor.shape)
+    return mat_common.lower_cholesky_solve(factor, eye)
 
 
 @partial(jax.jit, static_argnames=())
@@ -452,6 +507,51 @@ def arb_mat_norm_inf_batch_padded_point(a: jax.Array, *, pad_to: int) -> jax.Arr
     return arb_mat_norm_inf_point(*call_args)
 
 
+def arb_mat_symmetric_part_batch_fixed_point(a: jax.Array) -> jax.Array:
+    return arb_mat_symmetric_part_point(a)
+
+
+def arb_mat_symmetric_part_batch_padded_point(a: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((a,), pad_to)
+    return arb_mat_symmetric_part_point(*call_args)
+
+
+def arb_mat_is_symmetric_batch_fixed_point(a: jax.Array) -> jax.Array:
+    return arb_mat_is_symmetric_point(a)
+
+
+def arb_mat_is_symmetric_batch_padded_point(a: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((a,), pad_to)
+    return arb_mat_is_symmetric_point(*call_args)
+
+
+def arb_mat_is_spd_batch_fixed_point(a: jax.Array) -> jax.Array:
+    return arb_mat_is_spd_point(a)
+
+
+def arb_mat_is_spd_batch_padded_point(a: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((a,), pad_to)
+    return arb_mat_is_spd_point(*call_args)
+
+
+def arb_mat_cho_batch_fixed_point(a: jax.Array) -> jax.Array:
+    return arb_mat_cho_point(a)
+
+
+def arb_mat_cho_batch_padded_point(a: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((a,), pad_to)
+    return arb_mat_cho_point(*call_args)
+
+
+def arb_mat_ldl_batch_fixed_point(a: jax.Array) -> tuple[jax.Array, jax.Array]:
+    return arb_mat_ldl_point(a)
+
+
+def arb_mat_ldl_batch_padded_point(a: jax.Array, *, pad_to: int) -> tuple[jax.Array, jax.Array]:
+    call_args, _ = _pad_args_repeat_last((a,), pad_to)
+    return arb_mat_ldl_point(*call_args)
+
+
 def arb_mat_matvec_cached_prepare_point(a: jax.Array) -> jax.Array:
     return _arb_mat_point_matrix(a)
 
@@ -470,6 +570,104 @@ def arb_mat_matvec_cached_apply_batch_fixed_point(cache: jax.Array, x: jax.Array
 def arb_mat_matvec_cached_apply_batch_padded_point(cache: jax.Array, x: jax.Array, *, pad_to: int) -> jax.Array:
     call_args, _ = _pad_args_repeat_last((cache, x), pad_to)
     return arb_mat_matvec_cached_apply_point(*call_args)
+
+
+def arb_mat_dense_matvec_plan_prepare_batch_fixed_point(a: jax.Array) -> mat_common.DenseMatvecPlan:
+    return arb_mat_dense_matvec_plan_prepare_point(a)
+
+
+def arb_mat_dense_matvec_plan_prepare_batch_padded_point(a: jax.Array, *, pad_to: int) -> mat_common.DenseMatvecPlan:
+    call_args, _ = _pad_args_repeat_last((a,), pad_to)
+    return arb_mat_dense_matvec_plan_prepare_point(*call_args)
+
+
+def arb_mat_dense_matvec_plan_apply_batch_fixed_point(plan: mat_common.DenseMatvecPlan | jax.Array, x: jax.Array) -> jax.Array:
+    return arb_mat_dense_matvec_plan_apply_point(plan, x)
+
+
+def arb_mat_dense_matvec_plan_apply_batch_padded_point(
+    plan: mat_common.DenseMatvecPlan | jax.Array,
+    x: jax.Array,
+    *,
+    pad_to: int,
+) -> jax.Array:
+    (x_pad,), _ = _pad_args_repeat_last((x,), pad_to)
+    return arb_mat_dense_matvec_plan_apply_point(plan, x_pad)
+
+
+def arb_mat_dense_lu_solve_plan_prepare_batch_fixed_point(a: jax.Array) -> mat_common.DenseLUSolvePlan:
+    return arb_mat_dense_lu_solve_plan_prepare_point(a)
+
+
+def arb_mat_dense_spd_solve_plan_prepare_batch_fixed_point(a: jax.Array) -> mat_common.DenseCholeskySolvePlan:
+    return arb_mat_dense_spd_solve_plan_prepare_point(a)
+
+
+def arb_mat_dense_spd_solve_plan_prepare_batch_padded_point(a: jax.Array, *, pad_to: int) -> mat_common.DenseCholeskySolvePlan:
+    call_args, _ = _pad_args_repeat_last((a,), pad_to)
+    return arb_mat_dense_spd_solve_plan_prepare_point(*call_args)
+
+
+def arb_mat_dense_lu_solve_plan_prepare_batch_padded_point(a: jax.Array, *, pad_to: int) -> mat_common.DenseLUSolvePlan:
+    call_args, _ = _pad_args_repeat_last((a,), pad_to)
+    return arb_mat_dense_lu_solve_plan_prepare_point(*call_args)
+
+
+def arb_mat_dense_lu_solve_plan_apply_batch_fixed_point(
+    plan: mat_common.DenseLUSolvePlan | tuple[jax.Array, jax.Array, jax.Array],
+    b: jax.Array,
+) -> jax.Array:
+    return arb_mat_dense_lu_solve_plan_apply_point(plan, b)
+
+
+def arb_mat_dense_lu_solve_plan_apply_batch_padded_point(
+    plan: mat_common.DenseLUSolvePlan | tuple[jax.Array, jax.Array, jax.Array],
+    b: jax.Array,
+    *,
+    pad_to: int,
+) -> jax.Array:
+    (b_pad,), _ = _pad_args_repeat_last((b,), pad_to)
+    return arb_mat_dense_lu_solve_plan_apply_point(plan, b_pad)
+
+
+def arb_mat_spd_solve_batch_fixed_point(plan: mat_common.DenseCholeskySolvePlan | jax.Array, b: jax.Array) -> jax.Array:
+    return arb_mat_spd_solve_point(plan, b)
+
+
+def arb_mat_spd_solve_batch_padded_point(
+    plan: mat_common.DenseCholeskySolvePlan | jax.Array,
+    b: jax.Array,
+    *,
+    pad_to: int,
+) -> jax.Array:
+    (b_pad,), _ = _pad_args_repeat_last((b,), pad_to)
+    return arb_mat_spd_solve_point(plan, b_pad)
+
+
+def arb_mat_dense_spd_solve_plan_apply_batch_fixed_point(
+    plan: mat_common.DenseCholeskySolvePlan | jax.Array,
+    b: jax.Array,
+) -> jax.Array:
+    return arb_mat_dense_spd_solve_plan_apply_point(plan, b)
+
+
+def arb_mat_dense_spd_solve_plan_apply_batch_padded_point(
+    plan: mat_common.DenseCholeskySolvePlan | jax.Array,
+    b: jax.Array,
+    *,
+    pad_to: int,
+) -> jax.Array:
+    (b_pad,), _ = _pad_args_repeat_last((b,), pad_to)
+    return arb_mat_dense_spd_solve_plan_apply_point(plan, b_pad)
+
+
+def arb_mat_spd_inv_batch_fixed_point(plan: mat_common.DenseCholeskySolvePlan | jax.Array) -> jax.Array:
+    return arb_mat_spd_inv_point(plan)
+
+
+def arb_mat_spd_inv_batch_padded_point(plan: mat_common.DenseCholeskySolvePlan | jax.Array, *, pad_to: int) -> jax.Array:
+    del pad_to
+    return arb_mat_spd_inv_point(plan)
 
 
 def arb_mat_transpose_batch_fixed_point(a: jax.Array) -> jax.Array:
@@ -522,6 +720,32 @@ def acb_mat_banded_matvec_point(a: jax.Array, x: jax.Array, *, lower_bandwidth: 
     checks.check_equal(a_mid.shape[-1], x_mid.shape[-1], "point_wrappers.acb_mat_banded_matvec_point.inner")
     mask = _band_mask(a_mid.shape[-2], a_mid.shape[-1], lower_bandwidth, upper_bandwidth)
     return jnp.einsum("...ij,...j->...i", jnp.where(mask, a_mid, jnp.zeros_like(a_mid)), x_mid)
+
+
+@partial(jax.jit, static_argnames=())
+def acb_mat_hermitian_part_point(a: jax.Array) -> jax.Array:
+    a_mid = _acb_mat_point_matrix(a)
+    return 0.5 * (a_mid + jnp.conj(jnp.swapaxes(a_mid, -2, -1)))
+
+
+def acb_mat_is_hermitian_point(a: jax.Array) -> jax.Array:
+    return mat_common.complex_midpoint_is_hermitian(_acb_mat_point_matrix(a))
+
+
+def acb_mat_is_hpd_point(a: jax.Array) -> jax.Array:
+    chol = jnp.linalg.cholesky(acb_mat_hermitian_part_point(a))
+    return acb_mat_is_hermitian_point(a) & mat_common.lower_cholesky_finite(chol)
+
+
+@partial(jax.jit, static_argnames=())
+def acb_mat_cho_point(a: jax.Array) -> jax.Array:
+    return jnp.linalg.cholesky(acb_mat_hermitian_part_point(a))
+
+
+def acb_mat_ldl_point(a: jax.Array) -> tuple[jax.Array, jax.Array]:
+    chol = acb_mat_cho_point(a)
+    diag = jnp.diagonal(chol, axis1=-2, axis2=-1)
+    return chol / diag[..., None, :], jnp.real(diag * jnp.conj(diag))
 
 
 @partial(jax.jit, static_argnames=())
@@ -583,6 +807,21 @@ def acb_mat_dense_lu_solve_plan_prepare_point(a: jax.Array) -> mat_common.DenseL
     return mat_common.DenseLUSolvePlan(p=p, l=l, u=u, rows=int(p.shape[-1]), algebra="acb")
 
 
+def acb_mat_dense_hpd_solve_plan_prepare_point(a: jax.Array) -> mat_common.DenseCholeskySolvePlan:
+    factor = acb_mat_cho_point(a)
+    return mat_common.DenseCholeskySolvePlan(factor=factor, rows=int(factor.shape[-1]), algebra="acb", structure="hermitian")
+
+
+def acb_mat_dense_matvec_plan_prepare_point(a: jax.Array) -> mat_common.DenseMatvecPlan:
+    matrix = _acb_mat_point_matrix(a)
+    return mat_common.DenseMatvecPlan(matrix=matrix, rows=int(matrix.shape[-2]), cols=int(matrix.shape[-1]), algebra="acb")
+
+
+def acb_mat_dense_matvec_plan_apply_point(plan: mat_common.DenseMatvecPlan | jax.Array, x: jax.Array) -> jax.Array:
+    matrix = jnp.asarray(plan.matrix) if isinstance(plan, mat_common.DenseMatvecPlan) else _acb_mat_point_matrix(plan)
+    return jnp.einsum("...ij,...j->...i", matrix, _acb_mat_point_vector(x))
+
+
 def acb_mat_lu_solve_point(plan: mat_common.DenseLUSolvePlan | tuple[jax.Array, jax.Array, jax.Array], b: jax.Array) -> jax.Array:
     plan = mat_common.as_dense_lu_solve_plan(plan, algebra="acb", label="point_wrappers.acb_mat_lu_solve_point")
     p_mid = _acb_mat_point_matrix(plan.p)
@@ -604,6 +843,21 @@ def acb_mat_lu_solve_point(plan: mat_common.DenseLUSolvePlan | tuple[jax.Array, 
 
 def acb_mat_dense_lu_solve_plan_apply_point(plan: mat_common.DenseLUSolvePlan | tuple[jax.Array, jax.Array, jax.Array], b: jax.Array) -> jax.Array:
     return acb_mat_lu_solve_point(plan, b)
+
+
+def acb_mat_hpd_solve_point(plan: mat_common.DenseCholeskySolvePlan | jax.Array, b: jax.Array) -> jax.Array:
+    factor = jnp.asarray(plan.factor) if isinstance(plan, mat_common.DenseCholeskySolvePlan) else acb_mat_cho_point(plan)
+    return mat_common.lower_cholesky_solve(factor, _acb_mat_point_rhs(b))
+
+
+def acb_mat_dense_hpd_solve_plan_apply_point(plan: mat_common.DenseCholeskySolvePlan | jax.Array, b: jax.Array) -> jax.Array:
+    return acb_mat_hpd_solve_point(plan, b)
+
+
+def acb_mat_hpd_inv_point(plan: mat_common.DenseCholeskySolvePlan | jax.Array) -> jax.Array:
+    factor = jnp.asarray(plan.factor) if isinstance(plan, mat_common.DenseCholeskySolvePlan) else acb_mat_cho_point(plan)
+    eye = jnp.broadcast_to(jnp.eye(factor.shape[-1], dtype=factor.dtype), factor.shape)
+    return mat_common.lower_cholesky_solve(factor, eye)
 
 
 @partial(jax.jit, static_argnames=())
@@ -699,6 +953,51 @@ def acb_mat_sqr_batch_padded_point(a: jax.Array, *, pad_to: int) -> jax.Array:
     return acb_mat_sqr_point(*call_args)
 
 
+def acb_mat_hermitian_part_batch_fixed_point(a: jax.Array) -> jax.Array:
+    return acb_mat_hermitian_part_point(a)
+
+
+def acb_mat_hermitian_part_batch_padded_point(a: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((a,), pad_to)
+    return acb_mat_hermitian_part_point(*call_args)
+
+
+def acb_mat_is_hermitian_batch_fixed_point(a: jax.Array) -> jax.Array:
+    return acb_mat_is_hermitian_point(a)
+
+
+def acb_mat_is_hermitian_batch_padded_point(a: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((a,), pad_to)
+    return acb_mat_is_hermitian_point(*call_args)
+
+
+def acb_mat_is_hpd_batch_fixed_point(a: jax.Array) -> jax.Array:
+    return acb_mat_is_hpd_point(a)
+
+
+def acb_mat_is_hpd_batch_padded_point(a: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((a,), pad_to)
+    return acb_mat_is_hpd_point(*call_args)
+
+
+def acb_mat_cho_batch_fixed_point(a: jax.Array) -> jax.Array:
+    return acb_mat_cho_point(a)
+
+
+def acb_mat_cho_batch_padded_point(a: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((a,), pad_to)
+    return acb_mat_cho_point(*call_args)
+
+
+def acb_mat_ldl_batch_fixed_point(a: jax.Array) -> tuple[jax.Array, jax.Array]:
+    return acb_mat_ldl_point(a)
+
+
+def acb_mat_ldl_batch_padded_point(a: jax.Array, *, pad_to: int) -> tuple[jax.Array, jax.Array]:
+    call_args, _ = _pad_args_repeat_last((a,), pad_to)
+    return acb_mat_ldl_point(*call_args)
+
+
 def acb_mat_matvec_cached_prepare_point(a: jax.Array) -> jax.Array:
     return _acb_mat_point_matrix(a)
 
@@ -717,6 +1016,104 @@ def acb_mat_matvec_cached_apply_batch_fixed_point(cache: jax.Array, x: jax.Array
 def acb_mat_matvec_cached_apply_batch_padded_point(cache: jax.Array, x: jax.Array, *, pad_to: int) -> jax.Array:
     call_args, _ = _pad_args_repeat_last((cache, x), pad_to)
     return acb_mat_matvec_cached_apply_point(*call_args)
+
+
+def acb_mat_dense_matvec_plan_prepare_batch_fixed_point(a: jax.Array) -> mat_common.DenseMatvecPlan:
+    return acb_mat_dense_matvec_plan_prepare_point(a)
+
+
+def acb_mat_dense_hpd_solve_plan_prepare_batch_fixed_point(a: jax.Array) -> mat_common.DenseCholeskySolvePlan:
+    return acb_mat_dense_hpd_solve_plan_prepare_point(a)
+
+
+def acb_mat_dense_hpd_solve_plan_prepare_batch_padded_point(a: jax.Array, *, pad_to: int) -> mat_common.DenseCholeskySolvePlan:
+    call_args, _ = _pad_args_repeat_last((a,), pad_to)
+    return acb_mat_dense_hpd_solve_plan_prepare_point(*call_args)
+
+
+def acb_mat_dense_matvec_plan_prepare_batch_padded_point(a: jax.Array, *, pad_to: int) -> mat_common.DenseMatvecPlan:
+    call_args, _ = _pad_args_repeat_last((a,), pad_to)
+    return acb_mat_dense_matvec_plan_prepare_point(*call_args)
+
+
+def acb_mat_dense_matvec_plan_apply_batch_fixed_point(plan: mat_common.DenseMatvecPlan | jax.Array, x: jax.Array) -> jax.Array:
+    return acb_mat_dense_matvec_plan_apply_point(plan, x)
+
+
+def acb_mat_dense_matvec_plan_apply_batch_padded_point(
+    plan: mat_common.DenseMatvecPlan | jax.Array,
+    x: jax.Array,
+    *,
+    pad_to: int,
+) -> jax.Array:
+    (x_pad,), _ = _pad_args_repeat_last((x,), pad_to)
+    return acb_mat_dense_matvec_plan_apply_point(plan, x_pad)
+
+
+def acb_mat_dense_lu_solve_plan_prepare_batch_fixed_point(a: jax.Array) -> mat_common.DenseLUSolvePlan:
+    return acb_mat_dense_lu_solve_plan_prepare_point(a)
+
+
+def acb_mat_dense_lu_solve_plan_prepare_batch_padded_point(a: jax.Array, *, pad_to: int) -> mat_common.DenseLUSolvePlan:
+    call_args, _ = _pad_args_repeat_last((a,), pad_to)
+    return acb_mat_dense_lu_solve_plan_prepare_point(*call_args)
+
+
+def acb_mat_dense_lu_solve_plan_apply_batch_fixed_point(
+    plan: mat_common.DenseLUSolvePlan | tuple[jax.Array, jax.Array, jax.Array],
+    b: jax.Array,
+) -> jax.Array:
+    return acb_mat_dense_lu_solve_plan_apply_point(plan, b)
+
+
+def acb_mat_dense_lu_solve_plan_apply_batch_padded_point(
+    plan: mat_common.DenseLUSolvePlan | tuple[jax.Array, jax.Array, jax.Array],
+    b: jax.Array,
+    *,
+    pad_to: int,
+) -> jax.Array:
+    (b_pad,), _ = _pad_args_repeat_last((b,), pad_to)
+    return acb_mat_dense_lu_solve_plan_apply_point(plan, b_pad)
+
+
+def acb_mat_hpd_solve_batch_fixed_point(plan: mat_common.DenseCholeskySolvePlan | jax.Array, b: jax.Array) -> jax.Array:
+    return acb_mat_hpd_solve_point(plan, b)
+
+
+def acb_mat_hpd_solve_batch_padded_point(
+    plan: mat_common.DenseCholeskySolvePlan | jax.Array,
+    b: jax.Array,
+    *,
+    pad_to: int,
+) -> jax.Array:
+    (b_pad,), _ = _pad_args_repeat_last((b,), pad_to)
+    return acb_mat_hpd_solve_point(plan, b_pad)
+
+
+def acb_mat_dense_hpd_solve_plan_apply_batch_fixed_point(
+    plan: mat_common.DenseCholeskySolvePlan | jax.Array,
+    b: jax.Array,
+) -> jax.Array:
+    return acb_mat_dense_hpd_solve_plan_apply_point(plan, b)
+
+
+def acb_mat_dense_hpd_solve_plan_apply_batch_padded_point(
+    plan: mat_common.DenseCholeskySolvePlan | jax.Array,
+    b: jax.Array,
+    *,
+    pad_to: int,
+) -> jax.Array:
+    (b_pad,), _ = _pad_args_repeat_last((b,), pad_to)
+    return acb_mat_dense_hpd_solve_plan_apply_point(plan, b_pad)
+
+
+def acb_mat_hpd_inv_batch_fixed_point(plan: mat_common.DenseCholeskySolvePlan | jax.Array) -> jax.Array:
+    return acb_mat_hpd_inv_point(plan)
+
+
+def acb_mat_hpd_inv_batch_padded_point(plan: mat_common.DenseCholeskySolvePlan | jax.Array, *, pad_to: int) -> jax.Array:
+    del pad_to
+    return acb_mat_hpd_inv_point(plan)
 
 
 def acb_mat_zero_point(n: int, *, dtype: jnp.dtype = jnp.float64) -> jax.Array:

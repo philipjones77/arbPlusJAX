@@ -11,7 +11,6 @@ from . import kernel_helpers as kh
 from . import point_wrappers
 from . import wrappers_common as wc
 
-jax.config.update("jax_enable_x64", True)
 
 
 def _kernel_name(name: str) -> str:
@@ -31,8 +30,16 @@ def _make_wrapper(name: str, base_fn: Callable[..., jax.Array], kernel_fn: Calla
     is_acb = name.startswith("acb_")
     point_fn = getattr(point_wrappers, _point_name(name), None)
     exact_rigorous_fn = getattr(acb_mat if is_acb else arb_mat, f"{_kernel_name(name)}_rigorous", None)
+    uses_plan_surface = (
+        "dense_matvec_plan" in name
+        or "dense_lu_solve_plan" in name
+        or "dense_spd_solve_plan" in name
+        or "dense_hpd_solve_plan" in name
+    )
 
     def rig_fn(*args, prec_bits: int, **kwargs):
+        if uses_plan_surface:
+            return base_fn(*args, prec_bits=prec_bits, **kwargs)
         if callable(exact_rigorous_fn):
             return exact_rigorous_fn(*args, **kwargs)
         if is_acb:
@@ -56,12 +63,23 @@ def _make_wrapper(name: str, base_fn: Callable[..., jax.Array], kernel_fn: Calla
         return wc.rigorous_interval_kernel(kernel_fn, args, prec_bits, **kwargs)
 
     def adapt_fn(*args, prec_bits: int, **kwargs):
+        if uses_plan_surface:
+            return base_fn(*args, prec_bits=prec_bits, **kwargs)
         if is_acb:
             return wc.adaptive_acb_kernel(kernel_fn, args, prec_bits, **kwargs)
         return wc.adaptive_interval_kernel(kernel_fn, args, prec_bits, **kwargs)
 
     def wrapper(*args, impl: str = "basic", dps: int | None = None, prec_bits: int | None = None, **kwargs):
         pb = wc.resolve_prec_bits(dps, prec_bits)
+        if uses_plan_surface:
+            if impl == "baseline":
+                impl = "basic"
+            checks = {"point", "basic", "rigorous", "adaptive"} if point_fn is not None else {"basic", "rigorous", "adaptive"}
+            if impl not in checks:
+                raise ValueError(f"invalid impl={impl!r} for {name}")
+            if impl == "point":
+                return point_fn(*args, **kwargs)
+            return base_fn(*args, prec_bits=pb, **kwargs)
         return wc.dispatch_mode(impl, point_fn, base_fn, rig_fn, adapt_fn, is_acb, pb, args, kwargs)
 
     wrapper.__name__ = name.replace("_prec", "_mode")
@@ -125,11 +143,24 @@ for _base in (
     "arb_mat_banded_matvec",
     "arb_mat_matvec_cached_prepare",
     "arb_mat_matvec_cached_apply",
+    "arb_mat_dense_matvec_plan_prepare",
+    "arb_mat_dense_matvec_plan_apply",
+    "arb_mat_symmetric_part",
+    "arb_mat_is_symmetric",
+    "arb_mat_is_spd",
+    "arb_mat_cho",
+    "arb_mat_ldl",
+    "arb_mat_dense_spd_solve_plan_prepare",
+    "arb_mat_spd_solve",
+    "arb_mat_dense_spd_solve_plan_apply",
+    "arb_mat_spd_inv",
     "arb_mat_solve",
     "arb_mat_inv",
     "arb_mat_triangular_solve",
     "arb_mat_lu",
+    "arb_mat_dense_lu_solve_plan_prepare",
     "arb_mat_lu_solve",
+    "arb_mat_dense_lu_solve_plan_apply",
     "arb_mat_qr",
     "arb_mat_det",
     "arb_mat_trace",
@@ -148,11 +179,24 @@ for _base in (
     "acb_mat_banded_matvec",
     "acb_mat_matvec_cached_prepare",
     "acb_mat_matvec_cached_apply",
+    "acb_mat_dense_matvec_plan_prepare",
+    "acb_mat_dense_matvec_plan_apply",
+    "acb_mat_hermitian_part",
+    "acb_mat_is_hermitian",
+    "acb_mat_is_hpd",
+    "acb_mat_cho",
+    "acb_mat_ldl",
+    "acb_mat_dense_hpd_solve_plan_prepare",
+    "acb_mat_hpd_solve",
+    "acb_mat_dense_hpd_solve_plan_apply",
+    "acb_mat_hpd_inv",
     "acb_mat_solve",
     "acb_mat_inv",
     "acb_mat_triangular_solve",
     "acb_mat_lu",
+    "acb_mat_dense_lu_solve_plan_prepare",
     "acb_mat_lu_solve",
+    "acb_mat_dense_lu_solve_plan_apply",
     "acb_mat_qr",
     "acb_mat_det",
     "acb_mat_trace",

@@ -11,7 +11,6 @@ from . import double_interval as di
 from . import kernel_helpers as kh
 from . import mat_common
 
-jax.config.update("jax_enable_x64", True)
 
 
 def arb_mat_as_matrix(x: jax.Array) -> jax.Array:
@@ -56,6 +55,34 @@ def _mid_vector(x: jax.Array) -> jax.Array:
 def _mid_rhs(x: jax.Array) -> jax.Array:
     arr = arb_mat_as_rhs(x)
     return di.midpoint(arr)
+
+
+def _mid_symmetric_part(a: jax.Array) -> jax.Array:
+    return mat_common.real_midpoint_symmetric_part(_mid_matrix(a))
+
+
+def _mid_is_symmetric(a: jax.Array) -> jax.Array:
+    return mat_common.real_midpoint_is_symmetric(_mid_matrix(a))
+
+
+def _mid_cholesky(a: jax.Array) -> tuple[jax.Array, jax.Array]:
+    sym_mid = _mid_symmetric_part(a)
+    chol = jnp.linalg.cholesky(sym_mid)
+    ok = _mid_is_symmetric(a) & mat_common.lower_cholesky_finite(chol)
+    return chol, ok
+
+
+def _mid_spd_solve(a: jax.Array, b: jax.Array) -> tuple[jax.Array, jax.Array]:
+    chol, ok = _mid_cholesky(a)
+    x = mat_common.lower_cholesky_solve(chol, _mid_rhs(b))
+    return x, ok
+
+
+def _mid_spd_inv(a: jax.Array) -> tuple[jax.Array, jax.Array]:
+    chol, ok = _mid_cholesky(a)
+    eye = jnp.broadcast_to(jnp.eye(chol.shape[-1], dtype=chol.dtype), chol.shape)
+    inv = mat_common.lower_cholesky_solve(chol, eye)
+    return inv, ok
 
 
 def _rhs_is_vector(x: jax.Array) -> bool:
@@ -149,8 +176,7 @@ def arb_mat_matvec_cached_prepare_prec(a: jax.Array, prec_bits: int = di.DEFAULT
 
 
 def arb_mat_dense_matvec_plan_prepare(a: jax.Array) -> mat_common.DenseMatvecPlan:
-    matrix = arb_mat_as_matrix(a)
-    return mat_common.DenseMatvecPlan(matrix=matrix, rows=int(matrix.shape[-3]), cols=int(matrix.shape[-2]), algebra="arb")
+    return mat_common.dense_matvec_plan_from_matrix(a, algebra="arb", label="arb_mat.dense_matvec_plan_prepare")
 
 
 def arb_mat_dense_matvec_plan_prepare_prec(
@@ -158,7 +184,7 @@ def arb_mat_dense_matvec_plan_prepare_prec(
     prec_bits: int = di.DEFAULT_PREC_BITS,
 ) -> mat_common.DenseMatvecPlan:
     matrix = di.round_interval_outward(arb_mat_as_matrix(a), prec_bits)
-    return mat_common.DenseMatvecPlan(matrix=matrix, rows=int(matrix.shape[-3]), cols=int(matrix.shape[-2]), algebra="arb")
+    return mat_common.dense_matvec_plan_from_matrix(matrix, algebra="arb", label="arb_mat.dense_matvec_plan_prepare_prec")
 
 
 def arb_mat_matvec_cached_apply(cache: jax.Array, x: jax.Array) -> jax.Array:
@@ -184,6 +210,20 @@ def arb_mat_permutation_matrix(perm: jax.Array, *, dtype: jnp.dtype = jnp.float6
 
 def arb_mat_transpose(a: jax.Array) -> jax.Array:
     return jnp.swapaxes(arb_mat_as_matrix(a), -3, -2)
+
+
+def arb_mat_symmetric_part(a: jax.Array) -> jax.Array:
+    a = arb_mat_as_matrix(a)
+    return di.fast_mul(di.interval(jnp.full(a.shape[:-1], 0.5, dtype=a.dtype), jnp.full(a.shape[:-1], 0.5, dtype=a.dtype)), a + arb_mat_transpose(a))
+
+
+def arb_mat_is_symmetric(a: jax.Array) -> jax.Array:
+    return _mid_is_symmetric(a)
+
+
+def arb_mat_is_spd(a: jax.Array) -> jax.Array:
+    _, ok = _mid_cholesky(a)
+    return ok
 
 
 def arb_mat_submatrix(a: jax.Array, row_start: int, row_stop: int, col_start: int, col_stop: int) -> jax.Array:
@@ -331,6 +371,104 @@ def arb_mat_banded_matvec_basic(a: jax.Array, x: jax.Array, *, lower_bandwidth: 
     return jnp.where(finite[..., None, None], out, mat_common.full_interval_like(out))
 
 
+def arb_mat_cho(a: jax.Array) -> jax.Array:
+    a = arb_mat_as_matrix(a)
+    chol, ok = _mid_cholesky(a)
+    out = mat_common.interval_from_point(chol)
+    return jnp.where(ok[..., None, None, None], out, mat_common.full_interval_like(out))
+
+
+def arb_mat_cho_basic(a: jax.Array) -> jax.Array:
+    return arb_mat_cho(a)
+
+
+def arb_mat_ldl(a: jax.Array) -> tuple[jax.Array, jax.Array]:
+    a = arb_mat_as_matrix(a)
+    chol, ok = _mid_cholesky(a)
+    diag = jnp.diagonal(chol, axis1=-2, axis2=-1)
+    l = chol / diag[..., None, :]
+    d = diag * diag
+    l_out = mat_common.interval_from_point(l)
+    d_out = mat_common.interval_from_point(d)
+    mask_l = ok[..., None, None, None]
+    mask_d = ok[..., None, None]
+    return jnp.where(mask_l, l_out, mat_common.full_interval_like(l_out)), jnp.where(mask_d, d_out, mat_common.full_interval_like(d_out))
+
+
+def arb_mat_ldl_basic(a: jax.Array) -> tuple[jax.Array, jax.Array]:
+    return arb_mat_ldl(a)
+
+
+def arb_mat_dense_spd_solve_plan_prepare(a: jax.Array) -> mat_common.DenseCholeskySolvePlan:
+    factor = arb_mat_cho(a)
+    return mat_common.dense_cholesky_solve_plan_from_factor(
+        factor,
+        algebra="arb",
+        structure="symmetric",
+        label="arb_mat.dense_spd_solve_plan_prepare",
+    )
+
+
+def arb_mat_spd_solve(
+    a_or_plan: mat_common.DenseCholeskySolvePlan | jax.Array,
+    b: jax.Array,
+) -> jax.Array:
+    if isinstance(a_or_plan, mat_common.DenseCholeskySolvePlan):
+        plan = mat_common.as_dense_cholesky_solve_plan(
+            a_or_plan,
+            algebra="arb",
+            structure="symmetric",
+            label="arb_mat.spd_solve",
+        )
+    else:
+        plan = arb_mat_dense_spd_solve_plan_prepare(a_or_plan)
+    factor = arb_mat_as_matrix(plan.factor)
+    b = arb_mat_as_rhs(b)
+    checks.check_equal(plan.rows, _rhs_rows_like(b, factor), "arb_mat.spd_solve.inner")
+    x = mat_common.lower_cholesky_solve(_mid_matrix(factor), _mid_rhs(b))
+    out = mat_common.interval_from_point(x)
+    finite = _finite_mask_from_point(x) & jnp.all(mat_common.interval_is_finite(factor), axis=(-2, -1))
+    return jnp.where(finite[(...,) + (None,) * (out.ndim - finite.ndim)], out, mat_common.full_interval_like(out))
+
+
+def arb_mat_spd_solve_basic(
+    a_or_plan: mat_common.DenseCholeskySolvePlan | jax.Array,
+    b: jax.Array,
+) -> jax.Array:
+    return arb_mat_spd_solve(a_or_plan, b)
+
+
+def arb_mat_dense_spd_solve_plan_apply(
+    plan: mat_common.DenseCholeskySolvePlan | jax.Array,
+    b: jax.Array,
+) -> jax.Array:
+    return arb_mat_spd_solve(plan, b)
+
+
+def arb_mat_spd_inv(a_or_plan: mat_common.DenseCholeskySolvePlan | jax.Array) -> jax.Array:
+    if isinstance(a_or_plan, mat_common.DenseCholeskySolvePlan):
+        plan = mat_common.as_dense_cholesky_solve_plan(
+            a_or_plan,
+            algebra="arb",
+            structure="symmetric",
+            label="arb_mat.spd_inv",
+        )
+    else:
+        plan = arb_mat_dense_spd_solve_plan_prepare(a_or_plan)
+    factor = arb_mat_as_matrix(plan.factor)
+    inv_mid = mat_common.lower_cholesky_solve(
+        _mid_matrix(factor),
+        jnp.broadcast_to(jnp.eye(plan.rows, dtype=factor.dtype), _mid_matrix(factor).shape),
+    )
+    out = mat_common.interval_from_point(inv_mid)
+    finite = jnp.all(jnp.isfinite(inv_mid), axis=(-2, -1)) & jnp.all(mat_common.interval_is_finite(factor), axis=(-2, -1))
+    return jnp.where(finite[..., None, None, None], out, mat_common.full_interval_like(out))
+
+
+def arb_mat_spd_inv_basic(a_or_plan: mat_common.DenseCholeskySolvePlan | jax.Array) -> jax.Array:
+    return arb_mat_spd_inv(a_or_plan)
+
+
 def arb_mat_solve(a: jax.Array, b: jax.Array) -> jax.Array:
     a = arb_mat_as_matrix(a)
     b = arb_mat_as_rhs(b)
@@ -338,9 +476,11 @@ def arb_mat_solve(a: jax.Array, b: jax.Array) -> jax.Array:
     a_mid = _mid_matrix(a)
     b_mid = _mid_rhs(b)
     vector_rhs = b_mid.ndim == a_mid.ndim - 1
-    x = jnp.linalg.solve(a_mid, b_mid[..., None] if vector_rhs else b_mid)
+    x_general = jnp.linalg.solve(a_mid, b_mid[..., None] if vector_rhs else b_mid)
     if vector_rhs:
-        x = x[..., 0]
+        x_general = x_general[..., 0]
+    x_spd, spd_ok = _mid_spd_solve(a, b)
+    x = jnp.where(spd_ok[(...,) + (None,) * (x_general.ndim - spd_ok.ndim)], x_spd, x_general)
     out = mat_common.interval_from_point(x)
     finite = _finite_mask_from_point(x)
     return jnp.where(finite[(...,) + (None,) * (out.ndim - finite.ndim)], out, mat_common.full_interval_like(out))
@@ -352,7 +492,9 @@ def arb_mat_solve_basic(a: jax.Array, b: jax.Array) -> jax.Array:
 
 def arb_mat_inv(a: jax.Array) -> jax.Array:
     a = arb_mat_as_matrix(a)
-    inv = jnp.linalg.inv(_mid_matrix(a))
+    inv_general = jnp.linalg.inv(_mid_matrix(a))
+    inv_spd, spd_ok = _mid_spd_inv(a)
+    inv = jnp.where(spd_ok[..., None, None], inv_spd, inv_general)
     out = mat_common.interval_from_point(inv)
     finite = jnp.all(jnp.isfinite(inv), axis=(-2, -1))
     return jnp.where(finite[..., None, None, None], out, mat_common.full_interval_like(out))
@@ -528,7 +670,7 @@ def arb_mat_lu_basic(a: jax.Array) -> tuple[jax.Array, jax.Array, jax.Array]:
 
 def arb_mat_dense_lu_solve_plan_prepare(a: jax.Array) -> mat_common.DenseLUSolvePlan:
     p, l, u = arb_mat_lu(a)
-    return mat_common.DenseLUSolvePlan(p=p, l=l, u=u, rows=int(arb_mat_as_matrix(a).shape[-3]), algebra="arb")
+    return mat_common.dense_lu_solve_plan_from_factors(p, l, u, algebra="arb", label="arb_mat.dense_lu_solve_plan_prepare")
 
 
 def arb_mat_dense_lu_solve_plan_prepare_prec(
@@ -536,7 +678,7 @@ def arb_mat_dense_lu_solve_plan_prepare_prec(
     prec_bits: int = di.DEFAULT_PREC_BITS,
 ) -> mat_common.DenseLUSolvePlan:
     p, l, u = arb_mat_lu_prec(a, prec_bits=prec_bits)
-    return mat_common.DenseLUSolvePlan(p=p, l=l, u=u, rows=int(arb_mat_as_matrix(a).shape[-3]), algebra="arb")
+    return mat_common.dense_lu_solve_plan_from_factors(p, l, u, algebra="arb", label="arb_mat.dense_lu_solve_plan_prepare_prec")
 
 
 def arb_mat_lu_solve(
@@ -598,6 +740,34 @@ def arb_mat_diag_matrix_rigorous(d: jax.Array) -> jax.Array:
     return arb_mat_diag_matrix(d)
 
 
+def arb_mat_symmetric_part_rigorous(a: jax.Array) -> jax.Array:
+    return arb_mat_symmetric_part(a)
+
+
+def arb_mat_is_symmetric_rigorous(a: jax.Array) -> jax.Array:
+    return arb_mat_is_symmetric(a)
+
+
+def arb_mat_is_spd_rigorous(a: jax.Array) -> jax.Array:
+    return arb_mat_is_spd(a)
+
+
+def arb_mat_cho_rigorous(a: jax.Array) -> jax.Array:
+    return arb_mat_cho(a)
+
+
+def arb_mat_ldl_rigorous(a: jax.Array) -> tuple[jax.Array, jax.Array]:
+    return arb_mat_ldl(a)
+
+
+def arb_mat_spd_solve_rigorous(a_or_plan: mat_common.DenseCholeskySolvePlan | jax.Array, b: jax.Array) -> jax.Array:
+    return arb_mat_spd_solve(a_or_plan, b)
+
+
+def arb_mat_spd_inv_rigorous(a_or_plan: mat_common.DenseCholeskySolvePlan | jax.Array) -> jax.Array:
+    return arb_mat_spd_inv(a_or_plan)
+
+
 @partial(jax.jit, static_argnames=("prec_bits",))
 def arb_mat_matmul_prec(a: jax.Array, b: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return di.round_interval_outward(arb_mat_matmul(a, b), prec_bits)
@@ -626,6 +796,62 @@ def arb_mat_banded_matvec_prec(
 @partial(jax.jit, static_argnames=("prec_bits",))
 def arb_mat_matvec_cached_apply_prec(cache: jax.Array, x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return di.round_interval_outward(arb_mat_matvec_cached_apply(cache, x), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def arb_mat_symmetric_part_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return di.round_interval_outward(arb_mat_symmetric_part(a), prec_bits)
+
+
+def arb_mat_is_symmetric_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    del prec_bits
+    return arb_mat_is_symmetric(a)
+
+
+def arb_mat_is_spd_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    del prec_bits
+    return arb_mat_is_spd(a)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def arb_mat_cho_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return di.round_interval_outward(arb_mat_cho(a), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def arb_mat_ldl_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> tuple[jax.Array, jax.Array]:
+    l, d = arb_mat_ldl(a)
+    return di.round_interval_outward(l, prec_bits), di.round_interval_outward(d, prec_bits)
+
+
+def arb_mat_dense_spd_solve_plan_prepare_prec(
+    a: jax.Array,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> mat_common.DenseCholeskySolvePlan:
+    factor = arb_mat_cho_prec(a, prec_bits=prec_bits)
+    return mat_common.dense_cholesky_solve_plan_from_factor(
+        factor,
+        algebra="arb",
+        structure="symmetric",
+        label="arb_mat.dense_spd_solve_plan_prepare_prec",
+    )
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def arb_mat_spd_solve_prec(
+    a_or_plan: mat_common.DenseCholeskySolvePlan | jax.Array,
+    b: jax.Array,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return di.round_interval_outward(arb_mat_spd_solve(a_or_plan, b), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def arb_mat_spd_inv_prec(
+    a_or_plan: mat_common.DenseCholeskySolvePlan | jax.Array,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return di.round_interval_outward(arb_mat_spd_inv(a_or_plan), prec_bits)
 
 
 @partial(jax.jit, static_argnames=("prec_bits",))
@@ -700,8 +926,13 @@ arb_mat_matmul_jit = jax.jit(arb_mat_matmul)
 arb_mat_matvec_jit = jax.jit(arb_mat_matvec)
 arb_mat_banded_matvec_jit = jax.jit(arb_mat_banded_matvec, static_argnames=("lower_bandwidth", "upper_bandwidth"))
 arb_mat_matvec_cached_apply_jit = jax.jit(arb_mat_matvec_cached_apply)
+arb_mat_symmetric_part_jit = jax.jit(arb_mat_symmetric_part)
 arb_mat_solve_jit = jax.jit(arb_mat_solve)
 arb_mat_inv_jit = jax.jit(arb_mat_inv)
+arb_mat_cho_jit = jax.jit(arb_mat_cho)
+arb_mat_ldl_jit = jax.jit(arb_mat_ldl)
+arb_mat_spd_solve_jit = jax.jit(arb_mat_spd_solve)
+arb_mat_spd_inv_jit = jax.jit(arb_mat_spd_inv)
 arb_mat_sqr_jit = jax.jit(arb_mat_sqr)
 arb_mat_det_jit = jax.jit(arb_mat_det)
 arb_mat_trace_jit = jax.jit(arb_mat_trace)
@@ -767,8 +998,255 @@ def arb_mat_matvec_cached_prepare_batch_fixed(a: jax.Array) -> jax.Array:
 
 
 def arb_mat_matvec_cached_prepare_batch_padded(a: jax.Array, *, pad_to: int) -> jax.Array:
-    call_args, _ = kh.pad_mixed_batch_args_repeat_last((a,), pad_to=pad_to)
+    call_args, _ = mat_common.pad_batch_repeat_last((a,), pad_to=pad_to)
     return arb_mat_matvec_cached_prepare(*call_args)
+
+
+def arb_mat_dense_matvec_plan_prepare_batch_fixed(a: jax.Array) -> mat_common.DenseMatvecPlan:
+    return arb_mat_dense_matvec_plan_prepare(a)
+
+
+def arb_mat_dense_matvec_plan_prepare_batch_padded(a: jax.Array, *, pad_to: int) -> mat_common.DenseMatvecPlan:
+    call_args, _ = mat_common.pad_batch_repeat_last((a,), pad_to=pad_to)
+    return arb_mat_dense_matvec_plan_prepare(*call_args)
+
+
+def arb_mat_dense_matvec_plan_apply_batch_fixed(plan: mat_common.DenseMatvecPlan | jax.Array, x: jax.Array) -> jax.Array:
+    return arb_mat_dense_matvec_plan_apply(plan, x)
+
+
+def arb_mat_dense_matvec_plan_apply_batch_padded(
+    plan: mat_common.DenseMatvecPlan | jax.Array,
+    x: jax.Array,
+    *,
+    pad_to: int,
+) -> jax.Array:
+    (x_pad,), _ = mat_common.pad_batch_repeat_last((x,), pad_to=pad_to)
+    return arb_mat_dense_matvec_plan_apply(plan, x_pad)
+
+
+def arb_mat_symmetric_part_batch_fixed(a: jax.Array) -> jax.Array:
+    return arb_mat_symmetric_part(a)
+
+
+def arb_mat_symmetric_part_batch_padded(a: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = kh.pad_mixed_batch_args_repeat_last((a,), pad_to=pad_to)
+    return arb_mat_symmetric_part(*call_args)
+
+
+def arb_mat_is_symmetric_batch_fixed(a: jax.Array) -> jax.Array:
+    return arb_mat_is_symmetric(a)
+
+
+def arb_mat_is_symmetric_batch_padded(a: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = kh.pad_mixed_batch_args_repeat_last((a,), pad_to=pad_to)
+    return arb_mat_is_symmetric(*call_args)
+
+
+def arb_mat_is_spd_batch_fixed(a: jax.Array) -> jax.Array:
+    return arb_mat_is_spd(a)
+
+
+def arb_mat_is_spd_batch_padded(a: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = kh.pad_mixed_batch_args_repeat_last((a,), pad_to=pad_to)
+    return arb_mat_is_spd(*call_args)
+
+
+def arb_mat_cho_batch_fixed(a: jax.Array) -> jax.Array:
+    return arb_mat_cho(a)
+
+
+def arb_mat_cho_batch_padded(a: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = kh.pad_mixed_batch_args_repeat_last((a,), pad_to=pad_to)
+    return arb_mat_cho(*call_args)
+
+
+def arb_mat_ldl_batch_fixed(a: jax.Array) -> tuple[jax.Array, jax.Array]:
+    return arb_mat_ldl(a)
+
+
+def arb_mat_ldl_batch_padded(a: jax.Array, *, pad_to: int) -> tuple[jax.Array, jax.Array]:
+    call_args, _ = kh.pad_mixed_batch_args_repeat_last((a,), pad_to=pad_to)
+    return arb_mat_ldl(*call_args)
+
+
+def arb_mat_dense_spd_solve_plan_prepare_batch_fixed(a: jax.Array) -> mat_common.DenseCholeskySolvePlan:
+    return arb_mat_dense_spd_solve_plan_prepare(a)
+
+
+def arb_mat_dense_spd_solve_plan_prepare_batch_padded(a: jax.Array, *, pad_to: int) -> mat_common.DenseCholeskySolvePlan:
+    call_args, _ = mat_common.pad_batch_repeat_last((a,), pad_to=pad_to)
+    return arb_mat_dense_spd_solve_plan_prepare(*call_args)
+
+
+def arb_mat_spd_solve_batch_fixed(a_or_plan: mat_common.DenseCholeskySolvePlan | jax.Array, b: jax.Array) -> jax.Array:
+    return arb_mat_spd_solve(a_or_plan, b)
+
+
+def arb_mat_spd_solve_batch_padded(
+    a_or_plan: mat_common.DenseCholeskySolvePlan | jax.Array,
+    b: jax.Array,
+    *,
+    pad_to: int,
+) -> jax.Array:
+    (b_pad,), _ = mat_common.pad_batch_repeat_last((b,), pad_to=pad_to)
+    return arb_mat_spd_solve(a_or_plan, b_pad)
+
+
+def arb_mat_dense_spd_solve_plan_apply_batch_fixed(
+    plan: mat_common.DenseCholeskySolvePlan | jax.Array,
+    b: jax.Array,
+) -> jax.Array:
+    return arb_mat_dense_spd_solve_plan_apply(plan, b)
+
+
+def arb_mat_dense_spd_solve_plan_apply_batch_padded(
+    plan: mat_common.DenseCholeskySolvePlan | jax.Array,
+    b: jax.Array,
+    *,
+    pad_to: int,
+) -> jax.Array:
+    (b_pad,), _ = mat_common.pad_batch_repeat_last((b,), pad_to=pad_to)
+    return arb_mat_dense_spd_solve_plan_apply(plan, b_pad)
+
+
+def arb_mat_spd_inv_batch_fixed(a_or_plan: mat_common.DenseCholeskySolvePlan | jax.Array) -> jax.Array:
+    return arb_mat_spd_inv(a_or_plan)
+
+
+def arb_mat_spd_inv_batch_padded(a_or_plan: mat_common.DenseCholeskySolvePlan | jax.Array, *, pad_to: int) -> jax.Array:
+    if isinstance(a_or_plan, mat_common.DenseCholeskySolvePlan):
+        return arb_mat_spd_inv(a_or_plan)
+    call_args, _ = kh.pad_mixed_batch_args_repeat_last((a_or_plan,), pad_to=pad_to)
+    return arb_mat_spd_inv(*call_args)
+
+
+def arb_mat_symmetric_part_batch_fixed_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return di.round_interval_outward(arb_mat_symmetric_part_batch_fixed(a), prec_bits)
+
+
+def arb_mat_symmetric_part_batch_padded_prec(a: jax.Array, *, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return di.round_interval_outward(arb_mat_symmetric_part_batch_padded(a, pad_to=pad_to), prec_bits)
+
+
+def arb_mat_is_symmetric_batch_fixed_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    del prec_bits
+    return arb_mat_is_symmetric_batch_fixed(a)
+
+
+def arb_mat_is_symmetric_batch_padded_prec(a: jax.Array, *, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    del prec_bits
+    return arb_mat_is_symmetric_batch_padded(a, pad_to=pad_to)
+
+
+def arb_mat_is_spd_batch_fixed_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    del prec_bits
+    return arb_mat_is_spd_batch_fixed(a)
+
+
+def arb_mat_is_spd_batch_padded_prec(a: jax.Array, *, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    del prec_bits
+    return arb_mat_is_spd_batch_padded(a, pad_to=pad_to)
+
+
+def arb_mat_cho_batch_fixed_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return di.round_interval_outward(arb_mat_cho_batch_fixed(a), prec_bits)
+
+
+def arb_mat_cho_batch_padded_prec(a: jax.Array, *, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return di.round_interval_outward(arb_mat_cho_batch_padded(a, pad_to=pad_to), prec_bits)
+
+
+def arb_mat_ldl_batch_fixed_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> tuple[jax.Array, jax.Array]:
+    l, d = arb_mat_ldl_batch_fixed(a)
+    return di.round_interval_outward(l, prec_bits), di.round_interval_outward(d, prec_bits)
+
+
+def arb_mat_ldl_batch_padded_prec(a: jax.Array, *, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS) -> tuple[jax.Array, jax.Array]:
+    l, d = arb_mat_ldl_batch_padded(a, pad_to=pad_to)
+    return di.round_interval_outward(l, prec_bits), di.round_interval_outward(d, prec_bits)
+
+
+def arb_mat_dense_spd_solve_plan_prepare_batch_fixed_prec(
+    a: jax.Array,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> mat_common.DenseCholeskySolvePlan:
+    return arb_mat_dense_spd_solve_plan_prepare_prec(a, prec_bits=prec_bits)
+
+
+def arb_mat_dense_spd_solve_plan_prepare_batch_padded_prec(
+    a: jax.Array,
+    *,
+    pad_to: int,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> mat_common.DenseCholeskySolvePlan:
+    plan = arb_mat_dense_spd_solve_plan_prepare_batch_padded(a, pad_to=pad_to)
+    return mat_common.dense_cholesky_solve_plan_from_factor(
+        di.round_interval_outward(plan.factor, prec_bits),
+        algebra="arb",
+        structure="symmetric",
+        label="arb_mat.dense_spd_solve_plan_prepare_batch_padded_prec",
+    )
+
+
+def arb_mat_spd_solve_batch_fixed_prec(
+    a_or_plan: mat_common.DenseCholeskySolvePlan | jax.Array,
+    b: jax.Array,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return di.round_interval_outward(arb_mat_spd_solve_batch_fixed(a_or_plan, b), prec_bits)
+
+
+def arb_mat_spd_solve_batch_padded_prec(
+    a_or_plan: mat_common.DenseCholeskySolvePlan | jax.Array,
+    b: jax.Array,
+    *,
+    pad_to: int,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return di.round_interval_outward(arb_mat_spd_solve_batch_padded(a_or_plan, b, pad_to=pad_to), prec_bits)
+
+
+def arb_mat_dense_spd_solve_plan_apply_prec(
+    plan: mat_common.DenseCholeskySolvePlan | jax.Array,
+    b: jax.Array,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return di.round_interval_outward(arb_mat_dense_spd_solve_plan_apply(plan, b), prec_bits)
+
+
+def arb_mat_dense_spd_solve_plan_apply_batch_fixed_prec(
+    plan: mat_common.DenseCholeskySolvePlan | jax.Array,
+    b: jax.Array,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return di.round_interval_outward(arb_mat_dense_spd_solve_plan_apply_batch_fixed(plan, b), prec_bits)
+
+
+def arb_mat_dense_spd_solve_plan_apply_batch_padded_prec(
+    plan: mat_common.DenseCholeskySolvePlan | jax.Array,
+    b: jax.Array,
+    *,
+    pad_to: int,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return di.round_interval_outward(arb_mat_dense_spd_solve_plan_apply_batch_padded(plan, b, pad_to=pad_to), prec_bits)
+
+
+def arb_mat_spd_inv_batch_fixed_prec(
+    a_or_plan: mat_common.DenseCholeskySolvePlan | jax.Array,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return di.round_interval_outward(arb_mat_spd_inv_batch_fixed(a_or_plan), prec_bits)
+
+
+def arb_mat_spd_inv_batch_padded_prec(
+    a_or_plan: mat_common.DenseCholeskySolvePlan | jax.Array,
+    *,
+    pad_to: int,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return di.round_interval_outward(arb_mat_spd_inv_batch_padded(a_or_plan, pad_to=pad_to), prec_bits)
 
 
 def arb_mat_solve_batch_fixed(a: jax.Array, b: jax.Array) -> jax.Array:
@@ -822,6 +1300,32 @@ def arb_mat_lu_batch_padded(a: jax.Array, *, pad_to: int) -> tuple[jax.Array, ja
 
 def arb_mat_qr_batch_fixed(a: jax.Array) -> tuple[jax.Array, jax.Array]:
     return arb_mat_qr(a)
+
+
+def arb_mat_dense_lu_solve_plan_prepare_batch_fixed(a: jax.Array) -> mat_common.DenseLUSolvePlan:
+    return arb_mat_dense_lu_solve_plan_prepare(a)
+
+
+def arb_mat_dense_lu_solve_plan_prepare_batch_padded(a: jax.Array, *, pad_to: int) -> mat_common.DenseLUSolvePlan:
+    call_args, _ = mat_common.pad_batch_repeat_last((a,), pad_to=pad_to)
+    return arb_mat_dense_lu_solve_plan_prepare(*call_args)
+
+
+def arb_mat_dense_lu_solve_plan_apply_batch_fixed(
+    plan: mat_common.DenseLUSolvePlan | tuple[jax.Array, jax.Array, jax.Array],
+    b: jax.Array,
+) -> jax.Array:
+    return arb_mat_dense_lu_solve_plan_apply(plan, b)
+
+
+def arb_mat_dense_lu_solve_plan_apply_batch_padded(
+    plan: mat_common.DenseLUSolvePlan | tuple[jax.Array, jax.Array, jax.Array],
+    b: jax.Array,
+    *,
+    pad_to: int,
+) -> jax.Array:
+    (b_pad,), _ = mat_common.pad_batch_repeat_last((b,), pad_to=pad_to)
+    return arb_mat_dense_lu_solve_plan_apply(plan, b_pad)
 
 
 def arb_mat_qr_batch_padded(a: jax.Array, *, pad_to: int) -> tuple[jax.Array, jax.Array]:
@@ -967,6 +1471,56 @@ def arb_mat_matvec_cached_prepare_batch_padded_prec(
     prec_bits: int = di.DEFAULT_PREC_BITS,
 ) -> jax.Array:
     return di.round_interval_outward(arb_mat_matvec_cached_prepare_batch_padded(a, pad_to=pad_to), prec_bits)
+
+
+def arb_mat_dense_matvec_plan_prepare_batch_fixed_prec(
+    a: jax.Array,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> mat_common.DenseMatvecPlan:
+    return arb_mat_dense_matvec_plan_prepare_prec(a, prec_bits=prec_bits)
+
+
+def arb_mat_dense_matvec_plan_prepare_batch_padded_prec(
+    a: jax.Array,
+    *,
+    pad_to: int,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> mat_common.DenseMatvecPlan:
+    plan = arb_mat_dense_matvec_plan_prepare_batch_padded(a, pad_to=pad_to)
+    return mat_common.dense_matvec_plan_from_matrix(
+        di.round_interval_outward(plan.matrix, prec_bits),
+        algebra="arb",
+        label="arb_mat.dense_matvec_plan_prepare_batch_padded_prec",
+    )
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def arb_mat_dense_matvec_plan_apply_prec(
+    plan: mat_common.DenseMatvecPlan | jax.Array,
+    x: jax.Array,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return di.round_interval_outward(arb_mat_dense_matvec_plan_apply(plan, x), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def arb_mat_dense_matvec_plan_apply_batch_fixed_prec(
+    plan: mat_common.DenseMatvecPlan | jax.Array,
+    x: jax.Array,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return di.round_interval_outward(arb_mat_dense_matvec_plan_apply_batch_fixed(plan, x), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits", "pad_to"))
+def arb_mat_dense_matvec_plan_apply_batch_padded_prec(
+    plan: mat_common.DenseMatvecPlan | jax.Array,
+    x: jax.Array,
+    *,
+    pad_to: int,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return di.round_interval_outward(arb_mat_dense_matvec_plan_apply_batch_padded(plan, x, pad_to=pad_to), prec_bits)
 
 
 @partial(jax.jit, static_argnames=("prec_bits",))
@@ -1153,6 +1707,49 @@ def arb_mat_dense_lu_solve_plan_apply_prec(
     prec_bits: int = di.DEFAULT_PREC_BITS,
 ) -> jax.Array:
     return di.round_interval_outward(arb_mat_dense_lu_solve_plan_apply(plan, b), prec_bits)
+
+
+def arb_mat_dense_lu_solve_plan_prepare_batch_fixed_prec(
+    a: jax.Array,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> mat_common.DenseLUSolvePlan:
+    return arb_mat_dense_lu_solve_plan_prepare_prec(a, prec_bits=prec_bits)
+
+
+def arb_mat_dense_lu_solve_plan_prepare_batch_padded_prec(
+    a: jax.Array,
+    *,
+    pad_to: int,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> mat_common.DenseLUSolvePlan:
+    plan = arb_mat_dense_lu_solve_plan_prepare_batch_padded(a, pad_to=pad_to)
+    return mat_common.dense_lu_solve_plan_from_factors(
+        di.round_interval_outward(plan.p, prec_bits),
+        di.round_interval_outward(plan.l, prec_bits),
+        di.round_interval_outward(plan.u, prec_bits),
+        algebra="arb",
+        label="arb_mat.dense_lu_solve_plan_prepare_batch_padded_prec",
+    )
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def arb_mat_dense_lu_solve_plan_apply_batch_fixed_prec(
+    plan: mat_common.DenseLUSolvePlan | tuple[jax.Array, jax.Array, jax.Array],
+    b: jax.Array,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return di.round_interval_outward(arb_mat_dense_lu_solve_plan_apply_batch_fixed(plan, b), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits", "pad_to"))
+def arb_mat_dense_lu_solve_plan_apply_batch_padded_prec(
+    plan: mat_common.DenseLUSolvePlan | tuple[jax.Array, jax.Array, jax.Array],
+    b: jax.Array,
+    *,
+    pad_to: int,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return di.round_interval_outward(arb_mat_dense_lu_solve_plan_apply_batch_padded(plan, b, pad_to=pad_to), prec_bits)
 
 
 def arb_mat_permutation_matrix_batch_fixed(perm: jax.Array, *, dtype: jnp.dtype = jnp.float64) -> jax.Array:
@@ -1368,6 +1965,15 @@ __all__ = [
     "arb_mat_dense_matvec_plan_prepare",
     "arb_mat_dense_matvec_plan_apply",
     "arb_mat_matvec_cached_apply",
+    "arb_mat_symmetric_part",
+    "arb_mat_is_symmetric",
+    "arb_mat_is_spd",
+    "arb_mat_cho",
+    "arb_mat_ldl",
+    "arb_mat_dense_spd_solve_plan_prepare",
+    "arb_mat_spd_solve",
+    "arb_mat_dense_spd_solve_plan_apply",
+    "arb_mat_spd_inv",
     "arb_mat_solve",
     "arb_mat_solve_basic",
     "arb_mat_inv",
@@ -1401,6 +2007,15 @@ __all__ = [
     "arb_mat_matvec_cached_prepare_prec",
     "arb_mat_dense_matvec_plan_prepare_prec",
     "arb_mat_matvec_cached_apply_prec",
+    "arb_mat_symmetric_part_prec",
+    "arb_mat_is_symmetric_prec",
+    "arb_mat_is_spd_prec",
+    "arb_mat_cho_prec",
+    "arb_mat_ldl_prec",
+    "arb_mat_dense_spd_solve_plan_prepare_prec",
+    "arb_mat_spd_solve_prec",
+    "arb_mat_dense_spd_solve_plan_apply_prec",
+    "arb_mat_spd_inv_prec",
     "arb_mat_solve_prec",
     "arb_mat_inv_prec",
     "arb_mat_sqr_prec",
@@ -1416,8 +2031,13 @@ __all__ = [
     "arb_mat_matvec_jit",
     "arb_mat_banded_matvec_jit",
     "arb_mat_matvec_cached_apply_jit",
+    "arb_mat_symmetric_part_jit",
     "arb_mat_solve_jit",
     "arb_mat_inv_jit",
+    "arb_mat_cho_jit",
+    "arb_mat_ldl_jit",
+    "arb_mat_spd_solve_jit",
+    "arb_mat_spd_inv_jit",
     "arb_mat_sqr_jit",
     "arb_mat_det_jit",
     "arb_mat_trace_jit",
@@ -1437,6 +2057,24 @@ __all__ = [
     "arb_mat_matvec_cached_prepare_batch_padded",
     "arb_mat_matvec_cached_apply_batch_fixed",
     "arb_mat_matvec_cached_apply_batch_padded",
+    "arb_mat_symmetric_part_batch_fixed",
+    "arb_mat_symmetric_part_batch_padded",
+    "arb_mat_is_symmetric_batch_fixed",
+    "arb_mat_is_symmetric_batch_padded",
+    "arb_mat_is_spd_batch_fixed",
+    "arb_mat_is_spd_batch_padded",
+    "arb_mat_cho_batch_fixed",
+    "arb_mat_cho_batch_padded",
+    "arb_mat_ldl_batch_fixed",
+    "arb_mat_ldl_batch_padded",
+    "arb_mat_dense_spd_solve_plan_prepare_batch_fixed",
+    "arb_mat_dense_spd_solve_plan_prepare_batch_padded",
+    "arb_mat_spd_solve_batch_fixed",
+    "arb_mat_spd_solve_batch_padded",
+    "arb_mat_dense_spd_solve_plan_apply_batch_fixed",
+    "arb_mat_dense_spd_solve_plan_apply_batch_padded",
+    "arb_mat_spd_inv_batch_fixed",
+    "arb_mat_spd_inv_batch_padded",
     "arb_mat_solve_batch_fixed",
     "arb_mat_solve_batch_padded",
     "arb_mat_inv_batch_fixed",

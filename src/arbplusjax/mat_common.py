@@ -3,13 +3,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import jax
+from jax import lax
 import jax.numpy as jnp
 
 from . import acb_core
 from . import checks
 from . import double_interval as di
+from . import kernel_helpers as kh
 
-jax.config.update("jax_enable_x64", True)
 
 
 @jax.tree_util.register_pytree_node_class
@@ -45,6 +46,28 @@ class DenseLUSolvePlan:
     def tree_unflatten(cls, aux_data, children):
         p, l, u = children
         return cls(p=p, l=l, u=u, rows=aux_data["rows"], algebra=aux_data["algebra"])
+
+
+@jax.tree_util.register_pytree_node_class
+@dataclass(frozen=True)
+class DenseCholeskySolvePlan:
+    factor: jax.Array
+    rows: int
+    algebra: str
+    structure: str
+
+    def tree_flatten(self):
+        return (self.factor,), {"rows": self.rows, "algebra": self.algebra, "structure": self.structure}
+
+    @classmethod
+    def tree_unflatten(cls, aux_data, children):
+        (factor,) = children
+        return cls(
+            factor=factor,
+            rows=aux_data["rows"],
+            algebra=aux_data["algebra"],
+            structure=aux_data["structure"],
+        )
 
 
 def as_interval_mat_2x2(x: jax.Array, label: str) -> jax.Array:
@@ -153,6 +176,40 @@ def box_sum(xs: jax.Array, axis: int = -1) -> jax.Array:
     re_out = di.interval(di._below(jnp.sum(re[..., 0], axis=axis)), di._above(jnp.sum(re[..., 1], axis=axis)))
     im_out = di.interval(di._below(jnp.sum(im[..., 0], axis=axis)), di._above(jnp.sum(im[..., 1], axis=axis)))
     return acb_core.acb_box(re_out, im_out)
+
+
+def real_midpoint_symmetric_part(a: jax.Array) -> jax.Array:
+    return 0.5 * (a + jnp.swapaxes(a, -2, -1))
+
+
+def complex_midpoint_hermitian_part(a: jax.Array) -> jax.Array:
+    return 0.5 * (a + jnp.conj(jnp.swapaxes(a, -2, -1)))
+
+
+def real_midpoint_is_symmetric(a: jax.Array) -> jax.Array:
+    scale = jnp.maximum(1.0, jnp.max(jnp.abs(a), axis=(-2, -1)))
+    tol = 32.0 * jnp.finfo(a.dtype).eps * scale
+    err = jnp.max(jnp.abs(a - jnp.swapaxes(a, -2, -1)), axis=(-2, -1))
+    return err <= tol
+
+
+def complex_midpoint_is_hermitian(a: jax.Array) -> jax.Array:
+    scale = jnp.maximum(1.0, jnp.max(jnp.abs(a), axis=(-2, -1)))
+    tol = 32.0 * jnp.finfo(jnp.real(a).dtype).eps * scale
+    err = jnp.max(jnp.abs(a - jnp.conj(jnp.swapaxes(a, -2, -1))), axis=(-2, -1))
+    return err <= tol
+
+
+def lower_cholesky_finite(factor: jax.Array) -> jax.Array:
+    return jnp.all(jnp.isfinite(factor), axis=(-2, -1))
+
+
+def lower_cholesky_solve(factor: jax.Array, rhs: jax.Array) -> jax.Array:
+    vector_rhs = rhs.ndim == factor.ndim - 1
+    rhs2 = rhs[..., None] if vector_rhs else rhs
+    y = lax.linalg.triangular_solve(factor, rhs2, left_side=True, lower=True, transpose_a=False, conjugate_a=False)
+    x = lax.linalg.triangular_solve(factor, y, left_side=True, lower=True, transpose_a=True, conjugate_a=True)
+    return x[..., 0] if vector_rhs else x
 
 
 def interval_trace(a: jax.Array) -> jax.Array:
@@ -266,6 +323,16 @@ def as_dense_matvec_plan(plan: DenseMatvecPlan | jax.Array, *, algebra: str, lab
     return DenseMatvecPlan(matrix=matrix, rows=int(matrix.shape[-3]), cols=int(matrix.shape[-2]), algebra=algebra)
 
 
+def dense_matvec_plan_from_matrix(matrix: jax.Array, *, algebra: str, label: str) -> DenseMatvecPlan:
+    if algebra == "arb":
+        matrix = as_interval_matrix(matrix, label)
+    elif algebra == "acb":
+        matrix = as_box_matrix(matrix, label)
+    else:
+        raise ValueError("algebra must be one of: arb, acb")
+    return DenseMatvecPlan(matrix=matrix, rows=int(matrix.shape[-3]), cols=int(matrix.shape[-2]), algebra=algebra)
+
+
 def as_dense_lu_solve_plan(plan: DenseLUSolvePlan | tuple[jax.Array, jax.Array, jax.Array], *, algebra: str, label: str) -> DenseLUSolvePlan:
     if isinstance(plan, DenseLUSolvePlan):
         checks.check(plan.algebra == algebra, f"{label}.algebra")
@@ -285,6 +352,51 @@ def as_dense_lu_solve_plan(plan: DenseLUSolvePlan | tuple[jax.Array, jax.Array, 
     checks.check_equal(p.shape[-3], l.shape[-3], f"{label}.rows")
     checks.check_equal(p.shape[-3], u.shape[-3], f"{label}.rows_u")
     return DenseLUSolvePlan(p=p, l=l, u=u, rows=int(p.shape[-3]), algebra=algebra)
+
+
+def dense_lu_solve_plan_from_factors(
+    p: jax.Array,
+    l: jax.Array,
+    u: jax.Array,
+    *,
+    algebra: str,
+    label: str,
+) -> DenseLUSolvePlan:
+    return as_dense_lu_solve_plan((p, l, u), algebra=algebra, label=label)
+
+
+def as_dense_cholesky_solve_plan(
+    plan: DenseCholeskySolvePlan | jax.Array,
+    *,
+    algebra: str,
+    structure: str,
+    label: str,
+) -> DenseCholeskySolvePlan:
+    if isinstance(plan, DenseCholeskySolvePlan):
+        checks.check(plan.algebra == algebra, f"{label}.algebra")
+        checks.check(plan.structure == structure, f"{label}.structure")
+        return plan
+    if algebra == "arb":
+        factor = as_interval_matrix(plan, label)
+    elif algebra == "acb":
+        factor = as_box_matrix(plan, label)
+    else:
+        raise ValueError("algebra must be one of: arb, acb")
+    return DenseCholeskySolvePlan(factor=factor, rows=int(factor.shape[-3]), algebra=algebra, structure=structure)
+
+
+def dense_cholesky_solve_plan_from_factor(
+    factor: jax.Array,
+    *,
+    algebra: str,
+    structure: str,
+    label: str,
+) -> DenseCholeskySolvePlan:
+    return as_dense_cholesky_solve_plan(factor, algebra=algebra, structure=structure, label=label)
+
+
+def pad_batch_repeat_last(args: tuple, *, pad_to: int):
+    return kh.pad_mixed_batch_args_repeat_last(args, pad_to=pad_to)
 
 
 def estimator_mean(probes: jax.Array, coerce_probes, integrand_fn) -> jax.Array:
@@ -327,6 +439,7 @@ def estimator_with_diagnostics(
 __all__ = [
     "DenseMatvecPlan",
     "DenseLUSolvePlan",
+    "DenseCholeskySolvePlan",
     "as_interval_mat_2x2",
     "as_interval_matrix",
     "as_interval_vector",
@@ -344,10 +457,21 @@ __all__ = [
     "complex_is_finite",
     "interval_sum",
     "box_sum",
+    "real_midpoint_symmetric_part",
+    "complex_midpoint_hermitian_part",
+    "real_midpoint_is_symmetric",
+    "complex_midpoint_is_hermitian",
+    "lower_cholesky_finite",
+    "lower_cholesky_solve",
     "interval_trace",
     "box_trace",
     "as_dense_matvec_plan",
+    "dense_matvec_plan_from_matrix",
     "as_dense_lu_solve_plan",
+    "dense_lu_solve_plan_from_factors",
+    "as_dense_cholesky_solve_plan",
+    "dense_cholesky_solve_plan_from_factor",
+    "pad_batch_repeat_last",
     "estimator_mean",
     "action_with_diagnostics",
     "estimator_with_diagnostics",

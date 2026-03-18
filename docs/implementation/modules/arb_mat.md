@@ -1,4 +1,4 @@
-Last updated: 2026-03-13T00:00:00Z
+Last updated: 2026-03-18T00:00:00Z
 
 # arb_mat
 
@@ -18,6 +18,10 @@ Implementation lives in `src/arbplusjax/arb_mat.py`. This module exposes direct 
   - `matmul`
   - `matvec`
   - cached `matvec` prepare/apply helpers
+  - symmetric-part and SPD structure queries
+  - Cholesky / LDL
+  - SPD-specialized solve/inverse
+  - SPD solve-plan prepare/apply
   - banded `matvec`
   - `solve`
   - `inv`
@@ -48,6 +52,10 @@ Implementation lives in `src/arbplusjax/arb_mat.py`. This module exposes direct 
   - `arb_mat_matmul(a, b)` / `arb_mat_matmul_basic(a, b)` / `arb_mat_matmul_prec(a, b)`
   - `arb_mat_matvec(a, x)` / `arb_mat_matvec_basic(a, x)` / `arb_mat_matvec_prec(a, x)`
   - `arb_mat_matvec_cached_prepare(a)` / `arb_mat_matvec_cached_apply(cache, x)`
+  - `arb_mat_symmetric_part(a)` / `arb_mat_is_symmetric(a)` / `arb_mat_is_spd(a)`
+  - `arb_mat_cho(a)` / `arb_mat_ldl(a)`
+  - `arb_mat_spd_solve(a_or_plan, b)` / `arb_mat_spd_inv(a_or_plan)`
+  - `arb_mat_dense_spd_solve_plan_prepare(a)` / `arb_mat_dense_spd_solve_plan_apply(plan, b)`
   - `arb_mat_banded_matvec(a, x, lower_bandwidth=..., upper_bandwidth=...)`
   - `arb_mat_banded_matvec_basic(a, x, lower_bandwidth=..., upper_bandwidth=...)`
   - `arb_mat_solve(a, b)` / `arb_mat_solve_basic(a, b)` / `arb_mat_solve_prec(a, b)`
@@ -72,6 +80,9 @@ Implementation lives in `src/arbplusjax/arb_mat.py`. This module exposes direct 
 - matrix entries are interpreted as intervals
 - `matmul_basic`, `matvec_basic`, and `banded_matvec_basic` use interval arithmetic directly
 - `matvec_cached_prepare` / `matvec_cached_apply` reuse the validated interval matrix layout and currently share the same arithmetic path as `matvec_basic`
+- `symmetric_part` is midpoint-based and exact for point intervals
+- `is_symmetric` / `is_spd` are midpoint structural diagnostics used to auto-route `solve` and `inv`
+- `cho`, `ldl`, `spd_solve`, and `spd_inv` use midpoint Cholesky on the symmetric part, then outward boxing
 - `solve` and `solve_basic` both currently use midpoint solve plus outward boxing
 - `inv` and `inv_basic` both currently use midpoint inverse plus outward boxing
 - `sqr_basic` reuses direct interval `matmul_basic(a, a)`
@@ -98,6 +109,7 @@ Implementation lives in `src/arbplusjax/arb_mat.py`. This module exposes direct 
 - legacy 2x2 specialized contract: `(..., 2, 2, 2)`
 - `zero(n)` and `identity(n)` build point intervals from dense `jax.numpy` constructors
 - fixed and padded batch helpers exist for the main hot paths and are intended to keep compile behavior stable under repeated shapes
+- generic `solve` / `inv` now auto-select the SPD route when midpoint structure checks pass, so structured dense cases do not require a separate caller-side dispatch
 
 ## Current Gaps
 
