@@ -94,6 +94,19 @@ def _rhs_rows_like(rhs: jax.Array, a: jax.Array) -> int:
     return int(arr.shape[-2] if arr.ndim == a.ndim - 1 else arr.shape[-3])
 
 
+def _rhs_batch_shape(rhs: jax.Array, rows: int) -> tuple[int, ...]:
+    arr = jnp.asarray(rhs)
+    if arr.ndim >= 3 and int(arr.shape[-3]) == rows:
+        return tuple(int(x) for x in arr.shape[:-3])
+    return tuple(int(x) for x in arr.shape[:-2])
+
+
+def _broadcast_interval_matrix_batch(a: jax.Array, batch_shape: tuple[int, ...]) -> jax.Array:
+    if not batch_shape or tuple(int(x) for x in a.shape[:-3]) == batch_shape:
+        return a
+    return jnp.broadcast_to(a, batch_shape + a.shape[-3:])
+
+
 def _finite_mask_from_point(x: jax.Array) -> jax.Array:
     if x.ndim >= 2:
         return jnp.all(jnp.isfinite(x), axis=tuple(range(x.ndim - 2, x.ndim)))
@@ -102,6 +115,14 @@ def _finite_mask_from_point(x: jax.Array) -> jax.Array:
 
 def _apply_perm_rhs(p: jax.Array, b: jax.Array) -> jax.Array:
     p_mid = di.midpoint(arb_mat_as_matrix(p))
+    b_mid = _mid_rhs(b)
+    if b.ndim == p.ndim - 1:
+        return mat_common.interval_from_point(jnp.einsum("...ij,...j->...i", p_mid, b_mid))
+    return mat_common.interval_from_point(jnp.matmul(p_mid, b_mid))
+
+
+def _apply_perm_transpose_rhs(p: jax.Array, b: jax.Array) -> jax.Array:
+    p_mid = jnp.swapaxes(di.midpoint(arb_mat_as_matrix(p)), -2, -1)
     b_mid = _mid_rhs(b)
     if b.ndim == p.ndim - 1:
         return mat_common.interval_from_point(jnp.einsum("...ij,...j->...i", p_mid, b_mid))
@@ -128,18 +149,18 @@ def _apply_band_mask_interval(a: jax.Array, *, lower_bandwidth: int, upper_bandw
 
 
 def arb_mat_matmul(a: jax.Array, b: jax.Array) -> jax.Array:
-    a = arb_mat_as_matrix(a)
-    b = arb_mat_as_matrix(b)
+    a = mat_common.as_interval_rect_matrix(a, "arb_mat.matmul.a")
+    b = mat_common.as_interval_rect_matrix(b, "arb_mat.matmul.b")
     checks.check_equal(a.shape[-2], b.shape[-3], "arb_mat.matmul.inner")
-    c = jnp.matmul(_mid_matrix(a), _mid_matrix(b))
+    c = jnp.matmul(di.midpoint(a), di.midpoint(b))
     out = mat_common.interval_from_point(c)
     finite = jnp.all(jnp.isfinite(c), axis=(-2, -1))
     return jnp.where(finite[..., None, None, None], out, mat_common.full_interval_like(out))
 
 
 def arb_mat_matmul_basic(a: jax.Array, b: jax.Array) -> jax.Array:
-    a = arb_mat_as_matrix(a)
-    b = arb_mat_as_matrix(b)
+    a = mat_common.as_interval_rect_matrix(a, "arb_mat.matmul_basic.a")
+    b = mat_common.as_interval_rect_matrix(b, "arb_mat.matmul_basic.b")
     checks.check_equal(a.shape[-2], b.shape[-3], "arb_mat.matmul_basic.inner")
     prods = di.fast_mul(a[..., :, :, None, :], b[..., None, :, :, :])
     out = mat_common.interval_sum(prods, axis=-2)
@@ -148,17 +169,17 @@ def arb_mat_matmul_basic(a: jax.Array, b: jax.Array) -> jax.Array:
 
 
 def arb_mat_matvec(a: jax.Array, x: jax.Array) -> jax.Array:
-    a = arb_mat_as_matrix(a)
+    a = mat_common.as_interval_rect_matrix(a, "arb_mat.matvec.a")
     x = arb_mat_as_vector(x)
     checks.check_equal(a.shape[-2], x.shape[-2], "arb_mat.matvec.inner")
-    y = jnp.einsum("...ij,...j->...i", _mid_matrix(a), _mid_vector(x))
+    y = jnp.einsum("...ij,...j->...i", di.midpoint(a), _mid_vector(x))
     out = mat_common.interval_from_point(y)
     finite = jnp.all(jnp.isfinite(y), axis=-1)
     return jnp.where(finite[..., None, None], out, mat_common.full_interval_like(out))
 
 
 def arb_mat_matvec_basic(a: jax.Array, x: jax.Array) -> jax.Array:
-    a = arb_mat_as_matrix(a)
+    a = mat_common.as_interval_rect_matrix(a, "arb_mat.matvec_basic.a")
     x = arb_mat_as_vector(x)
     checks.check_equal(a.shape[-2], x.shape[-2], "arb_mat.matvec_basic.inner")
     prods = di.fast_mul(a, x[..., None, :, :])
@@ -167,12 +188,28 @@ def arb_mat_matvec_basic(a: jax.Array, x: jax.Array) -> jax.Array:
     return jnp.where(finite[..., None, None], out, mat_common.full_interval_like(out))
 
 
+def arb_mat_rmatvec(a: jax.Array, x: jax.Array) -> jax.Array:
+    return arb_mat_matvec(arb_mat_transpose(a), x)
+
+
+def arb_mat_rmatvec_basic(a: jax.Array, x: jax.Array) -> jax.Array:
+    return arb_mat_matvec_basic(arb_mat_transpose(a), x)
+
+
 def arb_mat_matvec_cached_prepare(a: jax.Array) -> jax.Array:
-    return arb_mat_as_matrix(a)
+    return mat_common.as_interval_rect_matrix(a, "arb_mat.matvec_cached_prepare")
+
+
+def arb_mat_rmatvec_cached_prepare(a: jax.Array) -> jax.Array:
+    return arb_mat_transpose(arb_mat_matvec_cached_prepare(a))
 
 
 def arb_mat_matvec_cached_prepare_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return di.round_interval_outward(arb_mat_matvec_cached_prepare(a), prec_bits)
+
+
+def arb_mat_rmatvec_cached_prepare_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return di.round_interval_outward(arb_mat_rmatvec_cached_prepare(a), prec_bits)
 
 
 def arb_mat_dense_matvec_plan_prepare(a: jax.Array) -> mat_common.DenseMatvecPlan:
@@ -183,14 +220,14 @@ def arb_mat_dense_matvec_plan_prepare_prec(
     a: jax.Array,
     prec_bits: int = di.DEFAULT_PREC_BITS,
 ) -> mat_common.DenseMatvecPlan:
-    matrix = di.round_interval_outward(arb_mat_as_matrix(a), prec_bits)
+    matrix = di.round_interval_outward(mat_common.as_interval_rect_matrix(a, "arb_mat.dense_matvec_plan_prepare_prec"), prec_bits)
     return mat_common.dense_matvec_plan_from_matrix(matrix, algebra="arb", label="arb_mat.dense_matvec_plan_prepare_prec")
 
 
 def arb_mat_matvec_cached_apply(cache: jax.Array, x: jax.Array) -> jax.Array:
     cache = mat_common.as_dense_matvec_plan(cache, algebra="arb", label="arb_mat.matvec_cached_apply")
-    matrix = arb_mat_as_matrix(cache.matrix)
     x = arb_mat_as_vector(x)
+    matrix = _broadcast_interval_matrix_batch(arb_mat_as_matrix(cache.matrix), tuple(int(v) for v in x.shape[:-2]))
     checks.check_equal(cache.rows, x.shape[-2], "arb_mat.matvec_cached_apply.inner")
     prods = di.fast_mul(matrix, x[..., None, :, :])
     out = mat_common.interval_sum(prods, axis=-1)
@@ -200,6 +237,10 @@ def arb_mat_matvec_cached_apply(cache: jax.Array, x: jax.Array) -> jax.Array:
 
 def arb_mat_dense_matvec_plan_apply(plan: mat_common.DenseMatvecPlan | jax.Array, x: jax.Array) -> jax.Array:
     return arb_mat_matvec_cached_apply(plan, x)
+
+
+def arb_mat_rmatvec_cached_apply(cache: jax.Array, x: jax.Array) -> jax.Array:
+    return arb_mat_matvec_cached_apply(cache, x)
 
 
 def arb_mat_permutation_matrix(perm: jax.Array, *, dtype: jnp.dtype = jnp.float64) -> jax.Array:
@@ -212,9 +253,107 @@ def arb_mat_transpose(a: jax.Array) -> jax.Array:
     return jnp.swapaxes(arb_mat_as_matrix(a), -3, -2)
 
 
+def arb_mat_add(a: jax.Array, b: jax.Array) -> jax.Array:
+    return di.fast_add(arb_mat_as_matrix(a), arb_mat_as_matrix(b))
+
+
+def arb_mat_sub(a: jax.Array, b: jax.Array) -> jax.Array:
+    return di.fast_sub(arb_mat_as_matrix(a), arb_mat_as_matrix(b))
+
+
+def arb_mat_neg(a: jax.Array) -> jax.Array:
+    return di.neg(arb_mat_as_matrix(a))
+
+
+def arb_mat_mul_entrywise(a: jax.Array, b: jax.Array) -> jax.Array:
+    return di.fast_mul(arb_mat_as_matrix(a), arb_mat_as_matrix(b))
+
+
+def arb_mat_scalar_mul_arb(a: jax.Array, x: jax.Array) -> jax.Array:
+    return di.fast_mul(arb_mat_as_matrix(a), di.as_interval(x)[..., None, None, :])
+
+
+def arb_mat_scalar_div_arb(a: jax.Array, x: jax.Array) -> jax.Array:
+    return di.fast_div(arb_mat_as_matrix(a), di.as_interval(x)[..., None, None, :])
+
+
+def arb_mat_scalar_mul_si(a: jax.Array, x: float | int) -> jax.Array:
+    xx = jnp.asarray(x, dtype=arb_mat_as_matrix(a).dtype)
+    return arb_mat_scalar_mul_arb(a, di.interval(xx, xx))
+
+
+def arb_mat_scalar_div_si(a: jax.Array, x: float | int) -> jax.Array:
+    xx = jnp.asarray(x, dtype=arb_mat_as_matrix(a).dtype)
+    return arb_mat_scalar_div_arb(a, di.interval(xx, xx))
+
+
 def arb_mat_symmetric_part(a: jax.Array) -> jax.Array:
     a = arb_mat_as_matrix(a)
     return di.fast_mul(di.interval(jnp.full(a.shape[:-1], 0.5, dtype=a.dtype), jnp.full(a.shape[:-1], 0.5, dtype=a.dtype)), a + arb_mat_transpose(a))
+
+
+def arb_mat_one(n: int, *, dtype: jnp.dtype = jnp.float64) -> jax.Array:
+    return arb_mat_identity(n, dtype=dtype)
+
+
+def arb_mat_ones(rows: int, cols: int | None = None, *, dtype: jnp.dtype = jnp.float64) -> jax.Array:
+    cols = rows if cols is None else cols
+    return mat_common.interval_from_point(jnp.ones((rows, cols), dtype=dtype))
+
+
+def arb_mat_companion(coeffs: jax.Array) -> jax.Array:
+    coeffs = arb_mat_as_vector(coeffs)
+    return mat_common.interval_from_point(mat_common.companion_matrix(_mid_vector(coeffs)))
+
+
+def arb_mat_hilbert(n: int, *, dtype: jnp.dtype = jnp.float64) -> jax.Array:
+    return mat_common.interval_from_point(mat_common.hilbert_matrix(n, dtype=dtype))
+
+
+def arb_mat_pascal(n: int, *, dtype: jnp.dtype = jnp.float64) -> jax.Array:
+    return mat_common.interval_from_point(mat_common.pascal_matrix(n, dtype=dtype))
+
+
+def arb_mat_stirling(n: int, *, dtype: jnp.dtype = jnp.float64) -> jax.Array:
+    return mat_common.interval_from_point(mat_common.stirling2_matrix(n, dtype=dtype))
+
+
+def arb_mat_nrows(a: jax.Array) -> int:
+    return int(arb_mat_as_matrix(a).shape[-3])
+
+
+def arb_mat_ncols(a: jax.Array) -> int:
+    return int(arb_mat_as_matrix(a).shape[-2])
+
+
+def arb_mat_entry(a: jax.Array, row: int, col: int) -> jax.Array:
+    return arb_mat_as_matrix(a)[..., row, col, :]
+
+
+def arb_mat_eq(a: jax.Array, b: jax.Array) -> jax.Array:
+    aa = arb_mat_as_matrix(a)
+    bb = arb_mat_as_matrix(b)
+    return jnp.all(mat_common.interval_equal(aa, bb), axis=(-2, -1))
+
+
+def arb_mat_equal(a: jax.Array, b: jax.Array) -> jax.Array:
+    return arb_mat_eq(a, b)
+
+
+def arb_mat_ne(a: jax.Array, b: jax.Array) -> jax.Array:
+    return ~arb_mat_eq(a, b)
+
+
+def arb_mat_contains(a: jax.Array, b: jax.Array) -> jax.Array:
+    aa = arb_mat_as_matrix(a)
+    bb = arb_mat_as_matrix(b)
+    return jnp.all(di.contains(aa, bb), axis=(-2, -1))
+
+
+def arb_mat_overlaps(a: jax.Array, b: jax.Array) -> jax.Array:
+    aa = arb_mat_as_matrix(a)
+    bb = arb_mat_as_matrix(b)
+    return jnp.all(mat_common.interval_overlaps(aa, bb), axis=(-2, -1))
 
 
 def arb_mat_is_symmetric(a: jax.Array) -> jax.Array:
@@ -224,6 +363,35 @@ def arb_mat_is_symmetric(a: jax.Array) -> jax.Array:
 def arb_mat_is_spd(a: jax.Array) -> jax.Array:
     _, ok = _mid_cholesky(a)
     return ok
+
+
+def arb_mat_is_square(a: jax.Array) -> jax.Array:
+    aa = arb_mat_as_matrix(a)
+    return aa.shape[-3] == aa.shape[-2]
+
+
+def arb_mat_is_diag(a: jax.Array) -> jax.Array:
+    return mat_common.midpoint_is_diagonal(_mid_matrix(a))
+
+
+def arb_mat_is_tril(a: jax.Array) -> jax.Array:
+    return mat_common.midpoint_is_triangular(_mid_matrix(a), lower=True)
+
+
+def arb_mat_is_triu(a: jax.Array) -> jax.Array:
+    return mat_common.midpoint_is_triangular(_mid_matrix(a), lower=False)
+
+
+def arb_mat_is_zero(a: jax.Array) -> jax.Array:
+    return jnp.all(mat_common.interval_is_zero(arb_mat_as_matrix(a)), axis=(-2, -1))
+
+
+def arb_mat_is_finite(a: jax.Array) -> jax.Array:
+    return jnp.all(mat_common.interval_is_finite(arb_mat_as_matrix(a)), axis=(-2, -1))
+
+
+def arb_mat_is_exact(a: jax.Array) -> jax.Array:
+    return jnp.all(mat_common.interval_is_exact(arb_mat_as_matrix(a)), axis=(-2, -1))
 
 
 def arb_mat_submatrix(a: jax.Array, row_start: int, row_stop: int, col_start: int, col_stop: int) -> jax.Array:
@@ -261,7 +429,7 @@ def _arb_block_sizes_from_matrix_blocks(block_rows) -> tuple[tuple[int, ...], tu
         checks.check_equal(len(row), col_count, "arb_mat.block_row_width")
         row_height = None
         for j, block in enumerate(row):
-            block = arb_mat_as_matrix(block)
+            block = mat_common.as_interval_rect_matrix(block, "arb_mat.block_block")
             if row_height is None:
                 row_height = int(block.shape[-3])
             else:
@@ -288,7 +456,7 @@ def arb_mat_block_assemble(block_rows) -> jax.Array:
     del row_sizes, col_sizes
     row_chunks = []
     for row in block_rows:
-        row_chunks.append(jnp.concatenate([arb_mat_as_matrix(block) for block in row], axis=-2))
+        row_chunks.append(jnp.concatenate([mat_common.as_interval_rect_matrix(block, "arb_mat.block_assemble") for block in row], axis=-2))
     return jnp.concatenate(row_chunks, axis=-3)
 
 
@@ -399,6 +567,37 @@ def arb_mat_ldl_basic(a: jax.Array) -> tuple[jax.Array, jax.Array]:
     return arb_mat_ldl(a)
 
 
+def arb_mat_charpoly(a: jax.Array) -> jax.Array:
+    mid = _mid_matrix(a)
+    coeffs_general = mat_common.characteristic_polynomial_from_matrix(mid, hermitian=False)
+    coeffs_symmetric = mat_common.characteristic_polynomial_from_matrix(mid, hermitian=True)
+    mask = _mid_is_symmetric(a)
+    coeffs = jnp.where(mask[..., None], coeffs_symmetric, coeffs_general)
+    return mat_common.interval_from_point(jnp.real(coeffs))
+
+
+def arb_mat_pow_ui(a: jax.Array, n: int) -> jax.Array:
+    return mat_common.interval_from_point(mat_common.matrix_power_ui(_mid_matrix(a), n))
+
+
+def arb_mat_exp(a: jax.Array) -> jax.Array:
+    mid = _mid_matrix(a)
+    exp_general = mat_common.matrix_exp(mid, hermitian=False)
+    exp_symmetric = mat_common.matrix_exp(mid, hermitian=True)
+    exp_mid = jnp.where(_mid_is_symmetric(a)[..., None, None], exp_symmetric, exp_general)
+    return mat_common.interval_from_point(jnp.real(exp_mid))
+
+
+def arb_mat_eigvalsh(a: jax.Array) -> jax.Array:
+    values, _ = mat_common.real_symmetric_eigh(_mid_matrix(a))
+    return mat_common.interval_from_point(values)
+
+
+def arb_mat_eigh(a: jax.Array) -> tuple[jax.Array, jax.Array]:
+    values, vectors = mat_common.real_symmetric_eigh(_mid_matrix(a))
+    return mat_common.interval_from_point(values), mat_common.interval_from_point(vectors)
+
+
 def arb_mat_dense_spd_solve_plan_prepare(a: jax.Array) -> mat_common.DenseCholeskySolvePlan:
     factor = arb_mat_cho(a)
     return mat_common.dense_cholesky_solve_plan_from_factor(
@@ -422,8 +621,8 @@ def arb_mat_spd_solve(
         )
     else:
         plan = arb_mat_dense_spd_solve_plan_prepare(a_or_plan)
-    factor = arb_mat_as_matrix(plan.factor)
     b = arb_mat_as_rhs(b)
+    factor = _broadcast_interval_matrix_batch(arb_mat_as_matrix(plan.factor), _rhs_batch_shape(b, plan.rows))
     checks.check_equal(plan.rows, _rhs_rows_like(b, factor), "arb_mat.spd_solve.inner")
     x = mat_common.lower_cholesky_solve(_mid_matrix(factor), _mid_rhs(b))
     out = mat_common.interval_from_point(x)
@@ -467,6 +666,121 @@ def arb_mat_spd_inv(a_or_plan: mat_common.DenseCholeskySolvePlan | jax.Array) ->
 
 def arb_mat_spd_inv_basic(a_or_plan: mat_common.DenseCholeskySolvePlan | jax.Array) -> jax.Array:
     return arb_mat_spd_inv(a_or_plan)
+
+
+def arb_mat_solve_tril(a: jax.Array, b: jax.Array, *, unit_diagonal: bool = False) -> jax.Array:
+    return arb_mat_triangular_solve(a, b, lower=True, unit_diagonal=unit_diagonal)
+
+
+def arb_mat_solve_triu(a: jax.Array, b: jax.Array, *, unit_diagonal: bool = False) -> jax.Array:
+    return arb_mat_triangular_solve(a, b, lower=False, unit_diagonal=unit_diagonal)
+
+
+def arb_mat_solve_lu(a_or_plan: mat_common.DenseLUSolvePlan | tuple[jax.Array, jax.Array, jax.Array] | jax.Array, b: jax.Array) -> jax.Array:
+    if isinstance(a_or_plan, mat_common.DenseLUSolvePlan) or isinstance(a_or_plan, tuple):
+        return arb_mat_lu_solve(a_or_plan, b)
+    return arb_mat_lu_solve(arb_mat_dense_lu_solve_plan_prepare(a_or_plan), b)
+
+
+def arb_mat_solve_lu_precomp(plan: mat_common.DenseLUSolvePlan | tuple[jax.Array, jax.Array, jax.Array], b: jax.Array) -> jax.Array:
+    return arb_mat_lu_solve(plan, b)
+
+
+def arb_mat_solve_transpose(a_or_plan, b: jax.Array) -> jax.Array:
+    if isinstance(a_or_plan, mat_common.DenseCholeskySolvePlan):
+        b = arb_mat_as_rhs(b)
+        factor = _broadcast_interval_matrix_batch(arb_mat_as_matrix(a_or_plan.factor), _rhs_batch_shape(b, a_or_plan.rows))
+        checks.check_equal(a_or_plan.rows, _rhs_rows_like(b, factor), "arb_mat.solve_transpose.inner_spd")
+        x = mat_common.lower_cholesky_solve_transpose(_mid_matrix(factor), _mid_rhs(b))
+        out = mat_common.interval_from_point(x)
+        finite = _finite_mask_from_point(x)
+        return jnp.where(finite[(...,) + (None,) * (out.ndim - finite.ndim)], out, mat_common.full_interval_like(out))
+    if isinstance(a_or_plan, mat_common.DenseLUSolvePlan) or isinstance(a_or_plan, tuple):
+        plan = mat_common.as_dense_lu_solve_plan(a_or_plan, algebra="arb", label="arb_mat.solve_transpose")
+        b = arb_mat_as_rhs(b)
+        batch_shape = _rhs_batch_shape(b, plan.rows)
+        p = _broadcast_interval_matrix_batch(arb_mat_as_matrix(plan.p), batch_shape)
+        l = _broadcast_interval_matrix_batch(arb_mat_as_matrix(plan.l), batch_shape)
+        u = _broadcast_interval_matrix_batch(arb_mat_as_matrix(plan.u), batch_shape)
+        checks.check_equal(plan.rows, _rhs_rows_like(b, p), "arb_mat.solve_transpose.inner_lu")
+        p_mid = _mid_matrix(p)
+        l_mid = _mid_matrix(l)
+        u_mid = _mid_matrix(u)
+        b_mid = _mid_rhs(b)
+        vector_rhs = b_mid.ndim == p_mid.ndim - 1
+        y = lax.linalg.triangular_solve(
+            u_mid,
+            b_mid[..., None] if vector_rhs else b_mid,
+            left_side=True,
+            lower=False,
+            transpose_a=True,
+            conjugate_a=False,
+        )
+        z = lax.linalg.triangular_solve(
+            l_mid,
+            y,
+            left_side=True,
+            lower=True,
+            unit_diagonal=True,
+            transpose_a=True,
+            conjugate_a=False,
+        )
+        x = jnp.einsum("...ij,...j->...i", jnp.swapaxes(p_mid, -2, -1), z[..., 0]) if vector_rhs else jnp.matmul(jnp.swapaxes(p_mid, -2, -1), z)
+        out = mat_common.interval_from_point(x)
+        finite = _finite_mask_from_point(x)
+        return jnp.where(finite[(...,) + (None,) * (out.ndim - finite.ndim)], out, mat_common.full_interval_like(out))
+    a = arb_mat_as_matrix(a_or_plan)
+    b = arb_mat_as_rhs(b)
+    checks.check_equal(a.shape[-2], _rhs_rows_like(b, a), "arb_mat.solve_transpose.inner")
+    a_mid = _mid_matrix(a)
+    b_mid = _mid_rhs(b)
+    vector_rhs = b_mid.ndim == a_mid.ndim - 1
+    x = jnp.linalg.solve(jnp.swapaxes(a_mid, -2, -1), b_mid[..., None] if vector_rhs else b_mid)
+    if vector_rhs:
+        x = x[..., 0]
+    out = mat_common.interval_from_point(x)
+    finite = _finite_mask_from_point(x)
+    return jnp.where(finite[(...,) + (None,) * (out.ndim - finite.ndim)], out, mat_common.full_interval_like(out))
+
+
+def arb_mat_solve_add(a_or_plan, b: jax.Array, y: jax.Array) -> jax.Array:
+    if isinstance(a_or_plan, mat_common.DenseCholeskySolvePlan):
+        solved = arb_mat_spd_solve(a_or_plan, b)
+    elif isinstance(a_or_plan, (mat_common.DenseLUSolvePlan, tuple)):
+        solved = arb_mat_solve_lu(a_or_plan, b)
+    else:
+        solved = arb_mat_solve(a_or_plan, b)
+    return di.fast_add(arb_mat_as_rhs(y), solved)
+
+
+def arb_mat_solve_transpose_add(a_or_plan, b: jax.Array, y: jax.Array) -> jax.Array:
+    return di.fast_add(arb_mat_as_rhs(y), arb_mat_solve_transpose(a_or_plan, b))
+
+
+def arb_mat_mat_solve(a_or_plan, b: jax.Array) -> jax.Array:
+    if isinstance(a_or_plan, mat_common.DenseCholeskySolvePlan):
+        return arb_mat_spd_solve(a_or_plan, b)
+    return arb_mat_solve_lu(a_or_plan, b) if isinstance(a_or_plan, (mat_common.DenseLUSolvePlan, tuple)) else arb_mat_solve(a_or_plan, b)
+
+
+def arb_mat_mat_solve_transpose(a_or_plan, b: jax.Array) -> jax.Array:
+    return arb_mat_solve_transpose(a_or_plan, b)
+
+
+def arb_mat_solve_cho_precomp(plan: mat_common.DenseCholeskySolvePlan | jax.Array, b: jax.Array) -> jax.Array:
+    return arb_mat_spd_solve(plan, b)
+
+
+def arb_mat_solve_ldl_precomp(plan: mat_common.DenseCholeskySolvePlan | jax.Array, b: jax.Array) -> jax.Array:
+    return arb_mat_spd_solve(plan, b)
+
+
+def arb_mat_inv_cho_precomp(plan: mat_common.DenseCholeskySolvePlan | jax.Array) -> jax.Array:
+    return arb_mat_spd_inv(plan)
+
+
+def arb_mat_inv_ldl_precomp(plan: mat_common.DenseCholeskySolvePlan | jax.Array) -> jax.Array:
+    return arb_mat_spd_inv(plan)
 
 
 def arb_mat_solve(a: jax.Array, b: jax.Array) -> jax.Array:
@@ -686,10 +1000,11 @@ def arb_mat_lu_solve(
     b: jax.Array,
 ) -> jax.Array:
     plan = mat_common.as_dense_lu_solve_plan(plan, algebra="arb", label="arb_mat.lu_solve")
-    p = arb_mat_as_matrix(plan.p)
-    l = arb_mat_as_matrix(plan.l)
-    u = arb_mat_as_matrix(plan.u)
     b = arb_mat_as_rhs(b)
+    batch_shape = _rhs_batch_shape(b, plan.rows)
+    p = _broadcast_interval_matrix_batch(arb_mat_as_matrix(plan.p), batch_shape)
+    l = _broadcast_interval_matrix_batch(arb_mat_as_matrix(plan.l), batch_shape)
+    u = _broadcast_interval_matrix_batch(arb_mat_as_matrix(plan.u), batch_shape)
     checks.check_equal(plan.rows, _rhs_rows_like(b, p), "arb_mat.lu_solve.inner")
     pb = _apply_perm_rhs(p, b)
     y = arb_mat_triangular_solve(l, pb, lower=True, unit_diagonal=True)
@@ -760,12 +1075,64 @@ def arb_mat_ldl_rigorous(a: jax.Array) -> tuple[jax.Array, jax.Array]:
     return arb_mat_ldl(a)
 
 
+def arb_mat_eigvalsh_rigorous(a: jax.Array) -> jax.Array:
+    return arb_mat_eigvalsh(a)
+
+
+def arb_mat_eigh_rigorous(a: jax.Array) -> tuple[jax.Array, jax.Array]:
+    return arb_mat_eigh(a)
+
+
+def arb_mat_charpoly_rigorous(a: jax.Array) -> jax.Array:
+    return arb_mat_charpoly(a)
+
+
+def arb_mat_pow_ui_rigorous(a: jax.Array, n: int) -> jax.Array:
+    return arb_mat_pow_ui(a, n)
+
+
+def arb_mat_exp_rigorous(a: jax.Array) -> jax.Array:
+    return arb_mat_exp(a)
+
+
 def arb_mat_spd_solve_rigorous(a_or_plan: mat_common.DenseCholeskySolvePlan | jax.Array, b: jax.Array) -> jax.Array:
     return arb_mat_spd_solve(a_or_plan, b)
 
 
 def arb_mat_spd_inv_rigorous(a_or_plan: mat_common.DenseCholeskySolvePlan | jax.Array) -> jax.Array:
     return arb_mat_spd_inv(a_or_plan)
+
+
+def arb_mat_solve_tril_rigorous(a: jax.Array, b: jax.Array, *, unit_diagonal: bool = False) -> jax.Array:
+    return arb_mat_solve_tril(a, b, unit_diagonal=unit_diagonal)
+
+
+def arb_mat_solve_triu_rigorous(a: jax.Array, b: jax.Array, *, unit_diagonal: bool = False) -> jax.Array:
+    return arb_mat_solve_triu(a, b, unit_diagonal=unit_diagonal)
+
+
+def arb_mat_solve_lu_rigorous(a_or_plan, b: jax.Array) -> jax.Array:
+    return arb_mat_solve_lu(a_or_plan, b)
+
+
+def arb_mat_solve_transpose_rigorous(a_or_plan, b: jax.Array) -> jax.Array:
+    return arb_mat_solve_transpose(a_or_plan, b)
+
+
+def arb_mat_solve_add_rigorous(a_or_plan, b: jax.Array, y: jax.Array) -> jax.Array:
+    return arb_mat_solve_add(a_or_plan, b, y)
+
+
+def arb_mat_solve_transpose_add_rigorous(a_or_plan, b: jax.Array, y: jax.Array) -> jax.Array:
+    return arb_mat_solve_transpose_add(a_or_plan, b, y)
+
+
+def arb_mat_mat_solve_rigorous(a_or_plan, b: jax.Array) -> jax.Array:
+    return arb_mat_mat_solve(a_or_plan, b)
+
+
+def arb_mat_mat_solve_transpose_rigorous(a_or_plan, b: jax.Array) -> jax.Array:
+    return arb_mat_mat_solve_transpose(a_or_plan, b)
 
 
 @partial(jax.jit, static_argnames=("prec_bits",))
@@ -776,6 +1143,11 @@ def arb_mat_matmul_prec(a: jax.Array, b: jax.Array, prec_bits: int = di.DEFAULT_
 @partial(jax.jit, static_argnames=("prec_bits",))
 def arb_mat_matvec_prec(a: jax.Array, x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return di.round_interval_outward(arb_mat_matvec(a, x), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def arb_mat_rmatvec_prec(a: jax.Array, x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return di.round_interval_outward(arb_mat_rmatvec(a, x), prec_bits)
 
 
 @partial(jax.jit, static_argnames=("prec_bits", "lower_bandwidth", "upper_bandwidth"))
@@ -796,6 +1168,11 @@ def arb_mat_banded_matvec_prec(
 @partial(jax.jit, static_argnames=("prec_bits",))
 def arb_mat_matvec_cached_apply_prec(cache: jax.Array, x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return di.round_interval_outward(arb_mat_matvec_cached_apply(cache, x), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def arb_mat_rmatvec_cached_apply_prec(cache: jax.Array, x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return di.round_interval_outward(arb_mat_rmatvec_cached_apply(cache, x), prec_bits)
 
 
 @partial(jax.jit, static_argnames=("prec_bits",))
@@ -822,6 +1199,32 @@ def arb_mat_cho_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax
 def arb_mat_ldl_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> tuple[jax.Array, jax.Array]:
     l, d = arb_mat_ldl(a)
     return di.round_interval_outward(l, prec_bits), di.round_interval_outward(d, prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def arb_mat_eigvalsh_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return di.round_interval_outward(arb_mat_eigvalsh(a), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def arb_mat_eigh_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> tuple[jax.Array, jax.Array]:
+    values, vectors = arb_mat_eigh(a)
+    return di.round_interval_outward(values, prec_bits), di.round_interval_outward(vectors, prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def arb_mat_charpoly_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return di.round_interval_outward(arb_mat_charpoly(a), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("n", "prec_bits"))
+def arb_mat_pow_ui_prec(a: jax.Array, n: int, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return di.round_interval_outward(arb_mat_pow_ui(a, n), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def arb_mat_exp_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return di.round_interval_outward(arb_mat_exp(a), prec_bits)
 
 
 def arb_mat_dense_spd_solve_plan_prepare_prec(
@@ -852,6 +1255,58 @@ def arb_mat_spd_inv_prec(
     prec_bits: int = di.DEFAULT_PREC_BITS,
 ) -> jax.Array:
     return di.round_interval_outward(arb_mat_spd_inv(a_or_plan), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits", "unit_diagonal"))
+def arb_mat_solve_tril_prec(
+    a: jax.Array,
+    b: jax.Array,
+    *,
+    unit_diagonal: bool = False,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return di.round_interval_outward(arb_mat_solve_tril(a, b, unit_diagonal=unit_diagonal), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits", "unit_diagonal"))
+def arb_mat_solve_triu_prec(
+    a: jax.Array,
+    b: jax.Array,
+    *,
+    unit_diagonal: bool = False,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return di.round_interval_outward(arb_mat_solve_triu(a, b, unit_diagonal=unit_diagonal), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def arb_mat_solve_lu_prec(a_or_plan, b: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return di.round_interval_outward(arb_mat_solve_lu(a_or_plan, b), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def arb_mat_solve_transpose_prec(a_or_plan, b: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return di.round_interval_outward(arb_mat_solve_transpose(a_or_plan, b), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def arb_mat_solve_add_prec(a_or_plan, b: jax.Array, y: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return di.round_interval_outward(arb_mat_solve_add(a_or_plan, b, y), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def arb_mat_solve_transpose_add_prec(a_or_plan, b: jax.Array, y: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return di.round_interval_outward(arb_mat_solve_transpose_add(a_or_plan, b, y), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def arb_mat_mat_solve_prec(a_or_plan, b: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return di.round_interval_outward(arb_mat_mat_solve(a_or_plan, b), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def arb_mat_mat_solve_transpose_prec(a_or_plan, b: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return di.round_interval_outward(arb_mat_mat_solve_transpose(a_or_plan, b), prec_bits)
 
 
 @partial(jax.jit, static_argnames=("prec_bits",))
@@ -922,10 +1377,102 @@ def arb_mat_qr_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> tupl
     return di.round_interval_outward(q, prec_bits), di.round_interval_outward(r, prec_bits)
 
 
+def arb_mat_add_rigorous(a: jax.Array, b: jax.Array) -> jax.Array:
+    return arb_mat_add(a, b)
+
+
+def arb_mat_sub_rigorous(a: jax.Array, b: jax.Array) -> jax.Array:
+    return arb_mat_sub(a, b)
+
+
+def arb_mat_neg_rigorous(a: jax.Array) -> jax.Array:
+    return arb_mat_neg(a)
+
+
+def arb_mat_mul_entrywise_rigorous(a: jax.Array, b: jax.Array) -> jax.Array:
+    return arb_mat_mul_entrywise(a, b)
+
+
+def arb_mat_is_diag_rigorous(a: jax.Array) -> jax.Array:
+    return arb_mat_is_diag(a)
+
+
+def arb_mat_is_tril_rigorous(a: jax.Array) -> jax.Array:
+    return arb_mat_is_tril(a)
+
+
+def arb_mat_is_triu_rigorous(a: jax.Array) -> jax.Array:
+    return arb_mat_is_triu(a)
+
+
+def arb_mat_is_zero_rigorous(a: jax.Array) -> jax.Array:
+    return arb_mat_is_zero(a)
+
+
+def arb_mat_is_finite_rigorous(a: jax.Array) -> jax.Array:
+    return arb_mat_is_finite(a)
+
+
+def arb_mat_is_exact_rigorous(a: jax.Array) -> jax.Array:
+    return arb_mat_is_exact(a)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def arb_mat_add_prec(a: jax.Array, b: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return di.round_interval_outward(arb_mat_add(a, b), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def arb_mat_sub_prec(a: jax.Array, b: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return di.round_interval_outward(arb_mat_sub(a, b), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def arb_mat_neg_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return di.round_interval_outward(arb_mat_neg(a), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits",))
+def arb_mat_mul_entrywise_prec(a: jax.Array, b: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return di.round_interval_outward(arb_mat_mul_entrywise(a, b), prec_bits)
+
+
+def arb_mat_is_diag_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    del prec_bits
+    return arb_mat_is_diag(a)
+
+
+def arb_mat_is_tril_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    del prec_bits
+    return arb_mat_is_tril(a)
+
+
+def arb_mat_is_triu_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    del prec_bits
+    return arb_mat_is_triu(a)
+
+
+def arb_mat_is_zero_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    del prec_bits
+    return arb_mat_is_zero(a)
+
+
+def arb_mat_is_finite_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    del prec_bits
+    return arb_mat_is_finite(a)
+
+
+def arb_mat_is_exact_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    del prec_bits
+    return arb_mat_is_exact(a)
+
+
 arb_mat_matmul_jit = jax.jit(arb_mat_matmul)
 arb_mat_matvec_jit = jax.jit(arb_mat_matvec)
+arb_mat_rmatvec_jit = jax.jit(arb_mat_rmatvec)
 arb_mat_banded_matvec_jit = jax.jit(arb_mat_banded_matvec, static_argnames=("lower_bandwidth", "upper_bandwidth"))
 arb_mat_matvec_cached_apply_jit = jax.jit(arb_mat_matvec_cached_apply)
+arb_mat_rmatvec_cached_apply_jit = jax.jit(arb_mat_rmatvec_cached_apply)
 arb_mat_symmetric_part_jit = jax.jit(arb_mat_symmetric_part)
 arb_mat_solve_jit = jax.jit(arb_mat_solve)
 arb_mat_inv_jit = jax.jit(arb_mat_inv)
@@ -957,9 +1504,18 @@ def arb_mat_matvec_batch_fixed(a: jax.Array, x: jax.Array) -> jax.Array:
     return arb_mat_matvec(a, x)
 
 
+def arb_mat_rmatvec_batch_fixed(a: jax.Array, x: jax.Array) -> jax.Array:
+    return arb_mat_rmatvec(a, x)
+
+
 def arb_mat_matvec_batch_padded(a: jax.Array, x: jax.Array, *, pad_to: int) -> jax.Array:
     call_args, _ = kh.pad_mixed_batch_args_repeat_last((a, x), pad_to=pad_to)
     return arb_mat_matvec(*call_args)
+
+
+def arb_mat_rmatvec_batch_padded(a: jax.Array, x: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = kh.pad_mixed_batch_args_repeat_last((a, x), pad_to=pad_to)
+    return arb_mat_rmatvec(*call_args)
 
 
 def arb_mat_banded_matvec_batch_fixed(
@@ -988,18 +1544,36 @@ def arb_mat_matvec_cached_apply_batch_fixed(cache: jax.Array, x: jax.Array) -> j
     return arb_mat_matvec_cached_apply(cache, x)
 
 
+def arb_mat_rmatvec_cached_apply_batch_fixed(cache: jax.Array, x: jax.Array) -> jax.Array:
+    return arb_mat_rmatvec_cached_apply(cache, x)
+
+
 def arb_mat_matvec_cached_apply_batch_padded(cache: jax.Array, x: jax.Array, *, pad_to: int) -> jax.Array:
     call_args, _ = kh.pad_mixed_batch_args_repeat_last((cache, x), pad_to=pad_to)
     return arb_mat_matvec_cached_apply(*call_args)
+
+
+def arb_mat_rmatvec_cached_apply_batch_padded(cache: jax.Array, x: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = kh.pad_mixed_batch_args_repeat_last((cache, x), pad_to=pad_to)
+    return arb_mat_rmatvec_cached_apply(*call_args)
 
 
 def arb_mat_matvec_cached_prepare_batch_fixed(a: jax.Array) -> jax.Array:
     return arb_mat_matvec_cached_prepare(a)
 
 
+def arb_mat_rmatvec_cached_prepare_batch_fixed(a: jax.Array) -> jax.Array:
+    return arb_mat_rmatvec_cached_prepare(a)
+
+
 def arb_mat_matvec_cached_prepare_batch_padded(a: jax.Array, *, pad_to: int) -> jax.Array:
     call_args, _ = mat_common.pad_batch_repeat_last((a,), pad_to=pad_to)
     return arb_mat_matvec_cached_prepare(*call_args)
+
+
+def arb_mat_rmatvec_cached_prepare_batch_padded(a: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = mat_common.pad_batch_repeat_last((a,), pad_to=pad_to)
+    return arb_mat_rmatvec_cached_prepare(*call_args)
 
 
 def arb_mat_dense_matvec_plan_prepare_batch_fixed(a: jax.Array) -> mat_common.DenseMatvecPlan:
@@ -1402,9 +1976,19 @@ def arb_mat_matvec_batch_fixed_prec(a: jax.Array, x: jax.Array, prec_bits: int =
     return di.round_interval_outward(arb_mat_matvec_batch_fixed(a, x), prec_bits)
 
 
+@partial(jax.jit, static_argnames=("prec_bits",))
+def arb_mat_rmatvec_batch_fixed_prec(a: jax.Array, x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return di.round_interval_outward(arb_mat_rmatvec_batch_fixed(a, x), prec_bits)
+
+
 @partial(jax.jit, static_argnames=("prec_bits", "pad_to"))
 def arb_mat_matvec_batch_padded_prec(a: jax.Array, x: jax.Array, *, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return di.round_interval_outward(arb_mat_matvec_batch_padded(a, x, pad_to=pad_to), prec_bits)
+
+
+@partial(jax.jit, static_argnames=("prec_bits", "pad_to"))
+def arb_mat_rmatvec_batch_padded_prec(a: jax.Array, x: jax.Array, *, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return di.round_interval_outward(arb_mat_rmatvec_batch_padded(a, x, pad_to=pad_to), prec_bits)
 
 
 @partial(jax.jit, static_argnames=("prec_bits", "lower_bandwidth", "upper_bandwidth"))
@@ -1449,6 +2033,11 @@ def arb_mat_matvec_cached_apply_batch_fixed_prec(cache: jax.Array, x: jax.Array,
     return di.round_interval_outward(arb_mat_matvec_cached_apply_batch_fixed(cache, x), prec_bits)
 
 
+@partial(jax.jit, static_argnames=("prec_bits",))
+def arb_mat_rmatvec_cached_apply_batch_fixed_prec(cache: jax.Array, x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return di.round_interval_outward(arb_mat_rmatvec_cached_apply_batch_fixed(cache, x), prec_bits)
+
+
 @partial(jax.jit, static_argnames=("prec_bits", "pad_to"))
 def arb_mat_matvec_cached_apply_batch_padded_prec(
     cache: jax.Array,
@@ -1460,8 +2049,23 @@ def arb_mat_matvec_cached_apply_batch_padded_prec(
     return di.round_interval_outward(arb_mat_matvec_cached_apply_batch_padded(cache, x, pad_to=pad_to), prec_bits)
 
 
+@partial(jax.jit, static_argnames=("prec_bits", "pad_to"))
+def arb_mat_rmatvec_cached_apply_batch_padded_prec(
+    cache: jax.Array,
+    x: jax.Array,
+    *,
+    pad_to: int,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return di.round_interval_outward(arb_mat_rmatvec_cached_apply_batch_padded(cache, x, pad_to=pad_to), prec_bits)
+
+
 def arb_mat_matvec_cached_prepare_batch_fixed_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return di.round_interval_outward(arb_mat_matvec_cached_prepare_batch_fixed(a), prec_bits)
+
+
+def arb_mat_rmatvec_cached_prepare_batch_fixed_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return di.round_interval_outward(arb_mat_rmatvec_cached_prepare_batch_fixed(a), prec_bits)
 
 
 def arb_mat_matvec_cached_prepare_batch_padded_prec(
@@ -1471,6 +2075,15 @@ def arb_mat_matvec_cached_prepare_batch_padded_prec(
     prec_bits: int = di.DEFAULT_PREC_BITS,
 ) -> jax.Array:
     return di.round_interval_outward(arb_mat_matvec_cached_prepare_batch_padded(a, pad_to=pad_to), prec_bits)
+
+
+def arb_mat_rmatvec_cached_prepare_batch_padded_prec(
+    a: jax.Array,
+    *,
+    pad_to: int,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return di.round_interval_outward(arb_mat_rmatvec_cached_prepare_batch_padded(a, pad_to=pad_to), prec_bits)
 
 
 def arb_mat_dense_matvec_plan_prepare_batch_fixed_prec(
@@ -1863,6 +2476,100 @@ def arb_mat_lu_solve_batch_padded_prec(
     return di.round_interval_outward(arb_mat_lu_solve_batch_padded(plan, b, pad_to=pad_to), prec_bits)
 
 
+def _make_arb_batch_fixed(name: str):
+    fn = globals()[name]
+
+    def wrapped(*args, **kwargs):
+        return fn(*args, **kwargs)
+
+    wrapped.__name__ = f"{name}_batch_fixed"
+    return wrapped
+
+
+def _make_arb_batch_padded(name: str):
+    fn = globals()[name]
+
+    def wrapped(*args, pad_to: int, **kwargs):
+        call_args = []
+        for arg in args:
+            if mat_common.is_dense_plan_like(arg):
+                call_args.append(arg)
+            elif not mat_common.is_batch_pad_candidate(arg):
+                call_args.append(arg)
+            else:
+                (arg_pad,), _ = kh.pad_mixed_batch_args_repeat_last((arg,), pad_to=pad_to)
+                call_args.append(arg_pad)
+        return fn(*tuple(call_args), **kwargs)
+
+    wrapped.__name__ = f"{name}_batch_padded"
+    return wrapped
+
+
+def _make_arb_batch_fixed_prec(name: str):
+    fn = globals()[f"{name}_batch_fixed"]
+    round_values = "eigh" in name
+    passthrough = name.startswith("arb_mat_is_")
+
+    def wrapped(*args, prec_bits: int = di.DEFAULT_PREC_BITS, **kwargs):
+        out = fn(*args, **kwargs)
+        if passthrough:
+            return out
+        if round_values:
+            return tuple(di.round_interval_outward(part, prec_bits) for part in out)
+        return di.round_interval_outward(out, prec_bits)
+
+    wrapped.__name__ = f"{name}_batch_fixed_prec"
+    return wrapped
+
+
+def _make_arb_batch_padded_prec(name: str):
+    fn = globals()[f"{name}_batch_padded"]
+    round_values = "eigh" in name
+    passthrough = name.startswith("arb_mat_is_")
+
+    def wrapped(*args, pad_to: int, prec_bits: int = di.DEFAULT_PREC_BITS, **kwargs):
+        out = fn(*args, pad_to=pad_to, **kwargs)
+        if passthrough:
+            return out
+        if round_values:
+            return tuple(di.round_interval_outward(part, prec_bits) for part in out)
+        return di.round_interval_outward(out, prec_bits)
+
+    wrapped.__name__ = f"{name}_batch_padded_prec"
+    return wrapped
+
+
+for _arb_name in (
+    "arb_mat_add",
+    "arb_mat_sub",
+    "arb_mat_neg",
+    "arb_mat_mul_entrywise",
+    "arb_mat_is_diag",
+    "arb_mat_is_tril",
+    "arb_mat_is_triu",
+    "arb_mat_is_zero",
+    "arb_mat_is_finite",
+    "arb_mat_is_exact",
+    "arb_mat_charpoly",
+    "arb_mat_pow_ui",
+    "arb_mat_exp",
+    "arb_mat_eigvalsh",
+    "arb_mat_eigh",
+    "arb_mat_solve_tril",
+    "arb_mat_solve_triu",
+    "arb_mat_solve_lu",
+    "arb_mat_solve_transpose",
+    "arb_mat_solve_add",
+    "arb_mat_solve_transpose_add",
+    "arb_mat_mat_solve",
+    "arb_mat_mat_solve_transpose",
+):
+    globals()[f"{_arb_name}_batch_fixed"] = _make_arb_batch_fixed(_arb_name)
+    globals()[f"{_arb_name}_batch_padded"] = _make_arb_batch_padded(_arb_name)
+    globals()[f"{_arb_name}_batch_fixed_prec"] = _make_arb_batch_fixed_prec(_arb_name)
+    globals()[f"{_arb_name}_batch_padded_prec"] = _make_arb_batch_padded_prec(_arb_name)
+
+
 def arb_mat_2x2_det(a: jax.Array) -> jax.Array:
     a = _as_mat_2x2(a)
     a00 = di.midpoint(a[..., 0, 0, :])
@@ -1959,12 +2666,16 @@ __all__ = [
     "arb_mat_matmul_basic",
     "arb_mat_matvec",
     "arb_mat_matvec_basic",
+    "arb_mat_rmatvec",
+    "arb_mat_rmatvec_basic",
     "arb_mat_banded_matvec",
     "arb_mat_banded_matvec_basic",
     "arb_mat_matvec_cached_prepare",
+    "arb_mat_rmatvec_cached_prepare",
     "arb_mat_dense_matvec_plan_prepare",
     "arb_mat_dense_matvec_plan_apply",
     "arb_mat_matvec_cached_apply",
+    "arb_mat_rmatvec_cached_apply",
     "arb_mat_symmetric_part",
     "arb_mat_is_symmetric",
     "arb_mat_is_spd",
@@ -2003,10 +2714,13 @@ __all__ = [
     "arb_mat_qr_basic",
     "arb_mat_matmul_prec",
     "arb_mat_matvec_prec",
+    "arb_mat_rmatvec_prec",
     "arb_mat_banded_matvec_prec",
     "arb_mat_matvec_cached_prepare_prec",
+    "arb_mat_rmatvec_cached_prepare_prec",
     "arb_mat_dense_matvec_plan_prepare_prec",
     "arb_mat_matvec_cached_apply_prec",
+    "arb_mat_rmatvec_cached_apply_prec",
     "arb_mat_symmetric_part_prec",
     "arb_mat_is_symmetric_prec",
     "arb_mat_is_spd_prec",
@@ -2029,8 +2743,10 @@ __all__ = [
     "arb_mat_qr_prec",
     "arb_mat_matmul_jit",
     "arb_mat_matvec_jit",
+    "arb_mat_rmatvec_jit",
     "arb_mat_banded_matvec_jit",
     "arb_mat_matvec_cached_apply_jit",
+    "arb_mat_rmatvec_cached_apply_jit",
     "arb_mat_symmetric_part_jit",
     "arb_mat_solve_jit",
     "arb_mat_inv_jit",

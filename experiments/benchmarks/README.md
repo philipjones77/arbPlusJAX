@@ -1,7 +1,16 @@
 # Benchmark Experiments
 
-This folder holds notebook-driven benchmark experiments that are broader than the
-lightweight CLI benchmark smoke checks in `benchmarks/`.
+`experiments/benchmarks/` is the canonical home for benchmark experiments and
+their generated artifacts.
+
+The top-level `benchmarks/` package remains the implementation and CLI surface
+for reusable benchmark scripts. Generated benchmark outputs belong under:
+
+- `experiments/benchmarks/results/`
+- `experiments/benchmarks/outputs/`
+
+This folder also holds notebook-driven benchmark experiments that are broader
+than the lightweight CLI benchmark smoke checks in `benchmarks/`.
 
 Current notebook:
 

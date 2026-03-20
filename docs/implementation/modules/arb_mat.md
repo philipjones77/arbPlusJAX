@@ -15,15 +15,32 @@ Implementation lives in `src/arbplusjax/arb_mat.py`. This module exposes direct 
 
 - canonical real interval matrix substrate for Arb-like matrix work
 - `n x n` layout contracts plus:
+  - `add`
+  - `sub`
+  - `neg`
+  - entrywise multiply
+  - `charpoly`
+  - `pow_ui`
+  - `exp`
   - `matmul`
   - `matvec`
   - cached `matvec` prepare/apply helpers
   - symmetric-part and SPD structure queries
+  - diagonal / triangular / zero / finite / exact predicates
   - Cholesky / LDL
+  - symmetric eigenspectrum / eigendecomposition
   - SPD-specialized solve/inverse
   - SPD solve-plan prepare/apply
   - banded `matvec`
   - `solve`
+  - `solve_tril`
+  - `solve_triu`
+  - `solve_lu`
+  - `solve_transpose`
+  - `solve_add`
+  - `solve_transpose_add`
+  - `mat_solve`
+  - `mat_solve_transpose`
   - `inv`
   - `sqr`
   - `triangular_solve`
@@ -36,6 +53,7 @@ Implementation lives in `src/arbplusjax/arb_mat.py`. This module exposes direct 
   - `norm_inf`
   - `zero`
   - `identity`
+  - named constructors: companion / Hilbert / Pascal / Stirling
 - legacy/specialized `2x2` determinant and trace entry points also remain present
 
 ## Intended API Surface
@@ -49,16 +67,31 @@ Implementation lives in `src/arbplusjax/arb_mat.py`. This module exposes direct 
   - `arb_mat_as_vector(x)` for `(..., n, 2)`
   - `arb_mat_shape(a)`
   - `arb_mat_zero(n)` / `arb_mat_identity(n)`
+  - `arb_mat_add(a, b)` / `arb_mat_add_prec(a, b)`
+  - `arb_mat_sub(a, b)` / `arb_mat_sub_prec(a, b)`
+  - `arb_mat_neg(a)` / `arb_mat_neg_prec(a)`
+  - `arb_mat_mul_entrywise(a, b)` / `arb_mat_mul_entrywise_prec(a, b)`
+  - `arb_mat_charpoly(a)` / `arb_mat_charpoly_prec(a)`
+  - `arb_mat_pow_ui(a, n)` / `arb_mat_pow_ui_prec(a, n)`
+  - `arb_mat_exp(a)` / `arb_mat_exp_prec(a)`
   - `arb_mat_matmul(a, b)` / `arb_mat_matmul_basic(a, b)` / `arb_mat_matmul_prec(a, b)`
   - `arb_mat_matvec(a, x)` / `arb_mat_matvec_basic(a, x)` / `arb_mat_matvec_prec(a, x)`
   - `arb_mat_matvec_cached_prepare(a)` / `arb_mat_matvec_cached_apply(cache, x)`
   - `arb_mat_symmetric_part(a)` / `arb_mat_is_symmetric(a)` / `arb_mat_is_spd(a)`
+  - `arb_mat_is_diag(a)` / `arb_mat_is_tril(a)` / `arb_mat_is_triu(a)`
+  - `arb_mat_is_zero(a)` / `arb_mat_is_finite(a)` / `arb_mat_is_exact(a)`
   - `arb_mat_cho(a)` / `arb_mat_ldl(a)`
+  - `arb_mat_eigvalsh(a)` / `arb_mat_eigh(a)`
   - `arb_mat_spd_solve(a_or_plan, b)` / `arb_mat_spd_inv(a_or_plan)`
   - `arb_mat_dense_spd_solve_plan_prepare(a)` / `arb_mat_dense_spd_solve_plan_apply(plan, b)`
   - `arb_mat_banded_matvec(a, x, lower_bandwidth=..., upper_bandwidth=...)`
   - `arb_mat_banded_matvec_basic(a, x, lower_bandwidth=..., upper_bandwidth=...)`
   - `arb_mat_solve(a, b)` / `arb_mat_solve_basic(a, b)` / `arb_mat_solve_prec(a, b)`
+  - `arb_mat_solve_tril(a, b, unit_diagonal=...)` / `arb_mat_solve_triu(a, b, unit_diagonal=...)`
+  - `arb_mat_solve_lu(a_or_plan, b)` / `arb_mat_solve_lu_precomp(plan, b)`
+  - `arb_mat_solve_transpose(a_or_plan, b)`
+  - `arb_mat_solve_add(a_or_plan, b, y)` / `arb_mat_solve_transpose_add(a_or_plan, b, y)`
+  - `arb_mat_mat_solve(a_or_plan, b)` / `arb_mat_mat_solve_transpose(a_or_plan, b)`
   - `arb_mat_inv(a)` / `arb_mat_inv_basic(a)` / `arb_mat_inv_prec(a)`
   - `arb_mat_sqr(a)` / `arb_mat_sqr_basic(a)` / `arb_mat_sqr_prec(a)`
   - `arb_mat_triangular_solve(a, b, lower=..., unit_diagonal=...)`
@@ -72,6 +105,7 @@ Implementation lives in `src/arbplusjax/arb_mat.py`. This module exposes direct 
   - `arb_mat_norm_inf(a)` / `arb_mat_norm_inf_basic(a)` / `arb_mat_norm_inf_rigorous(a)`
   - `arb_mat_2x2_det(a)`
   - `arb_mat_2x2_trace(a)`
+  - `arb_mat_companion(coeffs)` / `arb_mat_hilbert(n)` / `arb_mat_pascal(n)` / `arb_mat_stirling(n)`
   - JIT aliases such as `arb_mat_matmul_jit`, `arb_mat_solve_jit`, `arb_mat_qr_jit`
   - fixed/padded batch helpers such as `arb_mat_matmul_batch_fixed`, `arb_mat_matmul_batch_padded`, `arb_mat_det_batch_fixed`, `arb_mat_trace_batch_padded`
 
@@ -80,10 +114,17 @@ Implementation lives in `src/arbplusjax/arb_mat.py`. This module exposes direct 
 - matrix entries are interpreted as intervals
 - `matmul_basic`, `matvec_basic`, and `banded_matvec_basic` use interval arithmetic directly
 - `matvec_cached_prepare` / `matvec_cached_apply` reuse the validated interval matrix layout and currently share the same arithmetic path as `matvec_basic`
+- `add`, `sub`, `neg`, and `mul_entrywise` are exact interval operations on the stored matrix boxes
+- `charpoly` is formed from midpoint eigenvalues; symmetric midpoint structure uses the symmetric eigensolver path
+- `pow_ui` uses midpoint repeated squaring
+- `exp` uses midpoint eigendecomposition and switches to the symmetric path when midpoint symmetry is detected
 - `symmetric_part` is midpoint-based and exact for point intervals
-- `is_symmetric` / `is_spd` are midpoint structural diagnostics used to auto-route `solve` and `inv`
+- `is_symmetric` / `is_spd` and the diagonal / triangular predicates are midpoint structural diagnostics used to auto-route `solve` and `inv`
 - `cho`, `ldl`, `spd_solve`, and `spd_inv` use midpoint Cholesky on the symmetric part, then outward boxing
+- `eigvalsh` / `eigh` use midpoint symmetric eigendecomposition on the symmetric part, then outward boxing
 - `solve` and `solve_basic` both currently use midpoint solve plus outward boxing
+- `solve_tril`, `solve_triu`, and `solve_lu` are thin aliases over the triangular / LU plan paths so structured downstream code can stay close to Arb naming
+- the dense factorization-solve ecosystem now also includes transpose solve, add-solve, and multi-RHS solve aliases on top of LU/Cholesky plan reuse
 - `inv` and `inv_basic` both currently use midpoint inverse plus outward boxing
 - `sqr_basic` reuses direct interval `matmul_basic(a, a)`
 - `triangular_solve` and `triangular_solve_basic` currently use midpoint triangular solve plus outward boxing
@@ -109,6 +150,9 @@ Implementation lives in `src/arbplusjax/arb_mat.py`. This module exposes direct 
 - legacy 2x2 specialized contract: `(..., 2, 2, 2)`
 - `zero(n)` and `identity(n)` build point intervals from dense `jax.numpy` constructors
 - fixed and padded batch helpers exist for the main hot paths and are intended to keep compile behavior stable under repeated shapes
+- the broader dense arithmetic / predicate / spectral / solve-alias surfaces now share the same fixed and padded batch conventions as the older hot paths
+- the matrix-function tranche (`charpoly`, `pow_ui`, `exp`) follows the same mode and padded-batch conventions
+- direct dense kernels, dense `matvec`, and cached `matvec` remain separate first-class entry points; the factorization-solve ecosystem is additive on top of them rather than replacing them with operator objects
 - generic `solve` / `inv` now auto-select the SPD route when midpoint structure checks pass, so structured dense cases do not require a separate caller-side dispatch
 
 ## Current Gaps

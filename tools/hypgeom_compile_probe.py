@@ -173,7 +173,7 @@ def main() -> None:
     parser.add_argument("--pad-to", type=int)
     parser.add_argument("--mode", choices=("basic", "adaptive", "rigorous"), default="basic")
     parser.add_argument("--dtype", choices=("float32", "float64"), default="float64")
-    parser.add_argument("--out-json", default="results/benchmarks/hypgeom_compile_probe/hypgeom_compile_probe.json")
+    parser.add_argument("--out-json", default="experiments/benchmarks/results/hypgeom_compile_probe/hypgeom_compile_probe.json")
     parser.add_argument("--out-md", default="docs/status/reports/hypgeom_compile_probe.md")
     args = parser.parse_args()
 

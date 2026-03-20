@@ -1,0 +1,15 @@
+{
+  "function": "CubesselK",
+  "backend": "jax_basic",
+  "samples": 180,
+  "seed": 2,
+  "error_stats": {
+    "mean": 1.780632061987607e-07,
+    "median": 1.861377718626045e-11,
+    "p95": 1.5486723725643917e-08,
+    "p99": 1.9465955489295467e-06,
+    "max": 2.474497159710154e-05
+  },
+  "containment_rate": 1.0,
+  "mean_width": 2.9362390219839837e-13
+}

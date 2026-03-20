@@ -1,5 +1,6 @@
 import jax.numpy as jnp
 
+from arbplusjax import acb_core
 from arbplusjax import scb_mat
 
 from tests._test_checks import _check
@@ -47,9 +48,18 @@ def test_matvec_cached_matvec_and_batch_helpers():
     _check(bool(jnp.allclose(scb_mat.scb_mat_matvec_cached_apply(plan, x), expected)))
     _check(bool(jnp.allclose(scb_mat.scb_mat_matvec_jit(csr, x), expected)))
     _check(bool(jnp.allclose(scb_mat.scb_mat_matvec_cached_apply_jit(plan, x), expected)))
+    rvec0 = jnp.array([1.0 + 0.5j, -1.0 + 0.25j, 0.5 - 0.75j], dtype=jnp.complex128)
+    _check(bool(jnp.allclose(scb_mat.scb_mat_rmatvec(csr, rvec0), dense.T @ rvec0)))
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(scb_mat.scb_mat_rmatvec_basic(csr, rvec0)), dense.T @ rvec0)))
     _check(bool(jnp.allclose(scb_mat.scb_mat_matvec_batch_fixed(csr, xs), xs @ dense.T)))
     _check(bool(jnp.allclose(scb_mat.scb_mat_matvec_cached_apply_batch_fixed(plan, xs), xs @ dense.T)))
     _check(scb_mat.scb_mat_matvec_batch_padded(csr, xs, pad_to=4).shape == (4, 3))
+    rvec = jnp.array([2.0 - 0.25j, -1.0 + 0.75j, 0.25 + 0.5j], dtype=jnp.complex128)
+    rplan = scb_mat.scb_mat_rmatvec_cached_prepare(csr)
+    rbasic_plan = scb_mat.scb_mat_rmatvec_cached_prepare_basic(csr)
+    _check(bool(jnp.allclose(scb_mat.scb_mat_rmatvec_cached_apply(rplan, rvec), dense.T @ rvec)))
+    _check(bool(jnp.allclose(scb_mat.scb_mat_rmatvec_cached_apply_jit(rplan, rvec), dense.T @ rvec)))
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(scb_mat.scb_mat_rmatvec_cached_apply_basic(rbasic_plan, rvec)), dense.T @ rvec)))
 
 
 def test_dense_rhs_multiply_and_format_conversions():

@@ -14,8 +14,8 @@ arbPlusJAX is the active JAX implementation workspace. The repository separates 
 - `contracts/`: binding runtime/API guarantees
 - `examples/`: runnable demos and templates
 - `experiments/`: exploratory work
-- `outputs/`: canonical output root going forward
-- `results/`: legacy output root still retained for compatibility with existing tooling
+- `experiments/benchmarks/outputs/`: benchmark-side generated artifact root
+- `experiments/benchmarks/results/`: benchmark run root
 
 ## Docs map
 

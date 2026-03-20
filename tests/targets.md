@@ -2,7 +2,7 @@
 
 Total functions: 2810
 
-| function | module | in_c | tested | in_mpmath | in_jax_scipy |
+| function | module | in_c | tested | in_mpmath | in_jax_public |
 |---|---|---|---|---|---|
 | acb_abs | acb_core | yes | yes | no | no |
 | acb_abs_batch | acb_core | no | no | no | no |

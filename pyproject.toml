@@ -5,14 +5,18 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "arbPlusJAX"
 version = "1.1.0"
-description = "JAX-first Arb migration workspace with C parity tooling."
+description = "Independent JAX implementation derived from Arb and FLINT, with C parity tooling."
 requires-python = ">=3.10"
+license = "LGPL-3.0-or-later"
 dependencies = [
   "jax>=0.4.35,<0.9; python_version < '3.11'",
   "jax>=0.4.35; python_version >= '3.11'",
   "numpy>=1.26",
   "scipy>=1.10",
   "pytest>=8.0",
+]
+classifiers = [
+  "License :: OSI Approved :: GNU Lesser General Public License v3 or later (LGPLv3+)",
 ]
 
 [project.optional-dependencies]

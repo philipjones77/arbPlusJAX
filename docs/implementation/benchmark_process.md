@@ -30,5 +30,4 @@ Generate a markdown summary:
 python tools/bench_report.py --run <run_dir> --out <run_dir>/report.md
 ```
 
-Store only curated summaries; raw benchmark artifacts under `results/benchmarks/` are gitignored by default.
-
+Store only curated summaries; raw benchmark artifacts under `experiments/benchmarks/results/` are gitignored by default.

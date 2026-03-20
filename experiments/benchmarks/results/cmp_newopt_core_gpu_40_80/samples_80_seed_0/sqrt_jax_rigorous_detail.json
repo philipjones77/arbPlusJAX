@@ -1,0 +1,15 @@
+{
+  "function": "sqrt",
+  "backend": "jax_rigorous",
+  "samples": 80,
+  "seed": 0,
+  "error_stats": {
+    "mean": 2.747455041252067e-13,
+    "median": 3.9745984281580604e-14,
+    "p95": 2.706390667128744e-13,
+    "p99": 7.850110561591342e-12,
+    "max": 8.883394020386959e-12
+  },
+  "containment_rate": 0.0,
+  "mean_width": 8.351386328674105e-07
+}

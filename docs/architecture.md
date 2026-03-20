@@ -67,8 +67,8 @@ Mode dispatch is centralized in `wrappers_common.py` and used by `*_wrappers.py`
 
 ## Results and Benchmarking
 
-- `outputs/`: canonical governed output root going forward.
-- `results/`: legacy benchmark logs and test runs retained for compatibility.
+- `experiments/benchmarks/outputs/`: benchmark-side generated artifact root.
+- `experiments/benchmarks/results/`: benchmark logs and sweep run root.
 - `tools/`: scripts for comparisons and audits.
 - `benchmarks/bench_harness.py`: uses `arbplusjax.api` to resolve interval/point modes for consistency.
 

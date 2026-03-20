@@ -25,7 +25,6 @@ Use Pallas only when:
 
 ## Forbidden in runtime code
 
-- `jax.scipy`
 - `scipy`
 - direct `jaxlib` internals
 - private JAX internals
@@ -33,7 +32,7 @@ Use Pallas only when:
 
 ## Benchmark and reference exception
 
-External comparison surfaces may use `scipy` or `jax.scipy` when they are clearly acting as:
+External comparison surfaces may use `scipy` when they are clearly acting as:
 
 - benchmarks
 - reference backends

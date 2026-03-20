@@ -39,6 +39,8 @@ Default fallback is `stuff/migration/c_chassis/build_linux_wsl`.
 - `example_all_modes_sweep.ipynb`
 - `example_large_sweeps_progress.ipynb`
 - `example_calc_modes_demo.ipynb`
+- `example_dense_matrix_surface.ipynb`
+- `example_dense_structured_spectral.ipynb`
 
 These notebooks compare the four modes (`point`, `basic`, `adaptive`, `rigorous`) and report:
 - timing (`time_ms`)
@@ -51,6 +53,14 @@ For calc examples, note the layering:
 - names like `acb_calc_integrate_line`, `acb_calc_integrate_gl_auto_deg`, and `acb_calc_integrate_taylor` are different numerical methods
 - the four modes are still `point`, `basic`, `adaptive`, and `rigorous`
 - mode selection is applied through `calc_wrappers` / `api`, not by the calc method name itself
+
+For dense matrix examples:
+- `example_dense_matrix_surface.ipynb` covers dense solve, cached matvec, and structured SPD / HPD solve-plan reuse
+- `example_dense_structured_spectral.ipynb` covers dense symmetric / Hermitian eigendecomposition and structured solve midpoint behavior
+
+Dense matrix documentation:
+- implementation overview: [dense_matrix_tranche.md](/home/phili/projects/arbplusJAX/docs/implementation/dense_matrix_tranche.md)
+- practical runbook: [dense_matrices.md](/home/phili/projects/arbplusJAX/docs/practical/dense_matrices.md)
 
 ## Scripted suite runs
 

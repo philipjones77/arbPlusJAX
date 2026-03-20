@@ -42,6 +42,12 @@ from .special.tail_acceleration import (
     evaluate_tail_integral,
 )
 from .special.bessel import (
+    hankel1 as _hankel1_impl,
+    hankel1_derivative,
+    hankel1_point as _hankel1_point_impl,
+    hankel2 as _hankel2_impl,
+    hankel2_derivative,
+    hankel2_point as _hankel2_point_impl,
     incomplete_bessel_i as _incomplete_bessel_i_impl,
     incomplete_bessel_i_argument_derivative,
     incomplete_bessel_i_derivative,
@@ -52,6 +58,24 @@ from .special.bessel import (
     incomplete_bessel_k_derivative,
     incomplete_bessel_k_lower_limit_derivative,
     incomplete_bessel_k_point as _incomplete_bessel_k_point_impl,
+    scaled_hankel1 as _scaled_hankel1_impl,
+    scaled_hankel1_derivative,
+    scaled_hankel1_point as _scaled_hankel1_point_impl,
+    scaled_hankel2 as _scaled_hankel2_impl,
+    scaled_hankel2_derivative,
+    scaled_hankel2_point as _scaled_hankel2_point_impl,
+    spherical_bessel_j as _spherical_bessel_j_impl,
+    spherical_bessel_j_derivative,
+    spherical_bessel_j_point as _spherical_bessel_j_point_impl,
+    spherical_bessel_y as _spherical_bessel_y_impl,
+    spherical_bessel_y_derivative,
+    spherical_bessel_y_point as _spherical_bessel_y_point_impl,
+    modified_spherical_bessel_i as _modified_spherical_bessel_i_impl,
+    modified_spherical_bessel_i_derivative,
+    modified_spherical_bessel_i_point as _modified_spherical_bessel_i_point_impl,
+    modified_spherical_bessel_k as _modified_spherical_bessel_k_impl,
+    modified_spherical_bessel_k_derivative,
+    modified_spherical_bessel_k_point as _modified_spherical_bessel_k_point_impl,
 )
 from .special.gamma import (
     incomplete_gamma_lower as _incomplete_gamma_lower_impl,
@@ -751,9 +775,17 @@ _POINT_FUNCS = {
     "besselj": point_wrappers.arb_bessel_j_point,
     "bessely": point_wrappers.arb_bessel_y_point,
     "besseli": point_wrappers.arb_bessel_i_point,
+    "hankel1": _hankel1_point_impl,
+    "spherical_bessel_j": _spherical_bessel_j_point_impl,
+    "spherical_bessel_y": _spherical_bessel_y_point_impl,
+    "modified_spherical_bessel_i": _modified_spherical_bessel_i_point_impl,
     "incomplete_bessel_i": _incomplete_bessel_i_point_impl,
     "besselk": point_wrappers.arb_bessel_k_point,
+    "hankel2": _hankel2_point_impl,
+    "modified_spherical_bessel_k": _modified_spherical_bessel_k_point_impl,
     "incomplete_bessel_k": _incomplete_bessel_k_point_impl,
+    "scaled_hankel1": _scaled_hankel1_point_impl,
+    "scaled_hankel2": _scaled_hankel2_point_impl,
     "incomplete_gamma_lower": _incomplete_gamma_lower_point_impl,
     "incomplete_gamma_upper": _incomplete_gamma_upper_point_impl,
     "laplace_bessel_k_tail": _laplace_bessel_k_tail_point_impl,
@@ -789,6 +821,11 @@ _POINT_FUNCS.update(
         "srb_mat_matmul_dense_rhs": srb_mat.srb_mat_matmul_dense_rhs,
         "srb_mat_matmul_sparse": srb_mat.srb_mat_matmul_sparse,
         "srb_mat_triangular_solve": srb_mat.srb_mat_triangular_solve,
+        "srb_mat_charpoly": srb_mat.srb_mat_charpoly,
+        "srb_mat_pow_ui": srb_mat.srb_mat_pow_ui,
+        "srb_mat_exp": srb_mat.srb_mat_exp,
+        "srb_mat_eigvalsh": srb_mat.srb_mat_eigvalsh,
+        "srb_mat_eigh": srb_mat.srb_mat_eigh,
         "srb_mat_lu": srb_mat.srb_mat_lu,
         "srb_mat_lu_solve": srb_mat.srb_mat_lu_solve,
         "srb_mat_qr": srb_mat.srb_mat_qr,
@@ -866,6 +903,11 @@ _POINT_FUNCS.update(
         "scb_mat_matmul_dense_rhs": scb_mat.scb_mat_matmul_dense_rhs,
         "scb_mat_matmul_sparse": scb_mat.scb_mat_matmul_sparse,
         "scb_mat_triangular_solve": scb_mat.scb_mat_triangular_solve,
+        "scb_mat_charpoly": scb_mat.scb_mat_charpoly,
+        "scb_mat_pow_ui": scb_mat.scb_mat_pow_ui,
+        "scb_mat_exp": scb_mat.scb_mat_exp,
+        "scb_mat_eigvalsh": scb_mat.scb_mat_eigvalsh,
+        "scb_mat_eigh": scb_mat.scb_mat_eigh,
         "scb_mat_lu": scb_mat.scb_mat_lu,
         "scb_mat_lu_solve": scb_mat.scb_mat_lu_solve,
         "scb_mat_qr": scb_mat.scb_mat_qr,
@@ -1136,14 +1178,41 @@ _INTERVAL_FUNCS = {
     "besselj": baseline_wrappers.arb_bessel_j_mp,
     "bessely": baseline_wrappers.arb_bessel_y_mp,
     "besseli": baseline_wrappers.arb_bessel_i_mp,
+    "hankel1": _hankel1_impl,
+    "spherical_bessel_j": _spherical_bessel_j_impl,
+    "spherical_bessel_y": _spherical_bessel_y_impl,
+    "modified_spherical_bessel_i": _modified_spherical_bessel_i_impl,
     "incomplete_bessel_i": _incomplete_bessel_i_impl,
     "besselk": baseline_wrappers.arb_bessel_k_mp,
+    "hankel2": _hankel2_impl,
+    "modified_spherical_bessel_k": _modified_spherical_bessel_k_impl,
     "incomplete_bessel_k": _incomplete_bessel_k_impl,
+    "scaled_hankel1": _scaled_hankel1_impl,
+    "scaled_hankel2": _scaled_hankel2_impl,
     "incomplete_gamma_lower": _incomplete_gamma_lower_impl,
     "incomplete_gamma_upper": _incomplete_gamma_upper_impl,
     "laplace_bessel_k_tail": _laplace_bessel_k_tail_impl,
     "cuda_besselk": cubesselk.cuda_besselk,
 }
+
+for _name in mat_wrappers.SPARSE_MODE_BASES:
+    _INTERVAL_FUNCS.setdefault(_name, getattr(mat_wrappers, f"{_name}_mode"))
+
+for _name in mat_wrappers.SPARSE_BATCH_MODE_BASES:
+    _DIRECT_INTERVAL_BASIC_BATCH_FASTPATHS.setdefault(
+        _name,
+        (
+            getattr(mat_wrappers, f"{_name}_batch_mode_fixed"),
+            getattr(mat_wrappers, f"{_name}_batch_mode_padded"),
+        ),
+    )
+    _DIRECT_INTERVAL_MODE_BATCH_FASTPATHS.setdefault(
+        _name,
+        (
+            getattr(mat_wrappers, f"{_name}_batch_mode_fixed"),
+            getattr(mat_wrappers, f"{_name}_batch_mode_padded"),
+        ),
+    )
 
 
 _MODULE_NAMES = (
@@ -2249,6 +2318,70 @@ def incomplete_bessel_k_batch(
         samples_per_panel=samples_per_panel,
     )
     return jax.vmap(fn)(nu, z, lower_limit)
+
+
+def hankel1(nu, z, *, method: str = "auto"):
+    return _hankel1_impl(nu, z, method=method)
+
+
+def hankel2(nu, z, *, method: str = "auto"):
+    return _hankel2_impl(nu, z, method=method)
+
+
+def scaled_hankel1(nu, z, *, method: str = "auto"):
+    return _scaled_hankel1_impl(nu, z, method=method)
+
+
+def scaled_hankel2(nu, z, *, method: str = "auto"):
+    return _scaled_hankel2_impl(nu, z, method=method)
+
+
+def hankel1_batch(nu, z, *, method: str = "auto"):
+    return jax.vmap(lambda a, b: hankel1(a, b, method=method))(nu, z)
+
+
+def hankel2_batch(nu, z, *, method: str = "auto"):
+    return jax.vmap(lambda a, b: hankel2(a, b, method=method))(nu, z)
+
+
+def scaled_hankel1_batch(nu, z, *, method: str = "auto"):
+    return jax.vmap(lambda a, b: scaled_hankel1(a, b, method=method))(nu, z)
+
+
+def scaled_hankel2_batch(nu, z, *, method: str = "auto"):
+    return jax.vmap(lambda a, b: scaled_hankel2(a, b, method=method))(nu, z)
+
+
+def spherical_bessel_j(n, z, *, method: str = "auto"):
+    return _spherical_bessel_j_impl(n, z, method=method)
+
+
+def spherical_bessel_y(n, z, *, method: str = "auto"):
+    return _spherical_bessel_y_impl(n, z, method=method)
+
+
+def modified_spherical_bessel_i(n, z, *, method: str = "auto"):
+    return _modified_spherical_bessel_i_impl(n, z, method=method)
+
+
+def modified_spherical_bessel_k(n, z, *, method: str = "auto"):
+    return _modified_spherical_bessel_k_impl(n, z, method=method)
+
+
+def spherical_bessel_j_batch(n, z, *, method: str = "auto"):
+    return jax.vmap(lambda a, b: spherical_bessel_j(a, b, method=method))(n, z)
+
+
+def spherical_bessel_y_batch(n, z, *, method: str = "auto"):
+    return jax.vmap(lambda a, b: spherical_bessel_y(a, b, method=method))(n, z)
+
+
+def modified_spherical_bessel_i_batch(n, z, *, method: str = "auto"):
+    return jax.vmap(lambda a, b: modified_spherical_bessel_i(a, b, method=method))(n, z)
+
+
+def modified_spherical_bessel_k_batch(n, z, *, method: str = "auto"):
+    return jax.vmap(lambda a, b: modified_spherical_bessel_k(a, b, method=method))(n, z)
 
 
 def get_public_function_metadata(name: str) -> PublicFunctionMetadata:

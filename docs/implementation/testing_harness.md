@@ -128,28 +128,6 @@ JAX SciPy is the nearest “same framework, different implementation” point ba
 
 Role:
 
-- compares arbPlusJAX against standard JAX-native special-function behavior,
-- separates interval-wrapper issues from raw JAX math issues,
-- useful for tracking JIT/batch parity on the same runtime substrate.
-
-Resolution:
-
-- installed JAX/JAXlib, or
-- `JAX_REPO`.
-
-Harness backend name:
-
-- `jax_scipy`
-
-This is especially important because it isolates whether a discrepancy comes from:
-
-- our interval/mode layer, or
-- the underlying JAX point computation itself.
-
-Bibliography key:
-
-- `[@jaxscipyspecial2026]`
-
 ### 6. Mathematica
 
 Mathematica is an optional high-precision point backend.
@@ -198,7 +176,6 @@ The shortest honest summary is:
 - Boost: extra industrial point reference.
 - mpmath: arbitrary-precision point reference.
 - SciPy: mainstream float64 point reference.
-- JAX SciPy: same-runtime point reference.
 - Mathematica: optional independent high-precision point reference.
 
 That distinction matters because not every mismatch means the same thing.
@@ -209,14 +186,14 @@ When a function has support across the full stack, the preferred comparison orde
 
 1. Arb / FLINT for interval containment.
 2. mpmath and Mathematica for high-precision point agreement.
-3. SciPy and JAX SciPy for mainstream float64 parity.
+3. SciPy for mainstream float64 parity.
 4. Boost as an additional point backend when relevant.
 
 In other words:
 
 - use Arb to judge enclosure quality,
 - use mpmath / Mathematica / Boost to judge hard point-value correctness,
-- use SciPy / JAX SciPy to judge user-visible float64 parity.
+- use SciPy to judge user-visible float64 parity.
 
 ## Current harness behavior
 
@@ -227,7 +204,6 @@ The harness currently resolves backends from `benchmarks/bench_registry.py`, whe
 - `jax_rigorous`
 - `jax_point`
 - `scipy`
-- `jax_scipy`
 - `mpmath`
 - `c_lib`
 - `c_fn`

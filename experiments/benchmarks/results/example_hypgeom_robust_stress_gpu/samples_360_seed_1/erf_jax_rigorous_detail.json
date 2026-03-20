@@ -1,0 +1,15 @@
+{
+  "function": "erf",
+  "backend": "jax_rigorous",
+  "samples": 360,
+  "seed": 1,
+  "error_stats": {
+    "mean": 0.1692178324887151,
+    "median": 0.04975352026686175,
+    "p95": 0.6099637429574992,
+    "p99": 0.721901129757308,
+    "max": 0.7481465122746793
+  },
+  "containment_rate": 0.0,
+  "mean_width": 9.74000874236483e-07
+}

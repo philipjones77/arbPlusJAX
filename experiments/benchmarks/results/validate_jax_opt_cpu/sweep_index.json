@@ -1,0 +1,12 @@
+[
+  {
+    "samples": 20,
+    "seed": 0,
+    "path": "/home/phili/projects/arbplusJAX/results/benchmarks/validate_jax_opt_cpu/samples_20_seed_0"
+  },
+  {
+    "samples": 30,
+    "seed": 0,
+    "path": "/home/phili/projects/arbplusJAX/results/benchmarks/validate_jax_opt_cpu/samples_30_seed_0"
+  }
+]

@@ -6,6 +6,7 @@ import time
 from pathlib import Path
 
 import jax
+from jax import lax
 import jax.numpy as jnp
 import numpy as np
 import mpmath as mp
@@ -179,16 +180,16 @@ def main() -> None:
         ok = ok_re & ok_im & np.isfinite(re) & np.isfinite(im)
         return float(np.mean(ok))
 
-    # jax.scipy reference (point)
-    js_real = jax.jit(jax.vmap(lambda t: jax.scipy.special.gammaln(t)))
-    js_cplx = None
-    js_real(jnp.asarray(mids, dtype=jnp.float64)).block_until_ready()
-    # jax.scipy.gammaln does not support complex dtype
+    # public-JAX real reference (point)
+    jax_native_real = jax.jit(jax.vmap(lambda t: lax.lgamma(t)))
+    jax_native_cplx = None
+    jax_native_real(jnp.asarray(mids, dtype=jnp.float64)).block_until_ready()
+    # public JAX lgamma remains real-only here
     t0 = time.perf_counter()
-    js_real_vals = np.array(js_real(jnp.asarray(mids, dtype=jnp.float64)).block_until_ready())
-    t_js_real = time.perf_counter() - t0
-    js_cplx_vals = None
-    t_js_cplx = None
+    jax_native_real_vals = np.array(jax_native_real(jnp.asarray(mids, dtype=jnp.float64)).block_until_ready())
+    t_jax_native_real = time.perf_counter() - t0
+    jax_native_cplx_vals = None
+    t_jax_native_cplx = None
 
     print(f"loggamma compare vs C midpoint (iters={args.iters}):")
     print("real:")
@@ -197,7 +198,7 @@ def main() -> None:
         ("mpmath", mp_real, t_mp_real),
         ("jax_basic", jax_real_basic_vals, t_jax_real_basic),
         ("jax_point", jax_real_point_vals, t_jax_real_point),
-        ("jax.scipy", js_real_vals, t_js_real),
+        ("jax_native", jax_native_real_vals, t_jax_native_real),
     ]:
         if name == "C":
             print(f"{name:10s} time={t:.3f}s (truth)")
@@ -212,7 +213,7 @@ def main() -> None:
         ("mpmath", mp_cplx, t_mp_cplx),
         ("jax_basic", jax_cplx_basic_vals, t_jax_cplx_basic),
         ("jax_point", jax_cplx_point_vals, t_jax_cplx_point),
-        ("jax.scipy", js_cplx_vals, t_js_cplx),
+        ("jax_native", jax_native_cplx_vals, t_jax_native_cplx),
     ]:
         if name == "C":
             print(f"{name:10s} time={t:.3f}s (truth)")
@@ -253,7 +254,7 @@ def main() -> None:
     cut_box = acb_core.acb_box(jnp.asarray(re_cut_box, dtype=jnp.float64), jnp.asarray(im_cut_box, dtype=jnp.float64))
     jax_real_cut = np.array(jax_real_basic(neg_jax).block_until_ready())
     jax_point_cut = np.array(jax_real_point(neg_jax).block_until_ready())
-    js_real_cut = np.array(js_real(jnp.asarray(neg, dtype=jnp.float64)).block_until_ready())
+    jax_native_real_cut = np.array(jax_native_real(jnp.asarray(neg, dtype=jnp.float64)).block_until_ready())
     mp_real_cut = []
     for v in neg:
         val = mp.loggamma(mp.mpf(v))
@@ -265,7 +266,7 @@ def main() -> None:
 
     jax_cplx_cut = np.array(jax_cplx_basic(cut_box).block_until_ready())
     jax_cplx_point_cut = np.array(jax_cplx_point(cut_box).block_until_ready())
-    js_cplx_cut = None
+    jax_native_cplx_cut = None
     mp_cplx_cut = np.asarray([complex(mp.loggamma(mp.mpf(re_cut[i]) + 1j * mp.mpf(im_cut[i]))) for i in range(args.iters)], dtype=np.complex128)
 
     print("real (negative axis stress):")
@@ -273,7 +274,7 @@ def main() -> None:
         ("mpmath", mp_real_cut),
         ("jax_basic", jax_real_cut),
         ("jax_point", jax_point_cut),
-        ("jax.scipy", js_real_cut),
+        ("jax_native", jax_native_real_cut),
     ]:
         mean_err, max_err = err_stats(vals, c_real_cut_mid)
         contain = contain_real(vals, c_real_cut)
@@ -284,7 +285,7 @@ def main() -> None:
         ("mpmath", mp_cplx_cut),
         ("jax_basic", jax_cplx_cut),
         ("jax_point", jax_cplx_point_cut),
-        ("jax.scipy", js_cplx_cut),
+        ("jax_native", jax_native_cplx_cut),
     ]:
         if vals is None:
             print(f"{name:10s} unavailable (complex not supported)")

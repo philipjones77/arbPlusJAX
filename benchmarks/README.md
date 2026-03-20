@@ -1,10 +1,21 @@
 # Benchmarks
 
-`benchmarks/` is the canonical home for benchmark and cross-backend comparison scripts.
+`benchmarks/` is the implementation and CLI home for benchmark and cross-backend
+comparison scripts.
+
+It also remains the repo-root benchmark package used by the pytest-facing smoke
+and harness entrypoints. `experiments/benchmarks/` does not replace it.
+
+Benchmark experiments and their generated artifacts are canonicalized under
+`experiments/benchmarks/`:
+
+- run trees: `experiments/benchmarks/results/`
+- generated reports and diagnostics: `experiments/benchmarks/outputs/`
 
 This directory is intentionally separate from `tests/`.
 
 - Use `tools/run_test_harness.py --profile bench-smoke` for lightweight benchmark smoke checks.
+- Use `python -m pytest benchmarks/test_benchmark_smoke.py` for the direct benchmark CLI smoke path.
 - Use `tools/run_benchmarks.py` or `tools/run_harness_profile.py` for real sweeps and reporting.
 - Do not treat full benchmark sweeps as part of the normal correctness harness.
 

@@ -1,0 +1,13 @@
+function,backend,samples,mean_abs_err,max_abs_err,containment_rate,mean_width,time_ms,notes
+besselj,jax_basic,40,,,,7.09397e-07,4.07584,
+besselj,jax_adaptive,40,,,,7.09398e-07,6.43745,
+besselj,jax_rigorous,40,,,,7.09397e-07,2.69035,
+besselj,scipy,40,,,,,0.129587,
+besselj,jax_point,40,,,,,1.48242,
+besselj,mpmath,40,,,,,19.6603,
+besselk,jax_basic,40,,,,0.100678,5.33625,
+besselk,jax_adaptive,40,,,,0.100679,11.3862,
+besselk,jax_rigorous,40,,,,0.100679,2.64823,
+besselk,scipy,40,,,,,0.073451,
+besselk,jax_point,40,,,,,1.26221,
+besselk,mpmath,40,,,,,207.704,

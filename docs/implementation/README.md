@@ -5,6 +5,8 @@ Last updated: 2026-03-17T00:00:00Z
 - implementation-facing notes:
   - `jax_setup.md`
   - `stable_kernel_subset.md`
+  - `dense_matrix_tranche.md`
+  - `sparse_matrix_tranche.md`
 - existing implementation-tree documents:
   - `build.md`
   - `linux_gpu_colab.md`
@@ -18,6 +20,8 @@ Last updated: 2026-03-17T00:00:00Z
 - `modules/`: module-level implementation notes (`arb_*`, `acb_*`, `hypgeom`, etc.)
   - includes `modules/dft.md`
   - includes `modules/nufft.md`
+  - includes `modules/arb_mat.md`
+  - includes `modules/acb_mat.md`
 - `wrappers/`: wrapper/mode-dispatch notes and interval API behavior
 - `external/`: separate implementation lineages integrated into this workspace
   - `ducc_review.md`

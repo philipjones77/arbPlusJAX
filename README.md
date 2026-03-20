@@ -1,6 +1,7 @@
 # arbPlusJAX
 
-Implementation of arb for JAX.
+arbPlusJAX is an independent JAX implementation derived from Arb and FLINT.
+It is not the official Arb project.
 
 ## Layout
 
@@ -138,3 +139,13 @@ The scripts in `tools/` load Arb reference libraries built in the Arb workspace 
 
 - JAX is the primary implementation. The Arb workspace is used for parity and benchmarking.
 - Some advanced helper routines are approximations; see `docs/` for details.
+- arbPlusJAX preserves Arb-shaped naming where compatibility or derivation is intentional, but remains a separate project.
+
+## Acknowledgments
+
+arbPlusJAX is an independent derivative of Arb and FLINT and also draws
+conceptual inspiration from parts of the Boost C++ ecosystem and mpmath. No
+Boost or mpmath source code is included in this repository as part of this
+acknowledgment.
+
+See [NOTICE](/home/phili/projects/arbplusJAX/NOTICE) for the reference links.

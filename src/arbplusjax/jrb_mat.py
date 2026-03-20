@@ -40,6 +40,8 @@ from . import checks
 from . import double_interval as di
 from . import iterative_solvers
 from . import mat_common
+from . import matrix_free_basic
+from . import matrix_free_core
 from . import sparse_common
 
 
@@ -122,6 +124,10 @@ def _jrb_operator_vector(x: jax.Array) -> jax.Array:
 
 def _jrb_point_interval(x: jax.Array) -> jax.Array:
     return di.interval(di._below(x), di._above(x))
+
+
+def _jrb_round_basic(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
+    return di.round_interval_outward(x, prec_bits)
 
 
 def _jrb_interval_sum(xs: jax.Array, axis: int = -1) -> jax.Array:
@@ -322,59 +328,386 @@ def jrb_mat_norm_inf_basic(a: jax.Array) -> jax.Array:
 
 def jrb_mat_dense_operator(a: jax.Array):
     """Return a matrix-free midpoint matvec closure for a dense interval matrix."""
-    mid = _jrb_mid_matrix(a)
-
-    def matvec(v: jax.Array) -> jax.Array:
-        vv = _jrb_mid_vector(v)
-        return jnp.einsum("...ij,...j->...i", mid, vv)
-
-    return matvec
+    return matrix_free_core.dense_operator(_jrb_mid_matrix(a), midpoint_vector=_jrb_mid_vector)
 
 
 def jrb_mat_dense_operator_adjoint(a: jax.Array):
     """Return the adjoint midpoint matvec closure for a dense interval matrix."""
-    mid = _jrb_mid_matrix(a)
+    return matrix_free_core.dense_operator_adjoint(_jrb_mid_matrix(a), midpoint_vector=_jrb_mid_vector, conjugate=False)
 
-    def matvec(v: jax.Array) -> jax.Array:
-        vv = _jrb_mid_vector(v)
-        return jnp.einsum("...ji,...j->...i", mid, vv)
 
-    return matvec
+def jrb_mat_dense_operator_rmatvec(a: jax.Array):
+    """Return the transpose midpoint matvec closure for right-vector products."""
+    return matrix_free_core.dense_operator_rmatvec(_jrb_mid_matrix(a), midpoint_vector=_jrb_mid_vector)
+
+
+def jrb_mat_dense_operator_plan_prepare(a: jax.Array):
+    return matrix_free_core.dense_operator_plan(_jrb_mid_matrix(a), orientation="forward", algebra="jrb")
+
+
+def jrb_mat_dense_operator_rmatvec_plan_prepare(a: jax.Array):
+    return matrix_free_core.dense_operator_plan(_jrb_mid_matrix(a), orientation="transpose", algebra="jrb")
+
+
+def jrb_mat_dense_operator_adjoint_plan_prepare(a: jax.Array):
+    return matrix_free_core.dense_operator_plan(_jrb_mid_matrix(a), orientation="transpose", algebra="jrb")
+
+
+def _jrb_sparse_to_bcoo(x):
+    return matrix_free_core.canonicalize_sparse_bcoo(
+        x,
+        algebra="jrb",
+        sparse_common=sparse_common,
+        label="jrb_mat.sparse_to_bcoo",
+    )
 
 
 def jrb_mat_bcoo_operator(a: sparse_common.SparseBCOO):
     """Return a matrix-free midpoint matvec closure for a real sparse BCOO matrix."""
-    a = sparse_common.as_sparse_bcoo(a, algebra="jrb", label="jrb_mat.bcoo_operator")
+    return matrix_free_core.sparse_bcoo_operator(
+        a,
+        as_sparse_bcoo=sparse_common.as_sparse_bcoo,
+        sparse_bcoo_cls=sparse_common.SparseBCOO,
+        sparse_bcoo_matvec=sparse_common.sparse_bcoo_matvec,
+        midpoint_vector=_jrb_operator_vector,
+        dtype=jnp.float64,
+        algebra="jrb",
+        label="jrb_mat.bcoo_operator",
+    )
 
-    def matvec(v: jax.Array) -> jax.Array:
-        vv = _jrb_operator_vector(v)
-        return jnp.asarray(
-            sparse_common.sparse_bcoo_matvec(a, vv, algebra="jrb", label="jrb_mat.bcoo_operator.apply"),
-            dtype=jnp.float64,
-        )
 
-    return matvec
+def jrb_mat_sparse_operator(a: sparse_common.SparseCOO | sparse_common.SparseCSR | sparse_common.SparseBCOO):
+    return jrb_mat_bcoo_operator(_jrb_sparse_to_bcoo(a))
 
 
 def jrb_mat_bcoo_operator_adjoint(a: sparse_common.SparseBCOO):
     """Return the adjoint matrix-free midpoint matvec closure for a real sparse BCOO matrix."""
-    a = sparse_common.as_sparse_bcoo(a, algebra="jrb", label="jrb_mat.bcoo_operator_adjoint")
-    at = sparse_common.SparseBCOO(
-        data=a.data,
-        indices=a.indices[:, ::-1],
-        rows=a.cols,
-        cols=a.rows,
+    return matrix_free_core.sparse_bcoo_operator_adjoint(
+        a,
+        as_sparse_bcoo=sparse_common.as_sparse_bcoo,
+        sparse_bcoo_cls=sparse_common.SparseBCOO,
+        sparse_bcoo_matvec=sparse_common.sparse_bcoo_matvec,
+        midpoint_vector=_jrb_operator_vector,
+        dtype=jnp.float64,
+        algebra="jrb",
+        label="jrb_mat.bcoo_operator_adjoint",
+        conjugate=False,
+    )
+
+
+def jrb_mat_sparse_operator_adjoint(a: sparse_common.SparseCOO | sparse_common.SparseCSR | sparse_common.SparseBCOO):
+    return jrb_mat_bcoo_operator_adjoint(_jrb_sparse_to_bcoo(a))
+
+
+def jrb_mat_bcoo_operator_rmatvec(a: sparse_common.SparseBCOO):
+    return matrix_free_core.sparse_bcoo_operator_rmatvec(
+        a,
+        as_sparse_bcoo=sparse_common.as_sparse_bcoo,
+        sparse_bcoo_cls=sparse_common.SparseBCOO,
+        sparse_bcoo_matvec=sparse_common.sparse_bcoo_matvec,
+        midpoint_vector=_jrb_operator_vector,
+        dtype=jnp.float64,
+        algebra="jrb",
+        label="jrb_mat.bcoo_operator_rmatvec",
+    )
+
+
+def jrb_mat_sparse_operator_rmatvec(a: sparse_common.SparseCOO | sparse_common.SparseCSR | sparse_common.SparseBCOO):
+    return jrb_mat_bcoo_operator_rmatvec(_jrb_sparse_to_bcoo(a))
+
+
+def jrb_mat_bcoo_operator_plan_prepare(a: sparse_common.SparseBCOO):
+    return matrix_free_core.sparse_bcoo_operator_plan(
+        a,
+        as_sparse_bcoo=sparse_common.as_sparse_bcoo,
+        sparse_bcoo_cls=sparse_common.SparseBCOO,
+        orientation="forward",
         algebra="jrb",
     )
 
-    def matvec(v: jax.Array) -> jax.Array:
-        vv = _jrb_operator_vector(v)
-        return jnp.asarray(
-            sparse_common.sparse_bcoo_matvec(at, vv, algebra="jrb", label="jrb_mat.bcoo_operator_adjoint.apply"),
-            dtype=jnp.float64,
-        )
 
-    return matvec
+def jrb_mat_sparse_operator_plan_prepare(a: sparse_common.SparseCOO | sparse_common.SparseCSR | sparse_common.SparseBCOO):
+    return jrb_mat_bcoo_operator_plan_prepare(_jrb_sparse_to_bcoo(a))
+
+
+def jrb_mat_bcoo_operator_rmatvec_plan_prepare(a: sparse_common.SparseBCOO):
+    return matrix_free_core.sparse_bcoo_operator_plan(
+        a,
+        as_sparse_bcoo=sparse_common.as_sparse_bcoo,
+        sparse_bcoo_cls=sparse_common.SparseBCOO,
+        orientation="transpose",
+        algebra="jrb",
+    )
+
+
+def jrb_mat_sparse_operator_rmatvec_plan_prepare(a: sparse_common.SparseCOO | sparse_common.SparseCSR | sparse_common.SparseBCOO):
+    return jrb_mat_bcoo_operator_rmatvec_plan_prepare(_jrb_sparse_to_bcoo(a))
+
+
+def jrb_mat_bcoo_operator_adjoint_plan_prepare(a: sparse_common.SparseBCOO):
+    return matrix_free_core.sparse_bcoo_operator_plan(
+        a,
+        as_sparse_bcoo=sparse_common.as_sparse_bcoo,
+        sparse_bcoo_cls=sparse_common.SparseBCOO,
+        orientation="transpose",
+        algebra="jrb",
+    )
+
+
+def jrb_mat_sparse_operator_adjoint_plan_prepare(a: sparse_common.SparseCOO | sparse_common.SparseCSR | sparse_common.SparseBCOO):
+    return jrb_mat_bcoo_operator_adjoint_plan_prepare(_jrb_sparse_to_bcoo(a))
+
+
+def jrb_mat_symmetric_operator(a: jax.Array):
+    return jrb_mat_dense_operator(a)
+
+
+def jrb_mat_symmetric_operator_plan_prepare(a: jax.Array):
+    return jrb_mat_dense_operator_plan_prepare(a)
+
+
+def jrb_mat_spd_operator(a: jax.Array):
+    return jrb_mat_dense_operator(a)
+
+
+def jrb_mat_spd_operator_plan_prepare(a: jax.Array):
+    return jrb_mat_dense_operator_plan_prepare(a)
+
+
+def jrb_mat_operator_plan_apply(plan: matrix_free_core.OperatorPlan, x: jax.Array) -> jax.Array:
+    return jrb_mat_operator_apply_point(plan, x)
+
+
+def _jrb_apply_operator_mid(operator, x: jax.Array) -> jax.Array:
+    return matrix_free_core.operator_apply_midpoint(
+        operator,
+        x,
+        midpoint_vector=_jrb_operator_vector,
+        sparse_bcoo_matvec=sparse_common.sparse_bcoo_matvec,
+        dtype=jnp.float64,
+    )
+
+
+def jrb_mat_rmatvec_point(a: jax.Array, x: jax.Array) -> jax.Array:
+    return jrb_mat_operator_apply_point(jrb_mat_dense_operator_rmatvec(a), x)
+
+
+def jrb_mat_rmatvec_basic(a: jax.Array, x: jax.Array) -> jax.Array:
+    return jrb_mat_rmatvec_point(a, x)
+
+
+def jrb_mat_lanczos_tridiag_adjoint(matvec, *, krylov_depth: int, reortho: str = "full", custom_vjp: bool = True):
+    return matrix_free_core.matfree_adjoints.lanczos_tridiag(
+        matvec,
+        krylov_depth=krylov_depth,
+        reortho=reortho,
+        custom_vjp=custom_vjp,
+    )
+
+
+def jrb_mat_cg_fixed_iterations(*, num_matvecs: int):
+    return matrix_free_core.matfree_adjoints.cg_fixed_iterations(num_matvecs=num_matvecs)
+
+
+def jrb_mat_solve_action_point(
+    matvec,
+    b: jax.Array,
+    *,
+    x0: jax.Array | None = None,
+    tol: float = 1e-8,
+    atol: float = 0.0,
+    maxiter: int | None = None,
+    symmetric: bool = True,
+    preconditioner=None,
+) -> jax.Array:
+    value, _ = jrb_mat_solve_action_with_diagnostics_point(
+        matvec,
+        b,
+        x0=x0,
+        tol=tol,
+        atol=atol,
+        maxiter=maxiter,
+        symmetric=symmetric,
+        preconditioner=preconditioner,
+    )
+    return value
+
+
+def jrb_mat_solve_action_basic(
+    matvec,
+    b: jax.Array,
+    *,
+    x0: jax.Array | None = None,
+    tol: float = 1e-8,
+    atol: float = 0.0,
+    maxiter: int | None = None,
+    symmetric: bool = True,
+    preconditioner=None,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return matrix_free_basic.solve_action_basic(
+        jrb_mat_solve_action_point,
+        matvec,
+        b,
+        x0=x0,
+        tol=tol,
+        atol=atol,
+        maxiter=maxiter,
+        symmetric=symmetric,
+        preconditioner=preconditioner,
+        round_output=_jrb_round_basic,
+        prec_bits=prec_bits,
+    )
+
+
+def jrb_mat_solve_action_with_diagnostics_point(
+    matvec,
+    b: jax.Array,
+    *,
+    x0: jax.Array | None = None,
+    tol: float = 1e-8,
+    atol: float = 0.0,
+    maxiter: int | None = None,
+    symmetric: bool = True,
+    preconditioner=None,
+):
+    b = jrb_mat_as_interval_vector(b)
+    b_mid = _jrb_mid_vector(b)
+    x0_mid = None if x0 is None else _jrb_mid_vector(x0)
+    mv = lambda v: _jrb_apply_operator_mid(matvec, _jrb_point_interval(v))
+    precond = None if preconditioner is None else (lambda v: _jrb_apply_operator_mid(preconditioner, _jrb_point_interval(v)))
+    solver = iterative_solvers.cg if symmetric else iterative_solvers.gmres
+    x_mid, info = solver(mv, b_mid, x0=x0_mid, tol=tol, atol=atol, maxiter=maxiter, M=precond)
+    out = _jrb_point_interval(x_mid)
+    finite = jnp.all(jnp.isfinite(x_mid), axis=-1)
+    return jnp.where(finite[..., None], out, _full_interval_like(out)), info
+
+
+def jrb_mat_solve_action_with_diagnostics_basic(
+    matvec,
+    b: jax.Array,
+    *,
+    x0: jax.Array | None = None,
+    tol: float = 1e-8,
+    atol: float = 0.0,
+    maxiter: int | None = None,
+    symmetric: bool = True,
+    preconditioner=None,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+):
+    return matrix_free_basic.solve_action_with_diagnostics_basic(
+        jrb_mat_solve_action_with_diagnostics_point,
+        matvec,
+        b,
+        x0=x0,
+        tol=tol,
+        atol=atol,
+        maxiter=maxiter,
+        symmetric=symmetric,
+        preconditioner=preconditioner,
+        round_output=_jrb_round_basic,
+        prec_bits=prec_bits,
+    )
+
+
+def jrb_mat_inverse_action_point(
+    matvec,
+    x: jax.Array,
+    *,
+    x0: jax.Array | None = None,
+    tol: float = 1e-8,
+    atol: float = 0.0,
+    maxiter: int | None = None,
+    symmetric: bool = True,
+    preconditioner=None,
+) -> jax.Array:
+    return jrb_mat_solve_action_point(
+        matvec,
+        x,
+        x0=x0,
+        tol=tol,
+        atol=atol,
+        maxiter=maxiter,
+        symmetric=symmetric,
+        preconditioner=preconditioner,
+    )
+
+
+def jrb_mat_inverse_action_basic(
+    matvec,
+    x: jax.Array,
+    *,
+    x0: jax.Array | None = None,
+    tol: float = 1e-8,
+    atol: float = 0.0,
+    maxiter: int | None = None,
+    symmetric: bool = True,
+    preconditioner=None,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return matrix_free_basic.inverse_action_basic(
+        jrb_mat_inverse_action_point,
+        matvec,
+        x,
+        x0=x0,
+        tol=tol,
+        atol=atol,
+        maxiter=maxiter,
+        symmetric=symmetric,
+        preconditioner=preconditioner,
+        round_output=_jrb_round_basic,
+        prec_bits=prec_bits,
+    )
+
+
+def jrb_mat_inverse_action_with_diagnostics_point(
+    matvec,
+    x: jax.Array,
+    *,
+    x0: jax.Array | None = None,
+    tol: float = 1e-8,
+    atol: float = 0.0,
+    maxiter: int | None = None,
+    symmetric: bool = True,
+    preconditioner=None,
+):
+    return jrb_mat_solve_action_with_diagnostics_point(
+        matvec,
+        x,
+        x0=x0,
+        tol=tol,
+        atol=atol,
+        maxiter=maxiter,
+        symmetric=symmetric,
+        preconditioner=preconditioner,
+    )
+
+
+def jrb_mat_inverse_action_with_diagnostics_basic(
+    matvec,
+    x: jax.Array,
+    *,
+    x0: jax.Array | None = None,
+    tol: float = 1e-8,
+    atol: float = 0.0,
+    maxiter: int | None = None,
+    symmetric: bool = True,
+    preconditioner=None,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+):
+    return matrix_free_basic.inverse_action_with_diagnostics_basic(
+        jrb_mat_inverse_action_with_diagnostics_point,
+        matvec,
+        x,
+        x0=x0,
+        tol=tol,
+        atol=atol,
+        maxiter=maxiter,
+        symmetric=symmetric,
+        preconditioner=preconditioner,
+        round_output=_jrb_round_basic,
+        prec_bits=prec_bits,
+    )
 
 
 def jrb_mat_bcoo_parametric_operator(indices: jax.Array, *, shape: tuple[int, int]):
@@ -666,15 +999,26 @@ def jrb_mat_bcoo_inverse_diagonal_with_diagnostics_point(
 
 
 def jrb_mat_operator_apply_point(matvec, x: jax.Array) -> jax.Array:
-    x = jrb_mat_as_interval_vector(x)
-    y = jnp.asarray(matvec(x), dtype=jnp.float64)
-    out = _jrb_point_interval(y)
-    finite = jnp.all(jnp.isfinite(y), axis=-1)
-    return jnp.where(finite[..., None, None], out, _full_interval_like(out))
+    return matrix_free_core.operator_apply_point(
+        matvec,
+        x,
+        midpoint_apply=_jrb_apply_operator_mid,
+        coerce_vector=jrb_mat_as_interval_vector,
+        point_from_midpoint=_jrb_point_interval,
+        full_like=_full_interval_like,
+        finite_mask_fn=lambda y: jnp.all(jnp.isfinite(y), axis=-1),
+        dtype=jnp.float64,
+    )
 
 
 def jrb_mat_operator_apply_basic(matvec, x: jax.Array) -> jax.Array:
-    return jrb_mat_operator_apply_point(matvec, x)
+    return matrix_free_basic.operator_apply_basic(
+        jrb_mat_operator_apply_point,
+        matvec,
+        x,
+        round_output=_jrb_round_basic,
+        prec_bits=di.DEFAULT_PREC_BITS,
+    )
 
 
 def _jrb_leja_points_interval_point(
@@ -1067,6 +1411,35 @@ def jrb_mat_logdet_leja_hutchpp_point(
     return jrb_mat_hutchpp_trace_point(action_fn, sketch_probes, residual_probes)
 
 
+def jrb_mat_det_leja_hutchpp_point(
+    matvec,
+    sketch_probes: jax.Array,
+    residual_probes: jax.Array,
+    *,
+    degree: int,
+    spectral_bounds: tuple[float | jax.Array, float | jax.Array],
+    candidate_count: int = 64,
+    max_degree: int | None = None,
+    min_degree: int = 8,
+    rtol: float = 1e-10,
+    atol: float = 1e-12,
+) -> jax.Array:
+    return matrix_free_core.det_from_logdet(
+        jrb_mat_logdet_leja_hutchpp_point(
+            matvec,
+            sketch_probes,
+            residual_probes,
+            degree=degree,
+            spectral_bounds=spectral_bounds,
+            candidate_count=candidate_count,
+            max_degree=max_degree,
+            min_degree=min_degree,
+            rtol=rtol,
+            atol=atol,
+        )
+    )
+
+
 def jrb_mat_logdet_leja_hutchpp_with_diagnostics_point(
     matvec,
     sketch_probes: jax.Array,
@@ -1129,6 +1502,34 @@ def jrb_mat_logdet_leja_hutchpp_with_diagnostics_point(
         ),
     )
     return value, diag
+
+
+def jrb_mat_det_leja_hutchpp_with_diagnostics_point(
+    matvec,
+    sketch_probes: jax.Array,
+    residual_probes: jax.Array,
+    *,
+    degree: int,
+    spectral_bounds: tuple[float | jax.Array, float | jax.Array],
+    candidate_count: int = 64,
+    max_degree: int | None = None,
+    min_degree: int = 8,
+    rtol: float = 1e-10,
+    atol: float = 1e-12,
+) -> tuple[jax.Array, JrbMatKrylovDiagnostics]:
+    value, diag = jrb_mat_logdet_leja_hutchpp_with_diagnostics_point(
+        matvec,
+        sketch_probes,
+        residual_probes,
+        degree=degree,
+        spectral_bounds=spectral_bounds,
+        candidate_count=candidate_count,
+        max_degree=max_degree,
+        min_degree=min_degree,
+        rtol=rtol,
+        atol=atol,
+    )
+    return matrix_free_core.det_from_logdet(value), diag
 
 
 def jrb_mat_bcoo_logdet_leja_hutchpp_point(
@@ -1208,50 +1609,55 @@ def jrb_mat_bcoo_logdet_leja_hutchpp_with_diagnostics_point(
 
 
 def jrb_mat_poly_action_point(matvec, x: jax.Array, coefficients: jax.Array) -> jax.Array:
-    x = jrb_mat_as_interval_vector(x)
-    coeffs = jnp.asarray(coefficients, dtype=jnp.float64)
-    x_mid = _jrb_mid_vector(x)
-
-    def step(carry, coeff):
-        term, acc = carry
-        next_acc = acc + coeff * term
-        next_term = matvec(_jrb_point_interval(term))
-        return (next_term, next_acc), None
-
-    if coeffs.ndim != 1:
-        raise ValueError("coefficients must be rank-1")
-    init = (x_mid, jnp.zeros_like(x_mid))
-    (_, acc), _ = lax.scan(step, init, coeffs)
-    out = _jrb_point_interval(acc)
-    finite = jnp.all(jnp.isfinite(acc), axis=-1)
-    return jnp.where(finite[..., None, None], out, _full_interval_like(out))
+    return matrix_free_core.poly_action_point(
+        matvec,
+        x,
+        coefficients,
+        midpoint_apply=_jrb_apply_operator_mid,
+        coerce_vector=jrb_mat_as_interval_vector,
+        midpoint_vector=_jrb_mid_vector,
+        point_from_midpoint=_jrb_point_interval,
+        full_like=_full_interval_like,
+        finite_mask_fn=lambda y: jnp.all(jnp.isfinite(y), axis=-1),
+        coeff_dtype=jnp.float64,
+    )
 
 
 def jrb_mat_poly_action_basic(matvec, x: jax.Array, coefficients: jax.Array) -> jax.Array:
-    return jrb_mat_poly_action_point(matvec, x, coefficients)
+    return matrix_free_basic.action_basic(
+        jrb_mat_poly_action_point,
+        matvec,
+        x,
+        coefficients,
+        round_output=_jrb_round_basic,
+        prec_bits=di.DEFAULT_PREC_BITS,
+    )
 
 
 def jrb_mat_expm_action_point(matvec, x: jax.Array, terms: int = 16) -> jax.Array:
-    x = jrb_mat_as_interval_vector(x)
-    if terms <= 0:
-        raise ValueError("terms must be > 0")
-    x_mid = _jrb_mid_vector(x)
-
-    def step(carry, k):
-        term, acc = carry
-        next_term = matvec(_jrb_point_interval(term)) / jnp.asarray(k, dtype=jnp.float64)
-        next_acc = acc + next_term
-        return (next_term, next_acc), None
-
-    init = (x_mid, x_mid)
-    (_, acc), _ = lax.scan(step, init, jnp.arange(1, terms, dtype=jnp.int32))
-    out = _jrb_point_interval(acc)
-    finite = jnp.all(jnp.isfinite(acc), axis=-1)
-    return jnp.where(finite[..., None, None], out, _full_interval_like(out))
+    return matrix_free_core.expm_action_point(
+        matvec,
+        x,
+        terms=terms,
+        midpoint_apply=_jrb_apply_operator_mid,
+        coerce_vector=jrb_mat_as_interval_vector,
+        midpoint_vector=_jrb_mid_vector,
+        point_from_midpoint=_jrb_point_interval,
+        full_like=_full_interval_like,
+        finite_mask_fn=lambda y: jnp.all(jnp.isfinite(y), axis=-1),
+        scalar_dtype=jnp.float64,
+    )
 
 
 def jrb_mat_expm_action_basic(matvec, x: jax.Array, terms: int = 16) -> jax.Array:
-    return jrb_mat_expm_action_point(matvec, x, terms=terms)
+    return matrix_free_basic.action_basic(
+        jrb_mat_expm_action_point,
+        matvec,
+        x,
+        terms=terms,
+        round_output=_jrb_round_basic,
+        prec_bits=di.DEFAULT_PREC_BITS,
+    )
 
 
 def _jrb_mat_lanczos_tridiag_state_point(matvec, x: jax.Array, steps: int):
@@ -1267,7 +1673,7 @@ def _jrb_mat_lanczos_tridiag_state_point(matvec, x: jax.Array, steps: int):
 
     def body(carry, _):
         q_prev, q_curr, beta_prev, basis, alphas, betas, k = carry
-        z = jnp.asarray(matvec(_jrb_point_interval(q_curr)), dtype=jnp.float64)
+        z = _jrb_apply_operator_mid(matvec, _jrb_point_interval(q_curr))
         alpha = jnp.vdot(q_curr, z).real
         r = z - alpha * q_curr - beta_prev * q_prev
         # Full reorthogonalisation against accumulated basis.
@@ -1307,27 +1713,29 @@ def jrb_mat_lanczos_diagnostics_point(matvec, x: jax.Array, steps: int) -> JrbMa
     basis, _, beta0, betas = _jrb_mat_lanczos_tridiag_state_point(matvec, x, steps)
     tail_norm = betas[-1]
     breakdown = tail_norm <= jnp.asarray(1e-30, dtype=jnp.float64)
-    return JrbMatKrylovDiagnostics(
-        algorithm_code=jnp.asarray(0, dtype=jnp.int32),
-        steps=jnp.asarray(steps, dtype=jnp.int32),
-        basis_dim=jnp.asarray(basis.shape[0], dtype=jnp.int32),
-        restart_count=jnp.asarray(0, dtype=jnp.int32),
-        beta0=jnp.asarray(beta0, dtype=jnp.float64),
-        tail_norm=jnp.asarray(tail_norm, dtype=jnp.float64),
-        breakdown=jnp.asarray(breakdown),
-        used_adjoint=jnp.asarray(False),
-        gradient_supported=jnp.asarray(True),
-        probe_count=jnp.asarray(1, dtype=jnp.int32),
+    return matrix_free_core.krylov_diagnostics(
+        JrbMatKrylovDiagnostics,
+        algorithm_code=0,
+        steps=steps,
+        basis_dim=basis.shape[0],
+        beta0=beta0,
+        tail_norm=tail_norm,
+        breakdown=breakdown,
     )
 
 
 def _jrb_mat_funm_action_lanczos_point_base(matvec, x: jax.Array, dense_funm, steps: int):
-    basis, T, beta0 = jrb_mat_lanczos_tridiag_point(matvec, x, steps)
-    e1 = jnp.zeros((steps,), dtype=jnp.float64).at[0].set(1.0)
-    y = beta0 * (basis.T @ (dense_funm(T) @ e1))
-    out = _jrb_point_interval(y)
-    finite = jnp.all(jnp.isfinite(y), axis=-1)
-    return jnp.where(finite[..., None], out, _full_interval_like(out))
+    return matrix_free_core.projected_krylov_action_point(
+        matvec,
+        x,
+        dense_funm,
+        steps,
+        krylov_decomp=jrb_mat_lanczos_tridiag_point,
+        point_from_midpoint=_jrb_point_interval,
+        full_like=_full_interval_like,
+        finite_mask_fn=lambda y: jnp.all(jnp.isfinite(y), axis=-1),
+        coeff_dtype=jnp.float64,
+    )
 
 
 @partial(jax.custom_vjp, nondiff_argnums=(0, 2, 3))
@@ -1357,11 +1765,16 @@ jrb_mat_funm_action_lanczos_point.defvjp(
 
 
 def _jrb_mat_funm_integrand_lanczos_point_base(matvec, x: jax.Array, dense_funm, steps: int):
-    basis, T, beta0 = jrb_mat_lanczos_tridiag_point(matvec, x, steps)
-    del basis
-    e1 = jnp.zeros((steps,), dtype=jnp.float64).at[0].set(1.0)
-    value = (beta0**2) * jnp.vdot(e1, dense_funm(T) @ e1).real
-    return jnp.asarray(value, dtype=jnp.float64)
+    return matrix_free_core.projected_krylov_integrand_point(
+        matvec,
+        x,
+        dense_funm,
+        steps,
+        krylov_decomp=jrb_mat_lanczos_tridiag_point,
+        coeff_dtype=jnp.float64,
+        scalar_dtype=jnp.float64,
+        scalar_postprocess=lambda value: value.real,
+    )
 
 
 @partial(jax.custom_vjp, nondiff_argnums=(0, 2, 3))
@@ -1387,11 +1800,11 @@ jrb_mat_funm_integrand_lanczos_point.defvjp(
 
 
 def jrb_mat_dense_funm_sym_eigh_point(scalar_fun):
-    def apply(matrix: jax.Array) -> jax.Array:
-        evals, evecs = jnp.linalg.eigh(jnp.asarray(matrix, dtype=jnp.float64))
-        return evecs @ jnp.diag(scalar_fun(evals)) @ evecs.T
-
-    return apply
+    return matrix_free_core.dense_funm_hermitian_eigh(
+        scalar_fun,
+        dtype=jnp.float64,
+        conjugate_right=False,
+    )
 
 
 def _jrb_dense_funm_point(a: jax.Array, scalar_fun) -> jax.Array:
@@ -1406,6 +1819,292 @@ def jrb_mat_funm_action_lanczos_dense_point(a: jax.Array, x: jax.Array, dense_fu
     return _jrb_mat_funm_action_lanczos_point_base(jrb_mat_dense_operator(a), x, dense_funm, steps)
 
 
+def jrb_mat_log_action_lanczos_point(matvec, x: jax.Array, steps: int) -> jax.Array:
+    return jrb_mat_funm_action_lanczos_point(matvec, x, jrb_mat_dense_funm_sym_eigh_point(jnp.log), steps)
+
+
+def jrb_mat_log_action_lanczos_basic(
+    matvec,
+    x: jax.Array,
+    steps: int,
+    *,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return matrix_free_basic.action_basic(
+        jrb_mat_log_action_lanczos_point,
+        matvec,
+        x,
+        steps,
+        round_output=_jrb_round_basic,
+        prec_bits=prec_bits,
+    )
+
+
+def jrb_mat_sqrt_action_lanczos_point(matvec, x: jax.Array, steps: int) -> jax.Array:
+    return jrb_mat_funm_action_lanczos_point(matvec, x, jrb_mat_dense_funm_sym_eigh_point(jnp.sqrt), steps)
+
+
+def jrb_mat_sqrt_action_lanczos_basic(
+    matvec,
+    x: jax.Array,
+    steps: int,
+    *,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return matrix_free_basic.action_basic(
+        jrb_mat_sqrt_action_lanczos_point,
+        matvec,
+        x,
+        steps,
+        round_output=_jrb_round_basic,
+        prec_bits=prec_bits,
+    )
+
+
+def jrb_mat_root_action_lanczos_point(matvec, x: jax.Array, *, degree: int, steps: int) -> jax.Array:
+    if degree <= 0:
+        raise ValueError("degree must be > 0")
+    inv_degree = 1.0 / jnp.asarray(degree, dtype=jnp.float64)
+    return jrb_mat_funm_action_lanczos_point(
+        matvec,
+        x,
+        jrb_mat_dense_funm_sym_eigh_point(lambda vals: jnp.power(vals, inv_degree)),
+        steps,
+    )
+
+
+def jrb_mat_root_action_lanczos_basic(
+    matvec,
+    x: jax.Array,
+    *,
+    degree: int,
+    steps: int,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return matrix_free_basic.action_basic(
+        jrb_mat_root_action_lanczos_point,
+        matvec,
+        x,
+        degree=degree,
+        steps=steps,
+        round_output=_jrb_round_basic,
+        prec_bits=prec_bits,
+    )
+
+
+def jrb_mat_sign_action_lanczos_point(matvec, x: jax.Array, steps: int) -> jax.Array:
+    return jrb_mat_funm_action_lanczos_point(matvec, x, jrb_mat_dense_funm_sym_eigh_point(jnp.sign), steps)
+
+
+def jrb_mat_sign_action_lanczos_basic(
+    matvec,
+    x: jax.Array,
+    steps: int,
+    *,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return matrix_free_basic.action_basic(
+        jrb_mat_sign_action_lanczos_point,
+        matvec,
+        x,
+        steps,
+        round_output=_jrb_round_basic,
+        prec_bits=prec_bits,
+    )
+
+
+def jrb_mat_sin_action_lanczos_point(matvec, x: jax.Array, steps: int) -> jax.Array:
+    return jrb_mat_funm_action_lanczos_point(matvec, x, jrb_mat_dense_funm_sym_eigh_point(jnp.sin), steps)
+
+
+def jrb_mat_sin_action_lanczos_basic(
+    matvec,
+    x: jax.Array,
+    steps: int,
+    *,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return matrix_free_basic.action_basic(
+        jrb_mat_sin_action_lanczos_point,
+        matvec,
+        x,
+        steps,
+        round_output=_jrb_round_basic,
+        prec_bits=prec_bits,
+    )
+
+
+def jrb_mat_cos_action_lanczos_point(matvec, x: jax.Array, steps: int) -> jax.Array:
+    return jrb_mat_funm_action_lanczos_point(matvec, x, jrb_mat_dense_funm_sym_eigh_point(jnp.cos), steps)
+
+
+def jrb_mat_cos_action_lanczos_basic(
+    matvec,
+    x: jax.Array,
+    steps: int,
+    *,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return matrix_free_basic.action_basic(
+        jrb_mat_cos_action_lanczos_point,
+        matvec,
+        x,
+        steps,
+        round_output=_jrb_round_basic,
+        prec_bits=prec_bits,
+    )
+
+
+def jrb_mat_sinh_action_lanczos_point(matvec, x: jax.Array, steps: int) -> jax.Array:
+    return jrb_mat_funm_action_lanczos_point(matvec, x, jrb_mat_dense_funm_sym_eigh_point(jnp.sinh), steps)
+
+
+def jrb_mat_sinh_action_lanczos_basic(
+    matvec,
+    x: jax.Array,
+    steps: int,
+    *,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return matrix_free_basic.action_basic(
+        jrb_mat_sinh_action_lanczos_point,
+        matvec,
+        x,
+        steps,
+        round_output=_jrb_round_basic,
+        prec_bits=prec_bits,
+    )
+
+
+def jrb_mat_cosh_action_lanczos_point(matvec, x: jax.Array, steps: int) -> jax.Array:
+    return jrb_mat_funm_action_lanczos_point(matvec, x, jrb_mat_dense_funm_sym_eigh_point(jnp.cosh), steps)
+
+
+def jrb_mat_cosh_action_lanczos_basic(
+    matvec,
+    x: jax.Array,
+    steps: int,
+    *,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return matrix_free_basic.action_basic(
+        jrb_mat_cosh_action_lanczos_point,
+        matvec,
+        x,
+        steps,
+        round_output=_jrb_round_basic,
+        prec_bits=prec_bits,
+    )
+
+
+def jrb_mat_tanh_action_lanczos_point(matvec, x: jax.Array, steps: int) -> jax.Array:
+    return jrb_mat_funm_action_lanczos_point(matvec, x, jrb_mat_dense_funm_sym_eigh_point(jnp.tanh), steps)
+
+
+def jrb_mat_tanh_action_lanczos_basic(
+    matvec,
+    x: jax.Array,
+    steps: int,
+    *,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return matrix_free_basic.action_basic(
+        jrb_mat_tanh_action_lanczos_point,
+        matvec,
+        x,
+        steps,
+        round_output=_jrb_round_basic,
+        prec_bits=prec_bits,
+    )
+
+
+def jrb_mat_log_action_lanczos_dense_point(a: jax.Array, x: jax.Array, steps: int) -> jax.Array:
+    return jrb_mat_log_action_lanczos_point(jrb_mat_dense_operator(a), x, steps)
+
+
+def jrb_mat_sqrt_action_lanczos_dense_point(a: jax.Array, x: jax.Array, steps: int) -> jax.Array:
+    return jrb_mat_sqrt_action_lanczos_point(jrb_mat_dense_operator(a), x, steps)
+
+
+def jrb_mat_root_action_lanczos_dense_point(a: jax.Array, x: jax.Array, *, degree: int, steps: int) -> jax.Array:
+    return jrb_mat_root_action_lanczos_point(jrb_mat_dense_operator(a), x, degree=degree, steps=steps)
+
+
+def jrb_mat_sign_action_lanczos_dense_point(a: jax.Array, x: jax.Array, steps: int) -> jax.Array:
+    return jrb_mat_sign_action_lanczos_point(jrb_mat_dense_operator(a), x, steps)
+
+
+def jrb_mat_sin_action_lanczos_dense_point(a: jax.Array, x: jax.Array, steps: int) -> jax.Array:
+    return jrb_mat_sin_action_lanczos_point(jrb_mat_dense_operator(a), x, steps)
+
+
+def jrb_mat_cos_action_lanczos_dense_point(a: jax.Array, x: jax.Array, steps: int) -> jax.Array:
+    return jrb_mat_cos_action_lanczos_point(jrb_mat_dense_operator(a), x, steps)
+
+
+def jrb_mat_sinh_action_lanczos_dense_point(a: jax.Array, x: jax.Array, steps: int) -> jax.Array:
+    return jrb_mat_sinh_action_lanczos_point(jrb_mat_dense_operator(a), x, steps)
+
+
+def jrb_mat_cosh_action_lanczos_dense_point(a: jax.Array, x: jax.Array, steps: int) -> jax.Array:
+    return jrb_mat_cosh_action_lanczos_point(jrb_mat_dense_operator(a), x, steps)
+
+
+def jrb_mat_tanh_action_lanczos_dense_point(a: jax.Array, x: jax.Array, steps: int) -> jax.Array:
+    return jrb_mat_tanh_action_lanczos_point(jrb_mat_dense_operator(a), x, steps)
+
+
+def jrb_mat_pow_action_lanczos_point(matvec, x: jax.Array, *, exponent: int, steps: int) -> jax.Array:
+    if exponent < 0:
+        raise ValueError("exponent must be >= 0")
+    return jrb_mat_funm_action_lanczos_point(
+        matvec,
+        x,
+        jrb_mat_dense_funm_sym_eigh_point(lambda vals: jnp.power(vals, exponent)),
+        steps,
+    )
+
+
+def jrb_mat_pow_action_lanczos_basic(
+    matvec,
+    x: jax.Array,
+    *,
+    exponent: int,
+    steps: int,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return matrix_free_basic.action_basic(
+        jrb_mat_pow_action_lanczos_point,
+        matvec,
+        x,
+        exponent=exponent,
+        steps=steps,
+        round_output=_jrb_round_basic,
+        prec_bits=prec_bits,
+    )
+
+
+def jrb_mat_pow_action_lanczos_dense_point(a: jax.Array, x: jax.Array, *, exponent: int, steps: int) -> jax.Array:
+    return jrb_mat_pow_action_lanczos_point(jrb_mat_dense_operator(a), x, exponent=exponent, steps=steps)
+
+
+def jrb_mat_pow_action_lanczos_with_diagnostics_point(
+    matvec,
+    x: jax.Array,
+    *,
+    exponent: int,
+    steps: int,
+) -> tuple[jax.Array, JrbMatKrylovDiagnostics]:
+    if exponent < 0:
+        raise ValueError("exponent must be >= 0")
+    return jrb_mat_funm_action_lanczos_with_diagnostics_point(
+        matvec,
+        x,
+        jrb_mat_dense_funm_sym_eigh_point(lambda vals: jnp.power(vals, exponent)),
+        steps,
+    )
+
+
 def jrb_mat_expm_action_lanczos_restarted_point(
     matvec,
     x: jax.Array,
@@ -1413,21 +2112,17 @@ def jrb_mat_expm_action_lanczos_restarted_point(
     steps: int,
     restarts: int,
 ) -> jax.Array:
-    x = jrb_mat_as_interval_vector(x)
-    if restarts <= 0:
-        raise ValueError("restarts must be > 0")
-
     dense_exp = jrb_mat_dense_funm_sym_eigh_point(jnp.exp)
+    scaled_matvec = matrix_free_core.scaled_operator(
+        matvec,
+        float(1.0 / restarts),
+    )
 
-    def scaled_matvec(v):
-        return matvec(v) / jnp.asarray(restarts, dtype=jnp.float64)
-
-    def body(y, _):
-        next_y = jrb_mat_funm_action_lanczos_point(scaled_matvec, y, dense_exp, steps)
-        return next_y, None
-
-    y, _ = lax.scan(body, x, xs=None, length=restarts)
-    return y
+    return matrix_free_core.restarted_action_point(
+        lambda y: jrb_mat_funm_action_lanczos_point(scaled_matvec, y, dense_exp, steps),
+        jrb_mat_as_interval_vector(x),
+        restarts=restarts,
+    )
 
 
 def jrb_mat_expm_action_lanczos_block_point(
@@ -1437,15 +2132,10 @@ def jrb_mat_expm_action_lanczos_block_point(
     steps: int,
     restarts: int = 1,
 ) -> jax.Array:
-    xs = di.as_interval(xs)
-    return jax.vmap(
-        lambda x: jrb_mat_expm_action_lanczos_restarted_point(
-            matvec,
-            x,
-            steps=steps,
-            restarts=restarts,
-        )
-    )(xs)
+    return matrix_free_core.block_action_point(
+        lambda x: jrb_mat_expm_action_lanczos_restarted_point(matvec, x, steps=steps, restarts=restarts),
+        di.as_interval(xs),
+    )
 
 
 def jrb_mat_expm_action_lanczos_restarted_with_diagnostics_point(
@@ -1483,7 +2173,7 @@ def jrb_mat_signm(a: jax.Array) -> jax.Array:
 def _jrb_mat_trace_integrand_point_base(matvec, x: jax.Array) -> jax.Array:
     x = jrb_mat_as_interval_vector(x)
     x_mid = _jrb_mid_vector(x)
-    y = jnp.asarray(matvec(x), dtype=jnp.float64)
+    y = _jrb_apply_operator_mid(matvec, x)
     return jnp.vdot(x_mid, y).real
 
 
@@ -1498,7 +2188,7 @@ def _jrb_mat_trace_integrand_point_fwd(matvec, x):
 
 
 def _jrb_mat_trace_integrand_point_bwd(matvec, x, cotangent):
-    action = jnp.asarray(matvec(x), dtype=jnp.float64)
+    action = _jrb_apply_operator_mid(matvec, x)
     scale = jnp.asarray(cotangent, dtype=jnp.float64)
     return (_jrb_point_interval(2.0 * scale * action),)
 
@@ -1530,6 +2220,59 @@ def jrb_mat_logdet_slq_point(matvec, probes: jax.Array, steps: int) -> jax.Array
     )
 
 
+def jrb_mat_logdet_slq_basic(
+    matvec,
+    probes: jax.Array,
+    steps: int,
+    *,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return matrix_free_basic.scalar_functional_basic(
+        jrb_mat_logdet_slq_point,
+        matvec,
+        probes,
+        steps,
+        lift_scalar=_jrb_point_interval,
+        round_output=_jrb_round_basic,
+        prec_bits=prec_bits,
+    )
+
+
+def jrb_mat_det_slq_point(matvec, probes: jax.Array, steps: int) -> jax.Array:
+    return matrix_free_core.det_from_logdet(jrb_mat_logdet_slq_point(matvec, probes, steps))
+
+
+def jrb_mat_det_slq_basic(
+    matvec,
+    probes: jax.Array,
+    steps: int,
+    *,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return matrix_free_basic.scalar_functional_basic(
+        jrb_mat_det_slq_point,
+        matvec,
+        probes,
+        steps,
+        lift_scalar=_jrb_point_interval,
+        round_output=_jrb_round_basic,
+        prec_bits=prec_bits,
+    )
+
+
+def _jrb_mat_logdet_slq_point_plan_kernel(matvec, probes: jax.Array, steps: int) -> jax.Array:
+    dense_funm = jrb_mat_dense_funm_sym_eigh_point(jnp.log)
+    return mat_common.estimator_mean(
+        probes,
+        di.as_interval,
+        lambda v: _jrb_mat_funm_integrand_lanczos_point_base(matvec, v, dense_funm, steps),
+    )
+
+
+def _jrb_mat_det_slq_point_plan_kernel(matvec, probes: jax.Array, steps: int) -> jax.Array:
+    return matrix_free_core.det_from_logdet(_jrb_mat_logdet_slq_point_plan_kernel(matvec, probes, steps))
+
+
 def jrb_mat_funm_action_lanczos_with_diagnostics_point(
     matvec,
     x: jax.Array,
@@ -1541,6 +2284,144 @@ def jrb_mat_funm_action_lanczos_with_diagnostics_point(
         lambda xx: jrb_mat_lanczos_diagnostics_point(matvec, xx, steps),
         x,
     )
+
+
+def jrb_mat_log_action_lanczos_with_diagnostics_point(
+    matvec,
+    x: jax.Array,
+    steps: int,
+) -> tuple[jax.Array, JrbMatKrylovDiagnostics]:
+    return jrb_mat_funm_action_lanczos_with_diagnostics_point(
+        matvec,
+        x,
+        jrb_mat_dense_funm_sym_eigh_point(jnp.log),
+        steps,
+    )
+
+
+def jrb_mat_sqrt_action_lanczos_with_diagnostics_point(
+    matvec,
+    x: jax.Array,
+    steps: int,
+) -> tuple[jax.Array, JrbMatKrylovDiagnostics]:
+    return jrb_mat_funm_action_lanczos_with_diagnostics_point(
+        matvec,
+        x,
+        jrb_mat_dense_funm_sym_eigh_point(jnp.sqrt),
+        steps,
+    )
+
+
+def jrb_mat_root_action_lanczos_with_diagnostics_point(
+    matvec,
+    x: jax.Array,
+    *,
+    degree: int,
+    steps: int,
+) -> tuple[jax.Array, JrbMatKrylovDiagnostics]:
+    if degree <= 0:
+        raise ValueError("degree must be > 0")
+    inv_degree = 1.0 / jnp.asarray(degree, dtype=jnp.float64)
+    return jrb_mat_funm_action_lanczos_with_diagnostics_point(
+        matvec,
+        x,
+        jrb_mat_dense_funm_sym_eigh_point(lambda vals: jnp.power(vals, inv_degree)),
+        steps,
+    )
+
+
+def jrb_mat_sign_action_lanczos_with_diagnostics_point(
+    matvec,
+    x: jax.Array,
+    steps: int,
+) -> tuple[jax.Array, JrbMatKrylovDiagnostics]:
+    return jrb_mat_funm_action_lanczos_with_diagnostics_point(
+        matvec,
+        x,
+        jrb_mat_dense_funm_sym_eigh_point(jnp.sign),
+        steps,
+    )
+
+
+def jrb_mat_sin_action_lanczos_with_diagnostics_point(
+    matvec,
+    x: jax.Array,
+    steps: int,
+) -> tuple[jax.Array, JrbMatKrylovDiagnostics]:
+    return jrb_mat_funm_action_lanczos_with_diagnostics_point(
+        matvec,
+        x,
+        jrb_mat_dense_funm_sym_eigh_point(jnp.sin),
+        steps,
+    )
+
+
+def jrb_mat_cos_action_lanczos_with_diagnostics_point(
+    matvec,
+    x: jax.Array,
+    steps: int,
+) -> tuple[jax.Array, JrbMatKrylovDiagnostics]:
+    return jrb_mat_funm_action_lanczos_with_diagnostics_point(
+        matvec,
+        x,
+        jrb_mat_dense_funm_sym_eigh_point(jnp.cos),
+        steps,
+    )
+
+
+def jrb_mat_sinh_action_lanczos_with_diagnostics_point(
+    matvec,
+    x: jax.Array,
+    steps: int,
+) -> tuple[jax.Array, JrbMatKrylovDiagnostics]:
+    return jrb_mat_funm_action_lanczos_with_diagnostics_point(
+        matvec,
+        x,
+        jrb_mat_dense_funm_sym_eigh_point(jnp.sinh),
+        steps,
+    )
+
+
+def jrb_mat_cosh_action_lanczos_with_diagnostics_point(
+    matvec,
+    x: jax.Array,
+    steps: int,
+) -> tuple[jax.Array, JrbMatKrylovDiagnostics]:
+    return jrb_mat_funm_action_lanczos_with_diagnostics_point(
+        matvec,
+        x,
+        jrb_mat_dense_funm_sym_eigh_point(jnp.cosh),
+        steps,
+    )
+
+
+def jrb_mat_tanh_action_lanczos_with_diagnostics_point(
+    matvec,
+    x: jax.Array,
+    steps: int,
+) -> tuple[jax.Array, JrbMatKrylovDiagnostics]:
+    return jrb_mat_funm_action_lanczos_with_diagnostics_point(
+        matvec,
+        x,
+        jrb_mat_dense_funm_sym_eigh_point(jnp.tanh),
+        steps,
+    )
+
+
+def jrb_mat_logdet_slq_symmetric_point(matvec, probes: jax.Array, steps: int) -> jax.Array:
+    return jrb_mat_logdet_slq_point(matvec, probes, steps)
+
+
+def jrb_mat_det_slq_symmetric_point(matvec, probes: jax.Array, steps: int) -> jax.Array:
+    return jrb_mat_det_slq_point(matvec, probes, steps)
+
+
+def jrb_mat_logdet_slq_spd_point(matvec, probes: jax.Array, steps: int) -> jax.Array:
+    return jrb_mat_logdet_slq_point(matvec, probes, steps)
+
+
+def jrb_mat_det_slq_spd_point(matvec, probes: jax.Array, steps: int) -> jax.Array:
+    return jrb_mat_det_slq_point(matvec, probes, steps)
 
 
 def jrb_mat_trace_estimator_with_diagnostics_point(
@@ -1574,18 +2455,59 @@ def jrb_mat_logdet_slq_with_diagnostics_point(
     )
 
 
+def jrb_mat_logdet_slq_with_diagnostics_basic(
+    matvec,
+    probes: jax.Array,
+    steps: int,
+    *,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+):
+    return matrix_free_basic.scalar_functional_with_diagnostics_basic(
+        jrb_mat_logdet_slq_with_diagnostics_point,
+        matvec,
+        probes,
+        steps,
+        lift_scalar=_jrb_point_interval,
+        round_output=_jrb_round_basic,
+        prec_bits=prec_bits,
+    )
+
+
+def jrb_mat_det_slq_with_diagnostics_point(
+    matvec,
+    probes: jax.Array,
+    steps: int,
+) -> tuple[jax.Array, JrbMatKrylovDiagnostics]:
+    value, diag = jrb_mat_logdet_slq_with_diagnostics_point(matvec, probes, steps)
+    return matrix_free_core.det_from_logdet(value), diag
+
+
+def jrb_mat_det_slq_with_diagnostics_basic(
+    matvec,
+    probes: jax.Array,
+    steps: int,
+    *,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+):
+    return matrix_free_basic.scalar_functional_with_diagnostics_basic(
+        jrb_mat_det_slq_with_diagnostics_point,
+        matvec,
+        probes,
+        steps,
+        lift_scalar=_jrb_point_interval,
+        round_output=_jrb_round_basic,
+        prec_bits=prec_bits,
+    )
+
+
 def jrb_mat_rademacher_probes_like(x: jax.Array, *, key: jax.Array, num: int) -> jax.Array:
     x = jrb_mat_as_interval_vector(x)
-    shape = (num,) + x.shape
-    mids = jax.random.rademacher(key, shape=x.shape[:-1] + (x.shape[-2],), dtype=jnp.float64)
-    mids = jax.random.rademacher(key, shape=(num, x.shape[-2]), dtype=jnp.float64)
-    return jax.vmap(_jrb_point_interval)(mids)
+    return matrix_free_core.rademacher_probes_real(_jrb_point_interval, x.shape[-2], key=key, num=num)
 
 
 def jrb_mat_normal_probes_like(x: jax.Array, *, key: jax.Array, num: int) -> jax.Array:
     x = jrb_mat_as_interval_vector(x)
-    mids = jax.random.normal(key, shape=(num, x.shape[-2]), dtype=jnp.float64)
-    return jax.vmap(_jrb_point_interval)(mids)
+    return matrix_free_core.normal_probes_real(_jrb_point_interval, x.shape[-2], key=key, num=num)
 
 
 @partial(jax.jit, static_argnames=("prec_bits",))
@@ -1633,7 +2555,67 @@ jrb_mat_matvec_basic_jit = jax.jit(jrb_mat_matvec_basic)
 jrb_mat_solve_basic_jit = jax.jit(jrb_mat_solve_basic)
 jrb_mat_triangular_solve_basic_jit = jax.jit(jrb_mat_triangular_solve_basic, static_argnames=("lower", "unit_diagonal"))
 jrb_mat_lu_basic_jit = jax.jit(jrb_mat_lu_basic)
-jrb_mat_expm_action_basic_jit = jax.jit(jrb_mat_expm_action_basic, static_argnames=("matvec", "terms"))
+
+_jrb_mat_expm_action_basic_jit_callable = jax.jit(jrb_mat_expm_action_basic, static_argnames=("matvec", "terms"))
+_jrb_mat_expm_action_basic_jit_plan = jax.jit(jrb_mat_expm_action_basic, static_argnames=("terms",))
+
+
+def jrb_mat_expm_action_basic_jit(matvec, x: jax.Array, terms: int = 16) -> jax.Array:
+    if isinstance(matvec, matrix_free_core.OperatorPlan):
+        return _jrb_mat_expm_action_basic_jit_plan(matvec, x, terms=terms)
+    return _jrb_mat_expm_action_basic_jit_callable(matvec, x, terms=terms)
+
+
+_jrb_mat_solve_action_point_jit_callable = jax.jit(
+    jrb_mat_solve_action_point,
+    static_argnames=("matvec", "tol", "atol", "maxiter", "symmetric", "preconditioner"),
+)
+_jrb_mat_solve_action_point_jit_plan = jax.jit(
+    jrb_mat_solve_action_point,
+    static_argnames=("tol", "atol", "maxiter", "symmetric", "preconditioner"),
+)
+
+
+def jrb_mat_solve_action_point_jit(matvec, b: jax.Array, **kwargs) -> jax.Array:
+    if isinstance(matvec, matrix_free_core.OperatorPlan):
+        return _jrb_mat_solve_action_point_jit_plan(matvec, b, **kwargs)
+    return _jrb_mat_solve_action_point_jit_callable(matvec, b, **kwargs)
+
+
+_jrb_mat_inverse_action_point_jit_callable = jax.jit(
+    jrb_mat_inverse_action_point,
+    static_argnames=("matvec", "tol", "atol", "maxiter", "symmetric", "preconditioner"),
+)
+_jrb_mat_inverse_action_point_jit_plan = jax.jit(
+    jrb_mat_inverse_action_point,
+    static_argnames=("tol", "atol", "maxiter", "symmetric", "preconditioner"),
+)
+
+
+def jrb_mat_inverse_action_point_jit(matvec, x: jax.Array, **kwargs) -> jax.Array:
+    if isinstance(matvec, matrix_free_core.OperatorPlan):
+        return _jrb_mat_inverse_action_point_jit_plan(matvec, x, **kwargs)
+    return _jrb_mat_inverse_action_point_jit_callable(matvec, x, **kwargs)
+
+
+_jrb_mat_logdet_slq_point_jit_callable = jax.jit(jrb_mat_logdet_slq_point, static_argnames=("matvec", "steps"))
+_jrb_mat_logdet_slq_point_jit_plan = jax.jit(_jrb_mat_logdet_slq_point_plan_kernel, static_argnames=("steps",))
+
+
+def jrb_mat_logdet_slq_point_jit(matvec, probes: jax.Array, steps: int) -> jax.Array:
+    if isinstance(matvec, matrix_free_core.OperatorPlan):
+        return _jrb_mat_logdet_slq_point_jit_plan(matvec, probes, steps=steps)
+    return _jrb_mat_logdet_slq_point_jit_callable(matvec, probes, steps=steps)
+
+
+_jrb_mat_det_slq_point_jit_callable = jax.jit(jrb_mat_det_slq_point, static_argnames=("matvec", "steps"))
+_jrb_mat_det_slq_point_jit_plan = jax.jit(_jrb_mat_det_slq_point_plan_kernel, static_argnames=("steps",))
+
+
+def jrb_mat_det_slq_point_jit(matvec, probes: jax.Array, steps: int) -> jax.Array:
+    if isinstance(matvec, matrix_free_core.OperatorPlan):
+        return _jrb_mat_det_slq_point_jit_plan(matvec, probes, steps=steps)
+    return _jrb_mat_det_slq_point_jit_callable(matvec, probes, steps=steps)
 
 
 __all__ = [
@@ -1669,8 +2651,29 @@ __all__ = [
     "jrb_mat_norm_inf_basic",
     "jrb_mat_dense_operator",
     "jrb_mat_dense_operator_adjoint",
+    "jrb_mat_dense_operator_rmatvec",
+    "jrb_mat_dense_operator_plan_prepare",
+    "jrb_mat_dense_operator_rmatvec_plan_prepare",
+    "jrb_mat_dense_operator_adjoint_plan_prepare",
     "jrb_mat_bcoo_operator",
     "jrb_mat_bcoo_operator_adjoint",
+    "jrb_mat_bcoo_operator_rmatvec",
+    "jrb_mat_bcoo_operator_plan_prepare",
+    "jrb_mat_bcoo_operator_rmatvec_plan_prepare",
+    "jrb_mat_bcoo_operator_adjoint_plan_prepare",
+    "jrb_mat_operator_plan_apply",
+    "jrb_mat_rmatvec_point",
+    "jrb_mat_rmatvec_basic",
+    "jrb_mat_lanczos_tridiag_adjoint",
+    "jrb_mat_cg_fixed_iterations",
+    "jrb_mat_solve_action_point",
+    "jrb_mat_solve_action_basic",
+    "jrb_mat_solve_action_with_diagnostics_point",
+    "jrb_mat_solve_action_with_diagnostics_basic",
+    "jrb_mat_inverse_action_point",
+    "jrb_mat_inverse_action_basic",
+    "jrb_mat_inverse_action_with_diagnostics_point",
+    "jrb_mat_inverse_action_with_diagnostics_basic",
     "jrb_mat_bcoo_parametric_operator",
     "jrb_mat_scipy_csr_operator",
     "jrb_mat_bcoo_gershgorin_bounds",
@@ -1688,6 +2691,33 @@ __all__ = [
     "jrb_mat_funm_integrand_lanczos_point",
     "jrb_mat_dense_funm_sym_eigh_point",
     "jrb_mat_funm_action_lanczos_dense_point",
+    "jrb_mat_log_action_lanczos_point",
+    "jrb_mat_log_action_lanczos_basic",
+    "jrb_mat_sqrt_action_lanczos_point",
+    "jrb_mat_sqrt_action_lanczos_basic",
+    "jrb_mat_root_action_lanczos_point",
+    "jrb_mat_root_action_lanczos_basic",
+    "jrb_mat_sign_action_lanczos_point",
+    "jrb_mat_sign_action_lanczos_basic",
+    "jrb_mat_sin_action_lanczos_point",
+    "jrb_mat_sin_action_lanczos_basic",
+    "jrb_mat_cos_action_lanczos_point",
+    "jrb_mat_cos_action_lanczos_basic",
+    "jrb_mat_sinh_action_lanczos_point",
+    "jrb_mat_sinh_action_lanczos_basic",
+    "jrb_mat_cosh_action_lanczos_point",
+    "jrb_mat_cosh_action_lanczos_basic",
+    "jrb_mat_tanh_action_lanczos_point",
+    "jrb_mat_tanh_action_lanczos_basic",
+    "jrb_mat_log_action_lanczos_dense_point",
+    "jrb_mat_sqrt_action_lanczos_dense_point",
+    "jrb_mat_root_action_lanczos_dense_point",
+    "jrb_mat_sign_action_lanczos_dense_point",
+    "jrb_mat_sin_action_lanczos_dense_point",
+    "jrb_mat_cos_action_lanczos_dense_point",
+    "jrb_mat_sinh_action_lanczos_dense_point",
+    "jrb_mat_cosh_action_lanczos_dense_point",
+    "jrb_mat_tanh_action_lanczos_dense_point",
     "jrb_mat_expm_action_lanczos_restarted_point",
     "jrb_mat_expm_action_lanczos_block_point",
     "jrb_mat_expm_action_lanczos_restarted_with_diagnostics_point",
@@ -1696,12 +2726,29 @@ __all__ = [
     "jrb_mat_trace_estimator_point",
     "jrb_mat_trace_estimator_with_diagnostics_point",
     "jrb_mat_logdet_slq_point",
+    "jrb_mat_logdet_slq_basic",
     "jrb_mat_logdet_slq_with_diagnostics_point",
+    "jrb_mat_logdet_slq_with_diagnostics_basic",
+    "jrb_mat_det_slq_point",
+    "jrb_mat_det_slq_basic",
+    "jrb_mat_det_slq_with_diagnostics_point",
+    "jrb_mat_det_slq_with_diagnostics_basic",
+    "jrb_mat_log_action_lanczos_with_diagnostics_point",
+    "jrb_mat_sqrt_action_lanczos_with_diagnostics_point",
+    "jrb_mat_root_action_lanczos_with_diagnostics_point",
+    "jrb_mat_sign_action_lanczos_with_diagnostics_point",
+    "jrb_mat_sin_action_lanczos_with_diagnostics_point",
+    "jrb_mat_cos_action_lanczos_with_diagnostics_point",
+    "jrb_mat_sinh_action_lanczos_with_diagnostics_point",
+    "jrb_mat_cosh_action_lanczos_with_diagnostics_point",
+    "jrb_mat_tanh_action_lanczos_with_diagnostics_point",
     "jrb_mat_log_action_leja_point",
     "jrb_mat_log_action_leja_with_diagnostics_point",
     "jrb_mat_hutchpp_trace_point",
     "jrb_mat_logdet_leja_hutchpp_point",
     "jrb_mat_logdet_leja_hutchpp_with_diagnostics_point",
+    "jrb_mat_det_leja_hutchpp_point",
+    "jrb_mat_det_leja_hutchpp_with_diagnostics_point",
     "jrb_mat_bcoo_logdet_leja_hutchpp_point",
     "jrb_mat_bcoo_logdet_leja_hutchpp_with_diagnostics_point",
     "jrb_mat_bcoo_inverse_diagonal_point",
@@ -1723,4 +2770,8 @@ __all__ = [
     "jrb_mat_sqrtm",
     "jrb_mat_rootm",
     "jrb_mat_signm",
+    "jrb_mat_pow_action_lanczos_point",
+    "jrb_mat_pow_action_lanczos_basic",
+    "jrb_mat_pow_action_lanczos_dense_point",
+    "jrb_mat_pow_action_lanczos_with_diagnostics_point",
 ]

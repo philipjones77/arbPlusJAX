@@ -159,6 +159,14 @@ def _arb_passthrough_prec(fn: Callable[..., jax.Array]) -> Callable[..., jax.Arr
     return wrapped
 
 
+def _lazy_ball_wrapper(attr_name: str) -> Callable[..., jax.Array]:
+    def wrapped(*args, **kwargs):
+        fn = getattr(ball_wrappers, attr_name)
+        return fn(*args, **kwargs)
+
+    return wrapped
+
+
 def _acb_rigorous_adapter(name: str) -> Callable[..., jax.Array] | None:
     if name in ("acb_exp_prec", "acb_exp_batch_prec"):
         return _acb_exp_rigorous
@@ -225,11 +233,11 @@ def _acb_rigorous_adapter(name: str) -> Callable[..., jax.Array] | None:
 
 def _acb_adaptive_adapter(name: str) -> Callable[..., jax.Array] | None:
     if name in ("acb_exp_prec", "acb_exp_batch_prec"):
-        return ball_wrappers.acb_ball_exp_adaptive
+        return _lazy_ball_wrapper("acb_ball_exp_adaptive")
     if name in ("acb_log_prec", "acb_log_batch_prec"):
-        return ball_wrappers.acb_ball_log_adaptive
+        return _lazy_ball_wrapper("acb_ball_log_adaptive")
     if name in ("acb_sin_prec", "acb_sin_batch_prec"):
-        return ball_wrappers.acb_ball_sin_adaptive
+        return _lazy_ball_wrapper("acb_ball_sin_adaptive")
     if name in ("acb_abs_prec", "acb_abs_batch_prec"):
         return _acb_passthrough_prec(acb_core.acb_abs_prec)
     if name in ("acb_sin_cos_prec", "acb_sin_cos_batch_prec"):
@@ -270,21 +278,21 @@ def _arb_rigorous_adapter(name: str) -> Callable[..., jax.Array] | None:
     if name in ("arb_sinh_cosh_prec", "arb_sinh_cosh_batch_prec"):
         return _arb_passthrough_prec(arb_core.arb_sinh_cosh_prec)
     if name in ("arb_gamma_prec", "arb_gamma_batch_prec"):
-        return ball_wrappers.arb_ball_gamma
+        return _lazy_ball_wrapper("arb_ball_gamma")
     if name in ("arb_lgamma_prec", "arb_lgamma_batch_prec"):
-        return ball_wrappers.arb_ball_lgamma
+        return _lazy_ball_wrapper("arb_ball_lgamma")
     if name in ("arb_rgamma_prec", "arb_rgamma_batch_prec"):
-        return ball_wrappers.arb_ball_rgamma
+        return _lazy_ball_wrapper("arb_ball_rgamma")
     if name in ("arb_pow_prec", "arb_pow_batch_prec"):
-        return ball_wrappers.arb_ball_pow
+        return _lazy_ball_wrapper("arb_ball_pow")
     if name in ("arb_pow_ui_prec", "arb_pow_ui_batch_prec"):
-        return ball_wrappers.arb_ball_pow_ui
+        return _lazy_ball_wrapper("arb_ball_pow_ui")
     if name in ("arb_pow_fmpq_prec", "arb_pow_fmpq_batch_prec"):
-        return ball_wrappers.arb_ball_pow_fmpq
+        return _lazy_ball_wrapper("arb_ball_pow_fmpq")
     if name in ("arb_root_ui_prec", "arb_root_ui_batch_prec"):
-        return ball_wrappers.arb_ball_root_ui
+        return _lazy_ball_wrapper("arb_ball_root_ui")
     if name in ("arb_root_prec", "arb_root_batch_prec"):
-        return ball_wrappers.arb_ball_root
+        return _lazy_ball_wrapper("arb_ball_root")
     if name in (
         "arb_sin_pi_prec", "arb_sin_pi_batch_prec",
         "arb_cos_pi_prec", "arb_cos_pi_batch_prec",
@@ -312,27 +320,27 @@ def _arb_rigorous_adapter(name: str) -> Callable[..., jax.Array] | None:
 
 def _arb_adaptive_adapter(name: str) -> Callable[..., jax.Array] | None:
     if name in ("arb_exp_prec", "arb_exp_batch_prec"):
-        return ball_wrappers.arb_ball_exp_adaptive
+        return _lazy_ball_wrapper("arb_ball_exp_adaptive")
     if name in ("arb_log_prec", "arb_log_batch_prec"):
-        return ball_wrappers.arb_ball_log_adaptive
+        return _lazy_ball_wrapper("arb_ball_log_adaptive")
     if name in ("arb_sin_prec", "arb_sin_batch_prec"):
-        return ball_wrappers.arb_ball_sin_adaptive
+        return _lazy_ball_wrapper("arb_ball_sin_adaptive")
     if name in ("arb_gamma_prec", "arb_gamma_batch_prec"):
-        return ball_wrappers.arb_ball_gamma_adaptive
+        return _lazy_ball_wrapper("arb_ball_gamma_adaptive")
     if name in ("arb_lgamma_prec", "arb_lgamma_batch_prec"):
-        return ball_wrappers.arb_ball_lgamma_adaptive
+        return _lazy_ball_wrapper("arb_ball_lgamma_adaptive")
     if name in ("arb_rgamma_prec", "arb_rgamma_batch_prec"):
-        return ball_wrappers.arb_ball_rgamma_adaptive
+        return _lazy_ball_wrapper("arb_ball_rgamma_adaptive")
     if name in ("arb_pow_prec", "arb_pow_batch_prec"):
-        return ball_wrappers.arb_ball_pow_adaptive
+        return _lazy_ball_wrapper("arb_ball_pow_adaptive")
     if name in ("arb_pow_ui_prec", "arb_pow_ui_batch_prec"):
-        return ball_wrappers.arb_ball_pow_ui_adaptive
+        return _lazy_ball_wrapper("arb_ball_pow_ui_adaptive")
     if name in ("arb_pow_fmpq_prec", "arb_pow_fmpq_batch_prec"):
-        return ball_wrappers.arb_ball_pow_fmpq_adaptive
+        return _lazy_ball_wrapper("arb_ball_pow_fmpq_adaptive")
     if name in ("arb_root_ui_prec", "arb_root_ui_batch_prec"):
-        return ball_wrappers.arb_ball_root_ui_adaptive
+        return _lazy_ball_wrapper("arb_ball_root_ui_adaptive")
     if name in ("arb_root_prec", "arb_root_batch_prec"):
-        return ball_wrappers.arb_ball_root_adaptive
+        return _lazy_ball_wrapper("arb_ball_root_adaptive")
     if name in ("arb_sin_cos_prec", "arb_sin_cos_batch_prec"):
         return _arb_passthrough_prec(arb_core.arb_sin_cos_prec)
     if name in ("arb_sinh_cosh_prec", "arb_sinh_cosh_batch_prec"):

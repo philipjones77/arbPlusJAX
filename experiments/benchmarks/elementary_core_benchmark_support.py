@@ -172,7 +172,6 @@ def detect_backends() -> list[BackendStatus]:
     statuses.append(BackendStatus("boost", boost_ok, boost_detail))
     statuses.append(BackendStatus("mpmath", _module_available("mpmath"), "python module"))
     statuses.append(BackendStatus("scipy", _module_available("scipy"), "python module"))
-    statuses.append(BackendStatus("jax_scipy", _module_available("jax.scipy"), "python module"))
     statuses.append(BackendStatus("mathematica", _wolfram_available(), _wolfram_detail()))
     return statuses
 

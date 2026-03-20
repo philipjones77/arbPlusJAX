@@ -22,5 +22,6 @@ Refresh/verify command:
 - `new_functions.md`: generated registry rows for new mathematical families without an Arb-like base name
 - `core_mode_benchmark_smoke.md`: warmed-JIT CPU smoke benchmark for selected real and complex core mode paths
 - `matrix_mode_benchmark_smoke.md`: warmed smoke benchmark for canonical `arb_mat` / `acb_mat` determinant and trace mode paths
+- `dense_matrix_surface_benchmark.md`: dense real/complex surface benchmark for direct solve, structured solve, dense `matvec`, cached `matvec`, LU-reuse solve aliases, matrix functions, and structured spectral paths
 - `hypgeom_mode_benchmark_smoke.md`: staged smoke benchmark for selected canonical and alternative hypergeometric families, including padded-batch comparisons
-- `../../../results/benchmarks/bessel_compile_probe_float32/bessel_compile_probe.md`: focused compile-count probe for canonical Bessel batch paths, including padded-core vs unpadded comparison
+- `../../../experiments/benchmarks/results/bessel_compile_probe_float32/bessel_compile_probe.md`: focused compile-count probe for canonical Bessel batch paths, including padded-core vs unpadded comparison

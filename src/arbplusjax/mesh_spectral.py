@@ -4,8 +4,8 @@ from collections.abc import Callable
 from dataclasses import dataclass
 
 import jax
+from jax import lax
 import jax.numpy as jnp
-import jax.scipy.linalg as jsp_linalg
 import numpy as np
 from scipy import sparse
 
@@ -137,10 +137,10 @@ def _solve_dense_generalized_eigenproblem(operator, mass, *, config: MeshEigenCo
     dense_operator = jnp.asarray(_materialize_dense_operator(operator), dtype=jnp.float64)
     dense_mass = jnp.asarray(_materialize_dense_operator(mass), dtype=jnp.float64)
     chol = jnp.linalg.cholesky(dense_mass)
-    reduced_left = jsp_linalg.solve_triangular(chol, dense_operator, lower=True)
-    reduced = jsp_linalg.solve_triangular(chol, reduced_left.T, lower=True).T
+    reduced_left = lax.linalg.triangular_solve(chol, dense_operator, left_side=True, lower=True)
+    reduced = lax.linalg.triangular_solve(chol, reduced_left.T, left_side=True, lower=True).T
     eigenvalues, reduced_vectors = jnp.linalg.eigh(reduced)
-    eigenvectors = jsp_linalg.solve_triangular(chol.T, reduced_vectors, lower=False)
+    eigenvectors = lax.linalg.triangular_solve(chol, reduced_vectors, left_side=True, lower=True, transpose_a=True)
     mass_norms = jnp.sqrt(jnp.sum(eigenvectors * (dense_mass @ eigenvectors), axis=0))
     eigenvectors = eigenvectors / jnp.maximum(mass_norms, jnp.asarray(1e-30, dtype=eigenvectors.dtype))
     selected_values, selected_vectors = _select_eigenpairs(eigenvalues, eigenvectors, config)

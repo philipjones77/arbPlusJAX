@@ -230,6 +230,18 @@ Recent benchmarks:
 - Rigorous/adaptive containment still low; further analytic bounds needed.
 - Code: `src/arbplusjax/hypgeom.py` (bessel section), `src/arbplusjax/ball_wrappers.py` (bessel bounds).
 
+### Higher-level Hankel and spherical Bessel package
+
+- The higher-level complete Hankel and spherical Bessel families now live in `src/arbplusjax/special/bessel/`.
+- Hankel:
+  - `hankel1`, `hankel2`, `scaled_hankel1`, `scaled_hankel2`
+  - direct `J +/- iY` composition plus explicit large-`|z|` asymptotic and derivative/recurrence helpers
+- Spherical:
+  - `spherical_bessel_j`, `spherical_bessel_y`, `modified_spherical_bessel_i`, `modified_spherical_bessel_k`
+  - family-specific series, seed formulas, integer-order recurrences, and large-`|z|` asymptotics
+- These are point surfaces today and are exposed through both `arbplusjax.special.bessel` and `arbplusjax.api`.
+- Detailed implementation note: `docs/implementation/modules/special_bessel.md`.
+
 ## Precision differences and constants
 
 Key differences to track per function:

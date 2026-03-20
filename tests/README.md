@@ -30,7 +30,7 @@ Common profiles:
 Use `--outdir` when you want the harness to write a shared environment header:
 
 ```bash
-python tools/run_test_harness.py --profile chassis --jax-mode cpu --outdir results/test_runs/chassis_cpu
+python tools/run_test_harness.py --profile chassis --jax-mode cpu --outdir tests/_runs/chassis_cpu
 ```
 
 This writes `runtime_manifest.json`, which uses the same schema as benchmark runs.

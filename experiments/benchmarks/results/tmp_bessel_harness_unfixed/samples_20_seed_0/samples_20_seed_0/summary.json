@@ -1,0 +1,153 @@
+{
+  "meta": {
+    "samples": 20,
+    "seed": 0,
+    "dps": 50,
+    "prec_bits": 200,
+    "jax_dtype": "float64",
+    "jax_fixed_batch_size": 40,
+    "c_ref_dir": "/home/phili/projects/arbplusJAX/stuff/migration/c_chassis/build",
+    "boost_ref_cmd": "",
+    "versions": {
+      "jax": "0.8.2",
+      "jaxlib": "0.8.2",
+      "numpy": "2.4.1",
+      "scipy": "1.17.0",
+      "mpmath": "1.4.0"
+    }
+  },
+  "rows": [
+    {
+      "function": "besselj",
+      "backend": "jax_basic",
+      "samples": 20,
+      "mean_abs_err": "",
+      "max_abs_err": "",
+      "containment_rate": "",
+      "mean_width": 5.97182472798925e-07,
+      "time_ms": 2.0851199951721355,
+      "notes": ""
+    },
+    {
+      "function": "besselj",
+      "backend": "jax_adaptive",
+      "samples": 20,
+      "mean_abs_err": "",
+      "max_abs_err": "",
+      "containment_rate": "",
+      "mean_width": 5.971831642917818e-07,
+      "time_ms": 5.678807996446267,
+      "notes": ""
+    },
+    {
+      "function": "besselj",
+      "backend": "jax_rigorous",
+      "samples": 20,
+      "mean_abs_err": "",
+      "max_abs_err": "",
+      "containment_rate": "",
+      "mean_width": 5.971828183885025e-07,
+      "time_ms": 1.7712720000417903,
+      "notes": ""
+    },
+    {
+      "function": "besselj",
+      "backend": "scipy",
+      "samples": 20,
+      "mean_abs_err": "",
+      "max_abs_err": "",
+      "containment_rate": "",
+      "mean_width": "",
+      "time_ms": 2.0095280051464215,
+      "notes": ""
+    },
+    {
+      "function": "besselj",
+      "backend": "jax_point",
+      "samples": 20,
+      "mean_abs_err": "",
+      "max_abs_err": "",
+      "containment_rate": "",
+      "mean_width": "",
+      "time_ms": 0.8880990062607452,
+      "notes": ""
+    },
+    {
+      "function": "besselj",
+      "backend": "mpmath",
+      "samples": 20,
+      "mean_abs_err": "",
+      "max_abs_err": "",
+      "containment_rate": "",
+      "mean_width": "",
+      "time_ms": 15.91897699108813,
+      "notes": ""
+    },
+    {
+      "function": "besselk",
+      "backend": "jax_basic",
+      "samples": 20,
+      "mean_abs_err": "",
+      "max_abs_err": "",
+      "containment_rate": "",
+      "mean_width": 0.034049573530612734,
+      "time_ms": 2.3402660008287057,
+      "notes": ""
+    },
+    {
+      "function": "besselk",
+      "backend": "jax_adaptive",
+      "samples": 20,
+      "mean_abs_err": "",
+      "max_abs_err": "",
+      "containment_rate": "",
+      "mean_width": 0.03404987772668415,
+      "time_ms": 8.21625700336881,
+      "notes": ""
+    },
+    {
+      "function": "besselk",
+      "backend": "jax_rigorous",
+      "samples": 20,
+      "mean_abs_err": "",
+      "max_abs_err": "",
+      "containment_rate": "",
+      "mean_width": 0.03404972562727263,
+      "time_ms": 2.0611490035662428,
+      "notes": ""
+    },
+    {
+      "function": "besselk",
+      "backend": "scipy",
+      "samples": 20,
+      "mean_abs_err": "",
+      "max_abs_err": "",
+      "containment_rate": "",
+      "mean_width": "",
+      "time_ms": 0.055715994676575065,
+      "notes": ""
+    },
+    {
+      "function": "besselk",
+      "backend": "jax_point",
+      "samples": 20,
+      "mean_abs_err": "",
+      "max_abs_err": "",
+      "containment_rate": "",
+      "mean_width": "",
+      "time_ms": 0.9520939929643646,
+      "notes": ""
+    },
+    {
+      "function": "besselk",
+      "backend": "mpmath",
+      "samples": 20,
+      "mean_abs_err": "",
+      "max_abs_err": "",
+      "containment_rate": "",
+      "mean_width": "",
+      "time_ms": 53.30821899406146,
+      "notes": ""
+    }
+  ]
+}

@@ -123,6 +123,26 @@ def arb_mat_transpose_point(a: jax.Array) -> jax.Array:
     return jnp.swapaxes(_arb_mat_point_matrix(a), -2, -1)
 
 
+@partial(jax.jit, static_argnames=())
+def arb_mat_add_point(a: jax.Array, b: jax.Array) -> jax.Array:
+    return _arb_mat_point_matrix(a) + _arb_mat_point_matrix(b)
+
+
+@partial(jax.jit, static_argnames=())
+def arb_mat_sub_point(a: jax.Array, b: jax.Array) -> jax.Array:
+    return _arb_mat_point_matrix(a) - _arb_mat_point_matrix(b)
+
+
+@partial(jax.jit, static_argnames=())
+def arb_mat_neg_point(a: jax.Array) -> jax.Array:
+    return -_arb_mat_point_matrix(a)
+
+
+@partial(jax.jit, static_argnames=())
+def arb_mat_mul_entrywise_point(a: jax.Array, b: jax.Array) -> jax.Array:
+    return _arb_mat_point_matrix(a) * _arb_mat_point_matrix(b)
+
+
 @partial(jax.jit, static_argnames=("row_start", "row_stop", "col_start", "col_stop"))
 def arb_mat_submatrix_point(a: jax.Array, row_start: int, row_stop: int, col_start: int, col_stop: int) -> jax.Array:
     return _arb_mat_point_matrix(a)[..., row_start:row_stop, col_start:col_stop]
@@ -329,6 +349,63 @@ def arb_mat_ldl_point(a: jax.Array) -> tuple[jax.Array, jax.Array]:
     return chol / diag[..., None, :], diag * diag
 
 
+@partial(jax.jit, static_argnames=())
+def arb_mat_eigvalsh_point(a: jax.Array) -> jax.Array:
+    values, _ = jnp.linalg.eigh(arb_mat_symmetric_part_point(a))
+    return values
+
+
+@partial(jax.jit, static_argnames=())
+def arb_mat_eigh_point(a: jax.Array) -> tuple[jax.Array, jax.Array]:
+    return jnp.linalg.eigh(arb_mat_symmetric_part_point(a))
+
+
+@partial(jax.jit, static_argnames=())
+def arb_mat_charpoly_point(a: jax.Array) -> jax.Array:
+    mid = _arb_mat_point_matrix(a)
+    coeffs_general = mat_common.characteristic_polynomial_from_matrix(mid, hermitian=False)
+    coeffs_symmetric = mat_common.characteristic_polynomial_from_matrix(mid, hermitian=True)
+    return jnp.where(mat_common.real_midpoint_is_symmetric(mid)[..., None], jnp.real(coeffs_symmetric), jnp.real(coeffs_general))
+
+
+@partial(jax.jit, static_argnames=("n",))
+def arb_mat_pow_ui_point(a: jax.Array, n: int) -> jax.Array:
+    return mat_common.matrix_power_ui(_arb_mat_point_matrix(a), n)
+
+
+@partial(jax.jit, static_argnames=())
+def arb_mat_exp_point(a: jax.Array) -> jax.Array:
+    mid = _arb_mat_point_matrix(a)
+    general = mat_common.matrix_exp(mid, hermitian=False)
+    symmetric = mat_common.matrix_exp(mid, hermitian=True)
+    return jnp.real(jnp.where(mat_common.real_midpoint_is_symmetric(mid)[..., None, None], symmetric, general))
+
+
+def arb_mat_is_diag_point(a: jax.Array) -> jax.Array:
+    return mat_common.midpoint_is_diagonal(_arb_mat_point_matrix(a))
+
+
+def arb_mat_is_tril_point(a: jax.Array) -> jax.Array:
+    return mat_common.midpoint_is_triangular(_arb_mat_point_matrix(a), lower=True)
+
+
+def arb_mat_is_triu_point(a: jax.Array) -> jax.Array:
+    return mat_common.midpoint_is_triangular(_arb_mat_point_matrix(a), lower=False)
+
+
+def arb_mat_is_zero_point(a: jax.Array) -> jax.Array:
+    return jnp.all(_arb_mat_point_matrix(a) == 0, axis=(-2, -1))
+
+
+def arb_mat_is_finite_point(a: jax.Array) -> jax.Array:
+    return jnp.all(jnp.isfinite(_arb_mat_point_matrix(a)), axis=(-2, -1))
+
+
+def arb_mat_is_exact_point(a: jax.Array) -> jax.Array:
+    del a
+    return jnp.asarray(True)
+
+
 def arb_mat_dense_lu_solve_plan_prepare_point(a: jax.Array) -> mat_common.DenseLUSolvePlan:
     p, l, u = arb_mat_lu_point(a)
     return mat_common.DenseLUSolvePlan(p=p, l=l, u=u, rows=int(p.shape[-1]), algebra="arb")
@@ -347,6 +424,10 @@ def arb_mat_dense_matvec_plan_prepare_point(a: jax.Array) -> mat_common.DenseMat
 def arb_mat_dense_matvec_plan_apply_point(plan: mat_common.DenseMatvecPlan | jax.Array, x: jax.Array) -> jax.Array:
     matrix = jnp.asarray(plan.matrix) if isinstance(plan, mat_common.DenseMatvecPlan) else _arb_mat_point_matrix(plan)
     return jnp.einsum("...ij,...j->...i", matrix, _arb_mat_point_vector(x))
+
+
+def arb_mat_rmatvec_point(a: jax.Array, x: jax.Array) -> jax.Array:
+    return arb_mat_matvec_point(arb_mat_transpose_point(a), x)
 
 
 def arb_mat_lu_solve_point(plan: mat_common.DenseLUSolvePlan | tuple[jax.Array, jax.Array, jax.Array], b: jax.Array) -> jax.Array:
@@ -370,6 +451,71 @@ def arb_mat_lu_solve_point(plan: mat_common.DenseLUSolvePlan | tuple[jax.Array, 
 
 def arb_mat_dense_lu_solve_plan_apply_point(plan: mat_common.DenseLUSolvePlan | tuple[jax.Array, jax.Array, jax.Array], b: jax.Array) -> jax.Array:
     return arb_mat_lu_solve_point(plan, b)
+
+
+def arb_mat_solve_transpose_point(a_or_plan, b: jax.Array) -> jax.Array:
+    if isinstance(a_or_plan, mat_common.DenseCholeskySolvePlan):
+        factor = jnp.asarray(a_or_plan.factor)
+        return mat_common.lower_cholesky_solve_transpose(factor, _arb_mat_point_rhs(b))
+    if isinstance(a_or_plan, mat_common.DenseLUSolvePlan) or isinstance(a_or_plan, tuple):
+        plan = mat_common.as_dense_lu_solve_plan(a_or_plan, algebra="arb", label="point_wrappers.arb_mat_solve_transpose_point")
+        p_mid = _arb_mat_point_matrix(plan.p)
+        l_mid = _arb_mat_point_matrix(plan.l)
+        u_mid = _arb_mat_point_matrix(plan.u)
+        b_mid = _arb_mat_point_rhs(b)
+        vector_rhs = b_mid.ndim == p_mid.ndim - 1
+        y = lax.linalg.triangular_solve(u_mid, b_mid[..., None] if vector_rhs else b_mid, left_side=True, lower=False, transpose_a=True, conjugate_a=False)
+        z = lax.linalg.triangular_solve(l_mid, y, left_side=True, lower=True, unit_diagonal=True, transpose_a=True, conjugate_a=False)
+        out = jnp.einsum("...ij,...j->...i", jnp.swapaxes(p_mid, -2, -1), z[..., 0]) if vector_rhs else jnp.matmul(jnp.swapaxes(p_mid, -2, -1), z)
+        return out
+    a_mid = _arb_mat_point_matrix(a_or_plan)
+    b_mid = _arb_mat_point_rhs(b)
+    vector_rhs = b_mid.ndim == a_mid.ndim - 1
+    out = jnp.linalg.solve(jnp.swapaxes(a_mid, -2, -1), b_mid[..., None] if vector_rhs else b_mid)
+    return out[..., 0] if vector_rhs else out
+
+
+def arb_mat_solve_lu_point(
+    a_or_plan: mat_common.DenseLUSolvePlan | tuple[jax.Array, jax.Array, jax.Array] | jax.Array,
+    b: jax.Array,
+) -> jax.Array:
+    if isinstance(a_or_plan, mat_common.DenseLUSolvePlan) or isinstance(a_or_plan, tuple):
+        return arb_mat_lu_solve_point(a_or_plan, b)
+    return arb_mat_lu_solve_point(arb_mat_dense_lu_solve_plan_prepare_point(a_or_plan), b)
+
+
+def arb_mat_solve_tril_point(a: jax.Array, b: jax.Array, *, unit_diagonal: bool = False) -> jax.Array:
+    return arb_mat_triangular_solve_point(a, b, lower=True, unit_diagonal=unit_diagonal)
+
+
+def arb_mat_solve_triu_point(a: jax.Array, b: jax.Array, *, unit_diagonal: bool = False) -> jax.Array:
+    return arb_mat_triangular_solve_point(a, b, lower=False, unit_diagonal=unit_diagonal)
+
+
+def arb_mat_solve_add_point(a_or_plan, b: jax.Array, y: jax.Array) -> jax.Array:
+    if isinstance(a_or_plan, mat_common.DenseCholeskySolvePlan):
+        solved = arb_mat_spd_solve_point(a_or_plan, b)
+    elif isinstance(a_or_plan, (mat_common.DenseLUSolvePlan, tuple)):
+        solved = arb_mat_solve_lu_point(a_or_plan, b)
+    else:
+        solved = arb_mat_solve_point(a_or_plan, b)
+    return _arb_mat_point_rhs(y) + solved
+
+
+def arb_mat_solve_transpose_add_point(a_or_plan, b: jax.Array, y: jax.Array) -> jax.Array:
+    return _arb_mat_point_rhs(y) + arb_mat_solve_transpose_point(a_or_plan, b)
+
+
+def arb_mat_mat_solve_point(a_or_plan, b: jax.Array) -> jax.Array:
+    if isinstance(a_or_plan, mat_common.DenseCholeskySolvePlan):
+        return arb_mat_spd_solve_point(a_or_plan, b)
+    if isinstance(a_or_plan, (mat_common.DenseLUSolvePlan, tuple)):
+        return arb_mat_solve_lu_point(a_or_plan, b)
+    return arb_mat_solve_point(a_or_plan, b)
+
+
+def arb_mat_mat_solve_transpose_point(a_or_plan, b: jax.Array) -> jax.Array:
+    return arb_mat_solve_transpose_point(a_or_plan, b)
 
 
 def arb_mat_spd_solve_point(plan: mat_common.DenseCholeskySolvePlan | jax.Array, b: jax.Array) -> jax.Array:
@@ -556,6 +702,10 @@ def arb_mat_matvec_cached_prepare_point(a: jax.Array) -> jax.Array:
     return _arb_mat_point_matrix(a)
 
 
+def arb_mat_rmatvec_cached_prepare_point(a: jax.Array) -> jax.Array:
+    return jnp.swapaxes(_arb_mat_point_matrix(a), -2, -1)
+
+
 @partial(jax.jit, static_argnames=())
 def arb_mat_matvec_cached_apply_point(cache: jax.Array, x: jax.Array) -> jax.Array:
     x_mid = _arb_mat_point_vector(x)
@@ -563,13 +713,27 @@ def arb_mat_matvec_cached_apply_point(cache: jax.Array, x: jax.Array) -> jax.Arr
     return jnp.einsum("...ij,...j->...i", jnp.asarray(cache), x_mid)
 
 
+@partial(jax.jit, static_argnames=())
+def arb_mat_rmatvec_cached_apply_point(cache: jax.Array, x: jax.Array) -> jax.Array:
+    return arb_mat_matvec_cached_apply_point(cache, x)
+
+
 def arb_mat_matvec_cached_apply_batch_fixed_point(cache: jax.Array, x: jax.Array) -> jax.Array:
     return arb_mat_matvec_cached_apply_point(cache, x)
+
+
+def arb_mat_rmatvec_cached_apply_batch_fixed_point(cache: jax.Array, x: jax.Array) -> jax.Array:
+    return arb_mat_rmatvec_cached_apply_point(cache, x)
 
 
 def arb_mat_matvec_cached_apply_batch_padded_point(cache: jax.Array, x: jax.Array, *, pad_to: int) -> jax.Array:
     call_args, _ = _pad_args_repeat_last((cache, x), pad_to)
     return arb_mat_matvec_cached_apply_point(*call_args)
+
+
+def arb_mat_rmatvec_cached_apply_batch_padded_point(cache: jax.Array, x: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((cache, x), pad_to)
+    return arb_mat_rmatvec_cached_apply_point(*call_args)
 
 
 def arb_mat_dense_matvec_plan_prepare_batch_fixed_point(a: jax.Array) -> mat_common.DenseMatvecPlan:
@@ -749,6 +913,67 @@ def acb_mat_ldl_point(a: jax.Array) -> tuple[jax.Array, jax.Array]:
 
 
 @partial(jax.jit, static_argnames=())
+def acb_mat_eigvalsh_point(a: jax.Array) -> jax.Array:
+    values, _ = jnp.linalg.eigh(acb_mat_hermitian_part_point(a))
+    return values
+
+
+@partial(jax.jit, static_argnames=())
+def acb_mat_eigh_point(a: jax.Array) -> tuple[jax.Array, jax.Array]:
+    return jnp.linalg.eigh(acb_mat_hermitian_part_point(a))
+
+
+@partial(jax.jit, static_argnames=())
+def acb_mat_charpoly_point(a: jax.Array) -> jax.Array:
+    mid = _acb_mat_point_matrix(a)
+    coeffs_general = mat_common.characteristic_polynomial_from_matrix(mid, hermitian=False)
+    coeffs_hermitian = mat_common.characteristic_polynomial_from_matrix(mid, hermitian=True)
+    return jnp.where(mat_common.complex_midpoint_is_hermitian(mid)[..., None], coeffs_hermitian, coeffs_general)
+
+
+@partial(jax.jit, static_argnames=("n",))
+def acb_mat_pow_ui_point(a: jax.Array, n: int) -> jax.Array:
+    return mat_common.matrix_power_ui(_acb_mat_point_matrix(a), n)
+
+
+@partial(jax.jit, static_argnames=())
+def acb_mat_exp_point(a: jax.Array) -> jax.Array:
+    mid = _acb_mat_point_matrix(a)
+    general = mat_common.matrix_exp(mid, hermitian=False)
+    hermitian = mat_common.matrix_exp(mid, hermitian=True)
+    return jnp.where(mat_common.complex_midpoint_is_hermitian(mid)[..., None, None], hermitian, general)
+
+
+def acb_mat_is_diag_point(a: jax.Array) -> jax.Array:
+    return mat_common.midpoint_is_diagonal(_acb_mat_point_matrix(a))
+
+
+def acb_mat_is_tril_point(a: jax.Array) -> jax.Array:
+    return mat_common.midpoint_is_triangular(_acb_mat_point_matrix(a), lower=True)
+
+
+def acb_mat_is_triu_point(a: jax.Array) -> jax.Array:
+    return mat_common.midpoint_is_triangular(_acb_mat_point_matrix(a), lower=False)
+
+
+def acb_mat_is_zero_point(a: jax.Array) -> jax.Array:
+    return jnp.all(_acb_mat_point_matrix(a) == 0, axis=(-2, -1))
+
+
+def acb_mat_is_finite_point(a: jax.Array) -> jax.Array:
+    return jnp.all(jnp.isfinite(_acb_mat_point_matrix(a)), axis=(-2, -1))
+
+
+def acb_mat_is_exact_point(a: jax.Array) -> jax.Array:
+    del a
+    return jnp.asarray(True)
+
+
+def acb_mat_is_real_point(a: jax.Array) -> jax.Array:
+    return jnp.all(jnp.imag(_acb_mat_point_matrix(a)) == 0, axis=(-2, -1))
+
+
+@partial(jax.jit, static_argnames=())
 def acb_mat_solve_point(a: jax.Array, b: jax.Array) -> jax.Array:
     a_mid = _acb_mat_point_matrix(a)
     b_mid = _acb_mat_point_rhs(b)
@@ -822,6 +1047,10 @@ def acb_mat_dense_matvec_plan_apply_point(plan: mat_common.DenseMatvecPlan | jax
     return jnp.einsum("...ij,...j->...i", matrix, _acb_mat_point_vector(x))
 
 
+def acb_mat_rmatvec_point(a: jax.Array, x: jax.Array) -> jax.Array:
+    return acb_mat_matvec_point(acb_mat_transpose_point(a), x)
+
+
 def acb_mat_lu_solve_point(plan: mat_common.DenseLUSolvePlan | tuple[jax.Array, jax.Array, jax.Array], b: jax.Array) -> jax.Array:
     plan = mat_common.as_dense_lu_solve_plan(plan, algebra="acb", label="point_wrappers.acb_mat_lu_solve_point")
     p_mid = _acb_mat_point_matrix(plan.p)
@@ -843,6 +1072,71 @@ def acb_mat_lu_solve_point(plan: mat_common.DenseLUSolvePlan | tuple[jax.Array, 
 
 def acb_mat_dense_lu_solve_plan_apply_point(plan: mat_common.DenseLUSolvePlan | tuple[jax.Array, jax.Array, jax.Array], b: jax.Array) -> jax.Array:
     return acb_mat_lu_solve_point(plan, b)
+
+
+def acb_mat_solve_transpose_point(a_or_plan, b: jax.Array) -> jax.Array:
+    if isinstance(a_or_plan, mat_common.DenseCholeskySolvePlan):
+        factor = jnp.asarray(a_or_plan.factor)
+        return mat_common.lower_cholesky_solve_transpose(factor, _acb_mat_point_rhs(b))
+    if isinstance(a_or_plan, mat_common.DenseLUSolvePlan) or isinstance(a_or_plan, tuple):
+        plan = mat_common.as_dense_lu_solve_plan(a_or_plan, algebra="acb", label="point_wrappers.acb_mat_solve_transpose_point")
+        p_mid = _acb_mat_point_matrix(plan.p)
+        l_mid = _acb_mat_point_matrix(plan.l)
+        u_mid = _acb_mat_point_matrix(plan.u)
+        b_mid = _acb_mat_point_rhs(b)
+        vector_rhs = b_mid.ndim == p_mid.ndim - 1
+        y = lax.linalg.triangular_solve(u_mid, b_mid[..., None] if vector_rhs else b_mid, left_side=True, lower=False, transpose_a=True, conjugate_a=False)
+        z = lax.linalg.triangular_solve(l_mid, y, left_side=True, lower=True, unit_diagonal=True, transpose_a=True, conjugate_a=False)
+        out = jnp.einsum("...ij,...j->...i", jnp.swapaxes(p_mid, -2, -1), z[..., 0]) if vector_rhs else jnp.matmul(jnp.swapaxes(p_mid, -2, -1), z)
+        return out
+    a_mid = _acb_mat_point_matrix(a_or_plan)
+    b_mid = _acb_mat_point_rhs(b)
+    vector_rhs = b_mid.ndim == a_mid.ndim - 1
+    out = jnp.linalg.solve(jnp.swapaxes(a_mid, -2, -1), b_mid[..., None] if vector_rhs else b_mid)
+    return out[..., 0] if vector_rhs else out
+
+
+def acb_mat_solve_lu_point(
+    a_or_plan: mat_common.DenseLUSolvePlan | tuple[jax.Array, jax.Array, jax.Array] | jax.Array,
+    b: jax.Array,
+) -> jax.Array:
+    if isinstance(a_or_plan, mat_common.DenseLUSolvePlan) or isinstance(a_or_plan, tuple):
+        return acb_mat_lu_solve_point(a_or_plan, b)
+    return acb_mat_lu_solve_point(acb_mat_dense_lu_solve_plan_prepare_point(a_or_plan), b)
+
+
+def acb_mat_solve_tril_point(a: jax.Array, b: jax.Array, *, unit_diagonal: bool = False) -> jax.Array:
+    return acb_mat_triangular_solve_point(a, b, lower=True, unit_diagonal=unit_diagonal)
+
+
+def acb_mat_solve_triu_point(a: jax.Array, b: jax.Array, *, unit_diagonal: bool = False) -> jax.Array:
+    return acb_mat_triangular_solve_point(a, b, lower=False, unit_diagonal=unit_diagonal)
+
+
+def acb_mat_solve_add_point(a_or_plan, b: jax.Array, y: jax.Array) -> jax.Array:
+    if isinstance(a_or_plan, mat_common.DenseCholeskySolvePlan):
+        solved = acb_mat_hpd_solve_point(a_or_plan, b)
+    elif isinstance(a_or_plan, (mat_common.DenseLUSolvePlan, tuple)):
+        solved = acb_mat_solve_lu_point(a_or_plan, b)
+    else:
+        solved = acb_mat_solve_point(a_or_plan, b)
+    return _acb_mat_point_rhs(y) + solved
+
+
+def acb_mat_solve_transpose_add_point(a_or_plan, b: jax.Array, y: jax.Array) -> jax.Array:
+    return _acb_mat_point_rhs(y) + acb_mat_solve_transpose_point(a_or_plan, b)
+
+
+def acb_mat_mat_solve_point(a_or_plan, b: jax.Array) -> jax.Array:
+    if isinstance(a_or_plan, mat_common.DenseCholeskySolvePlan):
+        return acb_mat_hpd_solve_point(a_or_plan, b)
+    if isinstance(a_or_plan, (mat_common.DenseLUSolvePlan, tuple)):
+        return acb_mat_solve_lu_point(a_or_plan, b)
+    return acb_mat_solve_point(a_or_plan, b)
+
+
+def acb_mat_mat_solve_transpose_point(a_or_plan, b: jax.Array) -> jax.Array:
+    return acb_mat_solve_transpose_point(a_or_plan, b)
 
 
 def acb_mat_hpd_solve_point(plan: mat_common.DenseCholeskySolvePlan | jax.Array, b: jax.Array) -> jax.Array:
@@ -1002,6 +1296,10 @@ def acb_mat_matvec_cached_prepare_point(a: jax.Array) -> jax.Array:
     return _acb_mat_point_matrix(a)
 
 
+def acb_mat_rmatvec_cached_prepare_point(a: jax.Array) -> jax.Array:
+    return jnp.swapaxes(_acb_mat_point_matrix(a), -2, -1)
+
+
 @partial(jax.jit, static_argnames=())
 def acb_mat_matvec_cached_apply_point(cache: jax.Array, x: jax.Array) -> jax.Array:
     x_mid = _acb_mat_point_vector(x)
@@ -1009,13 +1307,27 @@ def acb_mat_matvec_cached_apply_point(cache: jax.Array, x: jax.Array) -> jax.Arr
     return jnp.einsum("...ij,...j->...i", jnp.asarray(cache), x_mid)
 
 
+@partial(jax.jit, static_argnames=())
+def acb_mat_rmatvec_cached_apply_point(cache: jax.Array, x: jax.Array) -> jax.Array:
+    return acb_mat_matvec_cached_apply_point(cache, x)
+
+
 def acb_mat_matvec_cached_apply_batch_fixed_point(cache: jax.Array, x: jax.Array) -> jax.Array:
     return acb_mat_matvec_cached_apply_point(cache, x)
+
+
+def acb_mat_rmatvec_cached_apply_batch_fixed_point(cache: jax.Array, x: jax.Array) -> jax.Array:
+    return acb_mat_rmatvec_cached_apply_point(cache, x)
 
 
 def acb_mat_matvec_cached_apply_batch_padded_point(cache: jax.Array, x: jax.Array, *, pad_to: int) -> jax.Array:
     call_args, _ = _pad_args_repeat_last((cache, x), pad_to)
     return acb_mat_matvec_cached_apply_point(*call_args)
+
+
+def acb_mat_rmatvec_cached_apply_batch_padded_point(cache: jax.Array, x: jax.Array, *, pad_to: int) -> jax.Array:
+    call_args, _ = _pad_args_repeat_last((cache, x), pad_to)
+    return acb_mat_rmatvec_cached_apply_point(*call_args)
 
 
 def acb_mat_dense_matvec_plan_prepare_batch_fixed_point(a: jax.Array) -> mat_common.DenseMatvecPlan:
@@ -1137,6 +1449,31 @@ def acb_mat_transpose_point(a: jax.Array) -> jax.Array:
 @partial(jax.jit, static_argnames=())
 def acb_mat_conjugate_transpose_point(a: jax.Array) -> jax.Array:
     return jnp.swapaxes(jnp.conj(_acb_mat_point_matrix(a)), -2, -1)
+
+
+@partial(jax.jit, static_argnames=())
+def acb_mat_add_point(a: jax.Array, b: jax.Array) -> jax.Array:
+    return _acb_mat_point_matrix(a) + _acb_mat_point_matrix(b)
+
+
+@partial(jax.jit, static_argnames=())
+def acb_mat_sub_point(a: jax.Array, b: jax.Array) -> jax.Array:
+    return _acb_mat_point_matrix(a) - _acb_mat_point_matrix(b)
+
+
+@partial(jax.jit, static_argnames=())
+def acb_mat_neg_point(a: jax.Array) -> jax.Array:
+    return -_acb_mat_point_matrix(a)
+
+
+@partial(jax.jit, static_argnames=())
+def acb_mat_mul_entrywise_point(a: jax.Array, b: jax.Array) -> jax.Array:
+    return _acb_mat_point_matrix(a) * _acb_mat_point_matrix(b)
+
+
+@partial(jax.jit, static_argnames=())
+def acb_mat_conjugate_point(a: jax.Array) -> jax.Array:
+    return jnp.conj(_acb_mat_point_matrix(a))
 
 
 @partial(jax.jit, static_argnames=("row_start", "row_stop", "col_start", "col_stop"))

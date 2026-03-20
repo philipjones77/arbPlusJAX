@@ -1,0 +1,12 @@
+[
+  {
+    "samples": 40,
+    "seed": 0,
+    "path": "/home/phili/projects/arbplusJAX/results/benchmarks/cmp_newopt_core_gpu_40_80/samples_40_seed_0"
+  },
+  {
+    "samples": 80,
+    "seed": 0,
+    "path": "/home/phili/projects/arbplusJAX/results/benchmarks/cmp_newopt_core_gpu_40_80/samples_80_seed_0"
+  }
+]

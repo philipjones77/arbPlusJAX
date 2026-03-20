@@ -1,0 +1,109 @@
+{
+  "unpadded": {
+    "functions": [
+      "arb_hypgeom_1f1",
+      "arb_hypgeom_2f1",
+      "arb_hypgeom_u"
+    ],
+    "sizes": [
+      20,
+      40
+    ],
+    "pad_to": null,
+    "mode": "basic",
+    "dtype": "float64",
+    "compile_events": 27,
+    "family_compile_events": 6,
+    "compile_lines": [
+      "WARNING:2026-03-08 07:21:53,494:jax._src.interpreters.pxla:1963: Compiling jit(convert_element_type) with global shapes and types (ShapedArray(float64[]),). Argument mapping: (UnspecifiedValue,).",
+      "WARNING:2026-03-08 07:21:53,679:jax._src.interpreters.pxla:1963: Compiling jit(multiply) with global shapes and types (ShapedArray(float64[]), ShapedArray(float64[])). Argument mapping: (UnspecifiedValue, UnspecifiedValue).",
+      "WARNING:2026-03-08 07:21:53,785:jax._src.interpreters.pxla:1963: Compiling jit(log) with global shapes and types (ShapedArray(float64[]),). Argument mapping: (UnspecifiedValue,).",
+      "WARNING:2026-03-08 07:21:53,825:jax._src.interpreters.pxla:1963: Compiling jit(sqrt) with global shapes and types (ShapedArray(float64[]),). Argument mapping: (UnspecifiedValue,).",
+      "WARNING:2026-03-08 07:21:53,861:jax._src.interpreters.pxla:1963: Compiling jit(true_divide) with global shapes and types (ShapedArray(float64[]), ShapedArray(float64[])). Argument mapping: (UnspecifiedValue, UnspecifiedValue).",
+      "WARNING:2026-03-08 07:21:53,901:jax._src.interpreters.pxla:1963: Compiling jit(exp) with global shapes and types (ShapedArray(float64[]),). Argument mapping: (UnspecifiedValue,).",
+      "WARNING:2026-03-08 07:21:53,972:jax._src.interpreters.pxla:1963: Compiling jit(convert_element_type) with global shapes and types (ShapedArray(complex128[]),). Argument mapping: (UnspecifiedValue,).",
+      "WARNING:2026-03-08 07:21:54,035:jax._src.interpreters.pxla:1963: Compiling jit(convert_element_type) with global shapes and types (ShapedArray(float64[9]),). Argument mapping: (UnspecifiedValue,).",
+      "WARNING:2026-03-08 07:21:54,056:jax._src.interpreters.pxla:1963: Compiling jit(convert_element_type) with global shapes and types (ShapedArray(float64[8]),). Argument mapping: (UnspecifiedValue,).",
+      "WARNING:2026-03-08 07:21:54,119:jax._src.interpreters.pxla:1963: Compiling jit(convert_element_type) with global shapes and types (ShapedArray(int32[]),). Argument mapping: (UnspecifiedValue,).",
+      "WARNING:2026-03-08 07:21:54,140:jax._src.interpreters.pxla:1963: Compiling jit(broadcast_in_dim) with global shapes and types (ShapedArray(int32[]),). Argument mapping: (UnspecifiedValue,).",
+      "WARNING:2026-03-08 07:21:54,295:jax._src.interpreters.pxla:1963: Compiling jit(add) with global shapes and types (ShapedArray(float64[20]), ShapedArray(float64[])). Argument mapping: (UnspecifiedValue, UnspecifiedValue).",
+      "WARNING:2026-03-08 07:21:54,330:jax._src.interpreters.pxla:1963: Compiling jit(broadcast_in_dim) with global shapes and types (ShapedArray(float64[20]),). Argument mapping: (UnspecifiedValue,).",
+      "WARNING:2026-03-08 07:21:54,432:jax._src.interpreters.pxla:1963: Compiling jit(concatenate) with global shapes and types (ShapedArray(float64[20,1]), ShapedArray(float64[20,1])). Argument mapping: (UnspecifiedValue, UnspecifiedValue).",
+      "WARNING:2026-03-08 07:21:54,474:jax._src.interpreters.pxla:1963: Compiling jit(dynamic_slice) with global shapes and types (ShapedArray(float64[20,2]), ShapedArray(int64[], weak_type=True), ShapedArray(int64[], weak_type=True)). Argument mapping: (UnspecifiedValue, UnspecifiedValue, UnspecifiedValue).",
+      "WARNING:2026-03-08 07:21:54,511:jax._src.interpreters.pxla:1963: Compiling jit(squeeze) with global shapes and types (ShapedArray(float64[20,1]),). Argument mapping: (UnspecifiedValue,).",
+      "WARNING:2026-03-08 07:21:54,650:jax._src.interpreters.pxla:1963: Compiling jit(_arb_hypgeom_1f1_batch_padded_prec_core) with global shapes and types (ShapedArray(float64[20,2]), ShapedArray(float64[20,2]), ShapedArray(float64[20,2])). Argument mapping: (UnspecifiedValue, UnspecifiedValue, UnspecifiedValue).",
+      "WARNING:2026-03-08 07:21:55,633:jax._src.interpreters.pxla:1963: Compiling jit(_arb_hypgeom_2f1_batch_padded_prec_core) with global shapes and types (ShapedArray(float64[20,2]), ShapedArray(float64[20,2]), ShapedArray(float64[20,2]), ShapedArray(float64[20,2])). Argument mapping: (UnspecifiedValue, UnspecifiedValue, UnspecifiedValue, UnspecifiedValue).",
+      "WARNING:2026-03-08 07:21:56,582:jax._src.interpreters.pxla:1963: Compiling jit(_arb_hypgeom_u_batch_padded_prec_core) with global shapes and types (ShapedArray(float64[20,2]), ShapedArray(float64[20,2]), ShapedArray(float64[20,2])). Argument mapping: (UnspecifiedValue, UnspecifiedValue, UnspecifiedValue).",
+      "WARNING:2026-03-08 07:21:57,626:jax._src.interpreters.pxla:1963: Compiling jit(add) with global shapes and types (ShapedArray(float64[40]), ShapedArray(float64[])). Argument mapping: (UnspecifiedValue, UnspecifiedValue).",
+      "WARNING:2026-03-08 07:21:57,728:jax._src.interpreters.pxla:1963: Compiling jit(broadcast_in_dim) with global shapes and types (ShapedArray(float64[40]),). Argument mapping: (UnspecifiedValue,).",
+      "WARNING:2026-03-08 07:21:57,764:jax._src.interpreters.pxla:1963: Compiling jit(concatenate) with global shapes and types (ShapedArray(float64[40,1]), ShapedArray(float64[40,1])). Argument mapping: (UnspecifiedValue, UnspecifiedValue).",
+      "WARNING:2026-03-08 07:21:57,840:jax._src.interpreters.pxla:1963: Compiling jit(dynamic_slice) with global shapes and types (ShapedArray(float64[40,2]), ShapedArray(int64[], weak_type=True), ShapedArray(int64[], weak_type=True)). Argument mapping: (UnspecifiedValue, UnspecifiedValue, UnspecifiedValue).",
+      "WARNING:2026-03-08 07:21:57,918:jax._src.interpreters.pxla:1963: Compiling jit(squeeze) with global shapes and types (ShapedArray(float64[40,1]),). Argument mapping: (UnspecifiedValue,).",
+      "WARNING:2026-03-08 07:21:58,128:jax._src.interpreters.pxla:1963: Compiling jit(_arb_hypgeom_1f1_batch_padded_prec_core) with global shapes and types (ShapedArray(float64[40,2]), ShapedArray(float64[40,2]), ShapedArray(float64[40,2])). Argument mapping: (UnspecifiedValue, UnspecifiedValue, UnspecifiedValue).",
+      "WARNING:2026-03-08 07:21:58,809:jax._src.interpreters.pxla:1963: Compiling jit(_arb_hypgeom_2f1_batch_padded_prec_core) with global shapes and types (ShapedArray(float64[40,2]), ShapedArray(float64[40,2]), ShapedArray(float64[40,2]), ShapedArray(float64[40,2])). Argument mapping: (UnspecifiedValue, UnspecifiedValue, UnspecifiedValue, UnspecifiedValue).",
+      "WARNING:2026-03-08 07:21:59,645:jax._src.interpreters.pxla:1963: Compiling jit(_arb_hypgeom_u_batch_padded_prec_core) with global shapes and types (ShapedArray(float64[40,2]), ShapedArray(float64[40,2]), ShapedArray(float64[40,2])). Argument mapping: (UnspecifiedValue, UnspecifiedValue, UnspecifiedValue)."
+    ],
+    "family_compile_lines": [
+      "WARNING:2026-03-08 07:21:54,650:jax._src.interpreters.pxla:1963: Compiling jit(_arb_hypgeom_1f1_batch_padded_prec_core) with global shapes and types (ShapedArray(float64[20,2]), ShapedArray(float64[20,2]), ShapedArray(float64[20,2])). Argument mapping: (UnspecifiedValue, UnspecifiedValue, UnspecifiedValue).",
+      "WARNING:2026-03-08 07:21:55,633:jax._src.interpreters.pxla:1963: Compiling jit(_arb_hypgeom_2f1_batch_padded_prec_core) with global shapes and types (ShapedArray(float64[20,2]), ShapedArray(float64[20,2]), ShapedArray(float64[20,2]), ShapedArray(float64[20,2])). Argument mapping: (UnspecifiedValue, UnspecifiedValue, UnspecifiedValue, UnspecifiedValue).",
+      "WARNING:2026-03-08 07:21:56,582:jax._src.interpreters.pxla:1963: Compiling jit(_arb_hypgeom_u_batch_padded_prec_core) with global shapes and types (ShapedArray(float64[20,2]), ShapedArray(float64[20,2]), ShapedArray(float64[20,2])). Argument mapping: (UnspecifiedValue, UnspecifiedValue, UnspecifiedValue).",
+      "WARNING:2026-03-08 07:21:58,128:jax._src.interpreters.pxla:1963: Compiling jit(_arb_hypgeom_1f1_batch_padded_prec_core) with global shapes and types (ShapedArray(float64[40,2]), ShapedArray(float64[40,2]), ShapedArray(float64[40,2])). Argument mapping: (UnspecifiedValue, UnspecifiedValue, UnspecifiedValue).",
+      "WARNING:2026-03-08 07:21:58,809:jax._src.interpreters.pxla:1963: Compiling jit(_arb_hypgeom_2f1_batch_padded_prec_core) with global shapes and types (ShapedArray(float64[40,2]), ShapedArray(float64[40,2]), ShapedArray(float64[40,2]), ShapedArray(float64[40,2])). Argument mapping: (UnspecifiedValue, UnspecifiedValue, UnspecifiedValue, UnspecifiedValue).",
+      "WARNING:2026-03-08 07:21:59,645:jax._src.interpreters.pxla:1963: Compiling jit(_arb_hypgeom_u_batch_padded_prec_core) with global shapes and types (ShapedArray(float64[40,2]), ShapedArray(float64[40,2]), ShapedArray(float64[40,2])). Argument mapping: (UnspecifiedValue, UnspecifiedValue, UnspecifiedValue)."
+    ]
+  },
+  "padded": {
+    "functions": [
+      "arb_hypgeom_1f1",
+      "arb_hypgeom_2f1",
+      "arb_hypgeom_u"
+    ],
+    "sizes": [
+      20,
+      40
+    ],
+    "pad_to": 40,
+    "mode": "basic",
+    "dtype": "float64",
+    "compile_events": 31,
+    "family_compile_events": 3,
+    "compile_lines": [
+      "WARNING:2026-03-08 07:22:02,073:jax._src.interpreters.pxla:1963: Compiling jit(convert_element_type) with global shapes and types (ShapedArray(float64[]),). Argument mapping: (UnspecifiedValue,).",
+      "WARNING:2026-03-08 07:22:02,136:jax._src.interpreters.pxla:1963: Compiling jit(multiply) with global shapes and types (ShapedArray(float64[]), ShapedArray(float64[])). Argument mapping: (UnspecifiedValue, UnspecifiedValue).",
+      "WARNING:2026-03-08 07:22:02,185:jax._src.interpreters.pxla:1963: Compiling jit(log) with global shapes and types (ShapedArray(float64[]),). Argument mapping: (UnspecifiedValue,).",
+      "WARNING:2026-03-08 07:22:02,252:jax._src.interpreters.pxla:1963: Compiling jit(sqrt) with global shapes and types (ShapedArray(float64[]),). Argument mapping: (UnspecifiedValue,).",
+      "WARNING:2026-03-08 07:22:02,316:jax._src.interpreters.pxla:1963: Compiling jit(true_divide) with global shapes and types (ShapedArray(float64[]), ShapedArray(float64[])). Argument mapping: (UnspecifiedValue, UnspecifiedValue).",
+      "WARNING:2026-03-08 07:22:02,350:jax._src.interpreters.pxla:1963: Compiling jit(exp) with global shapes and types (ShapedArray(float64[]),). Argument mapping: (UnspecifiedValue,).",
+      "WARNING:2026-03-08 07:22:02,380:jax._src.interpreters.pxla:1963: Compiling jit(convert_element_type) with global shapes and types (ShapedArray(complex128[]),). Argument mapping: (UnspecifiedValue,).",
+      "WARNING:2026-03-08 07:22:02,412:jax._src.interpreters.pxla:1963: Compiling jit(convert_element_type) with global shapes and types (ShapedArray(float64[9]),). Argument mapping: (UnspecifiedValue,).",
+      "WARNING:2026-03-08 07:22:02,424:jax._src.interpreters.pxla:1963: Compiling jit(convert_element_type) with global shapes and types (ShapedArray(float64[8]),). Argument mapping: (UnspecifiedValue,).",
+      "WARNING:2026-03-08 07:22:02,462:jax._src.interpreters.pxla:1963: Compiling jit(convert_element_type) with global shapes and types (ShapedArray(int32[]),). Argument mapping: (UnspecifiedValue,).",
+      "WARNING:2026-03-08 07:22:02,481:jax._src.interpreters.pxla:1963: Compiling jit(broadcast_in_dim) with global shapes and types (ShapedArray(int32[]),). Argument mapping: (UnspecifiedValue,).",
+      "WARNING:2026-03-08 07:22:02,578:jax._src.interpreters.pxla:1963: Compiling jit(add) with global shapes and types (ShapedArray(float64[20]), ShapedArray(float64[])). Argument mapping: (UnspecifiedValue, UnspecifiedValue).",
+      "WARNING:2026-03-08 07:22:02,609:jax._src.interpreters.pxla:1963: Compiling jit(broadcast_in_dim) with global shapes and types (ShapedArray(float64[20]),). Argument mapping: (UnspecifiedValue,).",
+      "WARNING:2026-03-08 07:22:02,624:jax._src.interpreters.pxla:1963: Compiling jit(concatenate) with global shapes and types (ShapedArray(float64[20,1]), ShapedArray(float64[20,1])). Argument mapping: (UnspecifiedValue, UnspecifiedValue).",
+      "WARNING:2026-03-08 07:22:02,697:jax._src.interpreters.pxla:1963: Compiling jit(dynamic_slice) with global shapes and types (ShapedArray(float64[20,2]), ShapedArray(int64[], weak_type=True), ShapedArray(int64[], weak_type=True)). Argument mapping: (UnspecifiedValue, UnspecifiedValue, UnspecifiedValue).",
+      "WARNING:2026-03-08 07:22:02,755:jax._src.interpreters.pxla:1963: Compiling jit(squeeze) with global shapes and types (ShapedArray(float64[20,1]),). Argument mapping: (UnspecifiedValue,).",
+      "WARNING:2026-03-08 07:22:02,785:jax._src.interpreters.pxla:1963: Compiling jit(dynamic_slice) with global shapes and types (ShapedArray(float64[20,2]), ShapedArray(int64[], weak_type=True), ShapedArray(int64[], weak_type=True)). Argument mapping: (UnspecifiedValue, UnspecifiedValue, UnspecifiedValue).",
+      "WARNING:2026-03-08 07:22:02,842:jax._src.interpreters.pxla:1963: Compiling jit(broadcast_in_dim) with global shapes and types (ShapedArray(float64[1,2]),). Argument mapping: (UnspecifiedValue,).",
+      "WARNING:2026-03-08 07:22:02,922:jax._src.interpreters.pxla:1963: Compiling jit(reshape) with global shapes and types (ShapedArray(float64[1,20,2]),). Argument mapping: (UnspecifiedValue,).",
+      "WARNING:2026-03-08 07:22:02,960:jax._src.interpreters.pxla:1963: Compiling jit(concatenate) with global shapes and types (ShapedArray(float64[20,2]), ShapedArray(float64[20,2])). Argument mapping: (UnspecifiedValue, UnspecifiedValue).",
+      "WARNING:2026-03-08 07:22:03,104:jax._src.interpreters.pxla:1963: Compiling jit(_arb_hypgeom_1f1_batch_padded_prec_core) with global shapes and types (ShapedArray(float64[40,2]), ShapedArray(float64[40,2]), ShapedArray(float64[40,2])). Argument mapping: (UnspecifiedValue, UnspecifiedValue, UnspecifiedValue).",
+      "WARNING:2026-03-08 07:22:03,665:jax._src.interpreters.pxla:1963: Compiling jit(convert_element_type) with global shapes and types (ShapedArray(int64[]),). Argument mapping: (UnspecifiedValue,).",
+      "WARNING:2026-03-08 07:22:03,680:jax._src.interpreters.pxla:1963: Compiling jit(dynamic_slice) with global shapes and types (ShapedArray(float64[40,2]), ShapedArray(int64[]), ShapedArray(int64[])). Argument mapping: (UnspecifiedValue, UnspecifiedValue, UnspecifiedValue).",
+      "WARNING:2026-03-08 07:22:03,808:jax._src.interpreters.pxla:1963: Compiling jit(_arb_hypgeom_2f1_batch_padded_prec_core) with global shapes and types (ShapedArray(float64[40,2]), ShapedArray(float64[40,2]), ShapedArray(float64[40,2]), ShapedArray(float64[40,2])). Argument mapping: (UnspecifiedValue, UnspecifiedValue, UnspecifiedValue, UnspecifiedValue).",
+      "WARNING:2026-03-08 07:22:04,743:jax._src.interpreters.pxla:1963: Compiling jit(_arb_hypgeom_u_batch_padded_prec_core) with global shapes and types (ShapedArray(float64[40,2]), ShapedArray(float64[40,2]), ShapedArray(float64[40,2])). Argument mapping: (UnspecifiedValue, UnspecifiedValue, UnspecifiedValue).",
+      "WARNING:2026-03-08 07:22:05,406:jax._src.interpreters.pxla:1963: Compiling jit(add) with global shapes and types (ShapedArray(float64[40]), ShapedArray(float64[])). Argument mapping: (UnspecifiedValue, UnspecifiedValue).",
+      "WARNING:2026-03-08 07:22:05,524:jax._src.interpreters.pxla:1963: Compiling jit(broadcast_in_dim) with global shapes and types (ShapedArray(float64[40]),). Argument mapping: (UnspecifiedValue,).",
+      "WARNING:2026-03-08 07:22:05,552:jax._src.interpreters.pxla:1963: Compiling jit(concatenate) with global shapes and types (ShapedArray(float64[40,1]), ShapedArray(float64[40,1])). Argument mapping: (UnspecifiedValue, UnspecifiedValue).",
+      "WARNING:2026-03-08 07:22:05,601:jax._src.interpreters.pxla:1963: Compiling jit(dynamic_slice) with global shapes and types (ShapedArray(float64[40,2]), ShapedArray(int64[], weak_type=True), ShapedArray(int64[], weak_type=True)). Argument mapping: (UnspecifiedValue, UnspecifiedValue, UnspecifiedValue).",
+      "WARNING:2026-03-08 07:22:05,648:jax._src.interpreters.pxla:1963: Compiling jit(squeeze) with global shapes and types (ShapedArray(float64[40,1]),). Argument mapping: (UnspecifiedValue,).",
+      "WARNING:2026-03-08 07:22:05,671:jax._src.interpreters.pxla:1963: Compiling jit(dynamic_slice) with global shapes and types (ShapedArray(float64[40,2]), ShapedArray(int64[]), ShapedArray(int64[])). Argument mapping: (UnspecifiedValue, UnspecifiedValue, UnspecifiedValue)."
+    ],
+    "family_compile_lines": [
+      "WARNING:2026-03-08 07:22:03,104:jax._src.interpreters.pxla:1963: Compiling jit(_arb_hypgeom_1f1_batch_padded_prec_core) with global shapes and types (ShapedArray(float64[40,2]), ShapedArray(float64[40,2]), ShapedArray(float64[40,2])). Argument mapping: (UnspecifiedValue, UnspecifiedValue, UnspecifiedValue).",
+      "WARNING:2026-03-08 07:22:03,808:jax._src.interpreters.pxla:1963: Compiling jit(_arb_hypgeom_2f1_batch_padded_prec_core) with global shapes and types (ShapedArray(float64[40,2]), ShapedArray(float64[40,2]), ShapedArray(float64[40,2]), ShapedArray(float64[40,2])). Argument mapping: (UnspecifiedValue, UnspecifiedValue, UnspecifiedValue, UnspecifiedValue).",
+      "WARNING:2026-03-08 07:22:04,743:jax._src.interpreters.pxla:1963: Compiling jit(_arb_hypgeom_u_batch_padded_prec_core) with global shapes and types (ShapedArray(float64[40,2]), ShapedArray(float64[40,2]), ShapedArray(float64[40,2])). Argument mapping: (UnspecifiedValue, UnspecifiedValue, UnspecifiedValue)."
+    ]
+  }
+}

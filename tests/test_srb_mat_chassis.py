@@ -1,5 +1,6 @@
 import jax.numpy as jnp
 
+from arbplusjax import double_interval as di
 from arbplusjax import srb_mat
 
 from tests._test_checks import _check
@@ -53,9 +54,19 @@ def test_matvec_cached_matvec_and_batch_helpers():
     _check(bool(jnp.allclose(srb_mat.srb_mat_matvec_cached_apply(plan, x), expected)))
     _check(bool(jnp.allclose(srb_mat.srb_mat_matvec_jit(csr, x), expected)))
     _check(bool(jnp.allclose(srb_mat.srb_mat_matvec_cached_apply_jit(plan, x), expected)))
+    rvec0 = jnp.array([1.0, -1.0, 0.5], dtype=jnp.float64)
+    _check(bool(jnp.allclose(srb_mat.srb_mat_rmatvec(coo, rvec0), dense.T @ rvec0)))
+    _check(bool(jnp.allclose(di.midpoint(srb_mat.srb_mat_rmatvec_basic(csr, rvec0)), dense.T @ rvec0)))
     _check(bool(jnp.allclose(srb_mat.srb_mat_matvec_batch_fixed(csr, xs), xs @ dense.T)))
     _check(bool(jnp.allclose(srb_mat.srb_mat_matvec_cached_apply_batch_fixed(plan, xs), xs @ dense.T)))
     _check(srb_mat.srb_mat_matvec_batch_padded(csr, xs, pad_to=4).shape == (4, 3))
+
+    rvec = jnp.array([2.0, -1.0, 0.25], dtype=jnp.float64)
+    rplan = srb_mat.srb_mat_rmatvec_cached_prepare(csr)
+    rbasic_plan = srb_mat.srb_mat_rmatvec_cached_prepare_basic(csr)
+    _check(bool(jnp.allclose(srb_mat.srb_mat_rmatvec_cached_apply(rplan, rvec), dense.T @ rvec)))
+    _check(bool(jnp.allclose(srb_mat.srb_mat_rmatvec_cached_apply_jit(rplan, rvec), dense.T @ rvec)))
+    _check(bool(jnp.allclose(di.midpoint(srb_mat.srb_mat_rmatvec_cached_apply_basic(rbasic_plan, rvec)), dense.T @ rvec)))
 
 
 def test_dense_rhs_multiply_and_format_conversions():

@@ -118,7 +118,7 @@ python tools/run_benchmarks.py --profile quick --with-boost --boost-ref-cmd "<co
 Generate a markdown benchmark summary:
 
 ```
-python tools/bench_report.py --run results/benchmarks/<run_dir> --out results/benchmarks/<run_dir>/report.md
+python tools/bench_report.py --run experiments/benchmarks/results/<run_dir> --out experiments/benchmarks/results/<run_dir>/report.md
 ```
 
 ## Notes
@@ -140,4 +140,3 @@ Example: `arbPlusJAX_source_2026-03-01.zip`
 Use API names `cuda_besselk` or `cuda_besselk`:
 - point: `api.eval_point("cuda_besselk", nu, z)`
 - interval: `api.eval_interval("cuda_besselk", nu_iv, z_iv, mode="basic|rigorous|adaptive")`
-

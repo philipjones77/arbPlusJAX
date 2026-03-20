@@ -1,0 +1,15 @@
+{
+  "function": "cosh",
+  "backend": "jax_adaptive",
+  "samples": 40,
+  "seed": 0,
+  "error_stats": {
+    "mean": 7.111388916070105e-08,
+    "median": 3.7865197755060365e-08,
+    "p95": 2.575957747552593e-07,
+    "p99": 3.167686420768589e-07,
+    "max": 3.525664573622578e-07
+  },
+  "containment_rate": 0.075,
+  "mean_width": 2.9027462460362585e-06
+}

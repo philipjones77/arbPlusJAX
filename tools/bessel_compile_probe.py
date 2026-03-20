@@ -156,7 +156,7 @@ def main() -> None:
     parser.add_argument("--sizes", default="40,80")
     parser.add_argument("--pad-to", type=int)
     parser.add_argument("--dtype", choices=("float32", "float64"), default="float64")
-    parser.add_argument("--outdir", default="results/benchmarks/bessel_compile_probe")
+    parser.add_argument("--outdir", default="experiments/benchmarks/results/bessel_compile_probe")
     args = parser.parse_args()
 
     functions = [x for x in args.functions.split(",") if x]

@@ -1,0 +1,19 @@
+arbPlusJAX attribution notice
+
+arbPlusJAX is an independent derivative of Arb and FLINT.
+It also draws conceptual inspiration from parts of the Boost C++ ecosystem and
+mpmath.
+
+No Boost or mpmath source code is included in this repository as part of this
+acknowledgment.
+
+Primary upstream references:
+
+- Arb project documentation: https://arblib.org/arb-2.20.0.pdf
+- Arb credits and license notes: https://arblib.org/credits.html
+- FLINT project website: https://flintlib.org/
+- FLINT project news and license history: https://flintlib.org/news.html
+- Boost project website: https://www.boost.org/
+- Boost Software License 1.0: https://live.boost.org/users/license.html
+- mpmath project website: https://mpmath.org/
+- mpmath documentation: https://mpmath.org/doc/current/

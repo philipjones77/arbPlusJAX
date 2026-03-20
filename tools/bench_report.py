@@ -28,7 +28,7 @@ def main() -> int:
     parser.add_argument("--out", type=str, default="", help="Output markdown path.")
     args = parser.parse_args()
 
-    base = Path(args.run) if args.run else Path("results") / "benchmarks"
+    base = Path(args.run) if args.run else Path("experiments") / "benchmarks" / "results"
     run_dir = _pick_run(base)
     summary_csv = run_dir / "summary.csv"
     rows = list(csv.DictReader(summary_csv.read_text().splitlines()))

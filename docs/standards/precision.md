@@ -343,8 +343,8 @@ Use these references to document per-function behavior in audits or module notes
 - Core hypergeom and remainders: `src/arbplusjax/hypgeom.py`
 - Series helper utilities and gaps: `src/arbplusjax/series_missing_impl.py`, `src/arbplusjax/series_utils.py`
 
-### SciPy / JAX SciPy
-- External comparison only; benchmark and reference surfaces may use `scipy.special` and `jax.scipy.special`, but runtime implementation code should not depend on them.
+### SciPy
+- External comparison only; benchmark and reference surfaces may use `scipy.special`, but runtime implementation code should not depend on it.
 
 ### mpmath
 - Point evaluation with `mp.mp.dps`; intervals only with `mp.iv`.

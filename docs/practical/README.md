@@ -12,6 +12,7 @@ Use [implementation](/home/phili/projects/arbplusJAX/docs/implementation) for co
 - [running.md](/home/phili/projects/arbplusJAX/docs/practical/running.md): day-to-day run workflows across local, CI-style, and Colab environments
 - [benchmarking.md](/home/phili/projects/arbplusJAX/docs/practical/benchmarking.md): benchmark workflow, harness roles, and comparison policy
 - [numerical_guidance.md](/home/phili/projects/arbplusJAX/docs/practical/numerical_guidance.md): numerically informed operating guidance and guardrails
+- [dense_matrices.md](/home/phili/projects/arbplusJAX/docs/practical/dense_matrices.md): practical dense runtime guidance for direct dense, cached `matvec`, structured solve reuse, and padded batch tradeoffs
 
 ## Related implementation references
 

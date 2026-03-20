@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+from dataclasses import asdict
 from dataclasses import dataclass
+import json
 import math
 import os
 import resource
@@ -22,6 +24,22 @@ class JaxDiagnosticsConfig:
     trace_dir: str | None = None
 
 
+@dataclass(frozen=True)
+class JittedFunctionProfile:
+    name: str
+    diagnostics_enabled: bool
+    compile_ms: float
+    steady_ms_median: float
+    steady_ms_p95: float
+    recompile_new_shape_ms: float
+    peak_rss_delta_mb: float
+    device_memory_delta_mb: float | None = None
+    jaxpr: str | None = None
+    hlo: str | None = None
+    jaxpr_error: str | None = None
+    hlo_error: str | None = None
+
+
 def config_from_env(prefix: str = "ARBPLUSJAX_JAX_DIAGNOSTICS_") -> JaxDiagnosticsConfig:
     enabled = os.getenv(f"{prefix}ENABLED", "").lower() in {"1", "true", "yes", "on"}
     capture_jaxpr = os.getenv(f"{prefix}JAXPR", "").lower() in {"1", "true", "yes", "on"}
@@ -39,6 +57,25 @@ def config_from_env(prefix: str = "ARBPLUSJAX_JAX_DIAGNOSTICS_") -> JaxDiagnosti
 
 def peak_rss_mb() -> float:
     return float(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss) / 1024.0
+
+
+def peak_device_memory_mb() -> float | None:
+    try:
+        stats = jax.devices()[0].memory_stats()
+    except Exception:
+        return None
+    if not stats:
+        return None
+    candidates = [
+        "peak_bytes_in_use",
+        "bytes_in_use",
+        "allocated_bytes",
+    ]
+    for key in candidates:
+        value = stats.get(key)
+        if value is not None:
+            return float(value) / (1024.0 * 1024.0)
+    return None
 
 
 def _block(x: Any) -> Any:
@@ -106,13 +143,16 @@ def profile_jitted_function(
         "peak_rss_delta_mb": 0.0,
     }
     rss0 = peak_rss_mb()
+    device0 = peak_device_memory_mb()
     with maybe_trace(f"{name}_compile", cfg):
         t0 = time.perf_counter()
         out = _block(fn(arg))
         t1 = time.perf_counter()
     rss1 = peak_rss_mb()
+    device1 = peak_device_memory_mb()
     diagnostics["compile_ms"] = (t1 - t0) * 1e3
     diagnostics["peak_rss_delta_mb"] = max(rss1 - rss0, 0.0)
+    diagnostics["device_memory_delta_mb"] = None if device0 is None or device1 is None else max(device1 - device0, 0.0)
     times: list[float] = []
     with maybe_trace(f"{name}_steady", cfg):
         for _ in range(repeats):
@@ -132,11 +172,44 @@ def profile_jitted_function(
     return out, diagnostics
 
 
+def profile_function_suite(
+    cases: list[dict[str, Any]],
+    *,
+    repeats: int = 8,
+    config: JaxDiagnosticsConfig | None = None,
+) -> list[JittedFunctionProfile]:
+    profiles: list[JittedFunctionProfile] = []
+    for case in cases:
+        _, raw = profile_jitted_function(
+            case["fn"],
+            case["arg"],
+            case["alt_arg"],
+            repeats=repeats,
+            name=case.get("name", "jax_fn"),
+            config=config,
+        )
+        raw.pop("enabled", None)
+        profiles.append(JittedFunctionProfile(**raw))
+    return profiles
+
+
+def write_profile_report(path: str | Path, profiles: list[JittedFunctionProfile]) -> Path:
+    report_path = Path(path)
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    payload = [asdict(profile) for profile in profiles]
+    report_path.write_text(json.dumps(payload, indent=2, sort_keys=True))
+    return report_path
+
+
 __all__ = [
     "JaxDiagnosticsConfig",
+    "JittedFunctionProfile",
     "collect_compilation_artifacts",
     "config_from_env",
     "maybe_trace",
     "peak_rss_mb",
+    "peak_device_memory_mb",
     "profile_jitted_function",
+    "profile_function_suite",
+    "write_profile_report",
 ]

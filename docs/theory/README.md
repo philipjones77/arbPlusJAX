@@ -20,6 +20,9 @@ This section collects mathematical background and derivation notes for the inter
 - [Core Functions Methodology](/home/phili/projects/arbplusJAX/docs/theory/core_functions_methodology.md)
   - Documents the real interval core in `arb_core.py` and the complex box core in `acb_core.py`.
   - States the base formulas, grouping, and mode inheritance for the core kernels.
+- [Bessel Family Methodology](/home/phili/projects/arbplusJAX/docs/theory/bessel_family_methodology.md)
+  - Documents the Hankel and spherical Bessel surfaces in `special/bessel`.
+  - States the direct identities, recurrences, derivatives, and large-argument asymptotics used today.
 - [Sparse Symmetric Leja Plus Hutch++ Log-Det](/home/phili/projects/arbplusJAX/docs/theory/sparse_symmetric_leja_hutchpp_logdet.md)
   - Documents the sparse SPD `BCOO` log-determinant path in `jrb_mat`.
   - States the Newton-Leja action formula, Hutch++ trace estimator, adaptive stop rule, and sparse spectral-bound strategy.

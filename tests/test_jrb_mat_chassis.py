@@ -134,6 +134,83 @@ def test_matrix_free_operator_apply_poly_and_expm_action():
     _check(bool(jnp.allclose(di.midpoint(zero_applied), x_mid)))
 
 
+def test_operator_plans_and_rmatvec_surface():
+    a = _mat2(1.0, 2.0, 0.0, 3.0)
+    x = _vec2(1.0, -1.0)
+    dense = di.midpoint(a)
+    x_mid = di.midpoint(x)
+
+    rmat = jrb_mat.jrb_mat_rmatvec_point(a, x)
+    _check(bool(jnp.allclose(di.midpoint(rmat), dense.T @ x_mid)))
+
+    dense_plan = jrb_mat.jrb_mat_dense_operator_plan_prepare(a)
+    dense_rplan = jrb_mat.jrb_mat_dense_operator_rmatvec_plan_prepare(a)
+    _check(bool(jnp.allclose(di.midpoint(jrb_mat.jrb_mat_operator_plan_apply(dense_plan, x)), dense @ x_mid)))
+    _check(bool(jnp.allclose(di.midpoint(jrb_mat.jrb_mat_operator_plan_apply(dense_rplan, x)), dense.T @ x_mid)))
+
+    bdata = jnp.asarray([1.0, 2.0, 3.0], dtype=jnp.float64)
+    bindices = jnp.asarray([[0, 0], [0, 1], [1, 1]], dtype=jnp.int32)
+    bcoo = sparse_common.SparseBCOO(data=bdata, indices=bindices, rows=2, cols=2, algebra="jrb")
+    bplan = jrb_mat.jrb_mat_bcoo_operator_plan_prepare(bcoo)
+    brplan = jrb_mat.jrb_mat_bcoo_operator_rmatvec_plan_prepare(bcoo)
+    _check(bool(jnp.allclose(di.midpoint(jrb_mat.jrb_mat_operator_plan_apply(bplan, x)), dense @ x_mid)))
+    _check(bool(jnp.allclose(di.midpoint(jrb_mat.jrb_mat_operator_plan_apply(brplan, x)), dense.T @ x_mid)))
+
+    coeffs = jnp.asarray([1.0, 2.0], dtype=jnp.float64)
+    poly_from_plan = jrb_mat.jrb_mat_poly_action_point(dense_plan, x, coeffs)
+    _check(bool(jnp.allclose(di.midpoint(poly_from_plan), x_mid + 2.0 * (dense @ x_mid))))
+
+    zero_dense = _mat2(0.0, 0.0, 0.0, 0.0)
+    zero_plan = jrb_mat.jrb_mat_dense_operator_plan_prepare(zero_dense)
+    expm_from_plan = jrb_mat.jrb_mat_expm_action_point(zero_plan, x, terms=8)
+    _check(bool(jnp.allclose(di.midpoint(expm_from_plan), x_mid)))
+    expm_from_plan_jit = jrb_mat.jrb_mat_expm_action_basic_jit(zero_plan, x, terms=8)
+    _check(bool(jnp.allclose(di.midpoint(expm_from_plan_jit), x_mid)))
+
+    spd_dense = _mat2(2.0, 1.0, 1.0, 3.0)
+    spd_plan = jrb_mat.jrb_mat_dense_operator_plan_prepare(spd_dense)
+    basis, T, beta0 = jrb_mat.jrb_mat_lanczos_tridiag_point(spd_plan, x, steps=2)
+    _check(basis.shape == (2, 2))
+    _check(T.shape == (2, 2))
+    _check(bool(jnp.isfinite(beta0)))
+
+    dense_exp = jrb_mat.jrb_mat_dense_funm_sym_eigh_point(jnp.exp)
+    funm_plan = jrb_mat.jrb_mat_funm_action_lanczos_point(spd_plan, x, dense_exp, 2)
+    diag_funm, diag_info = jrb_mat.jrb_mat_funm_action_lanczos_with_diagnostics_point(spd_plan, x, dense_exp, 2)
+    _check(funm_plan.shape == (2, 2))
+    _check(bool(jnp.allclose(di.midpoint(funm_plan), di.midpoint(diag_funm), rtol=1e-6, atol=1e-6)))
+    _check(int(diag_info.steps) == 2)
+
+    probes = jnp.stack([x, _vec2(1.0, 1.0)], axis=0)
+    trace_value = jrb_mat.jrb_mat_trace_estimator_point(spd_plan, probes)
+    logdet_value = jrb_mat.jrb_mat_logdet_slq_point(spd_plan, probes, 2)
+    logdet_value_jit = jrb_mat.jrb_mat_logdet_slq_point_jit(spd_plan, probes, 2)
+    det_value_jit = jrb_mat.jrb_mat_det_slq_point_jit(spd_plan, probes, 2)
+    restarted = jrb_mat.jrb_mat_expm_action_lanczos_restarted_point(spd_plan, x, steps=2, restarts=2)
+    _check(bool(jnp.isfinite(trace_value)))
+    _check(bool(jnp.isfinite(logdet_value)))
+    _check(bool(jnp.isfinite(logdet_value_jit)))
+    _check(bool(jnp.isfinite(det_value_jit)))
+    _check(bool(jnp.allclose(logdet_value_jit, logdet_value, rtol=1e-6, atol=1e-6)))
+    _check(restarted.shape == (2, 2))
+
+    spd_data = jnp.asarray([2.0, 1.0, 1.0, 3.0], dtype=jnp.float64)
+    spd_indices = jnp.asarray([[0, 0], [0, 1], [1, 0], [1, 1]], dtype=jnp.int32)
+    spd_bcoo = sparse_common.SparseBCOO(data=spd_data, indices=spd_indices, rows=2, cols=2, algebra="jrb")
+    spd_bplan = jrb_mat.jrb_mat_bcoo_operator_plan_prepare(spd_bcoo)
+    sparse_trace = jrb_mat.jrb_mat_trace_estimator_point(spd_bplan, probes)
+    sparse_logdet = jrb_mat.jrb_mat_logdet_slq_point(spd_bplan, probes, 2)
+    sparse_logdet_jit = jrb_mat.jrb_mat_logdet_slq_point_jit(spd_bplan, probes, 2)
+    sparse_det_jit = jrb_mat.jrb_mat_det_slq_point_jit(spd_bplan, probes, 2)
+    sparse_restarted = jrb_mat.jrb_mat_expm_action_lanczos_restarted_point(spd_bplan, x, steps=2, restarts=2)
+    _check(bool(jnp.isfinite(sparse_trace)))
+    _check(bool(jnp.isfinite(sparse_logdet)))
+    _check(bool(jnp.isfinite(sparse_logdet_jit)))
+    _check(bool(jnp.isfinite(sparse_det_jit)))
+    _check(bool(jnp.allclose(sparse_logdet_jit, sparse_logdet, rtol=1e-6, atol=1e-6)))
+    _check(sparse_restarted.shape == (2, 2))
+
+
 def test_lanczos_funm_action_matches_exact_diagonal_case():
     a = _mat2(2.0, 0.0, 0.0, 3.0)
     x = _vec2(1.0, -2.0)
@@ -470,3 +547,84 @@ def test_scipy_csr_operator_matches_bcoo_operator_when_available():
     y_csr = jrb_mat.jrb_mat_operator_apply_point(op_csr, x)
     y_bcoo = jrb_mat.jrb_mat_operator_apply_point(op_bcoo, x)
     _check(bool(jnp.allclose(di.midpoint(y_csr), di.midpoint(y_bcoo), rtol=1e-10, atol=1e-10)))
+
+
+def test_named_matrix_free_real_function_actions_match_diagonal_case():
+    a = _mat2(4.0, 0.0, 0.0, 9.0)
+    x = _vec2(1.0, -2.0)
+    op = jrb_mat.jrb_mat_dense_operator(a)
+
+    log_action = jrb_mat.jrb_mat_log_action_lanczos_point(op, x, 2)
+    sqrt_action = jrb_mat.jrb_mat_sqrt_action_lanczos_point(op, x, 2)
+    root_action = jrb_mat.jrb_mat_root_action_lanczos_point(op, x, degree=2, steps=2)
+    sign_action = jrb_mat.jrb_mat_sign_action_lanczos_point(op, x, 2)
+    sin_action = jrb_mat.jrb_mat_sin_action_lanczos_point(op, x, 2)
+    cosh_action, cosh_info = jrb_mat.jrb_mat_cosh_action_lanczos_with_diagnostics_point(op, x, 2)
+    dense_log_action = jrb_mat.jrb_mat_log_action_lanczos_dense_point(a, x, 2)
+    diag_action, diag_info = jrb_mat.jrb_mat_sqrt_action_lanczos_with_diagnostics_point(op, x, 2)
+
+    x_mid = di.midpoint(x)
+    _check(bool(jnp.allclose(di.midpoint(log_action), jnp.asarray([jnp.log(4.0), jnp.log(9.0)]) * x_mid, rtol=1e-6, atol=1e-6)))
+    _check(bool(jnp.allclose(di.midpoint(sqrt_action), jnp.asarray([2.0, 3.0]) * x_mid, rtol=1e-6, atol=1e-6)))
+    _check(bool(jnp.allclose(di.midpoint(root_action), di.midpoint(sqrt_action), rtol=1e-6, atol=1e-6)))
+    _check(bool(jnp.allclose(di.midpoint(sign_action), x_mid, rtol=1e-6, atol=1e-6)))
+    _check(bool(jnp.allclose(di.midpoint(sin_action), jnp.asarray([jnp.sin(4.0), jnp.sin(9.0)]) * x_mid, rtol=1e-6, atol=1e-6)))
+    _check(bool(jnp.allclose(di.midpoint(cosh_action), jnp.asarray([jnp.cosh(4.0), jnp.cosh(9.0)]) * x_mid, rtol=1e-6, atol=1e-6)))
+    _check(bool(jnp.allclose(di.midpoint(dense_log_action), di.midpoint(log_action), rtol=1e-6, atol=1e-6)))
+    _check(bool(jnp.allclose(di.midpoint(diag_action), di.midpoint(sqrt_action), rtol=1e-6, atol=1e-6)))
+    _check(int(diag_info.steps) == 2)
+    _check(int(cosh_info.steps) == 2)
+
+    pow_action = jrb_mat.jrb_mat_pow_action_lanczos_point(op, x, exponent=2, steps=2)
+    _check(bool(jnp.allclose(di.midpoint(pow_action), jnp.asarray([16.0, 81.0]) * x_mid, rtol=1e-6, atol=1e-6)))
+
+
+def test_real_solve_inverse_and_det_matrix_free_apis_match_diagonal_case():
+    a = _mat2(2.0, 0.0, 0.0, 4.0)
+    x = _vec2(3.0, -2.0)
+    rhs = _vec2(6.0, -8.0)
+    op = jrb_mat.jrb_mat_dense_operator(a)
+
+    solved, info = jrb_mat.jrb_mat_solve_action_with_diagnostics_point(op, rhs, symmetric=True)
+    inv_applied = jrb_mat.jrb_mat_inverse_action_point(op, rhs, symmetric=True)
+    _check(bool(jnp.allclose(di.midpoint(solved), di.midpoint(x), rtol=1e-6, atol=1e-6)))
+    _check(bool(jnp.allclose(di.midpoint(inv_applied), di.midpoint(x), rtol=1e-6, atol=1e-6)))
+    _check(bool(info["converged"]))
+
+    probes = jnp.stack([_vec2(1.0, 1.0), _vec2(1.0, -1.0)], axis=0)
+    logdet = jrb_mat.jrb_mat_logdet_slq_point(op, probes, 2)
+    det = jrb_mat.jrb_mat_det_slq_point(op, probes, 2)
+    _check(bool(jnp.allclose(logdet, jnp.log(8.0), rtol=1e-6, atol=1e-6)))
+    _check(bool(jnp.allclose(det, 8.0, rtol=1e-6, atol=1e-6)))
+
+
+def test_sparse_operator_plans_cover_coo_csr_and_structured_aliases():
+    dense = jnp.asarray([[2.0, 1.0], [1.0, 3.0]], dtype=jnp.float64)
+    coo = sparse_common.SparseCOO(
+        data=jnp.asarray([2.0, 1.0, 1.0, 3.0], dtype=jnp.float64),
+        row=jnp.asarray([0, 0, 1, 1], dtype=jnp.int32),
+        col=jnp.asarray([0, 1, 0, 1], dtype=jnp.int32),
+        rows=2,
+        cols=2,
+        algebra="jrb",
+    )
+    csr = sparse_common.SparseCSR(
+        data=jnp.asarray([2.0, 1.0, 1.0, 3.0], dtype=jnp.float64),
+        indices=jnp.asarray([0, 1, 0, 1], dtype=jnp.int32),
+        indptr=jnp.asarray([0, 2, 4], dtype=jnp.int32),
+        rows=2,
+        cols=2,
+        algebra="jrb",
+    )
+    x = _vec2(1.0, -1.0)
+    x_mid = di.midpoint(x)
+    coo_plan = jrb_mat.jrb_mat_sparse_operator_plan_prepare(coo)
+    csr_plan = jrb_mat.jrb_mat_sparse_operator_plan_prepare(csr)
+    _check(bool(jnp.allclose(di.midpoint(jrb_mat.jrb_mat_operator_plan_apply(coo_plan, x)), dense @ x_mid)))
+    _check(bool(jnp.allclose(di.midpoint(jrb_mat.jrb_mat_operator_plan_apply(csr_plan, x)), dense @ x_mid)))
+
+    a = _mat2(2.0, 1.0, 1.0, 3.0)
+    sym_plan = jrb_mat.jrb_mat_symmetric_operator_plan_prepare(a)
+    spd_plan = jrb_mat.jrb_mat_spd_operator_plan_prepare(a)
+    _check(bool(jnp.allclose(di.midpoint(jrb_mat.jrb_mat_operator_plan_apply(sym_plan, x)), dense @ x_mid)))
+    _check(bool(jnp.allclose(di.midpoint(jrb_mat.jrb_mat_operator_plan_apply(spd_plan, x)), dense @ x_mid)))

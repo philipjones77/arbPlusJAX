@@ -79,3 +79,55 @@ def test_acb_dense_matvec_plan_modes_and_batch_padding():
     _check(bool(jnp.all(di.contains(acb_core.acb_imag(adapt_out), acb_core.acb_imag(basic_out)))))
     _check(padded_plan.matrix.shape == (4, 2, 2, 4))
     _check(padded_out.shape == (4, 2, 4))
+
+
+def test_arb_dense_factorized_solve_ecosystem():
+    a_mid = jnp.array([[3.0, 1.0], [2.0, 4.0]], dtype=jnp.float64)
+    rhs_mid = jnp.array([[1.0], [2.0]], dtype=jnp.float64)
+    add_mid = jnp.array([[0.5], [0.25]], dtype=jnp.float64)
+    a = di.interval(a_mid, a_mid)
+    rhs = di.interval(rhs_mid, rhs_mid)
+    add = di.interval(add_mid, add_mid)
+    plan = arb_mat.arb_mat_dense_lu_solve_plan_prepare(a)
+
+    solve_t = mat_wrappers.arb_mat_solve_transpose_mode(plan, rhs, impl="basic", prec_bits=53)
+    solve_add = mat_wrappers.arb_mat_solve_add_mode(plan, rhs, add, impl="basic", prec_bits=53)
+    solve_t_add = mat_wrappers.arb_mat_solve_transpose_add_mode(plan, rhs, add, impl="basic", prec_bits=53)
+    matsolve = mat_wrappers.arb_mat_mat_solve_mode(plan, rhs, impl="basic", prec_bits=53)
+    matsolve_t = mat_wrappers.arb_mat_mat_solve_transpose_mode(plan, rhs, impl="basic", prec_bits=53)
+    batch_t = mat_wrappers.arb_mat_solve_transpose_batch_mode_padded(plan, jnp.stack([rhs, rhs], axis=0), pad_to=4, impl="basic", prec_bits=53)
+
+    expected_t = jnp.linalg.solve(a_mid.T, rhs_mid)
+    expected = jnp.linalg.solve(a_mid, rhs_mid)
+    _check(bool(jnp.allclose(di.midpoint(solve_t), expected_t)))
+    _check(bool(jnp.allclose(di.midpoint(solve_add), expected + add_mid)))
+    _check(bool(jnp.allclose(di.midpoint(solve_t_add), expected_t + add_mid)))
+    _check(bool(jnp.allclose(di.midpoint(matsolve), expected)))
+    _check(bool(jnp.allclose(di.midpoint(matsolve_t), expected_t)))
+    _check(batch_t.shape == (4, 2, 1, 2))
+
+
+def test_acb_dense_factorized_solve_ecosystem():
+    a_mid = jnp.array([[3.0 + 0.0j, 1.0 - 0.5j], [2.0 + 0.25j, 4.0 + 0.0j]], dtype=jnp.complex128)
+    rhs_mid = jnp.array([[1.0 + 0.25j], [2.0 - 0.5j]], dtype=jnp.complex128)
+    add_mid = jnp.array([[0.5 - 0.1j], [0.25 + 0.2j]], dtype=jnp.complex128)
+    a = acb_core.acb_box(di.interval(jnp.real(a_mid), jnp.real(a_mid)), di.interval(jnp.imag(a_mid), jnp.imag(a_mid)))
+    rhs = acb_core.acb_box(di.interval(jnp.real(rhs_mid), jnp.real(rhs_mid)), di.interval(jnp.imag(rhs_mid), jnp.imag(rhs_mid)))
+    add = acb_core.acb_box(di.interval(jnp.real(add_mid), jnp.real(add_mid)), di.interval(jnp.imag(add_mid), jnp.imag(add_mid)))
+    plan = acb_mat.acb_mat_dense_lu_solve_plan_prepare(a)
+
+    solve_t = mat_wrappers.acb_mat_solve_transpose_mode(plan, rhs, impl="basic", prec_bits=53)
+    solve_add = mat_wrappers.acb_mat_solve_add_mode(plan, rhs, add, impl="basic", prec_bits=53)
+    solve_t_add = mat_wrappers.acb_mat_solve_transpose_add_mode(plan, rhs, add, impl="basic", prec_bits=53)
+    matsolve = mat_wrappers.acb_mat_mat_solve_mode(plan, rhs, impl="basic", prec_bits=53)
+    matsolve_t = mat_wrappers.acb_mat_mat_solve_transpose_mode(plan, rhs, impl="basic", prec_bits=53)
+    batch_t = mat_wrappers.acb_mat_solve_transpose_batch_mode_padded(plan, jnp.stack([rhs, rhs], axis=0), pad_to=4, impl="basic", prec_bits=53)
+
+    expected_t = jnp.linalg.solve(a_mid.T, rhs_mid)
+    expected = jnp.linalg.solve(a_mid, rhs_mid)
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(solve_t), expected_t)))
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(solve_add), expected + add_mid)))
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(solve_t_add), expected_t + add_mid)))
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(matsolve), expected)))
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(matsolve_t), expected_t)))
+    _check(batch_t.shape == (4, 2, 1, 4))

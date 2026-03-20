@@ -84,6 +84,29 @@ def test_acb_mat_det_trace_modes():
     _check(bool(di.contains(acb_core.acb_imag(tr_rig), acb_core.acb_imag(tr_basic))))
 
 
+def test_complex_matrix_rmatvec_modes_and_cached_surface():
+    a = jnp.array(
+        [
+            [[2.0, 2.0, 0.25, 0.25], [1.0, 1.0, -0.5, -0.5], [0.0, 0.0, 0.0, 0.0]],
+            [[-1.0, -1.0, 0.75, 0.75], [3.0, 3.0, 0.0, 0.0], [2.0, 2.0, 0.5, 0.5]],
+        ],
+        dtype=jnp.float64,
+    )
+    x = jnp.array([[1.0, 1.0, 0.5, 0.5], [-2.0, -2.0, 0.25, 0.25]], dtype=jnp.float64)
+    point_cache = api.eval_point("acb_mat_rmatvec_cached_prepare", a)
+    basic_cache = mat_wrappers.acb_mat_rmatvec_cached_prepare_mode(a, impl="basic", prec_bits=53)
+    point = mat_wrappers.acb_mat_rmatvec_mode(a, x, impl="point", prec_bits=53)
+    basic = mat_wrappers.acb_mat_rmatvec_mode(a, x, impl="basic", prec_bits=53)
+    cached_point = mat_wrappers.acb_mat_rmatvec_cached_apply_mode(point_cache, x, impl="point", prec_bits=53)
+    cached_basic = mat_wrappers.acb_mat_rmatvec_cached_apply_mode(basic_cache, x, impl="basic", prec_bits=53)
+    expected = acb_core.acb_midpoint(a).T @ acb_core.acb_midpoint(x)
+
+    _check(bool(jnp.allclose(point, expected)))
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(basic), expected)))
+    _check(bool(jnp.allclose(cached_point, expected)))
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(cached_basic), expected)))
+
+
 def test_matrix_point_api_fastpath():
     a = jnp.array(
         [
@@ -135,6 +158,29 @@ def test_matrix_cached_matvec_and_sqr_modes():
     _check(sq_adapt.shape == (2, 2, 2))
     _check(bool(jnp.allclose(sq_point, a_mid @ a_mid)))
     _check(bool(jnp.all(di.contains(sq_rig, sq_basic))))
+
+
+def test_matrix_rmatvec_modes_and_cached_surface():
+    a = jnp.array(
+        [
+            [[2.0, 2.0], [1.0, 1.0], [0.0, 0.0]],
+            [[-1.0, -1.0], [3.0, 3.0], [2.0, 2.0]],
+        ],
+        dtype=jnp.float64,
+    )
+    x = jnp.array([[1.0, 1.0], [-2.0, -2.0]], dtype=jnp.float64)
+    point_cache = api.eval_point("arb_mat_rmatvec_cached_prepare", a)
+    basic_cache = mat_wrappers.arb_mat_rmatvec_cached_prepare_mode(a, impl="basic", prec_bits=53)
+    point = mat_wrappers.arb_mat_rmatvec_mode(a, x, impl="point", prec_bits=53)
+    basic = mat_wrappers.arb_mat_rmatvec_mode(a, x, impl="basic", prec_bits=53)
+    cached_point = mat_wrappers.arb_mat_rmatvec_cached_apply_mode(point_cache, x, impl="point", prec_bits=53)
+    cached_basic = mat_wrappers.arb_mat_rmatvec_cached_apply_mode(basic_cache, x, impl="basic", prec_bits=53)
+    expected = di.midpoint(a).T @ di.midpoint(x)
+
+    _check(bool(jnp.allclose(point, expected)))
+    _check(bool(jnp.allclose(di.midpoint(basic), expected)))
+    _check(bool(jnp.allclose(cached_point, expected)))
+    _check(bool(jnp.allclose(di.midpoint(cached_basic), expected)))
 
 
 def test_matrix_cached_prepare_modes_and_batch_api():
@@ -329,8 +375,8 @@ def test_dense_matvec_plan_modes_and_batch_padding():
     _check(adapt_plan.matrix.shape == (2, 2, 2))
     _check(bool(jnp.allclose(point_out, expected)))
     _check(bool(jnp.allclose(di.midpoint(basic_out), expected)))
-    _check(bool(di.contains(rig_out, basic_out)))
-    _check(bool(di.contains(adapt_out, basic_out)))
+    _check(bool(jnp.all(di.contains(rig_out, basic_out))))
+    _check(bool(jnp.all(di.contains(adapt_out, basic_out))))
     _check(padded_plan.matrix.shape == (4, 2, 2, 2))
     _check(padded_out.shape == (4, 2, 2))
 
@@ -364,9 +410,9 @@ def test_acb_dense_matvec_plan_modes_and_batch_padding():
     _check(adapt_plan.matrix.shape == (2, 2, 4))
     _check(bool(jnp.allclose(point_out, expected)))
     _check(bool(jnp.allclose(acb_core.acb_midpoint(basic_out), expected)))
-    _check(bool(di.contains(acb_core.acb_real(rig_out), acb_core.acb_real(basic_out))))
-    _check(bool(di.contains(acb_core.acb_imag(rig_out), acb_core.acb_imag(basic_out))))
-    _check(bool(di.contains(acb_core.acb_real(adapt_out), acb_core.acb_real(basic_out))))
-    _check(bool(di.contains(acb_core.acb_imag(adapt_out), acb_core.acb_imag(basic_out))))
+    _check(bool(jnp.all(di.contains(acb_core.acb_real(rig_out), acb_core.acb_real(basic_out)))))
+    _check(bool(jnp.all(di.contains(acb_core.acb_imag(rig_out), acb_core.acb_imag(basic_out)))))
+    _check(bool(jnp.all(di.contains(acb_core.acb_real(adapt_out), acb_core.acb_real(basic_out)))))
+    _check(bool(jnp.all(di.contains(acb_core.acb_imag(adapt_out), acb_core.acb_imag(basic_out)))))
     _check(padded_plan.matrix.shape == (4, 2, 2, 4))
     _check(padded_out.shape == (4, 2, 4))

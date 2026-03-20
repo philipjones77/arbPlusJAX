@@ -8,8 +8,13 @@ from jax import lax
 import jax.numpy as jnp
 from jax import ops
 
+from . import acb_core
+from . import acb_mat
 from . import checks
+from . import double_interval as di
 from . import iterative_solvers
+from . import mat_common
+from . import sparse_core
 from . import sparse_common as sc
 
 
@@ -74,6 +79,22 @@ def _as_complex_rhs(x: jax.Array, label: str) -> jax.Array:
     arr = jnp.asarray(x, dtype=jnp.complex128)
     checks.check(arr.ndim in (1, 2), f"{label}.ndim")
     return arr
+
+
+def _dense_box_matrix(x, label: str) -> jax.Array:
+    return sc.sparse_complex_to_box_matrix(x, algebra="scb", label=label)
+
+
+def _box_sparse_matrix(x, label: str):
+    return sc.sparse_complex_to_box_sparse(x, algebra="scb", label=label)
+
+
+def _dense_box_vector(x: jax.Array, label: str) -> jax.Array:
+    return mat_common.box_from_point(_as_complex_vector(x, label))
+
+
+def _dense_box_rhs(x: jax.Array, label: str) -> jax.Array:
+    return mat_common.box_from_point(_as_complex_rhs(x, label))
 
 
 def scb_mat_shape(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO | sc.SparseMatvecPlan) -> tuple[int, int]:
@@ -177,7 +198,7 @@ def scb_mat_diag(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
         diag = jnp.zeros((x.rows,), dtype=x.data.dtype)
         mask = x.row == x.col
         return diag.at[x.row[mask]].add(x.data[mask])
-    return jnp.diag(scb_mat_to_dense(x))
+    return sparse_core.sparse_diag(x, to_coo_fn=_to_coo_any, dtype=jnp.complex128)
 
 
 def scb_mat_diag_matrix(d: jax.Array) -> sc.SparseCOO:
@@ -202,11 +223,37 @@ def scb_mat_norm_fro(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Arra
 
 
 def scb_mat_norm_1(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
-    return jnp.linalg.norm(scb_mat_to_dense(x), ord=1)
+    return sparse_core.sparse_norm_1(x, to_coo_fn=_to_coo_any)
 
 
 def scb_mat_norm_inf(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
-    return jnp.linalg.norm(scb_mat_to_dense(x), ord=jnp.inf)
+    return sparse_core.sparse_norm_inf(x, to_coo_fn=_to_coo_any)
+
+
+def scb_mat_trace_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
+    bx = _box_sparse_matrix(x, "scb_mat.trace_basic")
+    dense = sc.sparse_box_to_dense(bx, algebra="scb", label="scb_mat.trace_basic.dense")
+    return mat_common.box_trace(dense)
+
+
+def scb_mat_norm_fro_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
+    bx = _box_sparse_matrix(x, "scb_mat.norm_fro_basic")
+    total = mat_common.box_sum(acb_core.acb_mul(bx.data, acb_core.acb_conj(bx.data)), axis=0)
+    return acb_core.acb_sqrt(total)
+
+
+def scb_mat_norm_1_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
+    dense = sc.sparse_box_to_dense(_box_sparse_matrix(x, "scb_mat.norm_1_basic"), algebra="scb", label="scb_mat.norm_1_basic.dense")
+    abs_a = acb_core.acb_abs(dense)
+    col_sums = mat_common.interval_sum(abs_a, axis=-2)
+    return mat_common.box_from_point(jnp.max(di.midpoint(col_sums), axis=-1))
+
+
+def scb_mat_norm_inf_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
+    dense = sc.sparse_box_to_dense(_box_sparse_matrix(x, "scb_mat.norm_inf_basic"), algebra="scb", label="scb_mat.norm_inf_basic.dense")
+    abs_a = acb_core.acb_abs(dense)
+    row_sums = mat_common.interval_sum(abs_a, axis=-1)
+    return mat_common.box_from_point(jnp.max(di.midpoint(row_sums), axis=-1))
 
 
 def scb_mat_submatrix(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, row_start: int, row_stop: int, col_start: int, col_stop: int) -> sc.SparseCOO:
@@ -216,83 +263,15 @@ def scb_mat_submatrix(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, row_start:
     return scb_mat_coo(coo.data[mask], coo.row[mask] - row_start, coo.col[mask] - col_start, shape=(row_stop - row_start, col_stop - col_start))
 
 
-def _swap_rows_dense(a: jax.Array, i: int, j: int) -> jax.Array:
-    if i == j:
-        return a
-    row_i = a[i, :]
-    row_j = a[j, :]
-    a = a.at[i, :].set(row_j)
-    return a.at[j, :].set(row_i)
-
-
-def _swap_perm(perm: jax.Array, i: int, j: int) -> jax.Array:
-    if i == j:
-        return perm
-    vi = perm[i]
-    vj = perm[j]
-    perm = perm.at[i].set(vj)
-    return perm.at[j].set(vi)
-
-
-def _dense_sparse_lu_partial_pivot(a: jax.Array) -> tuple[jax.Array, jax.Array, jax.Array]:
-    n = a.shape[0]
-    u = jnp.array(a, copy=True)
-    l = jnp.eye(n, dtype=a.dtype)
-    perm = jnp.arange(n, dtype=jnp.int32)
-    for k in range(n):
-        pivot = int(k + jnp.argmax(jnp.abs(u[k:, k])))
-        u = _swap_rows_dense(u, k, pivot)
-        if k > 0 and pivot != k:
-            l_k = l[k, :k]
-            l_p = l[pivot, :k]
-            l = l.at[k, :k].set(l_p)
-            l = l.at[pivot, :k].set(l_k)
-        perm = _swap_perm(perm, k, pivot)
-        pivot_value = u[k, k]
-        if k + 1 < n:
-            factors = u[k + 1 :, k] / pivot_value
-            l = l.at[k + 1 :, k].set(factors)
-            u = u.at[k + 1 :, k:].set(u[k + 1 :, k:] - factors[:, None] * u[k, k:][None, :])
-            u = u.at[k + 1 :, k].set(0.0 + 0.0j)
-    return perm, l, u
-
-
-def _dense_householder_qr(a: jax.Array) -> tuple[jax.Array, jax.Array, jax.Array]:
-    m, n = a.shape
-    k = min(m, n)
-    work = jnp.array(a, copy=True)
-    reflectors = jnp.zeros((m, k), dtype=a.dtype)
-    taus = jnp.zeros((k,), dtype=a.dtype)
-    for j in range(k):
-        x = work[j:, j]
-        x0 = x[0]
-        normx = jnp.linalg.norm(x)
-        phase = jnp.where(jnp.abs(x0) > 0.0, x0 / jnp.abs(x0), 1.0 + 0.0j)
-        alpha = -phase * normx
-        v = x.at[0].add(-alpha)
-        beta = jnp.vdot(v, v)
-        tau = jnp.where(jnp.abs(beta) > 0.0, 2.0 / beta, 0.0 + 0.0j)
-        trailing = work[j:, j:]
-        trailing = trailing - tau * v[:, None] * (jnp.conjugate(v) @ trailing)[None, :]
-        work = work.at[j:, j:].set(trailing)
-        reflector = jnp.zeros((m,), dtype=a.dtype).at[j:].set(v)
-        reflectors = reflectors.at[:, j].set(reflector)
-        taus = taus.at[j].set(tau)
-        work = work.at[j, j].set(alpha)
-        if j + 1 < m:
-            work = work.at[j + 1 :, j].set(v[1:])
-    return reflectors, taus, jnp.triu(work[:k, :])
-
-
 def scb_mat_lu(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> tuple[sc.SparseCOO, sc.SparseCSR, sc.SparseCSR]:
-    csr = _as_csr(x, label="scb_mat.lu")
-    a = scb_mat_to_dense(csr)
-    perm, l, u = _dense_sparse_lu_partial_pivot(a)
-    n = csr.rows
-    p = scb_mat_permutation_matrix(perm)
-    l_sparse = scb_mat_from_dense_csr(jnp.tril(l))
-    u_sparse = scb_mat_from_dense_csr(jnp.triu(u))
-    return p, l_sparse, u_sparse
+    return sparse_core.sparse_lu_via_jax_dense(
+        x,
+        as_csr_fn=_as_csr,
+        to_dense_fn=scb_mat_to_dense,
+        from_dense_csr_fn=scb_mat_from_dense_csr,
+        permutation_matrix_fn=scb_mat_permutation_matrix,
+        complex_=True,
+    )
 
 
 def scb_mat_lu_solve(
@@ -307,7 +286,7 @@ def scb_mat_lu_solve(
 
 def scb_mat_qr(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> sc.SparseQRFactor:
     csr = _as_csr(x, label="scb_mat.qr")
-    reflectors, taus, r_dense = _dense_householder_qr(scb_mat_to_dense(csr))
+    reflectors, taus, r_dense = sparse_core.dense_householder_qr_complex(scb_mat_to_dense(csr))
     r_sparse = scb_mat_from_dense_csr(r_dense)
     return sc.SparseQRFactor(reflectors=reflectors, taus=taus, r_factor=r_sparse, rows=csr.rows, cols=csr.cols, algebra="scb")
 
@@ -423,6 +402,14 @@ def _as_csr(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, *, label: str) -> sc
     return scb_mat_coo_to_csr(scb_mat_bcoo_to_coo(sc.as_sparse_bcoo(x, algebra="scb", label=label)))
 
 
+def _to_coo_any(x):
+    if isinstance(x, sc.SparseCOO):
+        return sc.as_sparse_coo(x, algebra="scb", label="scb_mat._to_coo_any")
+    if isinstance(x, sc.SparseCSR):
+        return scb_mat_csr_to_coo(x)
+    return scb_mat_bcoo_to_coo(x)
+
+
 def _csr_triangular_solve_vector(x: sc.SparseCSR, b: jax.Array, *, lower: bool, unit_diagonal: bool) -> jax.Array:
     n = x.rows
     nnz = x.data.shape[0]
@@ -468,6 +455,113 @@ def scb_mat_conjugate_transpose(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) 
     return scb_mat_bcoo(jnp.conj(tx.data), tx.indices, shape=(tx.rows, tx.cols))
 
 
+def scb_mat_hermitian_part(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> sc.SparseCSR:
+    return scb_mat_coo_to_csr(sparse_core.sparse_structured_part_hermitian(x, to_coo_fn=_to_coo_any, from_coo_fn=scb_mat_coo))
+
+
+def scb_mat_is_hermitian(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, *, rtol: float = 1e-10, atol: float = 1e-10) -> jax.Array:
+    return sparse_core.sparse_is_hermitian_structural(x, to_coo_fn=_to_coo_any, rtol=rtol, atol=atol)
+
+
+def scb_mat_is_hpd(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
+    return sparse_core.sparse_is_hpd_structural(
+        x,
+        is_hermitian_fn=scb_mat_is_hermitian,
+        structured_part_fn=scb_mat_hermitian_part,
+        to_dense_fn=scb_mat_to_dense,
+    )
+
+
+def scb_mat_cho(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> sc.SparseCSR:
+    return sparse_core.sparse_midpoint_cho_from_symmetric_part(
+        x,
+        structured_part_fn=scb_mat_hermitian_part,
+        to_dense_fn=scb_mat_to_dense,
+        from_dense_csr_fn=scb_mat_from_dense_csr,
+    )
+
+
+def scb_mat_ldl(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> tuple[sc.SparseCSR, jax.Array]:
+    l, d = sparse_core.sparse_midpoint_ldl_from_cho(
+        x,
+        cho_fn=scb_mat_cho,
+        to_dense_fn=scb_mat_to_dense,
+        diag_map_fn=lambda diag: jnp.real(diag * jnp.conj(diag)),
+    )
+    return scb_mat_from_dense_csr(jnp.tril(l)), d
+
+
+def scb_mat_hermitian_part_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
+    bx = _box_sparse_matrix(x, "scb_mat.hermitian_part_basic")
+    herm = sc.sparse_box_scale(
+        sc.sparse_box_add(bx, sc.sparse_box_conjugate_transpose(bx, algebra="scb", label="scb_mat.hermitian_part_basic.transpose"), algebra="scb", label="scb_mat.hermitian_part_basic.add"),
+        0.5 + 0.0j,
+        algebra="scb",
+    )
+    return sc.sparse_box_to_dense(herm, algebra="scb", label="scb_mat.hermitian_part_basic.dense")
+
+
+def scb_mat_is_hermitian_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
+    dense = sc.sparse_box_to_dense(_box_sparse_matrix(x, "scb_mat.is_hermitian_basic"), algebra="scb", label="scb_mat.is_hermitian_basic.dense")
+    return mat_common.complex_midpoint_is_hermitian(acb_core.acb_midpoint(dense))
+
+
+def scb_mat_is_hpd_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
+    dense = sc.sparse_box_to_dense(_box_sparse_matrix(x, "scb_mat.is_hpd_basic"), algebra="scb", label="scb_mat.is_hpd_basic.dense")
+    mid = acb_core.acb_midpoint(dense)
+    chol = jnp.linalg.cholesky(mat_common.complex_midpoint_hermitian_part(mid))
+    return mat_common.complex_midpoint_is_hermitian(mid) & mat_common.lower_cholesky_finite(chol)
+
+
+def scb_mat_cho_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
+    return acb_mat.acb_mat_cho_basic(_dense_box_matrix(x, "scb_mat.cho_basic"))
+
+
+def scb_mat_ldl_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> tuple[jax.Array, jax.Array]:
+    return acb_mat.acb_mat_ldl_basic(_dense_box_matrix(x, "scb_mat.ldl_basic"))
+
+
+def scb_mat_charpoly(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
+    return acb_core.acb_midpoint(acb_mat.acb_mat_charpoly(_dense_box_matrix(x, "scb_mat.charpoly")))
+
+
+def scb_mat_charpoly_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
+    return acb_mat.acb_mat_charpoly(_dense_box_matrix(x, "scb_mat.charpoly_basic"))
+
+
+def scb_mat_pow_ui(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, n: int) -> jax.Array:
+    return acb_core.acb_midpoint(acb_mat.acb_mat_pow_ui(_dense_box_matrix(x, "scb_mat.pow_ui"), n))
+
+
+def scb_mat_pow_ui_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, n: int) -> jax.Array:
+    return acb_mat.acb_mat_pow_ui(_dense_box_matrix(x, "scb_mat.pow_ui_basic"), n)
+
+
+def scb_mat_exp(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
+    return acb_core.acb_midpoint(acb_mat.acb_mat_exp(_dense_box_matrix(x, "scb_mat.exp")))
+
+
+def scb_mat_exp_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
+    return acb_mat.acb_mat_exp(_dense_box_matrix(x, "scb_mat.exp_basic"))
+
+
+def scb_mat_eigvalsh(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
+    return acb_core.acb_midpoint(acb_mat.acb_mat_eigvalsh(_dense_box_matrix(x, "scb_mat.eigvalsh")))
+
+
+def scb_mat_eigvalsh_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
+    return acb_mat.acb_mat_eigvalsh(_dense_box_matrix(x, "scb_mat.eigvalsh_basic"))
+
+
+def scb_mat_eigh(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> tuple[jax.Array, jax.Array]:
+    values, vectors = acb_mat.acb_mat_eigh(_dense_box_matrix(x, "scb_mat.eigh"))
+    return acb_core.acb_midpoint(values), acb_core.acb_midpoint(vectors)
+
+
+def scb_mat_eigh_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> tuple[jax.Array, jax.Array]:
+    return acb_mat.acb_mat_eigh(_dense_box_matrix(x, "scb_mat.eigh_basic"))
+
+
 def scb_mat_matvec(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, v: jax.Array) -> jax.Array:
     v = _as_complex_vector(v, "scb_mat.matvec")
     if isinstance(x, sc.SparseCOO):
@@ -488,6 +582,10 @@ def scb_mat_matvec(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, v: jax.Array)
     raise TypeError("expected SparseCOO, SparseCSR, or SparseBCOO")
 
 
+def scb_mat_rmatvec(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, v: jax.Array) -> jax.Array:
+    return scb_mat_matvec(scb_mat_transpose(x), v)
+
+
 def scb_mat_matmul_dense_rhs(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, b: jax.Array) -> jax.Array:
     b = _as_complex_matrix(b, "scb_mat.matmul_dense_rhs")
     if isinstance(x, sc.SparseCOO):
@@ -506,6 +604,42 @@ def scb_mat_matmul_dense_rhs(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, b: 
         checks.check_equal(x.cols, b.shape[0], "scb_mat.matmul_dense_rhs.inner")
         return sc.sparse_bcoo_matmul_dense_rhs(x, b, algebra="scb", label="scb_mat.matmul_dense_rhs.bcoo")
     raise TypeError("expected SparseCOO, SparseCSR, or SparseBCOO")
+
+
+def scb_mat_to_dense_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
+    return sc.sparse_box_to_dense(_box_sparse_matrix(x, "scb_mat.to_dense_basic"), algebra="scb", label="scb_mat.to_dense_basic.dense")
+
+
+def scb_mat_transpose_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
+    tx = sc.sparse_box_transpose(_box_sparse_matrix(x, "scb_mat.transpose_basic"), algebra="scb", label="scb_mat.transpose_basic.transpose")
+    return sc.sparse_box_to_dense(tx, algebra="scb", label="scb_mat.transpose_basic.dense")
+
+
+def scb_mat_conjugate_transpose_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
+    tx = sc.sparse_box_conjugate_transpose(_box_sparse_matrix(x, "scb_mat.conjugate_transpose_basic"), algebra="scb", label="scb_mat.conjugate_transpose_basic.transpose")
+    return sc.sparse_box_to_dense(tx, algebra="scb", label="scb_mat.conjugate_transpose_basic.dense")
+
+
+def scb_mat_matvec_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, v: jax.Array) -> jax.Array:
+    return sc.sparse_box_matvec(
+        _box_sparse_matrix(x, "scb_mat.matvec_basic"),
+        _dense_box_vector(v, "scb_mat.matvec_basic"),
+        algebra="scb",
+        label="scb_mat.matvec_basic",
+    )
+
+
+def scb_mat_rmatvec_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, v: jax.Array) -> jax.Array:
+    return scb_mat_matvec_basic(scb_mat_transpose(x), v)
+
+
+def scb_mat_matmul_dense_rhs_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, b: jax.Array) -> jax.Array:
+    return sc.sparse_box_matmul_dense_rhs(
+        _box_sparse_matrix(x, "scb_mat.matmul_dense_rhs_basic"),
+        _dense_box_rhs(b, "scb_mat.matmul_dense_rhs_basic"),
+        algebra="scb",
+        label="scb_mat.matmul_dense_rhs_basic",
+    )
 
 
 def scb_mat_scale(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, alpha: jax.Array) -> sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO:
@@ -531,9 +665,7 @@ def scb_mat_sub(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, y: sc.SparseCOO 
 
 
 def scb_mat_matmul_sparse(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, y: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> sc.SparseBCOO:
-    xb = _as_bcoo(x, label="scb_mat.matmul_sparse.x")
-    yb = _as_bcoo(y, label="scb_mat.matmul_sparse.y")
-    return sc.sparse_bcoo_matmul_sparse(xb, yb, algebra="scb", label="scb_mat.matmul_sparse")
+    return sparse_core.sparse_matmul_sparse(x, y, to_bcoo_fn=_as_bcoo, matmul_sparse_fn=lambda xb, yb: sc.sparse_bcoo_matmul_sparse(xb, yb, algebra="scb", label="scb_mat.matmul_sparse"))
 
 
 def scb_mat_triangular_solve(
@@ -549,6 +681,21 @@ def scb_mat_triangular_solve(
     if b.ndim == 1:
         return _csr_triangular_solve_vector(x, b, lower=lower, unit_diagonal=unit_diagonal)
     return jax.vmap(lambda col: _csr_triangular_solve_vector(x, col, lower=lower, unit_diagonal=unit_diagonal), in_axes=1, out_axes=1)(b)
+
+
+def scb_mat_triangular_solve_basic(
+    x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO,
+    b: jax.Array,
+    *,
+    lower: bool,
+    unit_diagonal: bool = False,
+) -> jax.Array:
+    return acb_mat.acb_mat_triangular_solve_basic(
+        _dense_box_matrix(x, "scb_mat.triangular_solve_basic"),
+        _dense_box_rhs(b, "scb_mat.triangular_solve_basic"),
+        lower=lower,
+        unit_diagonal=unit_diagonal,
+    )
 
 
 def scb_mat_solve(
@@ -567,8 +714,7 @@ def scb_mat_solve(
     b = _as_complex_rhs(b, "scb_mat.solve")
     checks.check_equal(x.cols, b.shape[0], "scb_mat.solve.inner")
     if x.rows <= 16:
-        dense = sc.sparse_bcoo_to_dense(x, algebra="scb", label="scb_mat.solve.dense")
-        return jnp.linalg.solve(dense, b)
+        return sparse_core.sparse_direct_solve(x, b, to_dense_fn=lambda a: scb_mat_to_dense(_as_csr(a, label="scb_mat.solve.dense")))
 
     def matvec(v):
         return sc.sparse_bcoo_matvec(x, v, algebra="scb", label="scb_mat.solve.apply")
@@ -592,6 +738,190 @@ def scb_mat_solve(
     )
 
 
+def scb_mat_solve_basic(
+    x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO,
+    b: jax.Array,
+    **kwargs,
+) -> jax.Array:
+    del kwargs
+    return acb_mat.acb_mat_solve_basic(_dense_box_matrix(x, "scb_mat.solve_basic"), _dense_box_rhs(b, "scb_mat.solve_basic"))
+
+
+def scb_mat_lu_solve_plan_prepare(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> sc.SparseLUSolvePlan:
+    p, l, u = scb_mat_lu(x)
+    return sc.sparse_lu_solve_plan_from_factors(p, l, u, algebra="scb")
+
+
+def scb_mat_lu_solve_plan_prepare_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO):
+    return scb_mat_lu_solve_plan_prepare(x)
+
+
+def scb_mat_lu_solve_plan_apply(plan: sc.SparseLUSolvePlan | tuple, b: jax.Array) -> jax.Array:
+    plan = sc.as_sparse_lu_solve_plan(plan, algebra="scb", label="scb_mat.lu_solve_plan_apply")
+    return scb_mat_lu_solve((plan.p, plan.l, plan.u), b)
+
+
+def scb_mat_lu_solve_plan_apply_basic(plan, b: jax.Array) -> jax.Array:
+    if isinstance(plan, (sc.SparseLUSolvePlan, tuple)):
+        return mat_common.box_from_point(scb_mat_lu_solve_plan_apply(plan, _as_complex_rhs(b, "scb_mat.lu_solve_plan_apply_basic")))
+    return acb_mat.acb_mat_lu_solve_basic(plan, _dense_box_rhs(b, "scb_mat.lu_solve_plan_apply_basic"))
+
+
+def scb_mat_hpd_solve_plan_prepare(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> sc.SparseCholeskySolvePlan:
+    return sc.sparse_cholesky_solve_plan_from_factor(scb_mat_cho(x), algebra="scb", structure="hpd")
+
+
+def scb_mat_hpd_solve_plan_prepare_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO):
+    return scb_mat_hpd_solve_plan_prepare(x)
+
+
+def scb_mat_hpd_solve_plan_apply(plan: sc.SparseCholeskySolvePlan | sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, b: jax.Array) -> jax.Array:
+    plan = sc.as_sparse_cholesky_solve_plan(plan, algebra="scb", structure="hpd", label="scb_mat.hpd_solve_plan_apply")
+    factor = _as_csr(plan.factor, label="scb_mat.hpd_solve_plan_apply.factor")
+    y = scb_mat_triangular_solve(factor, b, lower=True, unit_diagonal=False)
+    return scb_mat_triangular_solve(scb_mat_conjugate_transpose(factor), y, lower=False, unit_diagonal=False)
+
+
+def scb_mat_hpd_solve_plan_apply_basic(plan, b: jax.Array) -> jax.Array:
+    if isinstance(plan, (sc.SparseCholeskySolvePlan, sc.SparseCOO, sc.SparseCSR, sc.SparseBCOO)):
+        return mat_common.box_from_point(scb_mat_hpd_solve_plan_apply(plan, _as_complex_rhs(b, "scb_mat.hpd_solve_plan_apply_basic")))
+    return acb_mat.acb_mat_hpd_solve_basic(plan, _dense_box_rhs(b, "scb_mat.hpd_solve_plan_apply_basic"))
+
+
+def scb_mat_hpd_solve(x_or_plan: sc.SparseCholeskySolvePlan | sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, b: jax.Array) -> jax.Array:
+    if isinstance(x_or_plan, sc.SparseCholeskySolvePlan):
+        return scb_mat_hpd_solve_plan_apply(x_or_plan, b)
+    return scb_mat_hpd_solve_plan_apply(scb_mat_hpd_solve_plan_prepare(x_or_plan), b)
+
+
+def scb_mat_hpd_solve_basic(x_or_plan, b: jax.Array) -> jax.Array:
+    if isinstance(x_or_plan, (sc.SparseCholeskySolvePlan, sc.SparseCOO, sc.SparseCSR, sc.SparseBCOO)):
+        return mat_common.box_from_point(scb_mat_hpd_solve(x_or_plan, _as_complex_rhs(b, "scb_mat.hpd_solve_basic")))
+    return acb_mat.acb_mat_hpd_solve_basic(x_or_plan, _dense_box_rhs(b, "scb_mat.hpd_solve_basic"))
+
+
+def scb_mat_hpd_inv(x_or_plan: sc.SparseCholeskySolvePlan | sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
+    rows, _ = sc.sparse_shape(x_or_plan, algebra="scb", label="scb_mat.hpd_inv")
+    eye = jnp.eye(rows, dtype=jnp.complex128)
+    return scb_mat_hpd_solve(x_or_plan, eye)
+
+
+def scb_mat_hpd_inv_basic(x_or_plan) -> jax.Array:
+    if isinstance(x_or_plan, (sc.SparseCholeskySolvePlan, sc.SparseCOO, sc.SparseCSR, sc.SparseBCOO)):
+        return mat_common.box_from_point(scb_mat_hpd_inv(x_or_plan))
+    return acb_mat.acb_mat_hpd_inv_basic(x_or_plan)
+
+
+def scb_mat_solve_lu(x_or_plan: sc.SparseLUSolvePlan | tuple | sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, b: jax.Array) -> jax.Array:
+    if isinstance(x_or_plan, (sc.SparseLUSolvePlan, tuple)):
+        return scb_mat_lu_solve_plan_apply(x_or_plan, b)
+    return scb_mat_lu_solve_plan_apply(scb_mat_lu_solve_plan_prepare(x_or_plan), b)
+
+
+def scb_mat_solve_lu_precomp(plan: sc.SparseLUSolvePlan | tuple, b: jax.Array) -> jax.Array:
+    return scb_mat_lu_solve_plan_apply(plan, b)
+
+
+def scb_mat_solve_lu_basic(x_or_plan, b: jax.Array) -> jax.Array:
+    if isinstance(x_or_plan, (sc.SparseLUSolvePlan, tuple, sc.SparseCOO, sc.SparseCSR, sc.SparseBCOO)):
+        return mat_common.box_from_point(scb_mat_solve_lu(x_or_plan, _as_complex_rhs(b, "scb_mat.solve_lu_basic")))
+    return acb_mat.acb_mat_solve_lu(x_or_plan, _dense_box_rhs(b, "scb_mat.solve_lu_basic"))
+
+
+def scb_mat_solve_lu_precomp_basic(plan, b: jax.Array) -> jax.Array:
+    if isinstance(plan, (sc.SparseLUSolvePlan, tuple)):
+        return mat_common.box_from_point(scb_mat_solve_lu_precomp(plan, _as_complex_rhs(b, "scb_mat.solve_lu_precomp_basic")))
+    return acb_mat.acb_mat_solve_lu_precomp(plan, _dense_box_rhs(b, "scb_mat.solve_lu_precomp_basic"))
+
+
+def scb_mat_solve_transpose(x_or_plan, b: jax.Array) -> jax.Array:
+    if isinstance(x_or_plan, sc.SparseCholeskySolvePlan):
+        return scb_mat_hpd_solve_plan_apply(x_or_plan, b)
+    if isinstance(x_or_plan, (sc.SparseLUSolvePlan, tuple)):
+        plan = sc.as_sparse_lu_solve_plan(x_or_plan, algebra="scb", label="scb_mat.solve_transpose")
+        pb = scb_mat_matvec(scb_mat_transpose(plan.p), _as_complex_vector(b, "scb_mat.solve_transpose")) if jnp.asarray(b).ndim == 1 else scb_mat_matmul_dense_rhs(scb_mat_transpose(plan.p), _as_complex_matrix(b, "scb_mat.solve_transpose"))
+        y = scb_mat_triangular_solve(scb_mat_transpose(plan.u), pb, lower=True, unit_diagonal=False)
+        return scb_mat_triangular_solve(scb_mat_transpose(plan.l), y, lower=False, unit_diagonal=True)
+    if bool(scb_mat_is_hpd(x_or_plan)):
+        return scb_mat_hpd_solve(x_or_plan, b)
+    if sc.sparse_shape(x_or_plan, algebra="scb", label="scb_mat.solve_transpose.shape")[0] <= 16:
+        dense = scb_mat_to_dense(_as_csr(x_or_plan, label="scb_mat.solve_transpose.dense"))
+        return jnp.linalg.solve(dense.T, _as_complex_rhs(b, "scb_mat.solve_transpose.rhs"))
+    return scb_mat_solve(scb_mat_transpose(x_or_plan), b)
+
+
+def scb_mat_solve_transpose_basic(x_or_plan, b: jax.Array) -> jax.Array:
+    if isinstance(x_or_plan, (sc.SparseCholeskySolvePlan, sc.SparseLUSolvePlan, tuple, sc.SparseCOO, sc.SparseCSR, sc.SparseBCOO)):
+        return mat_common.box_from_point(scb_mat_solve_transpose(x_or_plan, _as_complex_rhs(b, "scb_mat.solve_transpose_basic")))
+    return acb_mat.acb_mat_solve_transpose(x_or_plan, _dense_box_rhs(b, "scb_mat.solve_transpose_basic"))
+
+
+def scb_mat_solve_add(x_or_plan, b: jax.Array, y: jax.Array) -> jax.Array:
+    return jnp.asarray(y, dtype=jnp.complex128) + scb_mat_mat_solve(x_or_plan, b)
+
+
+def scb_mat_solve_add_basic(x_or_plan, b: jax.Array, y: jax.Array) -> jax.Array:
+    if isinstance(x_or_plan, (sc.SparseCholeskySolvePlan, sc.SparseLUSolvePlan, tuple, sc.SparseCOO, sc.SparseCSR, sc.SparseBCOO)):
+        return mat_common.box_from_point(
+            scb_mat_solve_add(
+                x_or_plan,
+                _as_complex_rhs(b, "scb_mat.solve_add_basic"),
+                _as_complex_rhs(y, "scb_mat.solve_add_basic.y"),
+            )
+        )
+    return acb_mat.acb_mat_solve_add(
+        _dense_box_matrix(x_or_plan, "scb_mat.solve_add_basic") if isinstance(x_or_plan, (sc.SparseCOO, sc.SparseCSR, sc.SparseBCOO)) else x_or_plan,
+        _dense_box_rhs(b, "scb_mat.solve_add_basic"),
+        _dense_box_rhs(y, "scb_mat.solve_add_basic.y"),
+    )
+
+
+def scb_mat_solve_transpose_add(x_or_plan, b: jax.Array, y: jax.Array) -> jax.Array:
+    return jnp.asarray(y, dtype=jnp.complex128) + scb_mat_solve_transpose(x_or_plan, b)
+
+
+def scb_mat_solve_transpose_add_basic(x_or_plan, b: jax.Array, y: jax.Array) -> jax.Array:
+    if isinstance(x_or_plan, (sc.SparseCholeskySolvePlan, sc.SparseLUSolvePlan, tuple, sc.SparseCOO, sc.SparseCSR, sc.SparseBCOO)):
+        return mat_common.box_from_point(
+            scb_mat_solve_transpose_add(
+                x_or_plan,
+                _as_complex_rhs(b, "scb_mat.solve_transpose_add_basic"),
+                _as_complex_rhs(y, "scb_mat.solve_transpose_add_basic.y"),
+            )
+        )
+    return acb_mat.acb_mat_solve_transpose_add(
+        _dense_box_matrix(x_or_plan, "scb_mat.solve_transpose_add_basic") if isinstance(x_or_plan, (sc.SparseCOO, sc.SparseCSR, sc.SparseBCOO)) else x_or_plan,
+        _dense_box_rhs(b, "scb_mat.solve_transpose_add_basic"),
+        _dense_box_rhs(y, "scb_mat.solve_transpose_add_basic.y"),
+    )
+
+
+def scb_mat_mat_solve(x_or_plan, b: jax.Array) -> jax.Array:
+    if isinstance(x_or_plan, sc.SparseCholeskySolvePlan):
+        return scb_mat_hpd_solve_plan_apply(x_or_plan, b)
+    if isinstance(x_or_plan, (sc.SparseLUSolvePlan, tuple)):
+        return scb_mat_lu_solve_plan_apply(x_or_plan, b)
+    if bool(scb_mat_is_hpd(x_or_plan)):
+        return scb_mat_hpd_solve(x_or_plan, b)
+    return scb_mat_solve(x_or_plan, b)
+
+
+def scb_mat_mat_solve_basic(x_or_plan, b: jax.Array) -> jax.Array:
+    if isinstance(x_or_plan, (sc.SparseCholeskySolvePlan, sc.SparseLUSolvePlan, tuple, sc.SparseCOO, sc.SparseCSR, sc.SparseBCOO)):
+        return mat_common.box_from_point(scb_mat_mat_solve(x_or_plan, _as_complex_rhs(b, "scb_mat.mat_solve_basic")))
+    return acb_mat.acb_mat_mat_solve(x_or_plan, _dense_box_rhs(b, "scb_mat.mat_solve_basic"))
+
+
+def scb_mat_mat_solve_transpose(x_or_plan, b: jax.Array) -> jax.Array:
+    return scb_mat_solve_transpose(x_or_plan, b)
+
+
+def scb_mat_mat_solve_transpose_basic(x_or_plan, b: jax.Array) -> jax.Array:
+    if isinstance(x_or_plan, (sc.SparseCholeskySolvePlan, sc.SparseLUSolvePlan, tuple, sc.SparseCOO, sc.SparseCSR, sc.SparseBCOO)):
+        return mat_common.box_from_point(scb_mat_mat_solve_transpose(x_or_plan, _as_complex_rhs(b, "scb_mat.mat_solve_transpose_basic")))
+    return acb_mat.acb_mat_mat_solve_transpose(x_or_plan, _dense_box_rhs(b, "scb_mat.mat_solve_transpose_basic"))
+
+
 def scb_mat_solve_batch_fixed(
     x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO,
     bs: jax.Array,
@@ -602,8 +932,16 @@ def scb_mat_solve_batch_fixed(
     maxiter: int | None = None,
     restart: int = 20,
 ) -> jax.Array:
-    bs = _as_complex_matrix(bs, "scb_mat.solve_batch_fixed")
-    return jax.vmap(lambda b: scb_mat_solve(x, b, method=method, tol=tol, atol=atol, maxiter=maxiter, restart=restart))(bs)
+    return sc.vmapped_batch_fixed(
+        bs,
+        validate=_as_complex_matrix,
+        label="scb_mat.solve_batch_fixed",
+        apply=lambda b: scb_mat_solve(x, b, method=method, tol=tol, atol=atol, maxiter=maxiter, restart=restart),
+    )
+
+
+def scb_mat_solve_basic_batch_fixed(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, bs: jax.Array, **kwargs) -> jax.Array:
+    return sc.vmapped_batch_fixed(bs, validate=_as_complex_matrix, label="scb_mat.solve_basic_batch_fixed", apply=lambda b: scb_mat_solve_basic(x, b, **kwargs))
 
 
 def scb_mat_solve_batch_padded(
@@ -617,11 +955,17 @@ def scb_mat_solve_batch_padded(
     maxiter: int | None = None,
     restart: int = 20,
 ) -> jax.Array:
-    bs = _as_complex_matrix(bs, "scb_mat.solve_batch_padded")
-    checks.check(pad_to >= bs.shape[0], "scb_mat.solve_batch_padded.pad_to")
-    pad_count = int(pad_to - bs.shape[0])
-    padded = jnp.concatenate([bs, jnp.repeat(bs[-1:, :], pad_count, axis=0)], axis=0) if pad_count > 0 else bs
-    return scb_mat_solve_batch_fixed(x, padded, method=method, tol=tol, atol=atol, maxiter=maxiter, restart=restart)
+    return sc.vmapped_batch_padded(
+        bs,
+        pad_to=pad_to,
+        validate=_as_complex_matrix,
+        label="scb_mat.solve_batch_padded",
+        apply=lambda b: scb_mat_solve(x, b, method=method, tol=tol, atol=atol, maxiter=maxiter, restart=restart),
+    )
+
+
+def scb_mat_solve_basic_batch_padded(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, bs: jax.Array, *, pad_to: int, **kwargs) -> jax.Array:
+    return sc.vmapped_batch_padded(bs, pad_to=pad_to, validate=_as_complex_matrix, label="scb_mat.solve_basic_batch_padded", apply=lambda b: scb_mat_solve_basic(x, b, **kwargs))
 
 
 def scb_mat_triangular_solve_batch_fixed(
@@ -631,8 +975,16 @@ def scb_mat_triangular_solve_batch_fixed(
     lower: bool,
     unit_diagonal: bool = False,
 ) -> jax.Array:
-    bs = _as_complex_matrix(bs, "scb_mat.triangular_solve_batch_fixed")
-    return jax.vmap(lambda b: scb_mat_triangular_solve(x, b, lower=lower, unit_diagonal=unit_diagonal))(bs)
+    return sc.vmapped_batch_fixed(
+        bs,
+        validate=_as_complex_matrix,
+        label="scb_mat.triangular_solve_batch_fixed",
+        apply=lambda b: scb_mat_triangular_solve(x, b, lower=lower, unit_diagonal=unit_diagonal),
+    )
+
+
+def scb_mat_triangular_solve_basic_batch_fixed(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, bs: jax.Array, *, lower: bool, unit_diagonal: bool = False) -> jax.Array:
+    return sc.vmapped_batch_fixed(bs, validate=_as_complex_matrix, label="scb_mat.triangular_solve_basic_batch_fixed", apply=lambda b: scb_mat_triangular_solve_basic(x, b, lower=lower, unit_diagonal=unit_diagonal))
 
 
 def scb_mat_triangular_solve_batch_padded(
@@ -643,64 +995,203 @@ def scb_mat_triangular_solve_batch_padded(
     lower: bool,
     unit_diagonal: bool = False,
 ) -> jax.Array:
-    bs = _as_complex_matrix(bs, "scb_mat.triangular_solve_batch_padded")
-    checks.check(pad_to >= bs.shape[0], "scb_mat.triangular_solve_batch_padded.pad_to")
-    pad_count = int(pad_to - bs.shape[0])
-    padded = jnp.concatenate([bs, jnp.repeat(bs[-1:, :], pad_count, axis=0)], axis=0) if pad_count > 0 else bs
-    return scb_mat_triangular_solve_batch_fixed(x, padded, lower=lower, unit_diagonal=unit_diagonal)
+    return sc.vmapped_batch_padded(
+        bs,
+        pad_to=pad_to,
+        validate=_as_complex_matrix,
+        label="scb_mat.triangular_solve_batch_padded",
+        apply=lambda b: scb_mat_triangular_solve(x, b, lower=lower, unit_diagonal=unit_diagonal),
+    )
+
+
+def scb_mat_triangular_solve_basic_batch_padded(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, bs: jax.Array, *, pad_to: int, lower: bool, unit_diagonal: bool = False) -> jax.Array:
+    return sc.vmapped_batch_padded(bs, pad_to=pad_to, validate=_as_complex_matrix, label="scb_mat.triangular_solve_basic_batch_padded", apply=lambda b: scb_mat_triangular_solve_basic(x, b, lower=lower, unit_diagonal=unit_diagonal))
+
+
+def scb_mat_lu_solve_plan_apply_batch_fixed(plan: sc.SparseLUSolvePlan | tuple, bs: jax.Array) -> jax.Array:
+    return sc.vmapped_batch_fixed(
+        bs,
+        validate=_as_complex_matrix,
+        label="scb_mat.lu_solve_plan_apply_batch_fixed",
+        apply=lambda b: scb_mat_lu_solve_plan_apply(plan, b),
+    )
+
+
+def scb_mat_lu_solve_plan_apply_basic_batch_fixed(plan, bs: jax.Array) -> jax.Array:
+    return sc.vmapped_batch_fixed(bs, validate=_as_complex_matrix, label="scb_mat.lu_solve_plan_apply_basic_batch_fixed", apply=lambda b: scb_mat_lu_solve_plan_apply_basic(plan, b))
+
+
+def scb_mat_lu_solve_plan_apply_batch_padded(plan: sc.SparseLUSolvePlan | tuple, bs: jax.Array, *, pad_to: int) -> jax.Array:
+    return sc.vmapped_batch_padded(
+        bs,
+        pad_to=pad_to,
+        validate=_as_complex_matrix,
+        label="scb_mat.lu_solve_plan_apply_batch_padded",
+        apply=lambda b: scb_mat_lu_solve_plan_apply(plan, b),
+    )
+
+
+def scb_mat_lu_solve_plan_apply_basic_batch_padded(plan, bs: jax.Array, *, pad_to: int) -> jax.Array:
+    return sc.vmapped_batch_padded(bs, pad_to=pad_to, validate=_as_complex_matrix, label="scb_mat.lu_solve_plan_apply_basic_batch_padded", apply=lambda b: scb_mat_lu_solve_plan_apply_basic(plan, b))
+
+
+def scb_mat_hpd_solve_plan_apply_batch_fixed(plan: sc.SparseCholeskySolvePlan | sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, bs: jax.Array) -> jax.Array:
+    return sc.vmapped_batch_fixed(
+        bs,
+        validate=_as_complex_matrix,
+        label="scb_mat.hpd_solve_plan_apply_batch_fixed",
+        apply=lambda b: scb_mat_hpd_solve_plan_apply(plan, b),
+    )
+
+
+def scb_mat_hpd_solve_plan_apply_basic_batch_fixed(plan, bs: jax.Array) -> jax.Array:
+    return sc.vmapped_batch_fixed(bs, validate=_as_complex_matrix, label="scb_mat.hpd_solve_plan_apply_basic_batch_fixed", apply=lambda b: scb_mat_hpd_solve_plan_apply_basic(plan, b))
+
+
+def scb_mat_hpd_solve_plan_apply_batch_padded(
+    plan: sc.SparseCholeskySolvePlan | sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO,
+    bs: jax.Array,
+    *,
+    pad_to: int,
+) -> jax.Array:
+    return sc.vmapped_batch_padded(
+        bs,
+        pad_to=pad_to,
+        validate=_as_complex_matrix,
+        label="scb_mat.hpd_solve_plan_apply_batch_padded",
+        apply=lambda b: scb_mat_hpd_solve_plan_apply(plan, b),
+    )
+
+
+def scb_mat_hpd_solve_plan_apply_basic_batch_padded(plan, bs: jax.Array, *, pad_to: int) -> jax.Array:
+    return sc.vmapped_batch_padded(bs, pad_to=pad_to, validate=_as_complex_matrix, label="scb_mat.hpd_solve_plan_apply_basic_batch_padded", apply=lambda b: scb_mat_hpd_solve_plan_apply_basic(plan, b))
 
 
 def scb_mat_matvec_cached_prepare(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> sc.SparseMatvecPlan:
-    if isinstance(x, sc.SparseCOO):
-        x = sc.as_sparse_coo(x, algebra="scb", label="scb_mat.matvec_cached_prepare")
-        return sc.SparseMatvecPlan(storage="coo", payload=(x.data, x.row, x.col), rows=x.rows, cols=x.cols, algebra="scb")
-    if isinstance(x, sc.SparseCSR):
-        x = sc.as_sparse_csr(x, algebra="scb", label="scb_mat.matvec_cached_prepare")
-        row_ids = sc.csr_row_ids(x.indptr, rows=x.rows, nnz=x.data.shape[0])
-        return sc.SparseMatvecPlan(storage="csr", payload=(x.data, x.indices, row_ids), rows=x.rows, cols=x.cols, algebra="scb")
-    if isinstance(x, sc.SparseBCOO):
-        x = sc.as_sparse_bcoo(x, algebra="scb", label="scb_mat.matvec_cached_prepare")
-        return sc.SparseMatvecPlan(storage="bcoo", payload=x, rows=x.rows, cols=x.cols, algebra="scb")
-    raise TypeError("expected SparseCOO, SparseCSR, or SparseBCOO")
+    return sc.sparse_matvec_plan_from_sparse(x, algebra="scb", label="scb_mat.matvec_cached_prepare")
+
+
+def scb_mat_rmatvec_cached_prepare(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> sc.SparseMatvecPlan:
+    return scb_mat_matvec_cached_prepare(scb_mat_transpose(x))
+
+
+def scb_mat_matvec_cached_prepare_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO):
+    return sc.sparse_box_matvec_plan_from_sparse(
+        _box_sparse_matrix(x, "scb_mat.matvec_cached_prepare_basic"),
+        algebra="scb",
+        label="scb_mat.matvec_cached_prepare_basic",
+    )
+
+
+def scb_mat_rmatvec_cached_prepare_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO):
+    return scb_mat_matvec_cached_prepare_basic(scb_mat_transpose(x))
 
 
 def scb_mat_matvec_cached_apply(plan: sc.SparseMatvecPlan, v: jax.Array) -> jax.Array:
-    plan = sc.as_sparse_matvec_plan(plan, algebra="scb", label="scb_mat.matvec_cached_apply")
-    v = _as_complex_vector(v, "scb_mat.matvec_cached_apply")
-    checks.check_equal(plan.cols, v.shape[0], "scb_mat.matvec_cached_apply.inner")
-    if plan.storage == "coo":
-        data, row, col = plan.payload
-        return ops.segment_sum(data * v[col], row, num_segments=plan.rows)
-    if plan.storage == "csr":
-        data, indices, row_ids = plan.payload
-        return ops.segment_sum(data * v[indices], row_ids, num_segments=plan.rows)
-    return sc.sparse_bcoo_matvec(plan.payload, v, algebra="scb", label="scb_mat.matvec_cached_apply.bcoo")
+    return sc.sparse_matvec_plan_apply(plan, _as_complex_vector(v, "scb_mat.matvec_cached_apply"), algebra="scb", label="scb_mat.matvec_cached_apply")
+
+
+def scb_mat_rmatvec_cached_apply(plan: sc.SparseMatvecPlan, v: jax.Array) -> jax.Array:
+    return scb_mat_matvec_cached_apply(plan, v)
+
+
+def scb_mat_matvec_cached_apply_basic(plan, v: jax.Array) -> jax.Array:
+    return sc.sparse_box_matvec_plan_apply(
+        plan,
+        _dense_box_vector(v, "scb_mat.matvec_cached_apply_basic"),
+        algebra="scb",
+        label="scb_mat.matvec_cached_apply_basic",
+    )
+
+
+def scb_mat_rmatvec_cached_apply_basic(plan, v: jax.Array) -> jax.Array:
+    return scb_mat_matvec_cached_apply_basic(plan, v)
 
 
 def scb_mat_matvec_batch_fixed(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, vs: jax.Array) -> jax.Array:
-    vs = _as_complex_matrix(vs, "scb_mat.matvec_batch_fixed")
-    return jax.vmap(lambda v: scb_mat_matvec(x, v))(vs)
+    return sc.vmapped_batch_fixed(
+        vs,
+        validate=_as_complex_matrix,
+        label="scb_mat.matvec_batch_fixed",
+        apply=lambda v: scb_mat_matvec(x, v),
+    )
+
+
+def scb_mat_matvec_basic_batch_fixed(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, vs: jax.Array) -> jax.Array:
+    return sc.vmapped_batch_fixed(vs, validate=_as_complex_matrix, label="scb_mat.matvec_basic_batch_fixed", apply=lambda v: scb_mat_matvec_basic(x, v))
+
+
+def scb_mat_rmatvec_batch_fixed(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, vs: jax.Array) -> jax.Array:
+    return sc.vmapped_batch_fixed(vs, validate=_as_complex_matrix, label="scb_mat.rmatvec_batch_fixed", apply=lambda v: scb_mat_rmatvec(x, v))
+
+
+def scb_mat_rmatvec_basic_batch_fixed(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, vs: jax.Array) -> jax.Array:
+    return sc.vmapped_batch_fixed(vs, validate=_as_complex_matrix, label="scb_mat.rmatvec_basic_batch_fixed", apply=lambda v: scb_mat_rmatvec_basic(x, v))
 
 
 def scb_mat_matvec_batch_padded(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, vs: jax.Array, *, pad_to: int) -> jax.Array:
-    vs = _as_complex_matrix(vs, "scb_mat.matvec_batch_padded")
-    checks.check(pad_to >= vs.shape[0], "scb_mat.matvec_batch_padded.pad_to")
-    pad_count = int(pad_to - vs.shape[0])
-    padded = jnp.concatenate([vs, jnp.repeat(vs[-1:, :], pad_count, axis=0)], axis=0) if pad_count > 0 else vs
-    return scb_mat_matvec_batch_fixed(x, padded)
+    return sc.vmapped_batch_padded(
+        vs,
+        pad_to=pad_to,
+        validate=_as_complex_matrix,
+        label="scb_mat.matvec_batch_padded",
+        apply=lambda v: scb_mat_matvec(x, v),
+    )
+
+
+def scb_mat_matvec_basic_batch_padded(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, vs: jax.Array, *, pad_to: int) -> jax.Array:
+    return sc.vmapped_batch_padded(vs, pad_to=pad_to, validate=_as_complex_matrix, label="scb_mat.matvec_basic_batch_padded", apply=lambda v: scb_mat_matvec_basic(x, v))
+
+
+def scb_mat_rmatvec_batch_padded(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, vs: jax.Array, *, pad_to: int) -> jax.Array:
+    return sc.vmapped_batch_padded(vs, pad_to=pad_to, validate=_as_complex_matrix, label="scb_mat.rmatvec_batch_padded", apply=lambda v: scb_mat_rmatvec(x, v))
+
+
+def scb_mat_rmatvec_basic_batch_padded(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, vs: jax.Array, *, pad_to: int) -> jax.Array:
+    return sc.vmapped_batch_padded(vs, pad_to=pad_to, validate=_as_complex_matrix, label="scb_mat.rmatvec_basic_batch_padded", apply=lambda v: scb_mat_rmatvec_basic(x, v))
 
 
 def scb_mat_matvec_cached_apply_batch_fixed(plan: sc.SparseMatvecPlan, vs: jax.Array) -> jax.Array:
-    vs = _as_complex_matrix(vs, "scb_mat.matvec_cached_apply_batch_fixed")
-    return jax.vmap(lambda v: scb_mat_matvec_cached_apply(plan, v))(vs)
+    return sc.vmapped_batch_fixed(
+        vs,
+        validate=_as_complex_matrix,
+        label="scb_mat.matvec_cached_apply_batch_fixed",
+        apply=lambda v: scb_mat_matvec_cached_apply(plan, v),
+    )
+
+
+def scb_mat_matvec_cached_apply_basic_batch_fixed(plan, vs: jax.Array) -> jax.Array:
+    return sc.vmapped_batch_fixed(vs, validate=_as_complex_matrix, label="scb_mat.matvec_cached_apply_basic_batch_fixed", apply=lambda v: scb_mat_matvec_cached_apply_basic(plan, v))
+
+
+def scb_mat_rmatvec_cached_apply_batch_fixed(plan: sc.SparseMatvecPlan, vs: jax.Array) -> jax.Array:
+    return sc.vmapped_batch_fixed(vs, validate=_as_complex_matrix, label="scb_mat.rmatvec_cached_apply_batch_fixed", apply=lambda v: scb_mat_rmatvec_cached_apply(plan, v))
+
+
+def scb_mat_rmatvec_cached_apply_basic_batch_fixed(plan, vs: jax.Array) -> jax.Array:
+    return sc.vmapped_batch_fixed(vs, validate=_as_complex_matrix, label="scb_mat.rmatvec_cached_apply_basic_batch_fixed", apply=lambda v: scb_mat_rmatvec_cached_apply_basic(plan, v))
 
 
 def scb_mat_matvec_cached_apply_batch_padded(plan: sc.SparseMatvecPlan, vs: jax.Array, *, pad_to: int) -> jax.Array:
-    vs = _as_complex_matrix(vs, "scb_mat.matvec_cached_apply_batch_padded")
-    checks.check(pad_to >= vs.shape[0], "scb_mat.matvec_cached_apply_batch_padded.pad_to")
-    pad_count = int(pad_to - vs.shape[0])
-    padded = jnp.concatenate([vs, jnp.repeat(vs[-1:, :], pad_count, axis=0)], axis=0) if pad_count > 0 else vs
-    return scb_mat_matvec_cached_apply_batch_fixed(plan, padded)
+    return sc.vmapped_batch_padded(
+        vs,
+        pad_to=pad_to,
+        validate=_as_complex_matrix,
+        label="scb_mat.matvec_cached_apply_batch_padded",
+        apply=lambda v: scb_mat_matvec_cached_apply(plan, v),
+    )
+
+
+def scb_mat_matvec_cached_apply_basic_batch_padded(plan, vs: jax.Array, *, pad_to: int) -> jax.Array:
+    return sc.vmapped_batch_padded(vs, pad_to=pad_to, validate=_as_complex_matrix, label="scb_mat.matvec_cached_apply_basic_batch_padded", apply=lambda v: scb_mat_matvec_cached_apply_basic(plan, v))
+
+
+def scb_mat_rmatvec_cached_apply_batch_padded(plan: sc.SparseMatvecPlan, vs: jax.Array, *, pad_to: int) -> jax.Array:
+    return sc.vmapped_batch_padded(vs, pad_to=pad_to, validate=_as_complex_matrix, label="scb_mat.rmatvec_cached_apply_batch_padded", apply=lambda v: scb_mat_rmatvec_cached_apply(plan, v))
+
+
+def scb_mat_rmatvec_cached_apply_basic_batch_padded(plan, vs: jax.Array, *, pad_to: int) -> jax.Array:
+    return sc.vmapped_batch_padded(vs, pad_to=pad_to, validate=_as_complex_matrix, label="scb_mat.rmatvec_cached_apply_basic_batch_padded", apply=lambda v: scb_mat_rmatvec_cached_apply_basic(plan, v))
 
 
 @partial(jax.jit, static_argnames=())
@@ -724,6 +1215,11 @@ def scb_mat_matvec_jit(x, v: jax.Array) -> jax.Array:
 
 
 @partial(jax.jit, static_argnames=())
+def scb_mat_rmatvec_jit(x, v: jax.Array) -> jax.Array:
+    return scb_mat_rmatvec(x, v)
+
+
+@partial(jax.jit, static_argnames=())
 def scb_mat_matmul_dense_rhs_jit(x, b: jax.Array) -> jax.Array:
     return scb_mat_matmul_dense_rhs(x, b)
 
@@ -731,6 +1227,11 @@ def scb_mat_matmul_dense_rhs_jit(x, b: jax.Array) -> jax.Array:
 @partial(jax.jit, static_argnames=())
 def scb_mat_matvec_cached_apply_jit(plan: sc.SparseMatvecPlan, v: jax.Array) -> jax.Array:
     return scb_mat_matvec_cached_apply(plan, v)
+
+
+@partial(jax.jit, static_argnames=())
+def scb_mat_rmatvec_cached_apply_jit(plan: sc.SparseMatvecPlan, v: jax.Array) -> jax.Array:
+    return scb_mat_rmatvec_cached_apply(plan, v)
 
 
 def scb_mat_matvec_with_diagnostics(
@@ -807,78 +1308,91 @@ def scb_mat_norm_inf_jit(x) -> jax.Array:
     return scb_mat_norm_inf(x)
 
 
-def scb_mat_det(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
-    """Determinant using LU decomposition - point version.
-    
-    Args:
-        x: Sparse complex matrix (must be square)
-        
-    Returns:
-        Determinant as complex scalar
-    """
-    x = sc.as_sparse_coo(x, algebra="scb", label="scb_mat.det")
-    
-    P, L, U = scb_mat_lu(x)
-    
-    # Determinant is product of U diagonal times sign from permutation
-    u_diag = scb_mat_diag(U)
-    det_u = jnp.prod(u_diag)
-    
-    # Compute permutation sign
-    perm = P.indices[:, 0]
-    n = perm.shape[0]
-    sign = jnp.where(jnp.arange(n) == perm, 1.0, -1.0).prod()
-    
-    return sign * det_u
+def scb_mat_conjugate_transpose_jit(x):
+    return scb_mat_conjugate_transpose(x)
 
 
-def scb_mat_det_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
-    """Determinant using LU decomposition - basic interval version."""
+def scb_mat_hermitian_part_jit(x):
+    return scb_mat_hermitian_part(x)
+
+
+def scb_mat_is_hermitian_jit(x, *, rtol: float = 1e-10, atol: float = 1e-10) -> jax.Array:
+    return scb_mat_is_hermitian(x, rtol=rtol, atol=atol)
+
+
+def scb_mat_is_hpd_jit(x) -> jax.Array:
+    return scb_mat_is_hpd(x)
+
+
+def scb_mat_cho_jit(x):
+    return scb_mat_cho(x)
+
+
+def scb_mat_ldl_jit(x):
+    return scb_mat_ldl(x)
+
+
+def scb_mat_charpoly_jit(x) -> jax.Array:
+    return scb_mat_charpoly(x)
+
+
+@partial(jax.jit, static_argnames=("n",))
+def scb_mat_pow_ui_jit(x, n: int) -> jax.Array:
+    return scb_mat_pow_ui(x, n)
+
+
+def scb_mat_exp_jit(x) -> jax.Array:
+    return scb_mat_exp(x)
+
+
+def scb_mat_eigvalsh_jit(x) -> jax.Array:
+    return scb_mat_eigvalsh(x)
+
+
+def scb_mat_eigh_jit(x):
+    return scb_mat_eigh(x)
+
+
+def scb_mat_det_jit(x) -> jax.Array:
     return scb_mat_det(x)
 
 
-def scb_mat_inv(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
-    """Matrix inverse - point version using solve.
-    
-    Args:
-        x: Sparse complex matrix (must be square)
-        
-    Returns:
-        Dense complex inverse matrix
-    """
-    x = sc.as_sparse_coo(x, algebra="scb", label="scb_mat.inv")
-    
-    n = x.rows
-    I = jnp.eye(n, dtype=jnp.complex128)
-    
-    def solve_col(col):
-        return scb_mat_solve(x, col, method="gmres", tol=1e-10)
-    
-    inv_cols = jax.vmap(solve_col, in_axes=1, out_axes=1)(I)
-    return inv_cols
-
-
-def scb_mat_inv_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
-    """Matrix inverse - basic interval version."""
+def scb_mat_inv_jit(x) -> jax.Array:
     return scb_mat_inv(x)
 
 
+def scb_mat_sqr_jit(x):
+    return scb_mat_sqr(x)
+
+
+def scb_mat_det(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
+    return sc.sparse_det_from_lu(x, lu_fn=scb_mat_lu, diag_fn=scb_mat_diag, to_dense_fn=scb_mat_to_dense)
+
+
+def scb_mat_det_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
+    return acb_mat.acb_mat_det_basic(_dense_box_matrix(x, "scb_mat.det_basic"))
+
+
+def scb_mat_inv(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
+    return sc.sparse_inv_via_solve(
+        x,
+        algebra="scb",
+        label="scb_mat.inv",
+        dtype=jnp.complex128,
+        solve_fn=lambda a, col: scb_mat_solve(a, col, method="gmres", tol=1e-10),
+    )
+
+
+def scb_mat_inv_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
+    return acb_mat.acb_mat_inv_basic(_dense_box_matrix(x, "scb_mat.inv_basic"))
+
+
 def scb_mat_sqr(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO:
-    """Matrix square - point version.
-    
-    Args:
-        x: Sparse complex matrix (must be square)
-        
-    Returns:
-        x @ x as sparse matrix
-    """
-    x = sc.as_sparse_coo(x, algebra="scb", label="scb_mat.sqr")
-    return scb_mat_matmul_sparse(x, x)
+    return sc.sparse_square_via_matmul(x, matmul_sparse_fn=scb_mat_matmul_sparse)
 
 
 def scb_mat_sqr_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO:
-    """Matrix square - basic interval version."""
-    return scb_mat_sqr(x)
+    return acb_mat.acb_mat_sqr_basic(_dense_box_matrix(x, "scb_mat.sqr_basic"))
 
 
 __all__ = [
@@ -910,40 +1424,129 @@ __all__ = [
     "scb_mat_csr_to_bcoo",
     "scb_mat_bcoo_to_coo",
     "scb_mat_transpose",
+    "scb_mat_transpose_basic",
     "scb_mat_conjugate_transpose",
+    "scb_mat_conjugate_transpose_basic",
+    "scb_mat_hermitian_part",
+    "scb_mat_hermitian_part_basic",
+    "scb_mat_is_hermitian",
+    "scb_mat_is_hermitian_basic",
+    "scb_mat_is_hpd",
+    "scb_mat_is_hpd_basic",
+    "scb_mat_cho",
+    "scb_mat_cho_basic",
+    "scb_mat_ldl",
+    "scb_mat_ldl_basic",
+    "scb_mat_charpoly",
+    "scb_mat_charpoly_basic",
+    "scb_mat_pow_ui",
+    "scb_mat_pow_ui_basic",
+    "scb_mat_exp",
+    "scb_mat_exp_basic",
+    "scb_mat_eigvalsh",
+    "scb_mat_eigvalsh_basic",
+    "scb_mat_eigh",
+    "scb_mat_eigh_basic",
     "scb_mat_scale",
     "scb_mat_add",
     "scb_mat_sub",
+    "scb_mat_matvec",
+    "scb_mat_rmatvec",
+    "scb_mat_matvec_basic",
+    "scb_mat_rmatvec_basic",
+    "scb_mat_matvec_cached_prepare",
+    "scb_mat_matvec_cached_prepare_basic",
+    "scb_mat_rmatvec_cached_prepare",
+    "scb_mat_rmatvec_cached_prepare_basic",
+    "scb_mat_matvec_cached_apply",
+    "scb_mat_matvec_cached_apply_basic",
+    "scb_mat_rmatvec_cached_apply",
+    "scb_mat_rmatvec_cached_apply_basic",
     "scb_mat_triangular_solve",
+    "scb_mat_triangular_solve_basic",
     "scb_mat_triangular_solve_batch_fixed",
+    "scb_mat_triangular_solve_basic_batch_fixed",
     "scb_mat_triangular_solve_batch_padded",
+    "scb_mat_triangular_solve_basic_batch_padded",
     "scb_mat_triangular_solve_jit",
     "scb_mat_lu",
     "scb_mat_lu_solve",
+    "scb_mat_lu_solve_plan_prepare",
+    "scb_mat_lu_solve_plan_prepare_basic",
+    "scb_mat_lu_solve_plan_apply",
+    "scb_mat_lu_solve_plan_apply_basic",
+    "scb_mat_lu_solve_plan_apply_batch_fixed",
+    "scb_mat_lu_solve_plan_apply_basic_batch_fixed",
+    "scb_mat_lu_solve_plan_apply_batch_padded",
+    "scb_mat_lu_solve_plan_apply_basic_batch_padded",
+    "scb_mat_solve_lu",
+    "scb_mat_solve_lu_basic",
+    "scb_mat_solve_lu_precomp",
+    "scb_mat_solve_lu_precomp_basic",
     "scb_mat_qr",
     "scb_mat_qr_r",
     "scb_mat_qr_apply_q",
     "scb_mat_qr_explicit_q",
     "scb_mat_qr_solve",
     "scb_mat_solve",
+    "scb_mat_solve_basic",
+    "scb_mat_solve_transpose",
+    "scb_mat_solve_transpose_basic",
+    "scb_mat_solve_add",
+    "scb_mat_solve_add_basic",
+    "scb_mat_solve_transpose_add",
+    "scb_mat_solve_transpose_add_basic",
+    "scb_mat_mat_solve",
+    "scb_mat_mat_solve_basic",
+    "scb_mat_mat_solve_transpose",
+    "scb_mat_mat_solve_transpose_basic",
     "scb_mat_solve_batch_fixed",
+    "scb_mat_solve_basic_batch_fixed",
     "scb_mat_solve_batch_padded",
+    "scb_mat_solve_basic_batch_padded",
     "scb_mat_solve_jit",
+    "scb_mat_hpd_solve_plan_prepare",
+    "scb_mat_hpd_solve_plan_prepare_basic",
+    "scb_mat_hpd_solve_plan_apply",
+    "scb_mat_hpd_solve_plan_apply_basic",
+    "scb_mat_hpd_solve_plan_apply_batch_fixed",
+    "scb_mat_hpd_solve_plan_apply_basic_batch_fixed",
+    "scb_mat_hpd_solve_plan_apply_batch_padded",
+    "scb_mat_hpd_solve_plan_apply_basic_batch_padded",
+    "scb_mat_hpd_solve",
+    "scb_mat_hpd_solve_basic",
+    "scb_mat_hpd_inv",
+    "scb_mat_hpd_inv_basic",
     "scb_mat_matvec",
     "scb_mat_matmul_dense_rhs",
+    "scb_mat_matmul_dense_rhs_basic",
     "scb_mat_matmul_sparse",
     "scb_mat_matvec_cached_prepare",
     "scb_mat_matvec_cached_apply",
     "scb_mat_matvec_batch_fixed",
+    "scb_mat_matvec_basic_batch_fixed",
     "scb_mat_matvec_batch_padded",
+    "scb_mat_matvec_basic_batch_padded",
     "scb_mat_matvec_cached_apply_batch_fixed",
+    "scb_mat_matvec_cached_apply_basic_batch_fixed",
     "scb_mat_matvec_cached_apply_batch_padded",
+    "scb_mat_matvec_cached_apply_basic_batch_padded",
+    "scb_mat_rmatvec_batch_fixed",
+    "scb_mat_rmatvec_basic_batch_fixed",
+    "scb_mat_rmatvec_batch_padded",
+    "scb_mat_rmatvec_basic_batch_padded",
+    "scb_mat_rmatvec_cached_apply_batch_fixed",
+    "scb_mat_rmatvec_cached_apply_basic_batch_fixed",
+    "scb_mat_rmatvec_cached_apply_batch_padded",
+    "scb_mat_rmatvec_cached_apply_basic_batch_padded",
     "scb_mat_coo_to_dense_jit",
     "scb_mat_csr_to_dense_jit",
     "scb_mat_bcoo_to_dense_jit",
     "scb_mat_matvec_jit",
+    "scb_mat_rmatvec_jit",
     "scb_mat_matmul_dense_rhs_jit",
     "scb_mat_matvec_cached_apply_jit",
+    "scb_mat_rmatvec_cached_apply_jit",
     "scb_mat_matvec_with_diagnostics",
     "scb_mat_matvec_cached_apply_with_diagnostics",
     "scb_mat_solve_with_diagnostics",
@@ -953,11 +1556,30 @@ __all__ = [
     "scb_mat_norm_fro_jit",
     "scb_mat_norm_1_jit",
     "scb_mat_norm_inf_jit",
+    "scb_mat_conjugate_transpose_jit",
+    "scb_mat_hermitian_part_jit",
+    "scb_mat_is_hermitian_jit",
+    "scb_mat_is_hpd_jit",
+    "scb_mat_cho_jit",
+    "scb_mat_ldl_jit",
+    "scb_mat_charpoly_jit",
+    "scb_mat_pow_ui_jit",
+    "scb_mat_exp_jit",
+    "scb_mat_eigvalsh_jit",
+    "scb_mat_eigh_jit",
     "scb_mat_det",
     "scb_mat_det_basic",
+    "scb_mat_det_jit",
     "scb_mat_inv",
     "scb_mat_inv_basic",
+    "scb_mat_inv_jit",
     "scb_mat_sqr",
     "scb_mat_sqr_basic",
+    "scb_mat_sqr_jit",
+    "scb_mat_to_dense_basic",
+    "scb_mat_trace_basic",
+    "scb_mat_norm_fro_basic",
+    "scb_mat_norm_1_basic",
+    "scb_mat_norm_inf_basic",
     "ScbMatPointDiagnostics",
 ]

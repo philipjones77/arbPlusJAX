@@ -6,6 +6,7 @@ import time
 from pathlib import Path
 
 import jax
+from jax import lax
 import jax.numpy as jnp
 import numpy as np
 
@@ -126,12 +127,12 @@ def main() -> None:
     mp_mode_vals = np.array(mp_mode_fn(x_jax).block_until_ready())
     t_mp_mode = time.perf_counter() - t0
 
-    # jax.special (point, vectorized)
-    js_fn = jax.jit(jax.vmap(lambda t: jax.scipy.special.gamma(t)))
-    js_fn(jnp.asarray(mids, dtype=jnp.float64)).block_until_ready()
+    # public-JAX point reference
+    jax_native_fn = jax.jit(jax.vmap(lambda t: jnp.exp(lax.lgamma(t))))
+    jax_native_fn(jnp.asarray(mids, dtype=jnp.float64)).block_until_ready()
     t0 = time.perf_counter()
-    js_vals = np.array(js_fn(jnp.asarray(mids, dtype=jnp.float64)).block_until_ready())
-    t_js = time.perf_counter() - t0
+    jax_native_vals = np.array(jax_native_fn(jnp.asarray(mids, dtype=jnp.float64)).block_until_ready())
+    t_jax_native = time.perf_counter() - t0
 
     def err_stats(vals):
         err = np.abs(vals - c_mid)
@@ -148,7 +149,7 @@ def main() -> None:
         ("jax_rigorous", rig_vals, t_rig),
         ("jax_adaptive", adapt_vals, t_adapt),
         ("jax_mp_mode", mp_mode_vals, t_mp_mode),
-        ("jax.special", js_vals, t_js),
+        ("jax_native", jax_native_vals, t_jax_native),
     ]:
         if name == "C":
             print(f"{name:12s} time={t:.3f}s (truth)")

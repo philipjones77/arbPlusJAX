@@ -42,7 +42,7 @@ Preferred top-level structure:
 - `experiments/`: exploratory work, with each subfolder representing a separate experiment
 - `tools/`: repository tooling and maintenance scripts
 - `benchmarks/`: benchmark scripts and harness integration
-- `outputs/`: canonical output artifact directory
+- `experiments/benchmarks/outputs/`: benchmark output artifact directory
 - additional standard folders such as `configs/`, `data/`, `output/`, `stuff/`, and `papers/` may be added when the repository starts using them directly
 
 ## Docs Layout
@@ -150,5 +150,5 @@ Current repo-root mapping notes:
 
 - `contracts/` now exists as the reserved home for binding runtime/API guarantees
 - `experiments/` now exists as the reserved home for exploratory subprojects
-- `outputs/` now exists as the canonical governed output root
-- `results/` remains in the repo as a legacy compatibility output location until tooling is fully converged
+- `experiments/benchmarks/outputs/` is the canonical benchmark artifact root
+- `experiments/benchmarks/results/` is the canonical benchmark run root

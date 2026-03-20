@@ -109,6 +109,25 @@ def test_nxn_matvec_cached_and_sqr():
     _check(bool(jnp.allclose(di.midpoint(sq), a_mid @ a_mid)))
 
 
+def test_rmatvec_and_cached_rmatvec():
+    a = jnp.array(
+        [
+            [[1.0, 1.0], [2.0, 2.0], [0.0, 0.0]],
+            [[3.0, 3.0], [4.0, 4.0], [5.0, 5.0]],
+        ],
+        dtype=jnp.float64,
+    )
+    x = jnp.array([[1.0, 1.0], [-1.0, -1.0]], dtype=jnp.float64)
+    cache = arb_mat.arb_mat_rmatvec_cached_prepare(a)
+    got = arb_mat.arb_mat_rmatvec_basic(a, x)
+    cached = arb_mat.arb_mat_rmatvec_cached_apply(cache, x)
+    expected = di.midpoint(a).T @ di.midpoint(x)
+
+    _check(bool(jnp.allclose(di.midpoint(got), expected)))
+    _check(bool(jnp.allclose(di.midpoint(cached), expected)))
+    _check(bool(jnp.allclose(di.midpoint(arb_mat.arb_mat_rmatvec_cached_apply_jit(cache, x)), expected)))
+
+
 def test_cached_prepare_prec_and_batch_helpers():
     a = jnp.array(
         [

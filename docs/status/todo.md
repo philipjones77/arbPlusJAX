@@ -138,6 +138,7 @@ Current phase snapshot:
     - tests: [test_arb_mat_chassis.py](/home/phili/projects/arbplusJAX/tests/test_arb_mat_chassis.py), [test_acb_mat_chassis.py](/home/phili/projects/arbplusJAX/tests/test_acb_mat_chassis.py), [test_mat_modes.py](/home/phili/projects/arbplusJAX/tests/test_mat_modes.py)
 
 - Jones matrix-free real/complex chassis: `done` for first workstream, `in_progress` for deeper operator AD
+  - tracked completion plan: [matrix_free_completion_plan.md](/home/phili/projects/arbplusJAX/docs/status/matrix_free_completion_plan.md)
   - `jrb_mat` implemented families:
     - dense operator adapters
     - operator apply
@@ -267,11 +268,11 @@ Current phase snapshot:
 - Added a new top-priority roadmap workstream for the general incomplete-tail acceleration engine, incomplete Bessel specialization, and explicit derivative/AD support; demoted multivariate Bessel below that dependency chain.
 - Added asymptotic bessel evaluation + tightened bessel bounds (rigorous/adaptive) with denser sampling; basic mode uses midpoint evaluation; ran warmup bessel benchmarks (5000 samples).
 - Added JAX batch warmup timing option (`--jax-warmup`) and cached batch JITs for single-compile runs.
-- Added loggamma comparison tool with real/complex + branch-cut stress tests; included jax.scipy (real-only).
+- Added loggamma comparison tool with real/complex + branch-cut stress tests; included a public-JAX real-only point baseline.
 - Added explicit asymptotic remainder inflation for real bessel rigorous/adaptive interval bounds; added integer-crossing guards for `Y/K` interval APIs (real + complex box wrappers).
 - Enforced source zip filename format in `tools/package_repo.py`: `<repo>_source_YYYY-MM-DD.zip` with validation for custom output paths.
 - Added `cuda_besselk` backend with four-mode usage (point/basic/rigorous/adaptive) implemented in pure JAX (no CUDA dependency).
-- Added `cuda_besselk` to benchmark harness and ran characterization against existing `besselk` backends (`results/benchmarks/cuda_besselk_compare_purejax_20260301/samples_256_seed_7/summary.csv`).
+- Added `cuda_besselk` to benchmark harness and ran characterization against existing `besselk` backends (`experiments/benchmarks/results/cuda_besselk_compare_purejax_20260301/samples_256_seed_7/summary.csv`).
 - Added `cusf_compat` module in this workspace with `cusf_*` prefixed APIs (functions + helpers) and four-mode support (`point|basic|rigorous|adaptive`) for hypergeometric/Bessel/erf pathways.
 - Added `boost_hypgeom` module with Boost-prefixed hypergeometric APIs and helper aliases in four modes (`point|basic|rigorous|adaptive`), with docs and tests.
 

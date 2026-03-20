@@ -102,11 +102,21 @@ def run_arb_case(n: int, warmup: int, runs: int) -> dict[str, float]:
 
     direct_solve = jax.jit(lambda aa, bb: arb_mat.arb_mat_solve(aa, bb))
     lu_solve = jax.jit(lambda plan, bb: arb_mat.arb_mat_dense_lu_solve_plan_apply(plan, bb))
+    lu_solve_transpose = jax.jit(lambda plan, bb: arb_mat.arb_mat_solve_transpose(plan, bb))
+    lu_solve_add = jax.jit(lambda plan, bb, yy: arb_mat.arb_mat_solve_add(plan, bb, yy))
     cached_matvec = jax.jit(lambda plan, xx: arb_mat.arb_mat_dense_matvec_plan_apply(plan, xx))
     prepare_plan = lambda aa: arb_mat.arb_mat_dense_matvec_plan_prepare(aa)
     cached_matvec_padded = lambda plan, xx: arb_mat.arb_mat_dense_matvec_plan_apply_batch_padded(plan, xx, pad_to=8)
+    add = jax.jit(lambda aa, bb: arb_mat.arb_mat_add(aa, bb))
+    entrywise = jax.jit(lambda aa, bb: arb_mat.arb_mat_mul_entrywise(aa, bb))
+    charpoly = jax.jit(lambda aa: arb_mat.arb_mat_charpoly(aa))
+    power2 = jax.jit(lambda aa: arb_mat.arb_mat_pow_ui(aa, 2))
+    expm = jax.jit(lambda aa: arb_mat.arb_mat_exp(aa))
     spd_solve = jax.jit(lambda aa, bb: arb_mat.arb_mat_spd_solve(aa, bb))
     spd_plan_solve = jax.jit(lambda plan, bb: arb_mat.arb_mat_dense_spd_solve_plan_apply(plan, bb))
+    spd_eigh = jax.jit(lambda aa: arb_mat.arb_mat_eigh(aa))
+    solve_tril = jax.jit(lambda aa, bb: arb_mat.arb_mat_solve_tril(aa, bb))
+    solve_lu = jax.jit(lambda aa, bb: arb_mat.arb_mat_solve_lu(aa, bb))
     transpose = jax.jit(arb_mat.arb_mat_transpose)
     diag = jax.jit(arb_mat.arb_mat_diag)
     block_assemble = lambda blocks: arb_mat.arb_mat_block_assemble(blocks)
@@ -115,11 +125,21 @@ def run_arb_case(n: int, warmup: int, runs: int) -> dict[str, float]:
     return {
         "arb_direct_solve_s": _time_call(direct_solve, a, rhs, warmup=warmup, runs=runs),
         "arb_lu_reuse_s": _time_call(lu_solve, lu_plan, rhs, warmup=warmup, runs=runs),
+        "arb_lu_reuse_transpose_s": _time_call(lu_solve_transpose, lu_plan, rhs, warmup=warmup, runs=runs),
+        "arb_lu_reuse_add_s": _time_call(lu_solve_add, lu_plan, rhs, rhs, warmup=warmup, runs=runs),
         "arb_dense_plan_prepare_s": _time_call(prepare_plan, a, warmup=warmup, runs=runs),
         "arb_cached_matvec_s": _time_call(cached_matvec, cache, vec, warmup=warmup, runs=runs),
         "arb_cached_matvec_padded_s": _time_call(cached_matvec_padded, cache, vec_batch, warmup=warmup, runs=runs),
+        "arb_add_s": _time_call(add, a, a, warmup=warmup, runs=runs),
+        "arb_mul_entrywise_s": _time_call(entrywise, a, a, warmup=warmup, runs=runs),
+        "arb_charpoly_s": _time_call(charpoly, a, warmup=warmup, runs=runs),
+        "arb_pow_ui_s": _time_call(power2, a, warmup=warmup, runs=runs),
+        "arb_exp_s": _time_call(expm, spd_a, warmup=warmup, runs=runs),
         "arb_spd_solve_s": _time_call(spd_solve, spd_a, spd_rhs, warmup=warmup, runs=runs),
         "arb_spd_plan_solve_s": _time_call(spd_plan_solve, spd_plan, spd_rhs, warmup=warmup, runs=runs),
+        "arb_spd_eigh_s": _time_call(spd_eigh, spd_a, warmup=warmup, runs=runs),
+        "arb_solve_tril_s": _time_call(solve_tril, arb_mat.arb_mat_cho(spd_a), spd_rhs, warmup=warmup, runs=runs),
+        "arb_solve_lu_s": _time_call(solve_lu, a, rhs, warmup=warmup, runs=runs),
         "arb_transpose_s": _time_call(transpose, a, warmup=warmup, runs=runs),
         "arb_diag_s": _time_call(diag, a, warmup=warmup, runs=runs),
         "arb_block_assemble_s": _time_call(block_assemble, arb_blocks, warmup=warmup, runs=runs),
@@ -143,11 +163,21 @@ def run_acb_case(n: int, warmup: int, runs: int) -> dict[str, float]:
 
     direct_solve = jax.jit(lambda aa, bb: acb_mat.acb_mat_solve(aa, bb))
     lu_solve = jax.jit(lambda plan, bb: acb_mat.acb_mat_dense_lu_solve_plan_apply(plan, bb))
+    lu_solve_transpose = jax.jit(lambda plan, bb: acb_mat.acb_mat_solve_transpose(plan, bb))
+    lu_solve_add = jax.jit(lambda plan, bb, yy: acb_mat.acb_mat_solve_add(plan, bb, yy))
     cached_matvec = jax.jit(lambda plan, xx: acb_mat.acb_mat_dense_matvec_plan_apply(plan, xx))
     prepare_plan = lambda aa: acb_mat.acb_mat_dense_matvec_plan_prepare(aa)
     cached_matvec_padded = lambda plan, xx: acb_mat.acb_mat_dense_matvec_plan_apply_batch_padded(plan, xx, pad_to=8)
+    add = jax.jit(lambda aa, bb: acb_mat.acb_mat_add(aa, bb))
+    entrywise = jax.jit(lambda aa, bb: acb_mat.acb_mat_mul_entrywise(aa, bb))
+    charpoly = jax.jit(lambda aa: acb_mat.acb_mat_charpoly(aa))
+    power2 = jax.jit(lambda aa: acb_mat.acb_mat_pow_ui(aa, 2))
+    expm = jax.jit(lambda aa: acb_mat.acb_mat_exp(aa))
     hpd_solve = jax.jit(lambda aa, bb: acb_mat.acb_mat_hpd_solve(aa, bb))
     hpd_plan_solve = jax.jit(lambda plan, bb: acb_mat.acb_mat_dense_hpd_solve_plan_apply(plan, bb))
+    hpd_eigh = jax.jit(lambda aa: acb_mat.acb_mat_eigh(aa))
+    solve_tril = jax.jit(lambda aa, bb: acb_mat.acb_mat_solve_tril(aa, bb))
+    solve_lu = jax.jit(lambda aa, bb: acb_mat.acb_mat_solve_lu(aa, bb))
     transpose = jax.jit(acb_mat.acb_mat_transpose)
     ctranspose = jax.jit(acb_mat.acb_mat_conjugate_transpose)
     diag = jax.jit(acb_mat.acb_mat_diag)
@@ -157,11 +187,21 @@ def run_acb_case(n: int, warmup: int, runs: int) -> dict[str, float]:
     return {
         "acb_direct_solve_s": _time_call(direct_solve, a, rhs, warmup=warmup, runs=runs),
         "acb_lu_reuse_s": _time_call(lu_solve, lu_plan, rhs, warmup=warmup, runs=runs),
+        "acb_lu_reuse_transpose_s": _time_call(lu_solve_transpose, lu_plan, rhs, warmup=warmup, runs=runs),
+        "acb_lu_reuse_add_s": _time_call(lu_solve_add, lu_plan, rhs, rhs, warmup=warmup, runs=runs),
         "acb_dense_plan_prepare_s": _time_call(prepare_plan, a, warmup=warmup, runs=runs),
         "acb_cached_matvec_s": _time_call(cached_matvec, cache, vec, warmup=warmup, runs=runs),
         "acb_cached_matvec_padded_s": _time_call(cached_matvec_padded, cache, vec_batch, warmup=warmup, runs=runs),
+        "acb_add_s": _time_call(add, a, a, warmup=warmup, runs=runs),
+        "acb_mul_entrywise_s": _time_call(entrywise, a, a, warmup=warmup, runs=runs),
+        "acb_charpoly_s": _time_call(charpoly, a, warmup=warmup, runs=runs),
+        "acb_pow_ui_s": _time_call(power2, a, warmup=warmup, runs=runs),
+        "acb_exp_s": _time_call(expm, hpd_a, warmup=warmup, runs=runs),
         "acb_hpd_solve_s": _time_call(hpd_solve, hpd_a, hpd_rhs, warmup=warmup, runs=runs),
         "acb_hpd_plan_solve_s": _time_call(hpd_plan_solve, hpd_plan, hpd_rhs, warmup=warmup, runs=runs),
+        "acb_hpd_eigh_s": _time_call(hpd_eigh, hpd_a, warmup=warmup, runs=runs),
+        "acb_solve_tril_s": _time_call(solve_tril, acb_mat.acb_mat_cho(hpd_a), hpd_rhs, warmup=warmup, runs=runs),
+        "acb_solve_lu_s": _time_call(solve_lu, a, rhs, warmup=warmup, runs=runs),
         "acb_transpose_s": _time_call(transpose, a, warmup=warmup, runs=runs),
         "acb_conjugate_transpose_s": _time_call(ctranspose, a, warmup=warmup, runs=runs),
         "acb_diag_s": _time_call(diag, a, warmup=warmup, runs=runs),

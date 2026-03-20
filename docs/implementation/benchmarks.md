@@ -2,7 +2,7 @@ Last updated: 2026-03-04T00:00:00Z
 
 # Benchmarks
 
-`benchmarks/bench_harness.py` compares arbPlusJAX against multiple backends and writes sweep outputs under `results/benchmarks/`.
+`benchmarks/bench_harness.py` compares arbPlusJAX against multiple backends and writes sweep outputs under `experiments/benchmarks/results/`.
 
 For the backend roles and comparison policy, see [testing_harness.md](/home/phili/projects/arbplusJAX/docs/implementation/testing_harness.md).
 
@@ -55,7 +55,7 @@ export WOLFRAM_CLOUD_URL="https://www.wolframcloud.com/obj/pajones/arbplusjax-be
 
 Status:
 - Local Windows: validated via `wolframscript.exe` when the install dir is set.
-- Cloud: not validated unless a run includes `mathematica_cloud` in `results/benchmarks`.
+- Cloud: not validated unless a run includes `mathematica_cloud` in `experiments/benchmarks/results`.
 
 JAX batch timing:
 ```bash
@@ -103,14 +103,14 @@ Result retention policy:
 4. If available, include mpmath and Mathematica references.
 5. If available, include Boost via `--with-boost --boost-ref-cmd "<command>"`.
 6. Generate a report:
-   - `python tools/bench_report.py --run <run_dir> --out results/benchmarks/<run_dir>/report.md`
+   - `python tools/bench_report.py --run <run_dir> --out experiments/benchmarks/results/<run_dir>/report.md`
 7. Keep only curated summaries; avoid committing full raw run trees.
 
 ## Recent runs
 
-- `run_20260225T022435Z`: bessel suite, 5000 samples, warmup timing, updated bessel bounds (`results/benchmarks/run_20260225T022435Z`).
-- `run_20260225T021959Z`: bessel suite, 5000 samples, warmup timing, asymptotic bessel eval (`results/benchmarks/run_20260225T021959Z`).
-- `loggamma-compare-2026-02-25T03:42:10Z`: loggamma compare tool run (real+complex + branch-cut stress), see `results/runs.csv`.
+- `run_20260225T022435Z`: bessel suite, 5000 samples, warmup timing, updated bessel bounds (`experiments/benchmarks/results/run_20260225T022435Z`).
+- `run_20260225T021959Z`: bessel suite, 5000 samples, warmup timing, asymptotic bessel eval (`experiments/benchmarks/results/run_20260225T021959Z`).
+- `loggamma-compare-2026-02-25T03:42:10Z`: loggamma compare tool run (real+complex + branch-cut stress), see the experiment-side run artifacts under `experiments/benchmarks/results/`.
 
 ## Notes
 Containment is measured by testing whether JAX intervals are contained in the C Arb intervals, and whether point outputs fall inside the C intervals.

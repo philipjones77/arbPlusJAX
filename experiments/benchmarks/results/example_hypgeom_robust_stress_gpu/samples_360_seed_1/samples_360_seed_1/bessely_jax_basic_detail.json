@@ -1,0 +1,15 @@
+{
+  "function": "bessely",
+  "backend": "jax_basic",
+  "samples": 360,
+  "seed": 1,
+  "error_stats": {
+    "mean": 1.4568830103099932e-07,
+    "median": 4.478556414611035e-12,
+    "p95": 2.5290714233960925e-08,
+    "p99": 1.6108053932839613e-06,
+    "max": 3.202711377525702e-05
+  },
+  "containment_rate": 1.0,
+  "mean_width": 5.191379058886201e-13
+}

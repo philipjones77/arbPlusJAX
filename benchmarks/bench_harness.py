@@ -258,16 +258,6 @@ def _resolve_scipy_fn(name: str):
     return None
 
 
-def _resolve_jax_fn(name: str):
-    import jax.numpy as jnp
-    import jax.scipy.special as jsp
-    if hasattr(jsp, name):
-        return getattr(jsp, name)
-    if hasattr(jnp, name):
-        return getattr(jnp, name)
-    return None
-
-
 def _load_versions() -> dict[str, str]:
     versions: dict[str, str] = {}
     try:
@@ -551,7 +541,7 @@ def main() -> int:
     base_outdir = Path(args.outdir) if args.outdir else None
     if base_outdir is None:
         stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
-        base_outdir = Path("results") / "benchmarks" / f"run_{stamp}"
+        base_outdir = Path("experiments") / "benchmarks" / "results" / f"run_{stamp}"
     base_outdir.mkdir(parents=True, exist_ok=True)
     manifest = collect_runtime_manifest(REPO_ROOT, jax_mode=os.getenv("JAX_PLATFORMS", "auto"), python_path=sys.executable)
     write_runtime_manifest(base_outdir, manifest)
@@ -716,38 +706,7 @@ def main() -> int:
                             "notes": "",
                         })
 
-                if spec.jax_scipy:
-                    fn = _resolve_jax_fn(spec.jax_scipy)
-                    if fn is not None:
-                        t0 = time.perf_counter()
-                        if is_bivariate:
-                            y = np.asarray(fn(jnp.asarray(nu_jax), jnp.asarray(z_jax)))
-                        else:
-                            y = np.asarray(fn(jnp.asarray(x_jax)))
-                        t1 = time.perf_counter()
-                        y = _trim_first_dim(y, samples)
-                        mean_abs_err = ""
-                        max_abs_err = ""
-                        containment_rate = ""
-                        if c_out is not None:
-                            c_mid = _interval_mid(c_out)
-                            err = np.abs(y - c_mid)
-                            mean_abs_err = float(np.mean(err))
-                            max_abs_err = float(np.max(err))
-                            containment_rate = float(np.mean(_contains(c_out, y)))
-                        results.append({
-                            "function": spec.name,
-                            "backend": "jax_scipy",
-                            "samples": samples,
-                            "mean_abs_err": mean_abs_err,
-                            "max_abs_err": max_abs_err,
-                            "containment_rate": containment_rate,
-                            "mean_width": "",
-                            "time_ms": (t1 - t0) * 1e3,
-                            "notes": "",
-                        })
-
-                    if args.jax_point_batch and spec.jax_point:
+                if args.jax_point_batch and spec.jax_point:
                         try:
                             if args.jax_warmup:
                                 if is_bivariate:

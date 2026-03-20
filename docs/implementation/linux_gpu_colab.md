@@ -92,7 +92,7 @@ from pathlib import Path
 import shutil
 
 drive.mount('/content/drive')
-run_dir = Path('/content/arbplusJAX/results/benchmarks')
+run_dir = Path('/content/arbplusJAX/experiments/benchmarks/results')
 out_dir = Path('/content/drive/MyDrive/arbplusjax_runs')
 out_dir.mkdir(parents=True, exist_ok=True)
 
