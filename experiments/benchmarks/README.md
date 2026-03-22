@@ -1,13 +1,24 @@
 # Benchmark Experiments
 
 `experiments/benchmarks/` is the canonical home for benchmark experiments and
-their generated artifacts.
+their experiment-owned generated artifacts.
 
 The top-level `benchmarks/` package remains the implementation and CLI surface
-for reusable benchmark scripts. Generated benchmark outputs belong under:
+for reusable benchmark scripts. Canonical benchmark run outputs belong under:
 
-- `experiments/benchmarks/results/`
+- `benchmarks/results/`
+
+Experiment-generated derived outputs, retained summaries, and notebook products
+belong under:
+
 - `experiments/benchmarks/outputs/`
+
+Rule:
+
+- benchmark scripts write benchmark runs to `benchmarks/results/`
+- experiment notebooks and scripts may read those runs
+- experiment notebooks and scripts must write their own outputs under
+  `experiments/benchmarks/outputs/`
 
 This folder also holds notebook-driven benchmark experiments that are broader
 than the lightweight CLI benchmark smoke checks in `benchmarks/`.
@@ -36,7 +47,7 @@ Reference backends are auto-discovered from the standard local prefix:
 The optional shell bootstrap is:
 
 ```bash
-source tools/source_reference_env.sh
+source benchmarks/source_reference_env.sh
 ```
 
 Optional JAX diagnostics are opt-in through

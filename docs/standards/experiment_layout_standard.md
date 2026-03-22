@@ -125,10 +125,20 @@ Benchmark code stays in `benchmarks/`.
 Experiment folders may:
 
 - call benchmark scripts
-- summarize benchmark artifacts
+- read or summarize benchmark artifacts from `benchmarks/results/`
 - produce additional plots or derived analysis
 
 But benchmark CLI entrypoints do not move into experiment folders.
+
+Experiment-generated files must still stay inside the owning experiment tree.
+
+That means:
+
+- experiments may consume data from `benchmarks/results/`
+- experiments must not write their own retained outputs into `benchmarks/results/`
+- retained experiment outputs belong under `experiments/<name>/outputs/`
+- transient experiment scratch files belong under `experiments/<name>/artifacts/` or
+  `experiments/<name>/cache/`
 
 ## Naming Rule
 

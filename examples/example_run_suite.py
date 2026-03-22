@@ -22,8 +22,13 @@ def _run(cmd: list[str], cwd: Path, env: dict[str, str], dry_run: bool) -> int:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Run example benchmark profiles from examples/_input JSON config.")
-    parser.add_argument("--config", default="examples/_input/example_run.json")
+    parser = argparse.ArgumentParser(
+        description="Run example benchmark profiles from examples/inputs JSON config."
+    )
+    parser.add_argument(
+        "--config",
+        default="examples/inputs/example_run_suite/example_run.json",
+    )
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
@@ -31,7 +36,10 @@ def main() -> int:
     cfg_path = (repo_root / args.config).resolve()
     if not cfg_path.exists():
         print(f"Missing config: {cfg_path}")
-        print("Copy examples/example_run_template.json to examples/_input/example_run.json and edit it.")
+        print(
+            "Copy examples/inputs/example_run_suite/example_run_template.json "
+            "to examples/inputs/example_run_suite/example_run.json and edit it."
+        )
         return 2
 
     cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
@@ -46,7 +54,7 @@ def main() -> int:
         print("No profiles in config.")
         return 2
 
-    out_root = repo_root / "examples" / "_output" / cfg.get("run_name", f"run_{time.strftime('%Y%m%dT%H%M%S')}")
+    out_root = repo_root / "benchmarks" / "results" / cfg.get("run_name", f"run_{time.strftime('%Y%m%dT%H%M%S')}")
     out_root.mkdir(parents=True, exist_ok=True)
 
     env = os.environ.copy()
@@ -63,7 +71,7 @@ def main() -> int:
         profile_out = out_root / name
         cmd = [
             python_bin,
-            "tools/run_harness_profile.py",
+            "benchmarks/run_harness_profile.py",
             "--name",
             name,
             "--outdir",

@@ -31,3 +31,13 @@ experiments/<human_name>/
 Benchmark code still belongs in `benchmarks/`.
 Experiments may call benchmarks and summarize their outputs, but benchmark CLI
 entrypoints do not move here.
+
+Experiments may read benchmark run artifacts from `benchmarks/results/`, but
+experiment-generated outputs must stay inside the experiment tree, typically
+under `experiments/<name>/outputs/`.
+
+Current retained experiment root:
+
+- `experiments/benchmarks/`
+  - canonical retained benchmark experiment area
+  - keeps benchmark notebooks, support code, and experiment-owned retained outputs

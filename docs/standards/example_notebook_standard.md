@@ -102,6 +102,26 @@ That means:
 Installed-package execution may still be supported as an explicit secondary
 path, but it must not be the default notebook assumption.
 
+### Example input/output ownership rule
+
+Example-owned data should live under:
+
+- `examples/inputs/<example_name>/`
+- `examples/outputs/<example_name>/`
+
+Do not scatter unrelated input or output files directly under the root of
+`examples/inputs/` or `examples/outputs/`.
+
+Each example should own a single named subfolder and reuse that location for:
+
+- templates
+- shared example fixtures
+- retained example summaries
+- example-specific generated outputs
+
+Avoid duplicating equivalent templates or retained outputs across multiple
+example folders.
+
 ### Instantiation rule
 
 The notebook must instantiate and use a concrete object or input family.
