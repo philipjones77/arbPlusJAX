@@ -1,0 +1,17 @@
+function,backend,samples,mean_abs_err,max_abs_err,containment_rate,mean_width,time_ms,notes,sweep_sample,sweep_seed,wall_s,peak_rss_mb,run_dir
+exp,c_arb,16,,,,4.10703e-06,0.049418,,16,0,3.101607,599.703125,/home/phili/projects/arbplusJAX/examples/outputs/example_run_suite/cpu_stage1_smoke/core_smoke/samples_16_seed_0
+exp,jax_basic,16,1.38778e-16,1.77636e-15,0,4.10703e-06,0.348782,,16,0,3.101607,599.703125,/home/phili/projects/arbplusJAX/examples/outputs/example_run_suite/cpu_stage1_smoke/core_smoke/samples_16_seed_0
+exp,jax_adaptive,16,1.02667e-12,2.84928e-12,0,4.10704e-06,0.414533,,16,0,3.101607,599.703125,/home/phili/projects/arbplusJAX/examples/outputs/example_run_suite/cpu_stage1_smoke/core_smoke/samples_16_seed_0
+exp,jax_rigorous,16,1.02667e-12,2.84928e-12,0,4.10704e-06,0.340335,,16,0,3.101607,599.703125,/home/phili/projects/arbplusJAX/examples/outputs/example_run_suite/cpu_stage1_smoke/core_smoke/samples_16_seed_0
+exp,scipy,16,1.02672e-12,2.84928e-12,1,,0.01888,,16,0,3.101607,599.703125,/home/phili/projects/arbplusJAX/examples/outputs/example_run_suite/cpu_stage1_smoke/core_smoke/samples_16_seed_0
+exp,jax_point,16,1.02667e-12,2.84928e-12,1,,0.422574,,16,0,3.101607,599.703125,/home/phili/projects/arbplusJAX/examples/outputs/example_run_suite/cpu_stage1_smoke/core_smoke/samples_16_seed_0
+exp,mpmath,16,1.02672e-12,2.84928e-12,1,,0.250031,,16,0,3.101607,599.703125,/home/phili/projects/arbplusJAX/examples/outputs/example_run_suite/cpu_stage1_smoke/core_smoke/samples_16_seed_0
+exp,boost,16,1.02672e-12,2.84928e-12,1,,7.82295,,16,0,3.101607,599.703125,/home/phili/projects/arbplusJAX/examples/outputs/example_run_suite/cpu_stage1_smoke/core_smoke/samples_16_seed_0
+log,c_arb,16,,,,1.96616e-06,0.042265,,16,0,3.101607,599.703125,/home/phili/projects/arbplusJAX/examples/outputs/example_run_suite/cpu_stage1_smoke/core_smoke/samples_16_seed_0
+log,jax_basic,16,4.85723e-17,2.22045e-16,0,1.96616e-06,0.430476,,16,0,3.101607,599.703125,/home/phili/projects/arbplusJAX/examples/outputs/example_run_suite/cpu_stage1_smoke/core_smoke/samples_16_seed_0
+log,jax_adaptive,16,1.25193e-12,1.50737e-11,0,1.96616e-06,0.500416,,16,0,3.101607,599.703125,/home/phili/projects/arbplusJAX/examples/outputs/example_run_suite/cpu_stage1_smoke/core_smoke/samples_16_seed_0
+log,jax_rigorous,16,1.25193e-12,1.50737e-11,0,1.96617e-06,0.440369,,16,0,3.101607,599.703125,/home/phili/projects/arbplusJAX/examples/outputs/example_run_suite/cpu_stage1_smoke/core_smoke/samples_16_seed_0
+log,scipy,16,1.25193e-12,1.50737e-11,1,,0.004301,,16,0,3.101607,599.703125,/home/phili/projects/arbplusJAX/examples/outputs/example_run_suite/cpu_stage1_smoke/core_smoke/samples_16_seed_0
+log,jax_point,16,1.25193e-12,1.50737e-11,1,,0.449265,,16,0,3.101607,599.703125,/home/phili/projects/arbplusJAX/examples/outputs/example_run_suite/cpu_stage1_smoke/core_smoke/samples_16_seed_0
+log,mpmath,16,1.25193e-12,1.50737e-11,1,,0.67994,,16,0,3.101607,599.703125,/home/phili/projects/arbplusJAX/examples/outputs/example_run_suite/cpu_stage1_smoke/core_smoke/samples_16_seed_0
+log,boost,16,1.25193e-12,1.50737e-11,1,,16.5081,,16,0,3.101607,599.703125,/home/phili/projects/arbplusJAX/examples/outputs/example_run_suite/cpu_stage1_smoke/core_smoke/samples_16_seed_0

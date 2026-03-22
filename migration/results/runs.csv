@@ -1,0 +1,6 @@
+run_id,timestamp_utc,tool,command,commit,platform,notes
+benchmark_arf-2026-03-22T14:22:29Z,2026-03-22T14:22:29Z,benchmark_arf,"benchmark_arf.py --samples 1024 --which add --runs 2",5b25d5749c273853bed05f35aadfce51c2b5c03d,"Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39","warm_time_ms=0.26"
+benchmark_arb_fpwrap-2026-03-22T14:22:29Z,2026-03-22T14:22:29Z,benchmark_arb_fpwrap,"benchmark_arb_fpwrap.py --samples 1024 --which exp --runs 2",5b25d5749c273853bed05f35aadfce51c2b5c03d,"Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39","warm_time_ms=0.07"
+benchmark_acf-2026-03-22T14:31:11Z,2026-03-22T14:31:11Z,benchmark_acf,"benchmark_acf.py --samples 4096 --which mul --runs 3",5b25d5749c273853bed05f35aadfce51c2b5c03d,"Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39","warm_time_ms=0.42"
+benchmark_fmpr-2026-03-22T14:31:11Z,2026-03-22T14:31:11Z,benchmark_fmpr,"benchmark_fmpr.py --samples 4096 --which mul --runs 3",5b25d5749c273853bed05f35aadfce51c2b5c03d,"Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39","warm_time_ms=0.69"
+benchmark_fmpzi-2026-03-22T14:31:11Z,2026-03-22T14:31:11Z,benchmark_fmpzi,"benchmark_fmpzi.py --samples 4096 --which add --runs 3",5b25d5749c273853bed05f35aadfce51c2b5c03d,"Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39","warm_time_ms=1.89"

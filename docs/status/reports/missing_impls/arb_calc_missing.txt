@@ -1,6 +1,0 @@
-arb_calc_isolate_roots
-arb_calc_newton_conv_factor
-arb_calc_newton_step
-arb_calc_partition
-arb_calc_refine_root_bisect
-arb_calc_refine_root_newton

@@ -1,8 +1,17 @@
-Last updated: 2026-03-21T18:40:00Z
+Last updated: 2026-03-22T22:00:00Z
 
 # TODO
 
-## Roadmap status
+This is the canonical consolidated TODO list for active implementation work in
+`docs/status/`.
+
+Organization rule:
+- Sections follow the top-level function and infrastructure categories defined in
+  [test_coverage_matrix.md](/home/phili/projects/arbplusJAX/docs/status/test_coverage_matrix.md).
+- Test-owner priorities follow
+  [test_gap_checklist.md](/home/phili/projects/arbplusJAX/docs/status/test_gap_checklist.md).
+- Generated inventories and detailed provenance stay in `docs/status/reports/`,
+  not here.
 
 Status legend:
 - `done`: landed in code and covered at least by targeted tests
@@ -17,738 +26,457 @@ Current phase snapshot:
 - Tier 4 higher extensions: `in_progress`
 - multivariate Bessel placement after scalar incomplete infrastructure: `planned`
 
-## Run-platform status
+## Cross-cutting execution and run-platform
+
+Status: `in_progress`
 
 - `done`
-  - root-level [tests](/home/phili/projects/arbplusJAX/tests) and [benchmarks](/home/phili/projects/arbplusJAX/benchmarks) remain the canonical run surfaces
-  - dedicated test orchestration exists in `tools/run_test_harness.py`
-  - dedicated benchmark orchestration exists in `benchmarks/run_benchmarks.py` and `benchmarks/run_harness_profile.py`
-  - Windows, Linux, and Google Colab run instructions are documented
-  - repo-root VS Code workspace files exist for generic, Linux, and Windows usage
+  - root-level [tests](/home/phili/projects/arbplusJAX/tests) and
+    [benchmarks](/home/phili/projects/arbplusJAX/benchmarks) remain the
+    canonical run surfaces
+  - dedicated test orchestration exists in
+    [tools/run_test_harness.py](/home/phili/projects/arbplusJAX/tools/run_test_harness.py)
+  - dedicated benchmark orchestration exists in
+    [benchmarks/run_benchmarks.py](/home/phili/projects/arbplusJAX/benchmarks/run_benchmarks.py)
+    and
+    [benchmarks/run_harness_profile.py](/home/phili/projects/arbplusJAX/benchmarks/run_harness_profile.py)
+  - a shared `runtime_manifest.json` schema now exists across test and benchmark
+    outputs
+  - the existing
+    [example_run_suite.py](/home/phili/projects/arbplusJAX/examples/example_run_suite.py)
+    flow now writes a suite-level runtime manifest, summary markdown, and SVG
+    plots under
+    [examples/outputs/example_run_suite/](/home/phili/projects/arbplusJAX/examples/outputs/example_run_suite/)
+  - the existing official API benchmark
+    [benchmark_api_surface.py](/home/phili/projects/arbplusJAX/benchmarks/benchmark_api_surface.py)
+    now emits the shared benchmark-report JSON schema instead of only printing
+    timings
+  - Windows, Linux, and Colab run instructions are documented
 - `in_progress`
-  - parity setup still depends on external Arb/FLINT reference builds and platform-specific shared-library configuration
-  - long-run benchmark scheduling/report collection is documented but not yet unified behind a single environment manifest
+  - unify long-run benchmark scheduling and report collection behind a single
+    environment manifest and execution policy
+  - keep benchmark ownership distinct from correctness ownership, but make the
+    pass/fail boundaries clearer in status docs
+  - add a dedicated sparse-matrix harness profile on top of the now-landed
+    sparse point layer
 - `planned`
-  - add a dedicated sparse-matrix harness profile on top of the now-landed sparse point layer
-- `done`
-  - a single `runtime_manifest.json` schema is now shared by the test harness and benchmark harness outputs
+  - add a single repo-facing execution checklist that names the minimum CPU,
+    parity, GPU, and benchmark slices required for a release-quality change
 
-## Current execution summary
+## 1. Core Numeric Scalars
+
+Status: `in_progress`
 
 - `done`
-  - canonical public entry points exist for `tail_integral`, `tail_integral_accelerated`, `incomplete_bessel_k`, and `incomplete_bessel_i`
-  - canonical public entry points also exist for `incomplete_gamma_upper`, `incomplete_gamma_lower`, and `laplace_bessel_k_tail`
-  - public metadata exists for family, stability, method tags, regime tags, and derivative status
-  - generic tail-engine modules exist under `src/arbplusjax/special/tail_acceleration/`
+  - direct test owners exist for the main scalar chassis:
+    `arb_core`, `acb_core`, `arf`, `acf`, `fmpr`, `fmpzi`, `arb_fpwrap`
+  - direct test owners also exist for supporting scalar layers:
+    `arb_calc`, `acb_calc`, `mag`, `fmpz_extras`
+  - representative public-API coverage now exists for scalar helper families:
+    `arf`, `acf`, `fmpr`, `fmpzi`, and `arb_fpwrap`
+  - the existing scalar performance scripts:
+    `benchmark_arf.py`, `benchmark_acf.py`, `benchmark_fmpr.py`,
+    `benchmark_fmpzi.py`, and `benchmark_arb_fpwrap.py`
+    now emit shared benchmark-report JSON with cold/warm/recompile timing
+  - the existing core comparison scripts:
+    `compare_arb_core.py` and `compare_acb_core.py`
+    now emit shared benchmark-report JSON for scalar accuracy artifacts
+- `in_progress`
+  - continue closing the remaining Arb/FLINT parity gap for the scalar core
+    modules listed in the missing-C snapshot below
+  - continue hardening specialized rigorous dispatch in uneven scalar families
+    instead of relying on generic wrapper inflation
+- `planned`
+  - add direct status rollups for which scalar families are genuinely
+    specialized-rigorous versus still wrapper-level
+
+## 2. Interval / Box / Precision Modes
+
+Status: `in_progress`
+
+- `done`
+  - direct test owners exist for `double_interval`, `mp_mode`, and
+    `jax_precision`
+  - mode tests exist for point/basic interval behavior and matrix mode routing
+  - targeted helper coverage now exists for shared batch padding, trimming,
+    midpoint conversion, and low-level shape guards in the existing runtime/API
+    test surface
+- `in_progress`
+  - add a direct owner test for `point_wrappers`
+  - continue tightening wrapper ownership for:
+    `ball_wrappers`, `baseline_wrappers`, `calc_wrappers`, `core_wrappers`,
+    `double_interval_wrappers`, `hypgeom_wrappers`, `mat_wrappers`,
+    `poly_wrappers`, and `wrappers_common`
+  - keep precision-routing and dtype policy explicit instead of letting wrapper
+    behavior drift by family
+- `planned`
+  - add a repo-wide wrapper contract matrix covering shape normalization,
+    broadcasting, dtype promotion, batch padding, and mode dispatch invariants
+
+## 3. Dense Matrix Functionality
+
+Status: `in_progress`
+
+- `done`
+  - dense `arb_mat` / `acb_mat` now cover the main public chassis:
+    `zero`, `identity`, `permutation_matrix`, `transpose`,
+    `conjugate_transpose`, `submatrix`, `diag`, `diag_matrix`, `matmul`,
+    `matvec`, `banded_matvec`, cached matvec prepare/apply, dense plan helpers,
+    `solve`, `inv`, `sqr`, `det`, `trace`, `norm_fro`, `norm_1`, `norm_inf`,
+    `triangular_solve`, `lu`, and `qr`
+  - point/basic/adaptive/rigorous API exposure exists for the main chassis
+  - dense benchmark and example coverage exist in
+    [benchmark_dense_matrix_surface.py](/home/phili/projects/arbplusJAX/benchmarks/benchmark_dense_matrix_surface.py),
+    [dense_matrix_surface_benchmark.md](/home/phili/projects/arbplusJAX/docs/status/reports/dense_matrix_surface_benchmark.md),
+    and
+    [example_dense_matrix_surface.ipynb](/home/phili/projects/arbplusJAX/examples/example_dense_matrix_surface.ipynb)
+- `in_progress`
+  - strengthen large-`n` determinant enclosures beyond midpoint fallback
+  - add parity/reference checks for `inv`, `qr`, banded matvec, cached matvec,
+    determinant, trace, and matrix norms
+  - separate midpoint-first solve-family implementations from true interval/box
+    linear-algebra kernels in status and engineering reports
+  - deepen rigorous treatment for solve/inverse/factorization paths instead of
+    relying on wrapper-level outward boxing around midpoint kernels
+- `planned`
+  - align dense matrix status reporting with the same engineering fields used by
+    function status reports: hardening, AD audit, batch support, and pure-JAX
+    aspiration
+
+## 4. Sparse / Block-Sparse / VBlock Functionality
+
+Status: `in_progress`
+
+- `done`
+  - sparse `srb_mat` / `scb_mat` point-mode layers exist with `COO`, `CSR`,
+    `BCOO`, sparse matvec, cached matvec, batching, sparse algebra, iterative
+    solves, pivoted LU, and structured Householder QR
+  - fixed-block `srb_block_mat` / `scb_block_mat` point-mode surfaces exist for
+    BSR-like storage, matvec/rmatvec, cached apply, batch helpers, triangular
+    solve, LU wrappers, and QR wrappers
+  - variable-block `srb_vblock_mat` / `scb_vblock_mat` surfaces exist for
+    partitioned COO/CSR, dense conversion, apply, cached apply, matmul, and
+    direct solve/factorization helpers
+- `in_progress`
+  - extend sparse interval/box storage and wrappers into fuller four-mode
+    coverage
+  - strengthen symbolic and numeric sparse direct-factorization quality beyond
+    the current point-mode LU/QR layer
+  - add direct-owner tests for `block_sparse_core`, `sparse_core`, and
+    `sparse_common`
+  - remove hidden assumptions in variable-block direct factorizations that
+    require square row/column partitions
+- `planned`
+  - add interval/box block-sparse and variable-block sparse modes
+  - add more benchmark coverage that separates storage-format overhead from
+    solver quality
+
+## 5. Matrix-Free / Operator Functionality
+
+Status: `in_progress`
+
+### Current Landed Surface
+
+- `done`
+  - `jrb_mat` and `jcb_mat` now provide matrix-free Krylov action, trace
+    estimator, and SLQ-style logdet scaffolding with targeted tests and
+    benchmark coverage
+  - custom VJP support exists for key action, quadratic-form, and trace-facing
+    paths
+  - restarted and block-RHS `expm` action variants exist on the Jones paths
+  - operator-plan surfaces now cover shell, finite-difference, sparse `BCOO`,
+    block-sparse, and variable-block sparse adapters
+  - reusable midpoint Krylov solve scaffolding now lives in `matrix_free_core`
+    rather than duplicated wrappers
+  - eigensolver diagnostics surfaces exist across Lanczos, Arnoldi, restarted,
+    block, Krylov-Schur, Davidson, Jacobi-Davidson, shift-invert, and contour
+    entry points
+
+### Core Operator Infrastructure
+
+- `in_progress`
+  - add a direct owner test for `matrix_free_core`
+  - add direct owner tests for `krylov_solvers` and `iterative_solvers`
+  - deepen the new `basic` semantics for operator-first surfaces
+  - harden flexible-preconditioner policy beyond the current shared
+    preconditioned `minres` path
+  - harden locking, restart, and correction-equation policy for the landed
+    Davidson/Jacobi-Davidson/shift-invert/contour eigensolver tranche
+  - add contour-integral matrix-function infrastructure in `matrix_free_core`
+    with reusable quadrature and spectral-transform substrate
+  - add broader rational and polynomial spectral-transform infrastructure in
+    `matrix_free_core`, with public exposure through `jrb_mat` / `jcb_mat`
+  - add a unified operator-first `logdet_solve` abstraction for dense, sparse,
+    and matrix-free SPD workflows
+
+### Estimators And Approximation Paths
+
+- `in_progress`
+  - evaluate a TFP `fastgp`-style rational multi-shift logdet path for SPD
+    operators as a benchmarked alternative to SLQ and Leja+Hutch++
+  - evaluate block rational Krylov versus Newton-Leja for GPU-heavy
+    matrix-function actions and trace-estimation workloads, with emphasis on
+    shift reuse, block RHS structure, stopping criteria, and AD-safe projected
+    solves
+  - add Hutch++-compatible trace-estimator integration for the rational-Krylov
+    path, with variance-reduction and batched-probe support
+
+### AD-Safe Caching And Adjoint Design
+
+- `in_progress`
+  - add an AD-safe cached rational-Krylov trace/logdet path in the operator
+    stack:
+    - forward surface should be an operator-plan-first JAX API, not an
+      arbitrary callable closure
+    - start with `@jax.custom_vjp` rather than a new primitive
+    - return compact projected-state metadata only:
+      poles, small projected matrices/recurrences, probe metadata,
+      deflation/locking maps, and residual estimates
+    - do not backpropagate through Krylov iteration, restart policy, PSD
+      detection, pole selection, or nugget heuristics
+    - VJP should use implicit adjoint solves reconstructed from the cached
+      projected metadata, with basis reuse across probes where possible
+  - make low-rank deflation AD-safe:
+    - save the cached deflation state in the forward residual of
+      `@jax.custom_vjp` surfaces
+    - use the same deflation state in the implicit-adjoint VJP so forward and
+      backward approximations stay consistent
+    - avoid differentiating through adaptive rank selection, pivot policy, or
+      refresh heuristics
+
+### Probe Design And Variance Reduction
+
+- `in_progress`
+  - add structured orthogonal probe-block support for stochastic trace/logdet
+    estimators across dense, sparse, and matrix-free operator paths:
+    - support FWHT/Hadamard-based on-device orthogonal probe blocks as the
+      default GPU-friendly variance-reduction path
+    - support blocked Rademacher plus thin-QR probe generation as a more
+      general fallback when FWHT layout assumptions do not hold
+    - make probe-block size a tunable operator-layer hyperparameter, with
+      practical power-of-two defaults such as `8`, `16`, `32`, and `64`
+    - keep the probe API shared across Hutchinson, Hutch++, SLQ, and
+      rational-Krylov trace-estimation paths
+    - prefer batched operator apply on whole probe blocks instead of
+      per-vector execution
+  - add variance-monitoring and adaptive stopping for orthogonal probe blocks:
+    - small pilot blocks for empirical variance estimation
+    - adaptive probe-budget selection from the pilot variance estimate
+    - reproducible per-block PRNG key threading and metadata capture
+  - add numerical and implementation rules for orthogonal probe blocks:
+    - use normalized orthogonal probes with random signs and optional
+      permutations to avoid deterministic alignment with operator structure
+    - accumulate stochastic reductions with fp64 or compensated summation
+    - allow in-place or streaming FWHT-style generation when memory pressure
+      makes full probe-block materialization undesirable
+    - keep the probe-generator output JIT-safe and pytree-friendly, with no
+      hidden Python-side caching
+
+### Deflation And Recycling
+
+- `in_progress`
+  - add low-rank deflation and probe-recycling support for stochastic
+    trace/logdet estimation:
+    - build and cache compact dominant subspaces using partial Cholesky,
+      pivoted Cholesky, Nyström, or related low-rank operator-first methods
+    - evaluate the projected low-rank contribution exactly on the compact
+      subspace and probe only the residual operator
+    - expose a reusable deflated-operator plan so Hutchinson, Hutch++, SLQ, and
+      rational-Krylov estimators can share the same deflation path
+    - recycle the cached subspace across nearby parameter values and repeated
+      solves, with refresh rules based on residual mass or variance drift
+    - keep deflation metadata on device and pytree-safe rather than relying on
+      hidden mutable caches
+  - add practical low-rank deflation rules:
+    - deflate until the residual carries only a small fraction of the
+      trace/log-trace mass or variance proxy
+    - re-orthogonalize recycled subspaces periodically when parameter drift
+      accumulates
+    - prefer matrix-free constructions that require only operator apply and
+      optional diagonal estimates
+
+### Numerical Safety And CI
+
+- `in_progress`
+  - add numerical safety rules for rational-Krylov logdet/trace work:
+    - small Lanczos or Gershgorin pretest for eigen-interval estimation
+    - PSD-safe shift and nugget clamping
+    - `log1p` handling for tiny projected eigenvalue contributions
+    - compensated or pairwise reductions, preferably promoted to fp64 on GPU
+  - add CI and contract coverage for cached-adjoint rational-Krylov paths:
+    - gradient dot-product checks against finite-difference or complex-step
+      references in fp64
+    - cached-basis VJP consistency versus explicit implicit-adjoint solves
+    - Hutch++ variance scans across probe counts and seeds
+    - orthogonal-probe variance scans versus i.i.d. Rademacher probes at fixed
+      compute budgets
+    - FWHT and QR probe-block parity checks for unbiased trace estimation on
+      small reference problems
+    - low-rank-deflated estimator variance scans versus undeflated estimators
+      at fixed probe budgets
+    - cached-deflation forward/VJP consistency checks across nearby parameter
+      values
+    - eigen-interval and nugget sensitivity sweeps for logdet stability
+    - JIT/cache stability checks so value changes do not trigger recompiles for
+      fixed operator shapes/configuration
+    - pytree contract checks so cached aux metadata survives `jit`, `vmap`, and
+      repeated calls without hidden Python-side state
+
+### Longer-Horizon Additions
+
+- `planned`
+  - add contour-integral matrix functions plus reusable dense/operator-first
+    `logm`, `sqrtm`, `rootm`, and `signm` infrastructure
+  - add broader operator-parameter adjoints beyond the now-landed
+    parameter-differentiable operator-plan tranche
+  - keep PETSc/SLEPc as benchmark and design references only, not governed
+    runtime backends
+
+## 6. Special Functions
+
+Status: `in_progress`
+
+- `done`
+  - canonical public entry points exist for `tail_integral`,
+    `tail_integral_accelerated`, `incomplete_bessel_k`,
+    `incomplete_bessel_i`, `incomplete_gamma_upper`,
+    `incomplete_gamma_lower`, and `laplace_bessel_k_tail`
+  - generic tail-engine modules exist under
+    `src/arbplusjax/special/tail_acceleration/`
   - incomplete-Bessel modules exist under `src/arbplusjax/special/bessel/`
-  - pure-JAX `high_precision_refine` fallback path is exposed, with `mpfallback` retained only as a compatibility alias
-  - explicit derivative support and custom JVPs exist for the current incomplete `K` and incomplete `I` point paths
-  - explicit derivative support exists for incomplete gamma and Laplace-Bessel tail public APIs
-  - a dedicated multi-environment test harness exists for Windows, Linux, and Google Colab via `tools/run_test_harness.py`
-  - test ownership vs benchmark ownership is now documented explicitly in `tests/README.md`, `benchmarks/README.md`, and `docs/implementation/run_platform.md`
-  - repo-root VS Code workspaces now exist for generic, Linux, and Windows entry points so the explorer root stays at the repository root instead of `docs/`
-  - dense `arb_mat` / `acb_mat` function families now cover the main explicit-matrix chassis across point/basic/adaptive/rigorous API exposure, batch helpers, cached matvec, and plan helpers
-  - dense `arb_mat` / `acb_mat` now also have exact structural rigorous transforms for permutation matrices, transpose, conjugate-transpose, submatrix extraction, diagonal extraction, and diagonal-matrix construction
-  - dense matrix benchmarking and notebook examples now exist in `benchmarks/benchmark_dense_matrix_surface.py`, `docs/status/reports/dense_matrix_surface_benchmark.md`, and `examples/example_dense_matrix_surface.ipynb`
-  - `jrb_mat` and `jcb_mat` now have pure-JAX matrix-free Krylov action, trace-estimator, and SLQ-style logdet scaffolding with targeted tests and benchmark coverage
-  - initial backward matrix-free support now exists for the Jones Krylov stack through custom VJPs on action and quadratic-form paths
-  - structured Jones diagnostics now exist for action, trace-estimator, and SLQ/logdet entry points in both the real Lanczos and complex Arnoldi paths
-  - restarted and block-RHS matrix-free `expm` action variants now exist for both the real Lanczos and complex Arnoldi Jones paths
-  - sparse `srb_mat` / `scb_mat` point-mode layers now exist with `COO` / `CSR` / `BCOO`, sparse matvec/cached matvec/batching, sparse algebra, iterative solves, pivoted LU, and structured Householder QR
+  - pure-JAX `high_precision_refine` is exposed, with `mpfallback` retained
+    only as a compatibility alias
+  - explicit derivative support exists for incomplete gamma, Laplace-Bessel
+    tails, and the current incomplete `K` / incomplete `I` point paths
+  - `boost_hypgeom` and `cusf_compat` surfaces now exist with tests and docs
 - `in_progress`
-  - ordinary gamma/Barnes/Bessel hardening is uneven across families
-  - tail-engine recurrence/sequence logic exists but still needs stronger calibration and broader family coverage
-  - incomplete `K` has richer regime logic than incomplete `I`; the two are not yet at the same maturity level
-  - diagnostics exist, but benchmark/report and RF77-facing usage are still incomplete
-  - dense matrix rigor is stronger for exact structural transforms, but solve/inverse/factorization rigor is still wrapper-level enclosure logic around JAX midpoint kernels rather than a deep certified Arb/Acb linear-algebra backend
+  - continue hardening ordinary gamma, Barnes-family, and ordinary Bessel
+    families where coverage remains uneven
+  - continue calibrating the generic tail-engine recurrence and sequence logic
+    across more families
+  - bring incomplete `I` to the same regime maturity as incomplete `K`
+  - finish hardening and characterization of the `bdg_*` Barnes and
+    double-gamma family
+  - reduce runtime cost of rigorous/adaptive `bdg_*` samplers in
+    `src/arbplusjax/ball_wrappers.py`
+  - continue hypergeometric engineering cleanup:
+    helper consolidation, family-specific adaptive/rigorous kernels, complex AD
+    audits, and compile-noise reduction outside the current representative
+    families
+  - add dedicated direct-owner tests for `bessel_kernels` and `barnesg`
+  - extend benchmark and RF77-facing usage/report coverage where diagnostics
+    exist but packaging is still incomplete
 - `planned`
-  - true arbitrary precision under a pure-JAX constraint is still unresolved
-  - hypergeometric-tail extensions on top of the same engine
-  - multivariate and incomplete-multivariate Bessel work
+  - extend the general incomplete-tail engine to more hypergeometric-tail
+    families
+  - add multivariate Bessel work only after scalar incomplete infrastructure is
+    genuinely stable
+  - add incomplete multivariate-Bessel-type routines only if reductions justify
+    them
+  - resolve what true arbitrary precision means under a strict pure-JAX
+    constraint
 
-## Function coverage snapshot
+Priority rule for remaining Arb/FLINT-style breadth:
+- do not migrate the missing callable surface breadth-first
+- prefer one canonical JAX-native implementation per important function family
+- prioritize IFJ and RF77-facing work first:
+  - Barnes-family hardening and IFJ-derived double-gamma work
+  - gamma-adjacent continuation functions that unblock contour and residue
+    workflows
+  - selected complex special functions with direct downstream use:
+    `Ei`, `Chi`, `Ci`, dilogarithm, Tricomi `U`, and selected `pfq`
+- after that, prioritize broad-value parity:
+  - dense matrix parity in `arb_mat` / `acb_mat`
+  - polynomial parity in `arb_poly` / `acb_poly`
+  - selected scalar gaps such as `lambertw`, zeta-adjacent functions, and
+    rising/beta families
+- defer broad elliptic/modular and full Dirichlet/L-function expansion until
+  the Barnes/gamma/integration path is stable enough to justify it
 
-- Public special-function API: `done`
-  - tail engine:
-    - `tail_integral`
-    - `tail_integral_batch`
-    - `tail_integral_accelerated`
-    - `tail_integral_accelerated_batch`
-  - incomplete Bessel:
-    - `incomplete_bessel_k`
-    - `incomplete_bessel_k_batch`
-    - `incomplete_bessel_i`
-    - `incomplete_bessel_i_batch`
-  - incomplete gamma:
-    - `incomplete_gamma_upper`
-    - `incomplete_gamma_upper_batch`
-    - `incomplete_gamma_lower`
-    - `incomplete_gamma_lower_batch`
-    - `incomplete_gamma_upper_argument_derivative`
-    - `incomplete_gamma_upper_parameter_derivative`
-    - `incomplete_gamma_upper_derivative`
-    - `incomplete_gamma_lower_argument_derivative`
-    - `incomplete_gamma_lower_parameter_derivative`
-    - `incomplete_gamma_lower_derivative`
-  - Laplace-Bessel:
-    - `laplace_bessel_k_tail`
-    - `laplace_bessel_k_tail_batch`
-    - `laplace_bessel_k_tail_lower_limit_derivative`
-    - `laplace_bessel_k_tail_lambda_derivative`
-    - `laplace_bessel_k_tail_derivative`
+## 7. Analytic / Algebraic / Domain Functionality
 
-- Dense real/complex matrix chassis: `done` for core surface, `in_progress` for deep rigor
-  - `arb_mat` / `acb_mat` implemented core families:
-    - `zero`
-    - `identity`
-    - `permutation_matrix`
-    - `transpose`
-    - `conjugate_transpose` on `acb_mat`
-    - `submatrix`
-    - `diag`
-    - `diag_matrix`
-    - `matmul`
-    - `matvec`
-    - `banded_matvec`
-    - `matvec_cached_prepare`
-    - `matvec_cached_apply`
-    - `dense_matvec_plan_prepare`
-    - `dense_matvec_plan_apply`
-    - `dense_lu_solve_plan_prepare`
-    - `dense_lu_solve_plan_apply`
-    - `solve`
-    - `inv`
-    - `sqr`
-    - `det`
-    - `trace`
-    - `norm_fro`
-    - `norm_1`
-    - `norm_inf`
-    - `triangular_solve`
-    - `lu`
-    - `qr`
-  - function-family status:
-    - point/basic/adaptive/rigorous API exposure: present for the main chassis
-    - precision helpers: present
-    - fixed/padded batch helpers: present
-    - benchmark and example surfaces:
-      - [benchmark_dense_matrix_surface.py](/home/phili/projects/arbplusJAX/benchmarks/benchmark_dense_matrix_surface.py)
-      - [dense_matrix_surface_benchmark.md](/home/phili/projects/arbplusJAX/docs/status/reports/dense_matrix_surface_benchmark.md)
-      - [example_dense_matrix_surface.ipynb](/home/phili/projects/arbplusJAX/examples/example_dense_matrix_surface.ipynb)
-    - tests: [test_arb_mat_chassis.py](/home/phili/projects/arbplusJAX/tests/test_arb_mat_chassis.py), [test_acb_mat_chassis.py](/home/phili/projects/arbplusJAX/tests/test_acb_mat_chassis.py), [test_mat_modes.py](/home/phili/projects/arbplusJAX/tests/test_mat_modes.py)
+Status: `in_progress`
 
-- Jones matrix-free real/complex chassis: `done` for point-mode public chassis, `in_progress` for deeper operator AD and advanced eigensolver families
-  - tracked completion plan: [matrix_free_completion_plan.md](/home/phili/projects/arbplusJAX/docs/status/matrix_free_completion_plan.md)
-  - current closure state:
-    - `jrb_mat` and `jcb_mat` point-mode chassis are now green in their dedicated chassis suites after the latest Davidson/Jacobi-Davidson hardening pass
-    - shared midpoint Krylov solve scaffolding now lives in `matrix_free_core` instead of duplicated Jones wrappers
-    - operator-plan JIT paths for matrix-function actions now bypass the plan/custom-VJP tracer failure mode
-    - SLQ estimators now handle complete orthogonal probe families correctly for exact small-basis cases without polluting probe gradients
-    - operator-plan surfaces now also cover shell, finite-difference, block-sparse, vblock-sparse, and parameter-differentiable sparse `BCOO` plan construction
-    - dense, sparse, block-sparse, and variable-block-sparse storage modules now expose thin operator-plan adapter wrappers into the Jones/operator layer
-    - unified `logdet_solve` result surfaces now exist in `jrb_mat` / `jcb_mat`, backed by reusable result metadata in `matrix_free_core`
-    - eigensolver diagnostics surfaces now exist across Lanczos/Arnoldi, block, restarted, Krylov-Schur, Davidson, Jacobi-Davidson, shift-invert, and contour entry points
-    - complex Hermitian action/integrand paths now prefer Hermitian Lanczos-backed projected kernels instead of generic Arnoldi where applicable
-  - next infrastructure tranche should deepen the new `basic` semantics, richer restarted/deflated eigensolver policy, and more reusable operator diagnostics
-  - ownership rule to finish and keep explicit:
-    - `matrix_free_core` owns reusable substrate only
-    - `jrb_mat` / `jcb_mat` own the canonical public matrix-free/operator solver surface
-    - `arb_mat` / `acb_mat`, `srb_mat` / `scb_mat`, and block/vblock sparse storage modules should expose only thin storage-to-operator adapter wrappers into the Jones layer for cross-representation iterative functionality
-  - PETSc-inspired JAX-native completion TODO for dense-equivalent operator functionality:
-    - extend the current preconditioned `minres` support into a more principled flexible-preconditioner / richer-structure policy in `jrb_mat` / `jcb_mat`
-    - first JAX-native Krylov-Schur-style restart, Davidson/Jacobi-Davidson-style block eigensolver APIs, shift-invert, and contour-filter eigensolver APIs now exist in `jrb_mat` / `jcb_mat` on top of reusable subspace/filter substrate in `matrix_free_core`
-    - continue hardening those eigensolver families beyond the current operator-native tranche, especially richer locking/restart policy and stronger correction-equation policy on top of the now-landed residual-history/deflation metadata
-    - generalized Hermitian-definite, generalized shift-invert, and first Hermitian polynomial/nonlinear point eigensolver fronts are now landed in `jrb_mat` / `jcb_mat`
-    - PETSc/SLEPc remain benchmark-oracle only through [benchmark_matrix_backend_candidates.py](/home/phili/projects/arbplusJAX/benchmarks/benchmark_matrix_backend_candidates.py), not governed runtime backends
-    - add contour-integral matrix-function infrastructure with reusable quadrature/spectral-transform substrate in `matrix_free_core`
-    - add polynomial and rational spectral-transform infrastructure in `matrix_free_core` with broader public solver/action exposure in `jrb_mat` / `jcb_mat`
-    - add a unified operator-first `logdet_solve` abstraction for dense, sparse, and matrix-free SPD workflows:
-      - target contract: one repo-owned surface returning `(logdet, solve_result, aux)`
-      - `aux` should carry reusable state for backward rules and repeated solves rather than forcing backward passes to reconstruct the full factorization/estimator state
-      - differentiation policy should stay repo-owned through custom JVP/VJP rules, even when the forward path later delegates to optional external backends
-      - first implementation target should remain JAX-native matrix-free / sparse SPD paths; external hierarchical backends stay optional benchmarked backends behind the same contract
-    - evaluate a TFP `fastgp`-style rational multi-shift logdet path for SPD operators:
-      - target scope: matrix-free `jrb_mat` first, with sparse `BCOO` convenience wrappers second
-      - core ingredients: Lanczos tridiagonalisation, partial-fraction / rational approximation of `log`, batched multi-shift tridiagonal solves, Hutchinson or Hutch++ trace estimation, and JAX-native preconditioners
-      - positioning: benchmarked alternative to existing SLQ and Leja+Hutch++ paths, not an immediate replacement
-      - acceptance bar: better accuracy/runtime tradeoff than SLQ on at least some SPD kernel/precision families, without breaking current AD guarantees
-    - add preconditioned block eigensolver coverage in `jrb_mat` / `jcb_mat`
-    - keep these capabilities AD-safe and JAX-native; PETSc/SLEPc remain design/oracle references and optional external backends, not the governed runtime backend
-  - placement rule:
-    - SLEPc-inspired JAX-native functionality must continue to land in `matrix_free_core` plus public `jrb_mat` / `jcb_mat`, not in dense/sparse storage modules
-  - `jrb_mat` implemented families:
-    - dense operator adapters
-    - operator apply
-    - polynomial actions
-    - `expm` actions
-    - Lanczos tridiagonalisation
-    - `funm_action_lanczos`
-    - `funm_integrand_lanczos`
-    - trace integrand
-    - trace estimator
-    - SLQ-style `logdet`
-    - probe generators
-    - custom VJP support for action/integrand/trace pathways
-    - structured diagnostics wrappers for action/trace/logdet
-    - restarted and block-RHS `expm` action wrappers
-  - `jcb_mat` implemented families:
-    - dense operator adapters
-    - adjoint operator adapters
-    - operator apply
-    - polynomial actions
-    - `expm` actions
-    - Arnoldi Hessenberg reduction
-    - `funm_action_arnoldi`
-    - `funm_integrand_arnoldi`
-    - trace integrand
-    - trace estimator
-    - SLQ-style `logdet`
-    - probe generators
-    - custom VJP support for action/integrand/trace pathways
-    - structured diagnostics wrappers for action/trace/logdet
-    - restarted and block-RHS `expm` action wrappers
-  - not yet implemented:
-    - broader operator-parameter adjoints beyond the now-landed dense/sparse/shell parameter-differentiable operator-plan paths
-    - flexible-preconditioner policy beyond the current shared preconditioned `minres` path
-    - deeper locking/restart policy and correction-equation hardening for the now-landed Davidson/Jacobi-Davidson/shift-invert/contour eigensolver tranche
-    - contour-integral matrix functions plus broader rational/polynomial spectral-transform infrastructure
-    - fully specified `basic` enclosure policy for all stochastic and solve-action families
-  - tests and benchmarks:
-    - [test_jrb_mat_chassis.py](/home/phili/projects/arbplusJAX/tests/test_jrb_mat_chassis.py)
-    - [test_jcb_mat_chassis.py](/home/phili/projects/arbplusJAX/tests/test_jcb_mat_chassis.py)
-    - [benchmark_matrix_free_krylov.py](/home/phili/projects/arbplusJAX/benchmarks/benchmark_matrix_free_krylov.py)
-    - [matrix_free_krylov_benchmark.md](/home/phili/projects/arbplusJAX/docs/status/reports/matrix_free_krylov_benchmark.md)
+- `done`
+  - direct test owners already exist for `acb_dirichlet`, `acb_elliptic`,
+    `acb_modular`, `acb_poly`, `arb_poly`, `bernoulli`, `dirichlet`, `dlog`,
+    and `partitions`
+- `in_progress`
+  - continue closing the large missing-C implementation gap in
+    `acb_dirichlet`, `arb_poly`, `acb_poly`, `dirichlet`, `acb_modular`, and
+    `acb_elliptic`
+  - keep domain-family status separate from generic wrapper status so remaining
+    work is visible by mathematical family, not just by module plumbing
+- `planned`
+  - add a clearer per-family gap summary for analytic/algebraic stacks once the
+    missing-implementation counts are regenerated
 
-- Sparse real/complex point chassis: `done` for point surface, `in_progress` for broader interval/box four-mode sparse coverage
-  - `srb_mat` / `scb_mat` implemented point families:
-    - `COO` / `CSR` / `BCOO`
-    - `shape`, `nnz`, `zero`, `identity`, permutation
-    - transpose and conjugate-transpose on `scb_mat`
-    - `diag`, `diag_matrix`, `submatrix`
-    - sparse `matvec`
-    - cached sparse `matvec` prepare/apply
-    - fixed/padded batch sparse `matvec`
-    - sparse x dense-RHS `matmul`
-    - sparse-sparse `matmul`
-    - sparse `add` / `sub` / `scale`
-    - sparse triangular solve
-    - iterative sparse `solve`
-    - pivoted sparse-fronted `lu` and `lu_solve`
-    - structured Householder `qr`, `qr_r`, `qr_apply_q`, `qr_explicit_q`, `qr_solve`
-  - not yet implemented:
-    - extend the now-landed sparse interval/box storage wrappers into fuller four-mode wrapper coverage
-    - stronger symbolic/numeric sparse direct-factorization package
-  - tests and benchmarks:
-    - [test_srb_mat_chassis.py](/home/phili/projects/arbplusJAX/tests/test_srb_mat_chassis.py)
-    - [test_scb_mat_chassis.py](/home/phili/projects/arbplusJAX/tests/test_scb_mat_chassis.py)
-    - [test_sparse_point_api.py](/home/phili/projects/arbplusJAX/tests/test_sparse_point_api.py)
-    - [benchmark_sparse_matrix_surface.py](/home/phili/projects/arbplusJAX/benchmarks/benchmark_sparse_matrix_surface.py)
+## 8. API / Runtime / Metadata / Validation
 
-- Block-sparse real/complex point chassis: `in_progress`
-  - `srb_block_mat` / `scb_block_mat` implemented fixed-block BSR-like families:
-    - `BlockCOO` / `BlockCSR`
-    - shape, block-shape, `nnzb`
-    - dense-to-block-sparse conversion
-    - `BlockCOO <-> BlockCSR`
-    - block-sparse to dense
-    - transpose
-    - block `matvec`
-    - cached block `matvec` prepare/apply
-    - block `rmatvec` and cached `rmatvec` prepare/apply
-    - fixed/padded batch block `matvec`
-    - fixed/padded batch block `rmatvec`
-    - block x dense-RHS `matmul`
-    - block triangular solve
-    - iterative block solve
-    - LU / LU-solve wrappers
-    - QR / QR-solve wrappers
-  - not yet implemented:
-    - variable block-size storage
-    - true block-native direct factorizations beyond the current explicit dense-backed fallback wrappers
-    - interval/box block-sparse modes
-  - tests and benchmarks:
-    - [test_srb_block_mat_chassis.py](/home/phili/projects/arbplusJAX/tests/test_srb_block_mat_chassis.py)
-    - [test_scb_block_mat_chassis.py](/home/phili/projects/arbplusJAX/tests/test_scb_block_mat_chassis.py)
-    - [test_block_sparse_point_api.py](/home/phili/projects/arbplusJAX/tests/test_block_sparse_point_api.py)
-    - [benchmark_block_sparse_matrix_surface.py](/home/phili/projects/arbplusJAX/benchmarks/benchmark_block_sparse_matrix_surface.py)
+Status: `in_progress`
 
-- Variable-block sparse real/complex point chassis: `in_progress`
-  - `srb_vblock_mat` / `scb_vblock_mat` implemented partitioned variable-block families:
-    - variable-block `COO` / `CSR`
-    - dense conversion
-    - `matvec`
-    - `rmatvec`
-    - cached `matvec`
-    - cached `rmatvec`
-    - dense-RHS `matmul`
-    - variable-block triangular solve
-    - direct `lu` / `lu_solve`
-    - direct `qr` / `qr_solve`
-  - current constraint:
-    - direct factorization assumes square row/column partitions
-    - no interval/box variable-block sparse modes
-  - tests:
-    - [test_srb_vblock_mat_chassis.py](/home/phili/projects/arbplusJAX/tests/test_srb_vblock_mat_chassis.py)
-    - [test_scb_vblock_mat_chassis.py](/home/phili/projects/arbplusJAX/tests/test_scb_vblock_mat_chassis.py)
-    - [test_vblock_sparse_point_api.py](/home/phili/projects/arbplusJAX/tests/test_vblock_sparse_point_api.py)
+- `done`
+  - public metadata exists for family, stability, method tags, regime tags, and
+    derivative status
+  - direct test owners already exist for `api`, `runtime`, `elementary`,
+    `function_provenance`, `jax_diagnostics`, `jax_precision`, `cusf_compat`,
+    and `soft_ops`
+- `in_progress`
+  - add direct owner tests for `public_metadata` and `capability_registry`
+  - add direct owner tests for `validation` and `soft_types`
+  - keep stable versus experimental API status explicit in metadata and status
+    reports
+  - keep naming cleanup moving toward canonical mathematical names with
+    implementation selection, rather than provenance-prefixed public names
+  - keep `docs/implementation/modules/arb_mat.md`,
+    `docs/implementation/modules/acb_mat.md`,
+    `docs/implementation/modules/jrb_mat.md`, and
+    `docs/implementation/modules/jcb_mat.md` aligned with source
+- `planned`
+  - add a tighter contract for metadata serialization, filtering, and
+    report-facing structure guarantees
 
-- Coverage gaps still open: `planned` or `in_progress`
-  - broader interval/box four-mode sparse wrappers on top of the now-landed sparse interval/box storage/public wrapper layer
-  - stronger symbolic/numeric sparse direct-factorization quality beyond the current point-mode LU/QR layer
-  - multivariate Bessel
-  - incomplete multivariate-Bessel-type routines
-  - hypergeometric-tail specialization on the generic tail engine
-  - true arbitrary precision under strict pure JAX
+## Priority test-owner additions
 
-## Recent updates
-- Updated roadmap and coverage status to reflect the implemented incomplete-gamma, Laplace-Bessel, dense-matrix, and Jones matrix-free surfaces.
-- Tightened dense `arb_mat` / `acb_mat` kernels by caching midpoint extraction in solve and triangular-solve hot paths, fixed `diag_matrix` to preserve interval/box width instead of collapsing to midpoints, and added dense surface benchmark/report coverage.
-- Expanded canonical matrix substrate docs to match the current `arb_mat` / `acb_mat` source surface, including zero/identity, banded matvec, cached matvec, norms, JIT wrappers, and fixed/padded batch helpers.
-- Expanded external Boost docs to cover the current Boost-prefixed `2f1` and batch/mode helper surface and to separate implemented APIs from the remaining Boost backlog.
-- Added angular-truncation `incomplete_bessel_i` on the same four-mode JAX surface as incomplete `bessel_k`, with batch entry points and explicit `z` / upper-limit derivatives.
-- Added an incomplete-Bessel benchmark tool/report path so the current quadrature/recurrence/asymptotic/high-precision-refine package can be timed with environment headers.
-- Added JAX-batched tail-integral entry points plus Gaussian/damped-oscillatory reference tests; incomplete `bessel_k` now has explicit asymptotic and pure-JAX high-precision-refine dispatch for scalar `method="auto"` regimes.
-- Upgraded the quadrature layer from fixed trapezoid-only panels to reusable `trapezoid` / `simpson` / `gauss_legendre` panel rules with refined-panel error estimation; incomplete `bessel_i` finite-interval quadrature now uses the shared quadrature module instead of a separate local trapezoid path.
-- Added a dedicated `tools/run_test_harness.py` entry point plus explicit Windows/Linux/Google Colab run-platform docs so correctness runs and benchmark runs are clearly separated while still supported in all three environments.
-- Added a new top-priority roadmap workstream for the general incomplete-tail acceleration engine, incomplete Bessel specialization, and explicit derivative/AD support; demoted multivariate Bessel below that dependency chain.
-- Added asymptotic bessel evaluation + tightened bessel bounds (rigorous/adaptive) with denser sampling; basic mode uses midpoint evaluation; ran warmup bessel benchmarks (5000 samples).
-- Added JAX batch warmup timing option (`--jax-warmup`) and cached batch JITs for single-compile runs.
-- Added loggamma comparison tool with real/complex + branch-cut stress tests; included a public-JAX real-only point baseline.
-- Added explicit asymptotic remainder inflation for real bessel rigorous/adaptive interval bounds; added integer-crossing guards for `Y/K` interval APIs (real + complex box wrappers).
-- Enforced source zip filename format in `tools/package_repo.py`: `<repo>_source_YYYY-MM-DD.zip` with validation for custom output paths.
-- Added `cuda_besselk` backend with four-mode usage (point/basic/rigorous/adaptive) implemented in pure JAX (no CUDA dependency).
-- Added `cuda_besselk` to benchmark harness and ran characterization against existing `besselk` backends (`benchmarks/results/cuda_besselk_compare_purejax_20260301/samples_256_seed_7/summary.csv`).
-- Added `cusf_compat` module in this workspace with `cusf_*` prefixed APIs (functions + helpers) and four-mode support (`point|basic|rigorous|adaptive`) for hypergeometric/Bessel/erf pathways.
-- Added `boost_hypgeom` module with Boost-prefixed hypergeometric APIs and helper aliases in four modes (`point|basic|rigorous|adaptive`), with docs and tests.
+Status: `in_progress`
 
-## Open items
-- B. Top-level priorities
-  - Tier 0: architecture and API
-    - define arbPlusJAX as the low-level special-function backend
-    - add a clean public API layer
-    - add method/regime metadata for each function family
-    - mark stable vs experimental entry points
-  - Tier 1: core special-function base
-    - harden gamma / loggamma / rgamma / Pochhammer
-    - harden Barnes double gamma and related Barnes-family objects
-    - harden the ordinary Bessel stack:
-      - `J_nu`
-      - `Y_nu`
-      - `I_nu`
-      - `K_nu`
-      - scaled forms
-      - derivatives where feasible
-  - Tier 2: general incomplete-tail engine
-    - implement a general Slevinsky-Safouhi-style tail acceleration framework
-    - implement region logic and diagnostics for that framework
-    - add JAX/NumPy-parallel APIs for that framework
-  - Tier 3: incomplete Bessel specialization
-    - implement efficient incomplete Bessel algorithms on top of the general engine
-    - implement derivatives of incomplete Bessel functions explicitly
-    - add fallback logic for fragile regimes
-    - add JAX custom derivative rules
-  - Tier 4: higher extensions
-    - extend the same engine to incomplete gamma / Laplace-Bessel / hypergeometric tails
-    - add multivariate Bessel algorithms where scalar reductions or radial reductions make sense
-    - add incomplete multivariate-Bessel-type routines later, only if justified by kernel reductions
-- C. New major work package: general Slevinsky-Safouhi framework
-  - C1. What arbPlusJAX should implement
-    - implement a general real-tail acceleration framework for integrals `F(a) = integral_a^inf f(t) dt`
-    - require an integrand family that admits derivative identities or structural recurrences yielding stable recurrence coefficients
-    - keep the framework generic enough to support:
-      - incomplete Bessel tails
-      - incomplete gamma-like tails
-      - Laplace-Bessel tails
-      - hypergeometric-type tails
-      - reduced Fox-H / Meijer-G tails when they collapse to 1-D real incomplete integrals
-  - C2. Why it belongs in arbPlusJAX
-    - it is low-level
-    - it is reusable across many function families
-    - it is real-domain and JAX-friendly
-    - it is independent of Mellin-Barnes contour orchestration
-    - it is the numerical primitive that higher integral packages should call when a reduction is detected
-- D. Concrete to-dos for the general Slevinsky-Safouhi engine
-  - D1. Add a generic tail-acceleration module
-    - keep and extend:
-      - `arbplusjax/special/tail_acceleration/__init__.py`
-      - `arbplusjax/special/tail_acceleration/core.py`
-      - `arbplusjax/special/tail_acceleration/quadrature.py`
-      - `arbplusjax/special/tail_acceleration/sequence.py`
-      - `arbplusjax/special/tail_acceleration/recurrence.py`
-      - `arbplusjax/special/tail_acceleration/regions.py`
-      - `arbplusjax/special/tail_acceleration/diagnostics.py`
-      - `arbplusjax/special/tail_acceleration/fallback_mp.py`
-  - D2. Implement the generic problem abstraction
-    - support:
-      - integrand callback
-      - lower limit
-      - chunk size / paneling strategy
-      - recurrence metadata
-      - derivative metadata
-      - regime metadata
-  - D3. Implement the basic evaluation modes
-    - support:
-      - `quadrature`
-      - `aitken`
-      - `wynn`
-      - `recurrence`
-      - `high_precision_refine`
-      - `auto`
-    - keep `mpfallback` only as a compatibility alias, not as the preferred pure-JAX method name
-  - D4. Implement specialized ratio-recurrence support
-    - support reusable numerator/denominator recurrences
-    - do not hardcode the abstraction to Bessel
-  - D5. Add method-selection / region logic
-    - route by:
-      - argument size
-      - decay rate
-      - oscillation level
-      - near-singular parameter surfaces
-      - expected cancellation
-      - requested precision
-      - whether derivatives are needed
-  - D6. Add diagnostics
-    - every evaluation should optionally return:
-      - chosen method
-      - number of recurrence steps
-      - chunk count
-      - estimated tail remainder
-      - instability flags
-      - fallback usage
-      - precision warning flags
-- E. Specific work package: efficient incomplete Bessel algorithms
-  - E1. Implement incomplete Bessel as a specialization of the tail engine
-    - keep and extend:
-      - `arbplusjax/special/bessel/incomplete_bessel_k.py`
-      - `arbplusjax/special/bessel/incomplete_bessel_i.py`
-      - `arbplusjax/special/bessel/incomplete_bessel_base.py`
-      - `arbplusjax/special/bessel/derivatives.py`
-      - `arbplusjax/special/bessel/recurrences.py`
-      - `arbplusjax/special/bessel/asymptotics.py`
-      - `arbplusjax/special/bessel/regions.py`
-      - `arbplusjax/special/bessel/fallback_mp.py`
-    - keep the incomplete-Bessel layer on top of the generic tail engine, not bypassing it
-  - E2. Primary target functions
-    - prioritize:
-      - incomplete `K`-type objects
-      - incomplete `I`-type objects when needed by reductions
-      - related weighted Laplace-Bessel tails
-      - broader incomplete Bessel families later
-  - E3. Methods to implement for incomplete Bessel
-    - support:
-      - recurrence-accelerated evaluation
-      - direct finite-interval quadrature for initialization/validation
-      - asymptotics for large arguments
-      - pure-JAX high-precision-refine fallback in fragile regions
-    - `method="auto"` should dispatch among:
-      - `recurrence`
-      - `quadrature`
-      - `asymptotic`
-      - `high_precision_refine`
-  - E4. Region logic for incomplete Bessel
-    - detect:
-      - small separation of relevant arguments
-      - values near poles or ill-conditioned recurrence coefficients
-      - strong cancellation
-      - large-order / large-argument mixed scaling
-      - near-transition regimes where asymptotics and recurrence both degrade
-- F. Derivatives of incomplete Bessel: explicit deliverable
-  - F1. Add derivative formulas as a standalone module
-    - keep and extend `arbplusjax/special/bessel/derivatives.py`
-    - support:
-      - derivatives with respect to argument
-      - derivatives with respect to truncation/lower-limit variable
-      - derivatives with respect to key shape/order parameters where stable
-  - F2. Do not rely on naive autodiff through recurrence
-    - do not make AD depend on tracing directly through:
-      - branch-heavy regime logic
-      - mixed-precision or fallback routing
-      - deep recurrences
-    - instead:
-      - implement explicit derivative identities
-      - expose custom JVP/VJP rules in JAX
-      - use those rules as the AD-facing interface
-  - F3. Split derivative support into levels
-    - Level 1: argument derivatives
-    - Level 2: lower-limit / truncation derivatives
-    - Level 3: order / parameter derivatives where stable identities exist
-- G. Revised multivariate Bessel placement
-  - keep multivariate Bessel after:
-    - the general tail-acceleration engine
-    - incomplete Bessel specialization
-    - derivative infrastructure
-  - when revisited, implement it using:
-    - series evaluation
-    - integral fallback
-    - asymptotics
-    - reduction to scalar Bessel / incomplete-Bessel pieces when available
-- H. Concrete file-level to-do list
-  - H1. General engine files
-    - `arbplusjax/special/tail_acceleration/core.py`
-    - `arbplusjax/special/tail_acceleration/quadrature.py`
-    - `arbplusjax/special/tail_acceleration/sequence.py`
-    - `arbplusjax/special/tail_acceleration/recurrence.py`
-    - `arbplusjax/special/tail_acceleration/regions.py`
-    - `arbplusjax/special/tail_acceleration/diagnostics.py`
-    - `arbplusjax/special/tail_acceleration/fallback_mp.py`
-  - H2. Incomplete Bessel files
-    - `arbplusjax/special/bessel/incomplete_bessel_base.py`
-    - `arbplusjax/special/bessel/incomplete_bessel_k.py`
-    - `arbplusjax/special/bessel/incomplete_bessel_i.py`
-    - `arbplusjax/special/bessel/recurrences.py`
-    - `arbplusjax/special/bessel/derivatives.py`
-    - `arbplusjax/special/bessel/asymptotics.py`
-    - `arbplusjax/special/bessel/regions.py`
-    - `arbplusjax/special/bessel/fallback_mp.py`
-  - H3. Public API additions
-    - expose:
-      - `tail_integral(...)`
-      - `tail_integral_accelerated(...)`
-      - `incomplete_bessel_k(...)`
-      - `incomplete_bessel_i(...)`
-      - `incomplete_bessel_k_derivative(...)`
-      - later: `multivariate_bessel(...)`
-- I. Testing to-do list
-  - I1. General tail engine tests
-    - add tests for:
-      - exponential tails
-      - Gaussian tails
-      - oscillatory damped tails
-      - known incomplete-gamma-type tails
-      - agreement between plain quadrature and accelerated evaluation
-  - I2. Incomplete Bessel tests
-    - add tests for:
-      - reference quadrature agreement
-      - recurrence vs quadrature agreement
-      - asymptotic agreement in large-argument regimes
-      - fallback correctness in fragile regions
-      - relative error maps over parameter grids
-  - I3. Derivative tests
-    - add tests for:
-      - argument derivatives
-      - truncation derivatives
-      - parameter derivatives where supported
-      - JAX custom-JVP/VJP consistency
-      - finite-difference comparisons
-      - NumPy/JAX parity
-  - I4. Stress tests
-    - explicitly test:
-      - near-transition regimes
-      - large-order / large-argument cases
-      - small-separation cases
-      - cancellation-heavy cases
-      - batched/vectorized inputs
-- J. Benchmark to-do list
-  - J1. General tail engine benchmarks
-    - benchmark:
-      - plain quadrature
-      - accelerated sequence methods
-      - specialized recurrence
-      - high-precision-refine fallback triggers
-  - J2. Incomplete Bessel benchmarks
-    - benchmark by region:
-      - fast benign regime
-      - difficult recurrence regime
-      - asymptotic regime
-      - fallback regime
-  - J3. Diagnostics header
-    - every notebook/benchmark should report:
-      - OS
-      - local / WSL / Colab
-      - CPU / GPU / TPU availability
-      - backend
-      - dtype
-      - runtime
-      - memory diagnostics where feasible
-- K. Revised implementation order
-  - Phase 1
-    - clean public API
-    - capability registry
-    - gamma/Barnes/Bessel base cleanup
-  - Phase 2
-    - implement the general tail-acceleration engine
-    - add diagnostics and region logic
-    - add NumPy reference version
-    - add JAX-parallel interface
-  - Phase 3
-    - implement incomplete Bessel recurrence specialization
-    - add quadrature and asymptotic fallbacks
-    - add explicit derivative formulas
-    - add JAX custom derivative rules
-  - Phase 4
-    - extend to related incomplete hypergeometric/Bessel tails
-    - integrate with IntegralFunctionsJAX reductions
-    - add RF77-facing wrappers
-  - Phase 5
-    - implement multivariate Bessel using the now-complete scalar/incomplete infrastructure
-- L. Final priority summary
-  - highest-priority additions
-    - general Slevinsky-Safouhi-style tail-acceleration framework
-    - specific efficient incomplete Bessel algorithms
-    - explicit incomplete Bessel derivatives
-    - JAX custom derivative support
-    - pure-JAX high-precision-refine path for fragile regimes
-  - still important, but below that
-    - multivariate Bessel
-    - incomplete multivariate Bessel
-    - broader generalized hypergeometric extensions
-- M. Bottom line
-  - corrected roadmap:
-    - general incomplete-tail engine first
-    - incomplete Bessel specialization second
-    - derivatives and AD rules third
-    - multivariate Bessel after that
-- Immediate documentation hardening
-  - keep `implementation/modules/arb_mat.md` and `implementation/modules/acb_mat.md` aligned with source whenever new matrix helpers land
-  - add a companion doc pass for `jrb_mat.md` / `jcb_mat.md` once the first contour-log prototype exists
-  - keep `implementation/external/boost_hypgeom.md` aligned with the actual Boost-prefixed exported surface rather than the older minimal list
-- Public naming cleanup
-  - prefer canonical mathematical public names without provenance prefixes when multiple implementations target the same function
-  - separate Boost/CUDA/other variants through `impl=` selection, registry metadata, reports, and implementation modules
-  - keep prefixed compatibility helpers only where they remain useful for debugging, provenance, or migration
-- Immediate canonical matrix backlog
-  - add parity/reference checks for `inv`, `qr`, banded matvec, cached matvec, and matrix norms
-  - add stronger large-`n` determinant enclosures beyond midpoint fallback
-  - split midpoint-first implementations from true interval/box linear-solve algorithms in status docs and engineering reports
-- Continue completing missing JAX implementations and tests for remaining Arb modules (see Missing C implementations section below).
-- Finish hardening and characterization of the `bdg_*` Barnes/double-gamma family:
-  - point path is implemented and dtype-cleaned, but still needs dedicated optimization/benchmark characterization
-  - basic path is implemented, but rigorous/adaptive enclosure paths remain expensive in Barnes containment tests
-  - remaining slow tests:
-    - `tests/test_gamma_hardening.py::test_bdg_interval_modes_contain_basic`
-    - `tests/test_gamma_hardening.py::test_bdg_complex_modes_contain_basic`
-  - next work:
-    - reduce runtime cost of `bdg_*` rigorous/adaptive samplers in `src/arbplusjax/ball_wrappers.py`
-    - add dedicated point/basic benchmark coverage for `bdg_*`
-    - extend dtype-compliance validation beyond the current `float32`/`complex64` point/basic checks
-- Matrix-function roadmap for the Jones matrix-function subsystem (`jrb_mat` / `jcb_mat`) layered alongside `arb_mat` / `acb_mat`:
-  - current state:
-    - `src/arbplusjax/arb_mat.py` and `src/arbplusjax/acb_mat.py` now cover canonical `n x n` substrate:
-      - `matmul`
-      - `matvec`
-      - cached `matvec`
-      - banded `matvec`
-      - `solve`
-      - `inv`
-      - `sqr`
-      - `triangular_solve`
-      - `lu`
-      - `qr`
-      - `det`
-      - `trace`
-      - `norm_fro`
-      - `norm_1`
-      - `norm_inf`
-      - `zero`
-      - `identity`
-    - current tightening status:
-      - `trace_basic` and `trace_rigorous` use exact interval/box diagonal summation
-      - `det_basic` and `det_rigorous` use exact interval/box formulas for `1x1`-`3x3`, midpoint determinant fallback for larger sizes
-      - `norm_*_basic` and `norm_*_rigorous` now have dedicated interval/box aggregation paths
-      - `solve_basic`, `inv_basic`, `triangular_solve_basic`, `lu_basic`, and `qr_basic` remain midpoint-first with outward boxing
-    - `arb_mat` / `acb_mat` should continue to exist and be expanded as the canonical Arb/FLINT-style JAX matrix extension surface
-    - new Jones-labeled subsystem should hold the contour-integral / Krylov matrix-function stack as a separate subsystem, not as a replacement for `arb_mat` / `acb_mat`
-    - there is no current matrix-log, matrix-root, matrix-sign, matrix exponential/inverse scaling path, Fréchet derivative, or rational-Krylov substjrb and jcb rate
-  - implementation implication from recent matrix-function work:
-    - contour-integral + conformal-map methods are a good fit for dense/moderate-size matrix functions where we need AD-aware matrix log / roots and stable gradients
-    - block rational Krylov methods are a good fit for matrix-free `f(A)b` / trace-estimation style workloads and can supply principled residual/error control instead of heuristic pole/stopping rules
-    - this means `jrb_mat` / `jcb_mat` should not jump directly to `logm` / `sqrtm` wrappers; they first need reusable matrix linear-algebra kernels that obey repo JAX/dtype/batching/AD rules
-    - in parallel, `arb_mat` / `acb_mat` should continue to be filled out toward the missing Arb/FLINT matrix API surface
-  - phase 0: matrix substrate required before matrix functions
-    - add dense `jrb_mat` / `jcb_mat` primitives beyond 2x2:
-      - `matmul` (started in `jrb_mat.py` / `jcb_mat.py` with point/basic substrate)
-      - `matvec` (started in `jrb_mat.py` / `jcb_mat.py` with point/basic substrate)
-      - `solve` (started in `jrb_mat.py` / `jcb_mat.py`; current basic path is midpoint solve plus outward boxing)
-      - `triangular_solve`
-      - `lu`
-      - `qr`
-      - Hessenberg / Schur-compatible reductions where feasible
-    - define canonical real-interval and complex-box matrix layout conventions for batched `(..., n, n, 2)` and `(..., n, n, 4)` arrays
-    - make these kernels batch-stable, dtype-compliant, and JAX-transformable before layering matrix functions on top
-  - phase 1: canonical dense matrix functions
-    - implement midpoint `point` / `basic` dense matrix functions first under the Jones-labeled subsystem:
-      - `logm`
-      - `sqrtm`
-      - `invsqrtm`
-      - general matrix `rootm`
-      - `signm`
-    - first dense implementation path should be Schur-based or contour-based, not naive finite-difference or elementwise lifting
-    - expose Fréchet-derivative or equivalent VJP/JVP formulas for AD rather than relying on unstable autodiff through iterative decompositions
-  - phase 2: contour-integral mode family
-    - add contour-integral evaluators for `jrb_mat_*` / `jcb_mat_*` matrix logs and roots using quadrature nodes/weights that can be batched
-    - use conformal-map parameterization / contour shaping for better node efficiency in clustered spectra
-    - make the contour layer reusable across:
-      - `logm`
-      - `sqrtm`
-      - `rootm`
-      - trace-log style objectives
-    - for `basic` mode:
-      - midpoint matrix evaluation on a fixed contour/quadrature rule
-    - for `adaptive` mode:
-      - grow node count / contour resolution until residual and node-difference criteria stabilize
-    - for `rigorous` mode:
-      - combine interval/box perturbation inflation with residual-based enclosures and contour discretization error inflation
-  - phase 3: rational-Krylov / matrix-free path
-    - implement block rational Krylov infrastructure for `jrb_mat_*` / `jcb_mat_*` matrix-function actions `f(A)B`:
-      - block Arnoldi / rational Arnoldi basis growth
-      - shifted linear solves
-      - pole management
-      - projected small-matrix function evaluation
-    - use this path for larger matrices and trace-estimation workloads where dense Schur/contour is too expensive
-    - add residual-driven stopping criteria and pole/subspace heuristics informed by the April 2025 residual/error formulas rather than fixed iteration counts
-  - phase 4: AD and four-mode integration
-    - every public matrix-function family should follow the repo mode contract where mathematically appropriate:
-      - `point`
-      - `basic`
-      - `adaptive`
-      - `rigorous`
-    - AD should use explicit JVP/VJP rules or implicit differentiation for:
-      - dense contour solves
-      - rational-Krylov projected solves
-    - avoid differentiating through Python loops or opaque eigensolver control flow
-  - phase 5: accuracy and engineering validation
-    - compare against reference implementations for:
-      - matrix log
-      - matrix square root
-      - selected matrix roots
-    - benchmark:
-      - dense small/moderate matrices
-      - batched matrices
-      - matrix-free `f(A)b`
-      - gradient quality for trace-log / root objectives
-    - add engineering-status tracking for each matrix family:
-      - pure-JAX aspiration
-      - dtype compliance
-      - fixed-shape batch support
-      - AD audit status
-      - hardening level
-  - immediate next step for this repo:
-    - do not start with `logm` directly
-    - first add the reusable substrate and a single dense contour-based prototype for `jcb_mat_logm` / `jrb_mat_logm`
-    - after that, add a matching AD test and a small benchmark before expanding to roots/sign/Krylov
-  - immediate canonical matrix backlog:
-    - add stronger large-`n` determinant enclosures beyond midpoint fallback
-    - add parity/reference checks for general `n x n` determinant and trace once the C chassis exposes them
-    - add parity/reference checks for `inv`, `qr`, and matrix norms
-    - add distinct interval/box linear-solve tightening rather than midpoint boxing for solve-family kernels
-- External Boost backlog
-  - keep the canonical external-lineage module set focused on provenance-prefixed families that have a real implementation, tests, and benchmark value
-  - preferred public-API direction is still unprefixed mathematical names with implementation selection rather than long-term `boost_*` naming
-  - current implemented `boost_hypgeom` surface includes:
-    - `1f0`
-    - `0f1`
-    - `2f0`
-    - `1f1`
-    - `2f1`
-    - `pfq`
-    - precision helper for `pfq`
-  - next likely extensions:
-    - broaden batch wrappers beyond the current `0f1` / `1f1` / `2f1`-series / `pfq` subset
-    - tighten family-specific rigorous/adaptive kernels instead of relying on generic inflators where possible
-    - add benchmark/report coverage that makes Boost-prefixed families easy to compare against canonical `arb_hypgeom_*` entry points
+Highest priority:
+- add
+  [test_matrix_free_core_contracts.py](/home/phili/projects/arbplusJAX/tests/test_matrix_free_core_contracts.py)
+- add
+  [test_point_wrappers_contracts.py](/home/phili/projects/arbplusJAX/tests/test_point_wrappers_contracts.py)
+- add
+  [test_public_metadata_contracts.py](/home/phili/projects/arbplusJAX/tests/test_public_metadata_contracts.py)
+- add
+  [test_capability_registry_contracts.py](/home/phili/projects/arbplusJAX/tests/test_capability_registry_contracts.py)
+- add
+  [test_bessel_kernels_contracts.py](/home/phili/projects/arbplusJAX/tests/test_bessel_kernels_contracts.py)
+- add
+  [test_barnesg_contracts.py](/home/phili/projects/arbplusJAX/tests/test_barnesg_contracts.py)
 
-## Missing C implementations
-- Source: `docs/audit.md` (snapshot `2026-02-25T03:51:38Z`), grouped by function prefix/module.
+Next priority:
+- add
+  [test_block_sparse_core_contracts.py](/home/phili/projects/arbplusJAX/tests/test_block_sparse_core_contracts.py)
+- add
+  [test_sparse_core_contracts.py](/home/phili/projects/arbplusJAX/tests/test_sparse_core_contracts.py)
+- add
+  [test_krylov_solvers_contracts.py](/home/phili/projects/arbplusJAX/tests/test_krylov_solvers_contracts.py)
+- add
+  [test_transform_common_contracts.py](/home/phili/projects/arbplusJAX/tests/test_transform_common_contracts.py)
+
+Execution order:
+1. Add the six highest-priority direct-owner tests above.
+2. Re-run the CPU chassis and profile suite.
+3. Expand AD and compile-behavior assertions where those tests expose weak
+   spots.
+4. Add the second-priority shared-infrastructure tests.
+5. Re-run the full CPU harness, then opt-in parity and benchmark slices.
+
+## Missing C implementation snapshot
+
+Source:
+[audit.md](/home/phili/projects/arbplusJAX/docs/status/audit.md)
+snapshot `2026-02-25T03:51:38Z`.
 
 - Arb Core: 195
 - ACB Core: 144
@@ -761,37 +489,13 @@ Current phase snapshot:
 - Arb Poly: 87
 - ACB Poly: 86
 - Dirichlet: 38
-- ACB DFT: 0
 - Bool Mat: 34
 - ACB Modular: 27
-- ACF: 10
 - ACB Elliptic: 17
+- ACF: 10
+- ACB DFT: 0
 - Arb Calc: 0
 - ACB Calc: 0
-- `hypgeom` staged engineering cleanup:
-  - current pass improves helper consolidation for the gamma / erf / Ei-Si-Ci-Shi-Chi-li-dilog-fresnel tranche and adds padded-batch/AD smoke coverage across the first and second tranches
-  - current pass also adds dedicated fixed-shape padded basic batch entry points for canonical `0f1 / 1f1 / 2f1 / u` and the stronger orthogonal families (`legendre_p`, `legendre_q`, `jacobi_p`, `gegenbauer_c`)
-  - current pass also adds dedicated fixed-shape padded adaptive/rigorous batch entry points for the same canonical second tranche and compile-count probes in `docs/status/reports/hypgeom_compile_probe*.md`
-  - current pass also extends the fixed-shape padded basic/adaptive/rigorous batch path to the weaker orthogonal families (`chebyshev_t`, `chebyshev_u`, `laguerre_l`, `hermite_h`) and canonical `pfq`, with matching engineering tests and refreshed compile/smoke reports
-  - current pass also strengthens the canonical scalar kernels for `1f1`, `2f1`, `u`, `pfq`, and incomplete gamma:
-    - `1f1`: explicit Kummer-style regime candidate and boundary AD sweeps
-    - `2f1`: explicit transformed regime candidate and boundary AD sweeps
-    - `u`: explicit asymptotic candidate and boundary AD sweeps
-    - `pfq`: stronger sample tightening on top of the series/tail path
-    - incomplete gamma: sampled direct/complement candidates on real and complex paths
-  - current pass also adds fixed-shape padded basic batch support and mode-batch fastpaths for canonical lower/upper incomplete gamma, plus complex cut/corner AD checks for `2f1`, `u`, and incomplete gamma
-  - current pass also switches incomplete-gamma API padding to the family-specific padded fastpath and removes the earlier padded `gamma_upper` smoke-benchmark outlier; padded overhead remains, but it is now in-family rather than pathological
-  - current pass also adds specialized complement-aware adaptive/rigorous wrappers for lower/upper incomplete gamma on the real and complex sides, instead of relying only on the generic mode inflators
-  - current pass also extracts the shared real/complex direct-vs-complement incomplete-gamma candidate builders out of the duplicated scalar lower/upper implementations in `hypgeom.py`
-  - current pass also replaces incomplete-gamma batch-mode cores in `hypgeom_wrappers.py` so they dispatch directly to the specialized family kernels instead of routing through generic `*_mode` lambdas
-  - targeted incomplete-gamma compile probes now show family compile events reduced from `4` to `2` in both `basic` and `rigorous`
-  - current pass also extracts shared regime/sample candidate builders for canonical `1f1`, `2f1`, and `u` out of the duplicated real/complex scalar paths in `hypgeom.py`
-  - current pass also replaces the canonical `1f1`, `2f1`, and `u` batch-mode cores in `hypgeom_wrappers.py` so they dispatch directly to family kernels for `basic`, `rigorous`, and `adaptive` instead of routing through generic `*_mode` lambdas
-  - current pass also deepens the complex AD cut/corner sweeps for `1f1`, `2f1`, and `u`
-  - current pass also applies the same direct adaptive/rigorous batch-core treatment to the remaining weaker canonical families (`chebyshev_t`, `chebyshev_u`, `laguerre_l`, `hermite_h`, `pfq`)
-  - targeted `1f1/2f1/u` compile probes now show family compile events reduced from `6` to `3`; total padded compile count still rises from `27` to `31`, so caller/helper overhead remains the bottleneck
-  - still open:
-    - deeper helper extraction across the remaining canonical `hypgeom.py` families outside `1f1`, `2f1`, `u`, and incomplete gamma
-    - expand complex AD audits beyond the current representative cut/corner sweeps for the remaining canonical families outside `1f1`, `2f1`, `u`, and incomplete gamma
-    - deeper family-specific adaptive/rigorous kernels beyond the current staged mode-batch wrappers for the remaining weaker orthogonal families and the other heavy canonical families
-    - reduce remaining total compile noise; current fixed-shape work halves family-level compile events in the probe, but total compile events only improve from `49` to `47`
+
+Use the snapshot above for gap sizing only. Detailed missing-symbol inventories
+belong in `docs/status/reports/missing_impls/`.

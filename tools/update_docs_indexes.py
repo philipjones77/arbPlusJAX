@@ -115,7 +115,6 @@ def render_status_readme() -> str:
     primary_order = [
         "todo.md",
         "audit.md",
-        "function_gap_plan.md",
         "matrix_free_completion_plan.md",
         "sparse_completion_plan.md",
         "test_coverage_matrix.md",
