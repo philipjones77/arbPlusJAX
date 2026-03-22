@@ -1,6 +1,17 @@
 # Examples Notebook Suite
 
+Notebook policy and coverage:
+
+- [example_notebook_standard.md](/home/phili/projects/arbplusJAX/docs/standards/example_notebook_standard.md)
+- [example_notebook_inventory.md](/home/phili/projects/arbplusJAX/docs/reports/example_notebook_inventory.md)
+- [environment_portability_standard.md](/home/phili/projects/arbplusJAX/docs/standards/environment_portability_standard.md)
+
 All notebooks in this folder are named `example_*.ipynb` and are designed for both Linux and Windows.
+
+Default execution model:
+
+- notebooks run against the repo source tree through `/src`
+- installed-package execution is secondary, not the default notebook path
 
 ## Local run folders (not committed)
 

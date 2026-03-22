@@ -27,6 +27,11 @@ results/benchmarks/**
 examples/.ipynb_checkpoints/
 examples/_input/
 examples/_output/
+experiments/*/inputs/
+experiments/*/artifacts/
+experiments/*/cache/
+experiments/*/figures/
+experiments/*/tables/
 stuff/migration/c_chassis/build_linux_wsl/
 _bundles/
 

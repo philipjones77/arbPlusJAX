@@ -2,7 +2,8 @@ Last updated: 2026-03-17T00:00:00Z
 
 # Documentation Standard
 
-This standard defines the intended split between theory, implementation, and practical repository documentation.
+This standard defines the intended split between theory, implementation,
+practical, standards, reports, and status documentation.
 
 It also preserves the repo's core `specs/objects/contracts/implementation` structure:
 
@@ -16,12 +17,18 @@ It also preserves the repo's core `specs/objects/contracts/implementation` struc
 - `docs/theory/`: mathematical derivations, conceptual methodology, and explanations of why a method is valid
 - `docs/implementation/`: how the code is implemented, structured, wrapped, and organized
 - `docs/practical/`: how to actually run, validate, benchmark, and operate the repository based on observed numerical and workflow experience
+- `docs/standards/`: policy, governance, naming, runtime, and documentation rules
+- `docs/reports/`: current inventories of what exists in the repo today
+- `docs/status/`: current implementation state, gaps, TODOs, and in-progress completion notes
 
 ## Placement rules
 
 - if the reader is asking "why is this mathematically true?", place the document in `docs/theory/`
 - if the reader is asking "how is this code path built or wired internally?", place the document in `docs/implementation/`
 - if the reader is asking "how should I run this, tune this, compare this, or use this safely in practice?", place the document in `docs/practical/`
+- if the reader is asking "what is the rule or governance policy?", place the document in `docs/standards/`
+- if the reader is asking "what exists in the finished/current repo inventory?", place the document in `docs/reports/`
+- if the reader is asking "where are we in implementation, what is missing, what remains?", place the document in `docs/status/`
 - semantic definitions still belong in `docs/specs/`
 - binding runtime and API guarantees still belong in `contracts/`
 

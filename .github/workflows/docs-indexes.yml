@@ -1,0 +1,35 @@
+name: docs-indexes
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Update docs indexes
+        run: python tools/update_docs_indexes.py
+      - name: Commit refreshed docs indexes
+        run: |
+          if git diff --quiet -- docs/reports/README.md docs/status/README.md; then
+            echo "No docs index changes."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/reports/README.md docs/status/README.md
+          git commit -m "Auto-update docs status/report indexes"
+          git push

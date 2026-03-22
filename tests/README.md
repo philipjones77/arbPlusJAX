@@ -4,6 +4,18 @@ Last updated: 2026-03-14T00:00:00Z
 
 `tests/` is the canonical home for correctness checks. It is separate from `benchmarks/`, which is the canonical home for performance and cross-backend comparison runs.
 
+Naming policy:
+
+- [pytest_test_naming_standard.md](/home/phili/projects/arbplusJAX/docs/standards/pytest_test_naming_standard.md)
+- [environment_portability_standard.md](/home/phili/projects/arbplusJAX/docs/standards/environment_portability_standard.md)
+
+Repo-wide functionality and helper coverage map:
+
+- [test_coverage_matrix.md](/home/phili/projects/arbplusJAX/docs/status/test_coverage_matrix.md)
+  - includes the phased testing work plan used to burn down remaining gaps
+- [test_gap_checklist.md](/home/phili/projects/arbplusJAX/docs/status/test_gap_checklist.md)
+  - module-by-module direct-owner vs indirect-coverage checklist
+
 ## Test families
 
 - `test_*_chassis.py`: primary implementation tests for the JAX runtime surface.
