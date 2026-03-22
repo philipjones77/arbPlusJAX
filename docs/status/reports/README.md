@@ -24,4 +24,4 @@ Refresh/verify command:
 - `matrix_mode_benchmark_smoke.md`: warmed smoke benchmark for canonical `arb_mat` / `acb_mat` determinant and trace mode paths
 - `dense_matrix_surface_benchmark.md`: dense real/complex surface benchmark for direct solve, structured solve, dense `matvec`, cached `matvec`, LU-reuse solve aliases, matrix functions, and structured spectral paths
 - `hypgeom_mode_benchmark_smoke.md`: staged smoke benchmark for selected canonical and alternative hypergeometric families, including padded-batch comparisons
-- `../../../experiments/benchmarks/results/bessel_compile_probe_float32/bessel_compile_probe.md`: focused compile-count probe for canonical Bessel batch paths, including padded-core vs unpadded comparison
+- `../../../benchmarks/results/bessel_compile_probe_float32/bessel_compile_probe.md`: focused compile-count probe for canonical Bessel batch paths, including padded-core vs unpadded comparison

@@ -106,19 +106,19 @@ python -m pytest benchmarks -q -m benchmark
 For benchmark sweeps (speed/memory/accuracy):
 
 ```
-python tools/run_benchmarks.py --profile quick
+python benchmarks/run_benchmarks.py --profile quick
 ```
 
 Optional Boost baseline:
 
 ```
-python tools/run_benchmarks.py --profile quick --with-boost --boost-ref-cmd "<command>"
+python benchmarks/run_benchmarks.py --profile quick --with-boost --boost-ref-cmd "<command>"
 ```
 
 Generate a markdown benchmark summary:
 
 ```
-python tools/bench_report.py --run experiments/benchmarks/results/<run_dir> --out experiments/benchmarks/results/<run_dir>/report.md
+python benchmarks/bench_report.py --run benchmarks/results/<run_dir> --out benchmarks/results/<run_dir>/report.md
 ```
 
 ## Notes

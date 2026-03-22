@@ -78,5 +78,5 @@ Google Colab:
 ## Benchmark integration
 
 - `benchmarks/test_benchmark_smoke.py` is intentionally small and only checks that the benchmark harness is invocable.
-- Real benchmark sweeps are run through `tools/run_benchmarks.py` or `tools/run_harness_profile.py`.
+- Real benchmark sweeps are run through `benchmarks/run_benchmarks.py` or `benchmarks/run_harness_profile.py`.
 - The test harness does not run full performance sweeps by default. That separation keeps correctness runs stable across Windows, Linux, and Colab.

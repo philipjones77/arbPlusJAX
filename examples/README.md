@@ -19,7 +19,7 @@ Default execution model:
 ## Example-owned inputs and outputs
 
 - `examples/inputs/`: tracked/shared example input roots
-- `examples/outputs/`: retained example output roots
+- `examples/outputs/`: local example-owned working output roots
 
 Each example should own its own named subfolder under both roots.
 
@@ -33,6 +33,7 @@ Rules:
 - do not scatter ad hoc files directly under `examples/inputs/` or `examples/outputs/`
 - each example controls its own subfolder
 - shared templates belong in the owning example folder, not duplicated across unrelated examples
+- semi-permanent retained artifacts should be promoted into the repo-root `outputs/` tree
 - transient local-only output files should still be kept out of Git unless they are intentionally retained
 
 ## Runtime selection (CPU vs GPU)

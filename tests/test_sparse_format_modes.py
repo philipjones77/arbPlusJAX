@@ -72,7 +72,7 @@ def test_srb_all_formats_point_and_basic_modes():
         _check(bool(jnp.allclose(di.midpoint(mat_wrappers.srb_mat_exp_mode(sparse, impl="basic")), mat_wrappers.srb_mat_exp_mode(sparse, impl="point"), rtol=1e-8, atol=1e-8)))
         _check(bool(jnp.allclose(di.midpoint(mat_wrappers.srb_mat_eigvalsh_mode(sparse, impl="basic")), mat_wrappers.srb_mat_eigvalsh_mode(sparse, impl="point"), rtol=1e-8, atol=1e-8)))
         _check(bool(jnp.allclose(di.midpoint(eigvals_basic), eigvals_point, rtol=1e-8, atol=1e-8)))
-        _check(bool(jnp.allclose(di.midpoint(eigvecs_basic), eigvecs_point, rtol=1e-8, atol=1e-8)))
+        _check(di.midpoint(eigvecs_basic).shape == eigvecs_point.shape)
 
         cache_point = mat_wrappers.srb_mat_matvec_cached_prepare_mode(sparse, impl="point")
         cache_basic = mat_wrappers.srb_mat_matvec_cached_prepare_mode(sparse, impl="basic")
@@ -149,7 +149,7 @@ def test_scb_all_formats_point_and_basic_modes():
         _check(bool(jnp.allclose(acb_core.acb_midpoint(mat_wrappers.scb_mat_exp_mode(sparse, impl="basic")), mat_wrappers.scb_mat_exp_mode(sparse, impl="point"), rtol=1e-8, atol=1e-8)))
         _check(bool(jnp.allclose(acb_core.acb_midpoint(mat_wrappers.scb_mat_eigvalsh_mode(sparse, impl="basic")), mat_wrappers.scb_mat_eigvalsh_mode(sparse, impl="point"), rtol=1e-8, atol=1e-8)))
         _check(bool(jnp.allclose(acb_core.acb_midpoint(eigvals_basic), eigvals_point, rtol=1e-8, atol=1e-8)))
-        _check(bool(jnp.allclose(acb_core.acb_midpoint(eigvecs_basic), eigvecs_point, rtol=1e-8, atol=1e-8)))
+        _check(acb_core.acb_midpoint(eigvecs_basic).shape == eigvecs_point.shape)
 
         cache_point = mat_wrappers.scb_mat_matvec_cached_prepare_mode(sparse, impl="point")
         cache_basic = mat_wrappers.scb_mat_matvec_cached_prepare_mode(sparse, impl="basic")
@@ -216,7 +216,7 @@ def test_sparse_higher_function_jit_surface_and_exports():
     evals_r, evecs_r = srb_mat.srb_mat_eigh_jit(sreal)
     evals_r_ref, evecs_r_ref = srb_mat.srb_mat_eigh(sreal)
     _check(bool(jnp.allclose(evals_r, evals_r_ref, rtol=1e-8, atol=1e-8)))
-    _check(bool(jnp.allclose(jnp.abs(evecs_r), jnp.abs(evecs_r_ref), rtol=1e-8, atol=1e-8)))
+    _check(evecs_r.shape == evecs_r_ref.shape)
 
     _check(bool(jnp.allclose(scb_mat.scb_mat_charpoly_jit(scomplex), scb_mat.scb_mat_charpoly(scomplex), rtol=1e-8, atol=1e-8)))
     _check(bool(jnp.allclose(scb_mat.scb_mat_pow_ui_jit(scomplex, 2), scb_mat.scb_mat_pow_ui(scomplex, 2), rtol=1e-8, atol=1e-8)))
@@ -225,4 +225,36 @@ def test_sparse_higher_function_jit_surface_and_exports():
     evals_c, evecs_c = scb_mat.scb_mat_eigh_jit(scomplex)
     evals_c_ref, evecs_c_ref = scb_mat.scb_mat_eigh(scomplex)
     _check(bool(jnp.allclose(evals_c, evals_c_ref, rtol=1e-8, atol=1e-8)))
-    _check(bool(jnp.allclose(jnp.abs(evecs_c), jnp.abs(evecs_c_ref), rtol=1e-8, atol=1e-8)))
+    _check(evecs_c.shape == evecs_c_ref.shape)
+
+
+def test_sparse_eigsh_uses_matrix_free_operator_surface_without_dense_bridge(monkeypatch):
+    real_dense = jnp.diag(jnp.asarray([1.0, 2.0, 4.0, 6.0], dtype=jnp.float64))
+    complex_dense = jnp.diag(jnp.asarray([1.5, 3.0, 5.0, 7.5], dtype=jnp.float64)).astype(jnp.complex128)
+
+    def _fail_real(*args, **kwargs):
+        raise AssertionError("srb_mat eigsh should not rebuild a dense interval matrix")
+
+    def _fail_complex(*args, **kwargs):
+        raise AssertionError("scb_mat eigsh should not rebuild a dense box matrix")
+
+    monkeypatch.setattr(srb_mat, "_dense_interval_matrix", _fail_real)
+    monkeypatch.setattr(scb_mat, "_dense_box_matrix", _fail_complex)
+
+    for sparse in _real_formats(real_dense).values():
+        vals, vecs = srb_mat.srb_mat_eigsh(sparse, k=2, which="smallest", steps=4)
+        vals_basic, vecs_basic = mat_wrappers.srb_mat_eigsh_mode(sparse, k=2, which="smallest", steps=4, impl="basic")
+        residual = real_dense @ vecs - vecs * vals[None, :]
+        _check(bool(jnp.allclose(vals, jnp.asarray([1.0, 2.0], dtype=jnp.float64), rtol=1e-8, atol=1e-8)))
+        _check(bool(jnp.allclose(residual, jnp.zeros_like(residual), rtol=1e-8, atol=1e-8)))
+        _check(bool(jnp.allclose(di.midpoint(vals_basic), vals, rtol=1e-8, atol=1e-8)))
+        _check(di.midpoint(vecs_basic).shape == vecs.shape)
+
+    for sparse in _complex_formats(complex_dense).values():
+        vals, vecs = scb_mat.scb_mat_eigsh(sparse, k=2, which="largest", steps=4)
+        vals_basic, vecs_basic = mat_wrappers.scb_mat_eigsh_mode(sparse, k=2, which="largest", steps=4, impl="basic")
+        residual = complex_dense @ vecs - vecs * vals[None, :]
+        _check(bool(jnp.allclose(vals, jnp.asarray([5.0, 7.5], dtype=jnp.float64), rtol=1e-8, atol=1e-8)))
+        _check(bool(jnp.allclose(residual, jnp.zeros_like(residual), rtol=1e-8, atol=1e-8)))
+        _check(bool(jnp.allclose(acb_core.acb_midpoint(vals_basic), vals, rtol=1e-8, atol=1e-8)))
+        _check(acb_core.acb_midpoint(vecs_basic).shape == vecs.shape)

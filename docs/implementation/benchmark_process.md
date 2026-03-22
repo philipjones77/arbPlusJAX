@@ -12,8 +12,8 @@ Use this when adding or changing numerical functionality.
    - Linux/macOS: `export ARBPLUSJAX_RUN_BENCHMARKS=1`
    - `python -m pytest benchmarks -q -m benchmark`
 3. Run quick benchmark sweep:
-   - `python tools/run_benchmarks.py --profile quick`
-   - (`tools/run_benchmarks.py` uses JAX batched mode by default; add `--no-jax-batch` only when debugging.)
+   - `python benchmarks/run_benchmarks.py --profile quick`
+   - (`benchmarks/run_benchmarks.py` uses JAX batched mode by default; add `--no-jax-batch` only when debugging.)
 
 ## Baselines to include
 - Always: arbPlusJAX interval modes (`basic`, `adaptive`, `rigorous`)
@@ -27,7 +27,7 @@ Use this when adding or changing numerical functionality.
 Generate a markdown summary:
 
 ```bash
-python tools/bench_report.py --run <run_dir> --out <run_dir>/report.md
+python benchmarks/bench_report.py --run <run_dir> --out <run_dir>/report.md
 ```
 
-Store only curated summaries; raw benchmark artifacts under `experiments/benchmarks/results/` are gitignored by default.
+Store only curated summaries; raw benchmark artifacts under `benchmarks/results/` are gitignored by default.

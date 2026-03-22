@@ -486,7 +486,7 @@ Required capabilities:
 Landing zone:
 
 - tools and docs
-- `experiments/benchmarks/outputs/`, `experiments/benchmarks/results/`, benchmark/report generators
+- `experiments/benchmarks/outputs/`, `benchmarks/results/`, benchmark/report generators
 
 ### 18. Testing and Benchmarking
 

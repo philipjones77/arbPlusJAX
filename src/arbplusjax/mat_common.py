@@ -485,9 +485,9 @@ def as_dense_matvec_plan(plan: DenseMatvecPlan | jax.Array, *, algebra: str, lab
         checks.check(plan.algebra == algebra, f"{label}.algebra")
         return plan
     if algebra == "arb":
-        matrix = as_interval_matrix(plan, label)
+        matrix = as_interval_rect_matrix(plan, label)
     elif algebra == "acb":
-        matrix = as_box_matrix(plan, label)
+        matrix = as_box_rect_matrix(plan, label)
     else:
         raise ValueError("algebra must be one of: arb, acb")
     return DenseMatvecPlan(matrix=matrix, rows=int(matrix.shape[-3]), cols=int(matrix.shape[-2]), algebra=algebra)
@@ -495,9 +495,9 @@ def as_dense_matvec_plan(plan: DenseMatvecPlan | jax.Array, *, algebra: str, lab
 
 def dense_matvec_plan_from_matrix(matrix: jax.Array, *, algebra: str, label: str) -> DenseMatvecPlan:
     if algebra == "arb":
-        matrix = as_interval_matrix(matrix, label)
+        matrix = as_interval_rect_matrix(matrix, label)
     elif algebra == "acb":
-        matrix = as_box_matrix(matrix, label)
+        matrix = as_box_rect_matrix(matrix, label)
     else:
         raise ValueError("algebra must be one of: arb, acb")
     return DenseMatvecPlan(matrix=matrix, rows=int(matrix.shape[-3]), cols=int(matrix.shape[-2]), algebra=algebra)
@@ -569,10 +569,30 @@ def pad_batch_repeat_last(args: tuple, *, pad_to: int):
     return kh.pad_mixed_batch_args_repeat_last(args, pad_to=pad_to)
 
 
-def estimator_mean(probes: jax.Array, coerce_probes, integrand_fn) -> jax.Array:
+def estimator_mean(probes: jax.Array, coerce_probes, integrand_fn, *, probe_midpoint=None) -> jax.Array:
     coerced = coerce_probes(probes)
     vals = jax.vmap(integrand_fn)(coerced)
-    return jnp.mean(vals)
+    estimate = jnp.mean(vals)
+    if probe_midpoint is None:
+        return estimate
+
+    mids = jnp.asarray(probe_midpoint(coerced))
+    if mids.ndim != 2:
+        return estimate
+    if mids.shape[0] != mids.shape[1]:
+        return estimate
+
+    gram = mids @ jnp.conjugate(mids).T
+    diag = jnp.real(jnp.diagonal(gram))
+    scale_ref = jnp.maximum(jnp.max(jnp.abs(diag)), jnp.asarray(1.0, dtype=diag.dtype))
+    mean_diag = jnp.mean(diag)
+    offdiag = gram - jnp.diag(jnp.diagonal(gram))
+    orthogonal = (jnp.max(jnp.abs(offdiag)) <= 1e-10 * scale_ref) & (jnp.max(jnp.abs(diag - mean_diag)) <= 1e-10 * scale_ref)
+    safe_diag = jnp.maximum(mean_diag, jnp.asarray(1e-30, dtype=diag.dtype))
+    scale = jnp.asarray(mids.shape[-1], dtype=estimate.dtype) / jnp.asarray(safe_diag, dtype=estimate.dtype)
+    orthogonal = lax.stop_gradient(orthogonal)
+    scale = lax.stop_gradient(scale)
+    return jnp.where(orthogonal, scale * estimate, estimate)
 
 
 def action_with_diagnostics(action_fn, diagnostics_fn, x: jax.Array):

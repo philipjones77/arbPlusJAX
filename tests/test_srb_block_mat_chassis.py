@@ -31,9 +31,14 @@ def test_block_sparse_real_roundtrip_and_kernels():
     _check(bool(jnp.allclose(srb_block_mat.srb_block_mat_matmul_dense_rhs(csr, rhs), dense @ rhs)))
     plan = srb_block_mat.srb_block_mat_matvec_cached_prepare(csr)
     _check(bool(jnp.allclose(srb_block_mat.srb_block_mat_matvec_cached_apply(plan, vec), dense @ vec)))
+    rplan = srb_block_mat.srb_block_mat_rmatvec_cached_prepare(csr)
+    _check(bool(jnp.allclose(srb_block_mat.srb_block_mat_rmatvec(csr, vec), dense.T @ vec)))
+    _check(bool(jnp.allclose(srb_block_mat.srb_block_mat_rmatvec_cached_apply(rplan, vec), dense.T @ vec)))
     vs = jnp.stack([vec, vec + 1.0], axis=0)
     _check(bool(jnp.allclose(srb_block_mat.srb_block_mat_matvec_batch_fixed(csr, vs), vs @ dense.T)))
     _check(bool(jnp.allclose(srb_block_mat.srb_block_mat_matvec_cached_apply_batch_fixed(plan, vs), vs @ dense.T)))
+    _check(bool(jnp.allclose(srb_block_mat.srb_block_mat_rmatvec_batch_fixed(csr, vs), vs @ dense)))
+    _check(bool(jnp.allclose(srb_block_mat.srb_block_mat_rmatvec_cached_apply_batch_fixed(rplan, vs), vs @ dense)))
 
 
 def test_block_sparse_real_triangular_and_iterative_solve():
@@ -53,9 +58,15 @@ def test_block_sparse_real_triangular_and_iterative_solve():
 
     tri_sol = srb_block_mat.srb_block_mat_triangular_solve(tri, rhs, lower=True)
     gmres = srb_block_mat.srb_block_mat_solve(dmat, rhs, method="gmres", tol=1e-10, atol=1e-10, maxiter=20)
+    lu = srb_block_mat.srb_block_mat_lu(dmat)
+    lu_sol = srb_block_mat.srb_block_mat_lu_solve(lu, rhs)
+    qr = srb_block_mat.srb_block_mat_qr(dmat)
+    qr_sol = srb_block_mat.srb_block_mat_qr_solve(qr, rhs)
 
     _check(bool(jnp.allclose(tri_sol, jnp.linalg.solve(dense, rhs), rtol=1e-8, atol=1e-8)))
     _check(bool(jnp.allclose(gmres, jnp.linalg.solve(diag, rhs), rtol=1e-8, atol=1e-8)))
+    _check(bool(jnp.allclose(lu_sol, jnp.linalg.solve(diag, rhs), rtol=1e-8, atol=1e-8)))
+    _check(bool(jnp.allclose(qr_sol, jnp.linalg.solve(diag, rhs), rtol=1e-8, atol=1e-8)))
 
 
 def test_block_sparse_real_diagnostics():

@@ -23,8 +23,6 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 def test_function_provenance_reports_are_current():
     expected = {
-        REPO_ROOT / "docs" / "function_naming.md": fpr.render_policy(),
-        REPO_ROOT / "docs" / "engineering_policy.md": fpr.render_engineering_policy(),
         REPO_ROOT / "docs" / "reports" / "function_provenance_registry.md": fpr.render_registry_summary(),
         REPO_ROOT / "docs" / "reports" / "function_capability_registry.json": cr.render_capability_registry_json(),
         REPO_ROOT / "docs" / "reports" / "function_implementation_index.md": fpr.render_implementation_index(),

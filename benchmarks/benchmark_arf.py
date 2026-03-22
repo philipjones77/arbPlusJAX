@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+from _source_tree_bootstrap import ensure_src_on_path
+
+ensure_src_on_path(__file__)
+
+
 import argparse
 import time
 from datetime import datetime, timezone

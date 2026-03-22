@@ -5,6 +5,8 @@ import pytest
 from arbplusjax import double_interval as di
 from arbplusjax import jrb_mat
 from arbplusjax import sparse_common
+from arbplusjax import srb_block_mat
+from arbplusjax import srb_vblock_mat
 
 from tests._test_checks import _check
 
@@ -211,6 +213,27 @@ def test_operator_plans_and_rmatvec_surface():
     _check(sparse_restarted.shape == (2, 2))
 
 
+def test_logdet_slq_plan_jit_matches_point_across_step_buckets():
+    a = jnp.stack(
+        [
+            jnp.stack([_exact_interval(4.0), _exact_interval(1.0), _exact_interval(0.0), _exact_interval(0.0)], axis=0),
+            jnp.stack([_exact_interval(1.0), _exact_interval(5.0), _exact_interval(1.0), _exact_interval(0.0)], axis=0),
+            jnp.stack([_exact_interval(0.0), _exact_interval(1.0), _exact_interval(6.0), _exact_interval(1.0)], axis=0),
+            jnp.stack([_exact_interval(0.0), _exact_interval(0.0), _exact_interval(1.0), _exact_interval(7.0)], axis=0),
+        ],
+        axis=0,
+    )
+    x0 = jnp.stack([_exact_interval(1.0), _exact_interval(0.0), _exact_interval(0.0), _exact_interval(0.0)], axis=0)
+    x1 = jnp.stack([_exact_interval(0.0), _exact_interval(1.0), _exact_interval(0.0), _exact_interval(0.0)], axis=0)
+    probes = jnp.stack([x0, x1], axis=0)
+    plan = jrb_mat.jrb_mat_dense_operator_plan_prepare(a)
+
+    for steps in (3, 4):
+        point = jrb_mat.jrb_mat_logdet_slq_point(plan, probes, steps)
+        compiled = jrb_mat.jrb_mat_logdet_slq_point_jit(plan, probes, steps)
+        _check(bool(jnp.allclose(compiled, point, rtol=1e-6, atol=1e-6)))
+
+
 def test_lanczos_funm_action_matches_exact_diagonal_case():
     a = _mat2(2.0, 0.0, 0.0, 3.0)
     x = _vec2(1.0, -2.0)
@@ -256,6 +279,9 @@ def test_lanczos_diagnostics_and_with_diagnostics_wrappers():
     _check(int(trace_diag.probe_count) == 2)
     _check(int(logdet_diag.algorithm_code) == 2)
     _check(int(logdet_diag.probe_count) == 2)
+    _check(float(logdet_diag.primal_residual) >= 0.0)
+    _check(int(logdet_diag.regime_code) >= 0)
+    _check(int(logdet_diag.solver_code) == int(jrb_mat.matrix_free_core.solver_code("lanczos")))
 
 
 def test_restarted_and_block_lanczos_expm_actions_match_diagonal_case():
@@ -392,6 +418,62 @@ def test_trace_and_logdet_estimators_have_probe_gradients():
 
     _check(bool(jnp.allclose(trace_grad, 4.0, rtol=1e-6, atol=1e-6)))
     _check(bool(jnp.allclose(logdet_grad, 2.0 * jnp.log(2.0), rtol=1e-6, atol=1e-6)))
+
+
+def test_jacobi_preconditioner_multi_shift_and_restarted_block_eigsh_surfaces():
+    diag = jnp.asarray([2.0, 4.0, 8.0], dtype=jnp.float64)
+    dense = jnp.diag(diag)
+    a = jax.vmap(jax.vmap(_exact_interval))(dense)
+    rhs = _vec3(2.0, 8.0, 16.0)
+    shifts = jnp.asarray([0.0, 1.0], dtype=jnp.float64)
+    op = jrb_mat.jrb_mat_dense_operator(a)
+    plan = jrb_mat.jrb_mat_dense_operator_plan_prepare(a)
+    prec = jrb_mat.jrb_mat_jacobi_preconditioner_plan_prepare(plan)
+
+    applied = jrb_mat.matrix_free_core.preconditioner_plan_apply(
+        prec,
+        rhs,
+        midpoint_vector=di.midpoint,
+        sparse_bcoo_matvec=sparse_common.sparse_bcoo_matvec,
+        dtype=jnp.float64,
+    )
+    _check(bool(jnp.allclose(applied, jnp.asarray([1.0, 2.0, 2.0], dtype=jnp.float64), rtol=1e-6, atol=1e-6)))
+
+    shifted = jrb_mat.jrb_mat_multi_shift_solve_point(plan, rhs, shifts, symmetric=True, preconditioner=prec, tol=1e-10)
+    shifted_jit = jrb_mat.jrb_mat_multi_shift_solve_point_jit(plan, rhs, shifts, symmetric=True, preconditioner=prec, tol=1e-10)
+    expected = jnp.stack(
+        [
+            jnp.asarray([1.0, 2.0, 2.0], dtype=jnp.float64),
+            jnp.asarray([2.0 / 3.0, 8.0 / 5.0, 16.0 / 9.0], dtype=jnp.float64),
+        ],
+        axis=0,
+    )
+    _check(shifted.shape == (2, 3, 2))
+    _check(bool(jnp.allclose(di.midpoint(shifted), expected, rtol=1e-6, atol=1e-6)))
+    _check(bool(jnp.allclose(di.midpoint(shifted_jit), expected, rtol=1e-6, atol=1e-6)))
+
+    vals_block, vecs_block = jrb_mat.jrb_mat_eigsh_block_point(plan, size=3, k=2, which="largest", block_size=2, subspace_iters=4)
+    vals_restart, vecs_restart = jrb_mat.jrb_mat_eigsh_restarted_point(plan, size=3, k=2, which="largest", steps=2, restarts=2, block_size=2)
+    vals_block_jit, vecs_block_jit = jrb_mat.jrb_mat_eigsh_block_point_jit(plan, size=3, k=2, which="largest", block_size=2, subspace_iters=4)
+    vals_restart_jit, vecs_restart_jit = jrb_mat.jrb_mat_eigsh_restarted_point_jit(
+        plan,
+        size=3,
+        k=2,
+        which="largest",
+        steps=2,
+        restarts=2,
+        block_size=2,
+    )
+
+    target = jnp.asarray([4.0, 8.0], dtype=jnp.float64)
+    _check(bool(jnp.allclose(vals_block, target, rtol=2e-2, atol=5e-2)))
+    _check(bool(jnp.allclose(vals_restart, target, rtol=2e-2, atol=5e-2)))
+    _check(bool(jnp.allclose(vals_block_jit, target, rtol=2e-2, atol=5e-2)))
+    _check(bool(jnp.allclose(vals_restart_jit, target, rtol=2e-2, atol=5e-2)))
+    _check(vecs_block.shape == (3, 2))
+    _check(vecs_restart.shape == (3, 2))
+    _check(vecs_block_jit.shape == (3, 2))
+    _check(vecs_restart_jit.shape == (3, 2))
 
 
 def test_sparse_bcoo_logdet_matches_exact_value_and_probe_gradient_is_finite():
@@ -589,13 +671,84 @@ def test_real_solve_inverse_and_det_matrix_free_apis_match_diagonal_case():
     inv_applied = jrb_mat.jrb_mat_inverse_action_point(op, rhs, symmetric=True)
     _check(bool(jnp.allclose(di.midpoint(solved), di.midpoint(x), rtol=1e-6, atol=1e-6)))
     _check(bool(jnp.allclose(di.midpoint(inv_applied), di.midpoint(x), rtol=1e-6, atol=1e-6)))
-    _check(bool(info["converged"]))
+    _check(float(info.primal_residual) <= 1e-6)
+    _check(int(info.structure_code) == int(jrb_mat.matrix_free_core.structure_code("symmetric")))
+    _check(int(info.solver_code) == int(jrb_mat.matrix_free_core.solver_code("cg")))
 
     probes = jnp.stack([_vec2(1.0, 1.0), _vec2(1.0, -1.0)], axis=0)
     logdet = jrb_mat.jrb_mat_logdet_slq_point(op, probes, 2)
     det = jrb_mat.jrb_mat_det_slq_point(op, probes, 2)
     _check(bool(jnp.allclose(logdet, jnp.log(8.0), rtol=1e-6, atol=1e-6)))
     _check(bool(jnp.allclose(det, 8.0, rtol=1e-6, atol=1e-6)))
+
+    bundle = jrb_mat.jrb_mat_logdet_solve_point(op, rhs, probes, 2, symmetric=True)
+    _check(bool(jnp.allclose(bundle.logdet, logdet, rtol=1e-6, atol=1e-6)))
+    _check(bool(jnp.allclose(di.midpoint(bundle.solve), di.midpoint(x), rtol=1e-6, atol=1e-6)))
+    _check(bool(bundle.aux.solve_diagnostics.converged))
+    _check(bool(bundle.aux.logdet_diagnostics.converged))
+
+
+def test_real_block_and_vblock_operator_plans_match_storage_matvec():
+    dense = jnp.asarray([[2.0, 1.0, 0.0], [1.0, 3.0, -1.0], [0.0, -1.0, 4.0]], dtype=jnp.float64)
+    block = srb_block_mat.srb_block_mat_from_dense_csr(dense[:2, :2], block_shape=(1, 1))
+    vblock = srb_vblock_mat.srb_vblock_mat_from_dense_csr(
+        dense,
+        row_block_sizes=jnp.asarray([1, 2], dtype=jnp.int32),
+        col_block_sizes=jnp.asarray([1, 2], dtype=jnp.int32),
+    )
+    x2 = jnp.stack([_exact_interval(1.0), _exact_interval(-2.0)], axis=0)
+    x3 = jnp.stack([_exact_interval(1.0), _exact_interval(-2.0), _exact_interval(0.5)], axis=0)
+
+    bplan = jrb_mat.jrb_mat_block_sparse_operator_plan_prepare(block)
+    brplan = jrb_mat.jrb_mat_block_sparse_operator_rmatvec_plan_prepare(block)
+    vplan = jrb_mat.jrb_mat_vblock_sparse_operator_plan_prepare(vblock)
+    vrplan = jrb_mat.jrb_mat_vblock_sparse_operator_rmatvec_plan_prepare(vblock)
+
+    _check(bool(jnp.allclose(di.midpoint(jrb_mat.jrb_mat_operator_plan_apply(bplan, x2)), dense[:2, :2] @ di.midpoint(x2))))
+    _check(bool(jnp.allclose(di.midpoint(jrb_mat.jrb_mat_operator_plan_apply(brplan, x2)), dense[:2, :2].T @ di.midpoint(x2))))
+    _check(bool(jnp.allclose(di.midpoint(jrb_mat.jrb_mat_operator_plan_apply(vplan, x3)), dense @ di.midpoint(x3))))
+    _check(bool(jnp.allclose(di.midpoint(jrb_mat.jrb_mat_operator_plan_apply(vrplan, x3)), dense.T @ di.midpoint(x3))))
+
+
+def test_real_minres_matrix_free_apis_match_indefinite_diagonal_case():
+    a = _mat2(2.0, 0.0, 0.0, -3.0)
+    x = _vec2(3.0, -2.0)
+    rhs = _vec2(6.0, 6.0)
+    op = jrb_mat.jrb_mat_dense_operator(a)
+    plan = jrb_mat.jrb_mat_dense_operator_plan_prepare(a)
+
+    solved, info = jrb_mat.jrb_mat_minres_solve_action_with_diagnostics_point(op, rhs)
+    inv_applied = jrb_mat.jrb_mat_minres_inverse_action_point(op, rhs)
+    solved_jit = jrb_mat.jrb_mat_minres_solve_action_point_jit(plan, rhs)
+    inv_jit = jrb_mat.jrb_mat_minres_inverse_action_point_jit(plan, rhs)
+
+    target = jnp.asarray([3.0, -2.0], dtype=jnp.float64)
+    _check(bool(jnp.allclose(di.midpoint(solved), target, rtol=1e-6, atol=1e-6)))
+    _check(bool(jnp.allclose(di.midpoint(inv_applied), target, rtol=1e-6, atol=1e-6)))
+    _check(bool(jnp.allclose(di.midpoint(solved_jit), target, rtol=1e-6, atol=1e-6)))
+    _check(bool(jnp.allclose(di.midpoint(inv_jit), target, rtol=1e-6, atol=1e-6)))
+    _check(float(info.primal_residual) <= 1e-6)
+    _check(int(info.structure_code) == int(jrb_mat.matrix_free_core.structure_code("symmetric")))
+    _check(int(info.solver_code) == int(jrb_mat.matrix_free_core.solver_code("minres")))
+
+
+def test_real_preconditioned_minres_matrix_free_apis_match_indefinite_diagonal_case():
+    a = _mat2(2.0, 0.0, 0.0, -3.0)
+    rhs = _vec2(6.0, 6.0)
+    plan = jrb_mat.jrb_mat_dense_operator_plan_prepare(a)
+    prec = jrb_mat.jrb_mat_jacobi_preconditioner_plan_prepare(plan)
+
+    solved, info = jrb_mat.jrb_mat_minres_solve_action_with_diagnostics_point(plan, rhs, preconditioner=prec)
+    inv_applied = jrb_mat.jrb_mat_minres_inverse_action_point(plan, rhs, preconditioner=prec)
+    solved_jit = jrb_mat.jrb_mat_minres_solve_action_point_jit(plan, rhs, preconditioner=prec)
+    inv_jit = jrb_mat.jrb_mat_minres_inverse_action_point_jit(plan, rhs, preconditioner=prec)
+
+    target = jnp.asarray([3.0, -2.0], dtype=jnp.float64)
+    _check(bool(jnp.allclose(di.midpoint(solved), target, rtol=1e-6, atol=1e-6)))
+    _check(bool(jnp.allclose(di.midpoint(inv_applied), target, rtol=1e-6, atol=1e-6)))
+    _check(bool(jnp.allclose(di.midpoint(solved_jit), target, rtol=1e-6, atol=1e-6)))
+    _check(bool(jnp.allclose(di.midpoint(inv_jit), target, rtol=1e-6, atol=1e-6)))
+    _check(float(info.primal_residual) <= 1e-6)
 
 
 def test_sparse_operator_plans_cover_coo_csr_and_structured_aliases():
@@ -628,3 +781,270 @@ def test_sparse_operator_plans_cover_coo_csr_and_structured_aliases():
     spd_plan = jrb_mat.jrb_mat_spd_operator_plan_prepare(a)
     _check(bool(jnp.allclose(di.midpoint(jrb_mat.jrb_mat_operator_plan_apply(sym_plan, x)), dense @ x_mid)))
     _check(bool(jnp.allclose(di.midpoint(jrb_mat.jrb_mat_operator_plan_apply(spd_plan, x)), dense @ x_mid)))
+
+
+def test_real_matrix_free_plan_jit_surface_and_diagnostics_metadata():
+    a = _mat2(2.0, 0.0, 0.0, 4.0)
+    x = _vec2(1.0, -1.0)
+    rhs = _vec2(2.0, -4.0)
+    probes = jnp.stack([_vec2(1.0, 0.0), _vec2(0.0, 1.0)], axis=0)
+    plan = jrb_mat.jrb_mat_dense_operator_plan_prepare(a)
+
+    applied = jrb_mat.jrb_mat_operator_apply_point_jit(plan, x)
+    r_applied = jrb_mat.jrb_mat_rmatvec_point_jit(a, x)
+    solved = jrb_mat.jrb_mat_solve_action_point_jit(plan, rhs, symmetric=True)
+    invd = jrb_mat.jrb_mat_inverse_action_point_jit(plan, rhs, symmetric=True)
+    log_action = jrb_mat.jrb_mat_log_action_lanczos_point_jit(plan, x, 2)
+    pow_action = jrb_mat.jrb_mat_pow_action_lanczos_point_jit(plan, x, exponent=2, steps=2)
+    logdet = jrb_mat.jrb_mat_logdet_slq_point_jit(plan, probes, 2)
+    det = jrb_mat.jrb_mat_det_slq_point_jit(plan, probes, 2)
+    _, solve_diag = jrb_mat.jrb_mat_solve_action_with_diagnostics_point(plan, rhs, symmetric=True)
+
+    _check(bool(jnp.allclose(di.midpoint(applied), jnp.asarray([2.0, -4.0]), rtol=1e-6, atol=1e-6)))
+    _check(bool(jnp.allclose(di.midpoint(r_applied), jnp.asarray([2.0, -4.0]), rtol=1e-6, atol=1e-6)))
+    _check(bool(jnp.allclose(di.midpoint(solved), jnp.asarray([1.0, -1.0]), rtol=1e-6, atol=1e-6)))
+    _check(bool(jnp.allclose(di.midpoint(invd), jnp.asarray([1.0, -1.0]), rtol=1e-6, atol=1e-6)))
+    _check(bool(jnp.allclose(di.midpoint(log_action), jnp.asarray([jnp.log(2.0), -jnp.log(4.0)]), rtol=1e-6, atol=1e-6)))
+    _check(bool(jnp.allclose(di.midpoint(pow_action), jnp.asarray([4.0, -16.0]), rtol=1e-6, atol=1e-6)))
+    _check(bool(jnp.allclose(logdet, jnp.log(8.0), rtol=1e-6, atol=1e-6)))
+    _check(bool(jnp.allclose(det, 8.0, rtol=1e-6, atol=1e-6)))
+    _check(float(solve_diag.primal_residual) <= 1e-6)
+    _check(bool(jnp.all(jnp.isfinite(solve_diag.residual_history))))
+
+
+def test_real_structured_matrix_free_aliases_match_base_paths():
+    a = _mat2(2.0, 0.0, 0.0, 4.0)
+    x = _vec2(1.0, -1.0)
+    rhs = _vec2(2.0, -4.0)
+    op = jrb_mat.jrb_mat_dense_operator(a)
+    probes = jnp.stack([_vec2(1.0, 0.0), _vec2(0.0, 1.0)], axis=0)
+
+    _check(bool(jnp.allclose(di.midpoint(jrb_mat.jrb_mat_log_action_symmetric_point(op, x, 2)), di.midpoint(jrb_mat.jrb_mat_log_action_lanczos_point(op, x, 2)), rtol=1e-6, atol=1e-6)))
+    _check(bool(jnp.allclose(di.midpoint(jrb_mat.jrb_mat_sqrt_action_spd_point(op, x, 2)), di.midpoint(jrb_mat.jrb_mat_sqrt_action_lanczos_point(op, x, 2)), rtol=1e-6, atol=1e-6)))
+    _check(bool(jnp.allclose(di.midpoint(jrb_mat.jrb_mat_expm_action_spd_point(op, x, steps=2)), di.midpoint(jrb_mat.jrb_mat_expm_action_lanczos_restarted_point(op, x, steps=2, restarts=1)), rtol=1e-6, atol=1e-6)))
+
+
+def test_jrb_mat_eigsh_operator_plan_matches_dense_diagonal_case():
+    dense = jnp.diag(jnp.asarray([1.0, 2.0, 4.0, 7.0], dtype=jnp.float64))
+    a = di.interval(dense, dense)
+    plan = jrb_mat.jrb_mat_dense_operator_plan_prepare(a)
+    vals, vecs = jrb_mat.jrb_mat_eigsh_point(plan, size=4, k=2, which="smallest", steps=4)
+    vals_jit, vecs_jit = jrb_mat.jrb_mat_eigsh_point_jit(plan, size=4, k=2, which="smallest", steps=4)
+    expected = jnp.asarray([1.0, 2.0], dtype=jnp.float64)
+    residual = dense @ vecs - vecs * vals[None, :]
+    _check(bool(jnp.allclose(vals, expected, rtol=1e-8, atol=1e-8)))
+    _check(bool(jnp.allclose(vals_jit, vals, rtol=1e-8, atol=1e-8)))
+    _check(bool(jnp.allclose(residual, jnp.zeros_like(residual), rtol=1e-8, atol=1e-8)))
+    _check(vecs.shape == (4, 2))
+    _check(vecs_jit.shape == vecs.shape)
+
+
+def test_jrb_mat_native_krylov_schur_davidson_shift_invert_and_contour_surfaces():
+    dense = jnp.diag(jnp.asarray([1.0, 3.0, 7.0], dtype=jnp.float64))
+    a = di.interval(dense, dense)
+    plan = jrb_mat.jrb_mat_dense_operator_plan_prepare(a)
+    prec = jrb_mat.jrb_mat_jacobi_preconditioner_plan_prepare(plan)
+
+    vals_ks, _ = jrb_mat.jrb_mat_eigsh_krylov_schur_point(plan, size=3, k=1, which="largest", steps=2, restarts=2, block_size=2)
+    vals_dav, _ = jrb_mat.jrb_mat_eigsh_davidson_point(plan, size=3, k=1, which="largest", subspace_iters=3, block_size=2, preconditioner=prec)
+    vals_jd, _ = jrb_mat.jrb_mat_eigsh_jacobi_davidson_point(plan, size=3, k=1, which="largest", subspace_iters=3, block_size=2, preconditioner=prec)
+    vals_si, _ = jrb_mat.jrb_mat_eigsh_shift_invert_point(plan, size=3, shift=2.8, k=1, which="largest", steps=3, preconditioner=prec)
+    vals_contour, _ = jrb_mat.jrb_mat_eigsh_contour_point(plan, size=3, center=3.0, radius=0.6, k=1, which="largest", quadrature_order=8, block_size=2, preconditioner=prec)
+
+    _check(bool(jnp.allclose(vals_ks, jnp.asarray([7.0]), atol=1e-4)))
+    _check(bool(jnp.allclose(vals_dav, jnp.asarray([7.0]), atol=1e-3)))
+    _check(bool(jnp.allclose(vals_jd, jnp.asarray([7.0]), atol=1e-3)))
+    _check(bool(jnp.allclose(di.midpoint(vals_si), jnp.asarray([3.0]), atol=5e-2)))
+    _check(bool(jnp.allclose(di.midpoint(vals_contour), jnp.asarray([3.0]), atol=2e-1)))
+
+    _, _, diag_ks = jrb_mat.jrb_mat_eigsh_krylov_schur_with_diagnostics_point(plan, size=3, k=1, which="largest", steps=2, restarts=2, block_size=2)
+    _, _, diag_dav = jrb_mat.jrb_mat_eigsh_davidson_with_diagnostics_point(plan, size=3, k=1, which="largest", subspace_iters=3, block_size=2, preconditioner=prec)
+    _check(int(diag_ks.locked_count) >= 1)
+    _check(int(diag_ks.deflated_count) >= 1)
+    _check(bool(diag_ks.converged))
+    _check(bool(diag_dav.converged))
+    _check(float(diag_dav.convergence_metric) <= 1e-3)
+    _check(diag_dav.residual_history.shape[-1] >= 1)
+
+
+def test_jrb_mat_generalized_eigsh_diagonal_surface():
+    a_dense = jnp.diag(jnp.asarray([2.0, 6.0, 12.0], dtype=jnp.float64))
+    b_dense = jnp.diag(jnp.asarray([1.0, 2.0, 3.0], dtype=jnp.float64))
+    a = di.interval(a_dense, a_dense)
+    b = di.interval(b_dense, b_dense)
+    a_plan = jrb_mat.jrb_mat_dense_operator_plan_prepare(a)
+    b_plan = jrb_mat.jrb_mat_dense_operator_plan_prepare(b)
+    b_prec = jrb_mat.jrb_mat_jacobi_preconditioner_plan_prepare(b_plan)
+
+    vals, vecs = jrb_mat.jrb_mat_geigsh_point(
+        a_plan,
+        b_plan,
+        size=3,
+        k=2,
+        which="smallest",
+        steps=3,
+        b_preconditioner=b_prec,
+    )
+    vals_d, vecs_d, diag = jrb_mat.jrb_mat_geigsh_with_diagnostics_point(
+        a_plan,
+        b_plan,
+        size=3,
+        k=2,
+        which="smallest",
+        steps=3,
+        b_preconditioner=b_prec,
+        tol=1e-6,
+    )
+
+    _check(bool(jnp.allclose(vals, jnp.asarray([2.0, 3.0]), atol=1e-4)))
+    _check(bool(jnp.allclose(vals_d, vals, atol=1e-4)))
+    _check(vecs.shape == (3, 2))
+    _check(vecs_d.shape == (3, 2))
+    _check(bool(diag.converged))
+    _check(float(diag.convergence_metric) <= 1e-6)
+
+
+def test_jrb_mat_generalized_shift_invert_diagonal_surface():
+    a_dense = jnp.diag(jnp.asarray([2.0, 6.0, 12.0], dtype=jnp.float64))
+    b_dense = jnp.diag(jnp.asarray([1.0, 2.0, 3.0], dtype=jnp.float64))
+    a = di.interval(a_dense, a_dense)
+    b = di.interval(b_dense, b_dense)
+    a_plan = jrb_mat.jrb_mat_dense_operator_plan_prepare(a)
+    b_plan = jrb_mat.jrb_mat_dense_operator_plan_prepare(b)
+    b_prec = jrb_mat.jrb_mat_jacobi_preconditioner_plan_prepare(b_plan)
+
+    vals, vecs = jrb_mat.jrb_mat_geigsh_shift_invert_point(
+        a_plan,
+        b_plan,
+        size=3,
+        shift=2.8,
+        k=1,
+        which="largest",
+        steps=3,
+        preconditioner=b_prec,
+    )
+    vals_d, vecs_d, diag = jrb_mat.jrb_mat_geigsh_shift_invert_with_diagnostics_point(
+        a_plan,
+        b_plan,
+        size=3,
+        shift=2.8,
+        k=1,
+        which="largest",
+        steps=3,
+        preconditioner=b_prec,
+        tol=1e-4,
+    )
+
+    _check(bool(jnp.allclose(di.midpoint(vals), jnp.asarray([3.0]), atol=5e-2)))
+    _check(bool(jnp.allclose(di.midpoint(vals_d), di.midpoint(vals), atol=5e-2)))
+    _check(vecs.shape == (3, 1, 2))
+    _check(vecs_d.shape == (3, 1, 2))
+    _check(bool(diag.converged))
+
+
+def test_jrb_mat_polynomial_and_nonlinear_eig_surfaces():
+    a0_dense = jnp.diag(jnp.asarray([4.0, 18.0, 40.0], dtype=jnp.float64))
+    a1_dense = jnp.diag(jnp.asarray([-5.0, -9.0, -13.0], dtype=jnp.float64))
+    a2_dense = jnp.eye(3, dtype=jnp.float64)
+    coeffs = [
+        jrb_mat.jrb_mat_dense_operator_plan_prepare(di.interval(a0_dense, a0_dense)),
+        jrb_mat.jrb_mat_dense_operator_plan_prepare(di.interval(a1_dense, a1_dense)),
+        jrb_mat.jrb_mat_dense_operator_plan_prepare(di.interval(a2_dense, a2_dense)),
+    ]
+    vals_p, vecs_p, diag_p = jrb_mat.jrb_mat_peigsh_with_diagnostics_point(
+        coeffs,
+        size=3,
+        lambda0=2.8,
+        newton_iters=4,
+        eig_steps=3,
+        tol=1e-6,
+    )
+
+    def mat_builder(lam):
+        dense = jnp.diag(jnp.exp(jnp.asarray(lam, dtype=jnp.float64)) - jnp.asarray([2.0, 4.0, 8.0], dtype=jnp.float64))
+        return jrb_mat.jrb_mat_dense_operator_plan_prepare(di.interval(dense, dense))
+
+    def dmat_builder(lam):
+        dense = jnp.eye(3, dtype=jnp.float64) * jnp.exp(jnp.asarray(lam, dtype=jnp.float64))
+        return jrb_mat.jrb_mat_dense_operator_plan_prepare(di.interval(dense, dense))
+
+    vals_n, vecs_n, diag_n = jrb_mat.jrb_mat_neigsh_with_diagnostics_point(
+        mat_builder,
+        dmat_builder,
+        size=3,
+        lambda0=1.45,
+        newton_iters=4,
+        eig_steps=3,
+        tol=1e-6,
+    )
+
+    _check(bool(jnp.allclose(di.midpoint(vals_p), jnp.asarray([3.0]), atol=5e-3)))
+    _check(bool(jnp.allclose(di.midpoint(vals_n), jnp.asarray([jnp.log(4.0)]), atol=5e-3)))
+    _check(vecs_p.shape == (3, 1, 2))
+    _check(vecs_n.shape == (3, 1, 2))
+    _check(bool(diag_p.converged))
+    _check(bool(diag_n.converged))
+
+
+def test_jrb_mat_restart_policy_handles_block_window_larger_than_k():
+    dense = jnp.diag(jnp.asarray([1.0, 2.0, 5.0, 9.0], dtype=jnp.float64))
+    a = di.interval(dense, dense)
+    plan = jrb_mat.jrb_mat_dense_operator_plan_prepare(a)
+
+    vals_restart, _ = jrb_mat.jrb_mat_eigsh_restarted_point(
+        plan,
+        size=4,
+        k=1,
+        which="largest",
+        steps=2,
+        restarts=3,
+        block_size=3,
+    )
+    vals_ks, _, diag_ks = jrb_mat.jrb_mat_eigsh_krylov_schur_with_diagnostics_point(
+        plan,
+        size=4,
+        k=1,
+        which="smallest",
+        steps=2,
+        restarts=3,
+        block_size=3,
+        tol=1e-6,
+    )
+
+    _check(bool(jnp.allclose(vals_restart, jnp.asarray([9.0]), atol=1e-4)))
+    _check(bool(jnp.allclose(vals_ks, jnp.asarray([1.0]), atol=1e-4)))
+    _check(int(diag_ks.restart_count) == 3)
+    _check(diag_ks.residual_history.shape[-1] >= 1)
+
+
+def test_jrb_mat_davidson_and_jd_handle_block_window_larger_than_k():
+    dense = jnp.diag(jnp.asarray([1.0, 2.0, 5.0, 9.0], dtype=jnp.float64))
+    a = di.interval(dense, dense)
+    plan = jrb_mat.jrb_mat_dense_operator_plan_prepare(a)
+    prec = jrb_mat.jrb_mat_jacobi_preconditioner_plan_prepare(plan)
+
+    vals_dav, _ = jrb_mat.jrb_mat_eigsh_davidson_point(
+        plan,
+        size=4,
+        k=1,
+        which="largest",
+        subspace_iters=3,
+        block_size=3,
+        preconditioner=prec,
+        tol=1e-6,
+    )
+    vals_jd, _, diag_jd = jrb_mat.jrb_mat_eigsh_jacobi_davidson_with_diagnostics_point(
+        plan,
+        size=4,
+        k=1,
+        which="smallest",
+        subspace_iters=3,
+        block_size=3,
+        preconditioner=prec,
+        tol=1e-6,
+    )
+
+    _check(bool(jnp.allclose(vals_dav, jnp.asarray([9.0]), atol=1e-4)))
+    _check(bool(jnp.allclose(vals_jd, jnp.asarray([1.0]), atol=1e-4)))
+    _check(int(diag_jd.locked_count) >= 1)
+    _check(diag_jd.residual_history.shape[-1] >= 1)

@@ -31,6 +31,13 @@ def safe_dot(a: jax.Array, b: jax.Array) -> jax.Array:
     return jnp.sum(aa.astype(dtype) * bb.astype(dtype))
 
 
+def safe_vdot(a: jax.Array, b: jax.Array) -> jax.Array:
+    aa = jnp.asarray(a)
+    bb = jnp.asarray(b)
+    dtype = reduction_dtype(aa if aa.size else bb)
+    return jnp.vdot(aa.astype(dtype), bb.astype(dtype))
+
+
 def safe_vdot_real(a: jax.Array, b: jax.Array) -> jax.Array:
     aa = jnp.asarray(a)
     bb = jnp.asarray(b)
@@ -86,6 +93,7 @@ __all__ = [
     "safe_sum",
     "safe_mean",
     "safe_dot",
+    "safe_vdot",
     "safe_vdot_real",
     "safe_norm",
     "kahan_sum",

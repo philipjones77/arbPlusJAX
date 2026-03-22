@@ -88,19 +88,19 @@ That means folders such as:
 
 should be gitignored by default.
 
-`outputs/` is different.
+`outputs/` inside an experiment is different.
 
-`outputs/` is the retained artifact area for important experiment results that
-need to be segregated for backup and correct storage.
+It is experiment-local working space, not the canonical retained-artifact root
+of the repository.
 
-Rules for `outputs/`:
+Rules for experiment-local `outputs/`:
 
-- `outputs/` should use human-readable named subfolders
-- `outputs/` is intended to be under source control
-- retained `outputs/` artifacts should use the repo's lower-level large-artifact
-  storage path, currently assumed to mean Git LFS
-- transient scratch outputs should go in `artifacts/` or `cache/`, not in the
-  retained `outputs/` area
+- `outputs/` may use human-readable named subfolders
+- experiment-local `outputs/` should not be treated as the canonical permanent
+  artifact home
+- semi-permanent retained artifacts belong under the repo-root `outputs/`
+  directory instead
+- transient scratch outputs should go in `artifacts/` or `cache/`
 
 The root experiment folder may still keep:
 
@@ -136,7 +136,8 @@ That means:
 
 - experiments may consume data from `benchmarks/results/`
 - experiments must not write their own retained outputs into `benchmarks/results/`
-- retained experiment outputs belong under `experiments/<name>/outputs/`
+- semi-permanent retained artifacts produced by experiments belong under the
+  repo-root `outputs/` tree
 - transient experiment scratch files belong under `experiments/<name>/artifacts/` or
   `experiments/<name>/cache/`
 

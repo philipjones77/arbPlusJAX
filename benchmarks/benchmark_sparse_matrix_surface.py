@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+from _source_tree_bootstrap import ensure_src_on_path
+
+ensure_src_on_path(__file__)
+
+
 import argparse
 import platform
 import time
@@ -61,6 +66,7 @@ def run_srb_case(n: int, warmup: int, runs: int) -> dict[str, float]:
     for storage, sparse in sparse_by_format.items():
         for impl in ("point", "basic"):
             cache = mat_wrappers.srb_mat_matvec_cached_prepare_mode(sparse, impl=impl)
+            rcache = mat_wrappers.srb_mat_rmatvec_cached_prepare_mode(sparse, impl=impl)
             lu_plan = mat_wrappers.srb_mat_lu_solve_plan_prepare_mode(sparse, impl=impl)
             spd_plan = mat_wrappers.srb_mat_spd_solve_plan_prepare_mode(sparse, impl=impl)
             prefix = f"srb_{storage}_{impl}"
@@ -106,6 +112,26 @@ def run_srb_case(n: int, warmup: int, runs: int) -> dict[str, float]:
                 warmup=warmup,
                 runs=runs,
             )
+            results[f"{prefix}_rmatvec_s"] = _time_call(
+                lambda a, v: mat_wrappers.srb_mat_rmatvec_mode(a, v, impl=impl),
+                sparse,
+                rhs,
+                warmup=warmup,
+                runs=runs,
+            )
+            results[f"{prefix}_cached_rmatvec_s"] = _time_call(
+                lambda plan, v: mat_wrappers.srb_mat_rmatvec_cached_apply_mode(plan, v, impl=impl),
+                rcache,
+                rhs,
+                warmup=warmup,
+                runs=runs,
+            )
+            results[f"{prefix}_eigsh_s"] = _time_call(
+                lambda a: mat_wrappers.srb_mat_eigsh_mode(a, k=min(2, n), which="smallest", steps=min(n, max(4, 2 * min(2, n))), impl=impl),
+                sparse,
+                warmup=warmup,
+                runs=runs,
+            )
             results[f"{prefix}_padded_matvec_s"] = _time_call(
                 lambda a, vs: mat_wrappers.srb_mat_matvec_batch_mode_padded(a, vs, pad_to=8, impl=impl),
                 sparse,
@@ -147,6 +173,7 @@ def run_scb_case(n: int, warmup: int, runs: int) -> dict[str, float]:
     for storage, sparse in sparse_by_format.items():
         for impl in ("point", "basic"):
             cache = mat_wrappers.scb_mat_matvec_cached_prepare_mode(sparse, impl=impl)
+            rcache = mat_wrappers.scb_mat_rmatvec_cached_prepare_mode(sparse, impl=impl)
             lu_plan = mat_wrappers.scb_mat_lu_solve_plan_prepare_mode(sparse, impl=impl)
             hpd_plan = mat_wrappers.scb_mat_hpd_solve_plan_prepare_mode(sparse, impl=impl)
             prefix = f"scb_{storage}_{impl}"
@@ -189,6 +216,26 @@ def run_scb_case(n: int, warmup: int, runs: int) -> dict[str, float]:
                 lambda plan, v: mat_wrappers.scb_mat_matvec_cached_apply_mode(plan, v, impl=impl),
                 cache,
                 rhs,
+                warmup=warmup,
+                runs=runs,
+            )
+            results[f"{prefix}_rmatvec_s"] = _time_call(
+                lambda a, v: mat_wrappers.scb_mat_rmatvec_mode(a, v, impl=impl),
+                sparse,
+                rhs,
+                warmup=warmup,
+                runs=runs,
+            )
+            results[f"{prefix}_cached_rmatvec_s"] = _time_call(
+                lambda plan, v: mat_wrappers.scb_mat_rmatvec_cached_apply_mode(plan, v, impl=impl),
+                rcache,
+                rhs,
+                warmup=warmup,
+                runs=runs,
+            )
+            results[f"{prefix}_eigsh_s"] = _time_call(
+                lambda a: mat_wrappers.scb_mat_eigsh_mode(a, k=min(2, n), which="largest", steps=min(n, max(4, 2 * min(2, n))), impl=impl),
+                sparse,
                 warmup=warmup,
                 runs=runs,
             )

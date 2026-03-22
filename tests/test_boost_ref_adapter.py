@@ -37,7 +37,7 @@ def test_boost_ref_adapter_bivariate_contract():
 
 
 def test_native_boost_ref_adapter_contract():
-    native = REPO_ROOT / "tools" / "run_boost_ref_adapter.sh"
+    native = REPO_ROOT / "benchmarks" / "run_boost_ref_adapter.sh"
     if sys.platform.startswith("win") or not native.exists():
         return
     cp = subprocess.run(

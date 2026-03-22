@@ -23,7 +23,7 @@ Current portability-relevant behavior:
 
 ### Benchmark harness
 
-- [run_benchmarks.py](/home/phili/projects/arbplusJAX/tools/run_benchmarks.py)
+- [run_benchmarks.py](/home/phili/projects/arbplusJAX/benchmarks/run_benchmarks.py)
 - [bench_harness.py](/home/phili/projects/arbplusJAX/benchmarks/bench_harness.py)
 
 Current portability-relevant behavior:

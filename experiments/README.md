@@ -15,7 +15,8 @@ Rules:
 - experiment subfolders should use human-readable names
 - notebooks and scripts live at the root of that experiment subfolder
 - `inputs/` and transient artifact subfolders should not be under source control
-- retained `outputs/` subfolders are for important artifacts and should be kept under source control via the repo's large-artifact storage path
+- experiment-local `outputs/` are scratch or pre-promotion material
+- semi-permanent retained artifacts belong under the repo-root `outputs/` tree
 
 Typical shape:
 
@@ -32,12 +33,14 @@ Benchmark code still belongs in `benchmarks/`.
 Experiments may call benchmarks and summarize their outputs, but benchmark CLI
 entrypoints do not move here.
 
-Experiments may read benchmark run artifacts from `benchmarks/results/`, but
-experiment-generated outputs must stay inside the experiment tree, typically
-under `experiments/<name>/outputs/`.
+Experiments may read benchmark run artifacts from `benchmarks/results/`.
+
+Experiment-local outputs may stay inside the experiment tree while work is in
+progress, but semi-permanent retained artifacts should be promoted into a named
+subfolder under the repo-root `outputs/` tree.
 
 Current retained experiment root:
 
 - `experiments/benchmarks/`
   - canonical retained benchmark experiment area
-  - keeps benchmark notebooks, support code, and experiment-owned retained outputs
+  - keeps benchmark notebooks, support code, and experiment-local working outputs

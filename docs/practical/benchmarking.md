@@ -23,5 +23,5 @@ This page is for the practical question: how should benchmark runs be structured
 ## Outputs
 
 - write benchmark artifacts under `experiments/benchmarks/outputs/`
-- write benchmark run trees under `experiments/benchmarks/results/`
+- write benchmark run trees under `benchmarks/results/`
 - use `benchmarks/benchmark_matrix_stack_diagnostics.py` when you need compile/recompile and memory visibility rather than pure throughput timing

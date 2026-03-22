@@ -160,8 +160,8 @@ def test_all_functions_smoke() -> None:
 
         if failures:
             # write a debug report for triage
-            report = Path(__file__).resolve().parent.parent / "results" / "test_failures_all_functions.txt"
-            report.parent.mkdir(exist_ok=True)
+            report = Path(__file__).resolve().parent.parent / "outputs" / "test_failures" / "test_failures_all_functions.txt"
+            report.parent.mkdir(parents=True, exist_ok=True)
             with report.open("w", encoding="utf-8") as r:
                 for name, module, msg in failures:
                     r.write(f"{module}.{name}: {msg}\n")

@@ -18,6 +18,11 @@ Comparisons:
 - Mathematica (if available)
 """
 
+from _source_tree_bootstrap import ensure_src_on_path
+
+ensure_src_on_path(__file__)
+
+
 import time
 import jax
 import jax.numpy as jnp

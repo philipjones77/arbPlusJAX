@@ -11,6 +11,10 @@ def test_besselk_metadata_marks_stable_bessel_surface():
     assert metadata.point_support is True
     assert metadata.interval_support is True
     assert metadata.interval_modes == ("point", "basic", "adaptive", "rigorous")
+    assert metadata.value_kinds == ("real", "complex", "real_interval", "complex_interval")
+    assert "besselk" in metadata.implementation_options
+    assert "cuda_besselk" in metadata.implementation_options
+    assert metadata.default_implementation == "besselk"
     assert "asymptotic" in metadata.method_tags
 
 
@@ -100,3 +104,51 @@ def test_laplace_bessel_tail_metadata_marks_experimental_tail_specialization():
     assert "tail_specialization" in metadata.method_tags
     assert "slow_combined_decay" in metadata.regime_tags
     assert metadata.derivative_status == "explicit_custom_jvp_and_explicit_lambda_lower"
+
+
+def test_incomplete_gamma_metadata_exposes_method_parameters_and_execution_strategy():
+    metadata = api.get_public_function_metadata("incomplete_gamma_upper")
+
+    assert metadata.default_method == "quadrature"
+    assert "regularized" in metadata.method_parameter_names
+    assert "panel_width" in metadata.method_parameter_names
+    assert metadata.execution_strategies == ("direct",)
+
+
+def test_evaluate_routes_to_alternative_implementation_by_name():
+    x = 0.5
+    y = 2.0
+
+    routed = api.evaluate("besselk", x, y, implementation="cuda_besselk", value_kind="real")
+    direct = api.eval_point("cuda_besselk", x, y)
+
+    assert routed == direct
+
+
+def test_evaluate_routes_method_and_method_params_to_direct_signature():
+    s = 2.5
+    z = 1.0
+
+    routed = api.evaluate(
+        "incomplete_gamma_upper",
+        s,
+        z,
+        method="quadrature",
+        method_params={"samples_per_panel": 8, "max_panels": 16},
+        return_diagnostics=False,
+    )
+    direct = api.incomplete_gamma_upper(
+        s,
+        z,
+        method="quadrature",
+        samples_per_panel=8,
+        max_panels=16,
+        return_diagnostics=False,
+    )
+
+    assert routed == direct
+
+
+def test_evaluate_rejects_interval_value_kind_with_point_mode():
+    with pytest.raises(ValueError):
+        api.evaluate("besselk", 0.5, 2.0, value_kind="real_interval")

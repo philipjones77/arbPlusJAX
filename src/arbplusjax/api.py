@@ -3,7 +3,7 @@ from __future__ import annotations
 import importlib
 import inspect
 from functools import lru_cache, partial
-from typing import Callable
+from typing import Callable, Mapping
 
 import jax
 from jax import lax
@@ -108,6 +108,8 @@ _COMPLEX_BY_FLOAT_DTYPE = {
     jnp.dtype(jnp.float32): jnp.dtype(jnp.complex64),
     jnp.dtype(jnp.float64): jnp.dtype(jnp.complex128),
 }
+
+_MODE_SET = ("point", "basic", "adaptive", "rigorous")
 
 _HYPGEOM_BASIC_BATCH_FASTPATHS = {
     "arb_hypgeom_0f1": ("arb_hypgeom_0f1_batch_fixed_prec", "arb_hypgeom_0f1_batch_padded_prec"),
@@ -1490,6 +1492,155 @@ def eval_interval_batch(
     return trim_batch_out(_cast_out_to_dtype(out, target), n)
 
 
+_VALUE_KIND_TO_DTYPE = {
+    "real": jnp.dtype(jnp.float64),
+    "real_interval": jnp.dtype(jnp.float64),
+    "complex": jnp.dtype(jnp.complex128),
+    "complex_interval": jnp.dtype(jnp.complex128),
+    "real_matrix": jnp.dtype(jnp.float64),
+    "real_interval_matrix": jnp.dtype(jnp.float64),
+    "complex_matrix": jnp.dtype(jnp.complex128),
+    "complex_interval_matrix": jnp.dtype(jnp.complex128),
+}
+
+
+def _dtype_from_value_kind(value_kind: str | None) -> jnp.dtype | None:
+    if value_kind is None:
+        return None
+    if value_kind not in _VALUE_KIND_TO_DTYPE:
+        raise ValueError(f"unsupported value_kind {value_kind!r}")
+    return _VALUE_KIND_TO_DTYPE[value_kind]
+
+
+def _resolve_target_dtype(args: tuple[jax.Array, ...], dtype: str | jnp.dtype | None, value_kind: str | None) -> jnp.dtype:
+    if value_kind is not None and dtype is not None:
+        return jnp.dtype(dtype)
+    explicit = _dtype_from_value_kind(value_kind)
+    if explicit is not None:
+        return explicit
+    return _resolve_dtype_for_args(args, dtype)
+
+
+def _resolve_dispatch_name(
+    name: str,
+    implementation: str | None,
+    metadata: PublicFunctionMetadata,
+) -> str:
+    if implementation is None or implementation in {"auto", metadata.default_implementation}:
+        return name
+    if implementation not in metadata.implementation_options:
+        raise ValueError(
+            f"unsupported implementation {implementation!r} for {name!r}; "
+            f"expected one of {metadata.implementation_options}"
+        )
+    return implementation
+
+
+def _validate_selection(
+    metadata: PublicFunctionMetadata,
+    *,
+    mode: str,
+    value_kind: str | None,
+    implementation_version: str | None,
+    strategy: str | None,
+) -> None:
+    if mode not in _MODE_SET:
+        raise ValueError(f"unsupported mode {mode!r}; expected one of {_MODE_SET}")
+    if value_kind is not None and value_kind not in metadata.value_kinds:
+        raise ValueError(
+            f"unsupported value_kind {value_kind!r} for {metadata.name!r}; "
+            f"expected one of {metadata.value_kinds}"
+        )
+    if value_kind is not None and "interval" in value_kind and mode == "point":
+        raise ValueError("interval value kinds require a non-point mode")
+    if implementation_version is not None and implementation_version not in metadata.implementation_versions:
+        raise ValueError(
+            f"unsupported implementation_version {implementation_version!r} for {metadata.name!r}; "
+            f"expected one of {metadata.implementation_versions}"
+        )
+    if strategy is not None and strategy not in metadata.execution_strategies:
+        raise ValueError(
+            f"unsupported strategy {strategy!r} for {metadata.name!r}; "
+            f"expected one of {metadata.execution_strategies}"
+        )
+
+
+def _call_routed_public_function(
+    name: str,
+    args: tuple[jax.Array, ...],
+    *,
+    mode: str,
+    prec_bits: int | None,
+    dps: int | None,
+    dtype: jnp.dtype,
+    kwargs: dict[str, object],
+) -> jax.Array:
+    cast_args = tuple(_cast_arg_to_dtype(arg, dtype) for arg in args)
+    if mode == "point" and not kwargs:
+        return eval_point(name, *cast_args, dtype=dtype)
+    if mode != "point" and not kwargs:
+        return eval_interval(name, *cast_args, mode=mode, prec_bits=prec_bits, dps=dps, dtype=dtype)
+
+    fn = _resolve_interval_fn(name) if mode != "point" else _resolve_point_fn(name)
+    call_kwargs = dict(kwargs)
+    has_mode, has_prec_bits, has_dps = _optional_kwarg_support(fn)
+    if mode != "point":
+        if not has_mode:
+            raise ValueError(
+                f"{name!r} does not expose direct mode-routed kwargs; use the canonical eval_point/eval_interval surface "
+                "or a function whose signature accepts method/strategy selection."
+            )
+        call_kwargs["mode"] = mode
+    if prec_bits is not None and has_prec_bits:
+        call_kwargs["prec_bits"] = prec_bits
+    if dps is not None and has_dps:
+        call_kwargs["dps"] = dps
+    out = fn(*cast_args, **call_kwargs)
+    return _cast_out_to_dtype(out, dtype)
+
+
+def evaluate(
+    name: str,
+    *args: jax.Array,
+    mode: str = "point",
+    dtype: str | jnp.dtype | None = None,
+    value_kind: str | None = None,
+    implementation: str | None = None,
+    implementation_version: str | None = None,
+    method: str | None = None,
+    strategy: str | None = None,
+    method_params: Mapping[str, object] | None = None,
+    prec_bits: int | None = None,
+    dps: int | None = None,
+    **kwargs,
+) -> jax.Array:
+    metadata = get_public_function_metadata(name)
+    _validate_selection(
+        metadata,
+        mode=mode,
+        value_kind=value_kind,
+        implementation_version=implementation_version,
+        strategy=strategy,
+    )
+    dispatch_name = _resolve_dispatch_name(name, implementation, metadata)
+    target = _resolve_target_dtype(args, dtype, value_kind)
+    call_kwargs = dict(method_params or {})
+    call_kwargs.update(kwargs)
+    if method is not None:
+        call_kwargs.setdefault("method", method)
+    if strategy is not None:
+        call_kwargs.setdefault("strategy", strategy)
+    return _call_routed_public_function(
+        dispatch_name,
+        args,
+        mode=mode,
+        prec_bits=prec_bits,
+        dps=dps,
+        dtype=target,
+        kwargs=call_kwargs,
+    )
+
+
 def _chunked_apply(fn: Callable, args: tuple[object, ...], chunk_size: int) -> jax.Array:
     if chunk_size <= 0:
         raise ValueError("chunk_size must be > 0")
@@ -1720,6 +1871,7 @@ def _point_ad_fn(name: str, kind: str, argnums: int | tuple[int, ...]):
 
 
 __all__ = [
+    "evaluate",
     "eval_point",
     "eval_point_batch",
     "eval_point_batch_chunked",

@@ -31,6 +31,7 @@ examples/outputs/*
 !examples/outputs/*/
 !examples/outputs/*/README.md
 experiments/*/inputs/
+experiments/*/outputs/
 experiments/*/artifacts/
 experiments/*/cache/
 experiments/*/figures/

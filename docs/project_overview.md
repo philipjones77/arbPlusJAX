@@ -15,7 +15,7 @@ arbPlusJAX is the active JAX implementation workspace. The repository separates 
 - `examples/`: runnable demos and templates
 - `experiments/`: exploratory work
 - `experiments/benchmarks/outputs/`: benchmark-side generated artifact root
-- `experiments/benchmarks/results/`: benchmark run root
+- `benchmarks/results/`: benchmark run root
 
 ## Docs map
 
@@ -46,12 +46,12 @@ arbPlusJAX is the active JAX implementation workspace. The repository separates 
 - status docs:
   - [status/todo.md](/home/phili/projects/arbplusJAX/docs/status/todo.md)
   - [status/audit.md](/home/phili/projects/arbplusJAX/docs/status/audit.md)
-  - [status/reports/README.md](/home/phili/projects/arbplusJAX/docs/status/reports/README.md)
+  - [reports/README.md](/home/phili/projects/arbplusJAX/docs/reports/README.md)
 
 ## Current conventions
 
 - keep `docs/specs/`, `docs/objects/`, `contracts/`, and `docs/implementation/` as the core repository structure for semantics, object catalogs, guarantees, and implementation notes
 - dense explicit matrix work lives under `arb_mat` and `acb_mat`
 - Jones-labeled `jrb_mat` and `jcb_mat` are the matrix-free/operator JAX layer
-- generated reports belong under `docs/status/reports/`
+- generated reports belong under `docs/reports/`
 - semantic definitions should go in `docs/specs/`, not in ad hoc implementation notes

@@ -230,7 +230,7 @@ def main() -> None:
     untested = sorted(n for n in jax_funcs if n not in tested)
 
     timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
-    results_dir = JAX_ROOT / "results"
+    results_dir = JAX_ROOT / "outputs" / "audits"
     results_dir.mkdir(exist_ok=True)
     audit_md = results_dir / f"audit_{timestamp}.md"
 

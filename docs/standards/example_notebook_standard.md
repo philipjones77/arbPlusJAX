@@ -116,11 +116,15 @@ Each example should own a single named subfolder and reuse that location for:
 
 - templates
 - shared example fixtures
-- retained example summaries
-- example-specific generated outputs
+- local working summaries
+- example-specific generated outputs during notebook development
 
 Avoid duplicating equivalent templates or retained outputs across multiple
 example folders.
+
+Semi-permanent retained artifacts do not belong to the canonical example-owned
+output tree. Promote those into named subfolders under the repo-root
+`outputs/` directory.
 
 ### Instantiation rule
 

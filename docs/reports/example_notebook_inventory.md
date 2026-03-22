@@ -88,7 +88,7 @@ Current notebook coverage:
 
 Related non-notebook example:
 
-- `matfree_adjoints_examples.py`
+- `example_matrix_free_adjoints.py`
 
 Status:
 

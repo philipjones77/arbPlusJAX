@@ -10,7 +10,7 @@ SRC_ROOT = REPO_ROOT / "src"
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from tools.reference_backends import apply_reference_env
+from benchmarks.reference_backends import apply_reference_env
 
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))

@@ -21,8 +21,6 @@ def main() -> None:
     if args.lookup:
         print(fp.render_lookup(args.lookup), end="")
         return
-    _write(REPO_ROOT / "docs" / "function_naming.md", fp.render_policy())
-    _write(REPO_ROOT / "docs" / "engineering_policy.md", fp.render_engineering_policy())
     _write(REPO_ROOT / "docs" / "reports" / "function_provenance_registry.md", fp.render_registry_summary())
     _write(REPO_ROOT / "docs" / "reports" / "function_capability_registry.json", cr.render_capability_registry_json())
     _write(REPO_ROOT / "docs" / "reports" / "function_implementation_index.md", fp.render_implementation_index())

@@ -56,7 +56,7 @@ export XLA_PYTHON_CLIENT_MEM_FRACTION=0.85
 Recommended benchmark pattern for stable GPU timings:
 
 ```bash
-python tools/run_benchmarks.py --profile quick
+python benchmarks/run_benchmarks.py --profile quick
 ```
 
 The benchmark harness already supports batched JAX mode by default.
@@ -92,7 +92,7 @@ from pathlib import Path
 import shutil
 
 drive.mount('/content/drive')
-run_dir = Path('/content/arbplusJAX/experiments/benchmarks/results')
+run_dir = Path('/content/arbplusJAX/benchmarks/results')
 out_dir = Path('/content/drive/MyDrive/arbplusjax_runs')
 out_dir.mkdir(parents=True, exist_ok=True)
 

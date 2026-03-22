@@ -19,12 +19,6 @@ classifiers = [
   "License :: OSI Approved :: GNU Lesser General Public License v3 or later (LGPLv3+)",
 ]
 
-[project.optional-dependencies]
-petsc = [
-  "petsc4py",
-  "slepc4py",
-]
-
 [tool.setuptools]
 package-dir = {"" = "src"}
 
@@ -39,6 +33,27 @@ testpaths = ["tests", "benchmarks"]
 markers = [
   "parity: tests that require the C reference libraries",
   "benchmark: optional benchmark checks and benchmark harness smoke tests",
+  "benchmark_perf: performance-oriented benchmark tests",
+  "benchmark_accuracy: accuracy/error-oriented benchmark tests",
+  "benchmark_compare: cross-backend or comparison benchmark tests",
+  "benchmark_compile: compile/recompile-oriented benchmark tests",
+  "benchmark_ad: autodiff/forward-backward benchmark tests",
+  "benchmark_official: canonical benchmark entrypoints for a benchmark concern",
+  "benchmark_cpu: benchmark tests intended for CPU execution",
+  "benchmark_gpu: benchmark tests intended for GPU or GPU-optional execution",
+  "benchmark_api: API routing and facade benchmark tests",
+  "benchmark_scalar: scalar/core arithmetic benchmark tests",
+  "benchmark_special: special-function benchmark tests",
+  "benchmark_combinatorics: combinatorics/sequence benchmark tests",
+  "benchmark_transform: transform benchmark tests",
+  "benchmark_backend_matrix: matrix backend comparison benchmark tests",
+  "benchmark_backend_transform: transform backend comparison benchmark tests",
+  "benchmark_matrix: broad matrix benchmark tests",
+  "benchmark_matrix_dense: dense matrix benchmark tests",
+  "benchmark_matrix_sparse: sparse matrix benchmark tests",
+  "benchmark_matrix_block_sparse: block-sparse matrix benchmark tests",
+  "benchmark_matrix_vblock_sparse: variable-block sparse matrix benchmark tests",
+  "benchmark_matrix_free: matrix-free/operator benchmark tests",
 ]
 
 [tool.ruff]

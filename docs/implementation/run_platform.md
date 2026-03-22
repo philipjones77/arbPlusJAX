@@ -13,7 +13,7 @@ The rule is simple:
 - `tests/` owns correctness
 - `benchmarks/` owns performance and cross-backend comparison
 - `tools/run_test_harness.py` owns test orchestration
-- `tools/run_benchmarks.py` and `tools/run_harness_profile.py` own benchmark orchestration
+- `benchmarks/run_benchmarks.py` and `benchmarks/run_harness_profile.py` own benchmark orchestration
 
 ## Environment matrix
 
@@ -29,7 +29,7 @@ The VS Code explorer root should be the repository root, [arbplusJAX](/home/phil
 
 Workspace files:
 
-- [arbPlusJAX.code-workspace](/home/phili/projects/arbplusJAX/arbPlusJAX.code-workspace): generic root workspace
+- `arbPlusJAX.code-workspace`: not currently present in this repo
 - [arbPlusJAX-linux.code-workspace](/home/phili/projects/arbplusJAX/arbPlusJAX-linux.code-workspace): Linux-specific defaults
 - [arbPlusJAX-windows.code-workspace](/home/phili/projects/arbplusJAX/arbPlusJAX-windows.code-workspace): Windows-specific defaults
 
@@ -52,7 +52,7 @@ Linux:
 
 ```bash
 python tools/run_test_harness.py --profile chassis --jax-mode cpu
-python tools/run_benchmarks.py --profile quick
+python benchmarks/run_benchmarks.py --profile quick
 ```
 
 Google Colab:
@@ -60,7 +60,7 @@ Google Colab:
 ```bash
 !python /content/arbplusJAX/tools/check_jax_runtime.py --quick-bench
 !python /content/arbplusJAX/tools/run_test_harness.py --profile chassis --jax-mode gpu
-!python /content/arbplusJAX/tools/run_benchmarks.py --profile quick
+!python /content/arbplusJAX/benchmarks/run_benchmarks.py --profile quick
 ```
 
 ## Test and benchmark contract
@@ -70,6 +70,12 @@ Google Colab:
 - Benchmark smoke tests should remain lightweight and invocable through pytest.
 - Full benchmark sweeps should stay outside the normal test harness so long runs can be scheduled independently.
 - When `tools/run_test_harness.py` is used with `--outdir`, and for every `benchmarks/bench_harness.py` run, both surfaces now emit the same `runtime_manifest.json` schema so OS, local/WSL/Colab, Python, JAX backend, and key env vars are recorded consistently.
+
+## Source-tree execution rule
+
+- Tests, benchmarks, and notebooks should import `arbplusjax` from `src/arbplusjax` in the current workspace.
+- Do not rely on a separately installed wheel or editable package copy when validating the active repo state.
+- Repo-root, `tests/`, `examples/`, `experiments/`, and `benchmarks/` source-tree bootstrap files should keep `src/` on `sys.path` for normal local execution.
 
 ## Matrix-specific note
 

@@ -281,6 +281,126 @@ def sparse_is_hermitian_structural(x, *, to_coo_fn, rtol: float, atol: float):
     return jnp.max(jnp.abs(data)) <= tol
 
 
+def _sparse_entry_map(coo):
+    entry_map = {}
+    for idx in range(int(coo.data.shape[0])):
+        key = (int(coo.row[idx]), int(coo.col[idx]))
+        value = coo.data[idx]
+        if key in entry_map:
+            entry_map[key] = entry_map[key] + value
+        else:
+            entry_map[key] = value
+    return entry_map
+
+
+def sparse_ldl_structural(
+    x,
+    *,
+    to_coo_fn,
+    structured_part_fn,
+    is_structured_fn,
+    dtype,
+    hermitian: bool,
+):
+    if not bool(is_structured_fn(x)):
+        raise ValueError("structured sparse LDL requires symmetric/Hermitian input")
+    coo = to_coo_fn(structured_part_fn(x))
+    n = int(coo.rows)
+    zero = jnp.asarray(0, dtype=dtype)
+    entry_map = _sparse_entry_map(coo)
+    l_cols: list[dict[int, jax.Array]] = [{i: jnp.asarray(1, dtype=dtype)} for i in range(n)]
+    d_values: list[jax.Array] = []
+    for k in range(n):
+        diag = entry_map.get((k, k), zero)
+        for s in range(k):
+            lks = l_cols[s].get(k, zero)
+            if hermitian:
+                diag = diag - lks * jnp.conj(lks) * d_values[s]
+            else:
+                diag = diag - lks * lks * d_values[s]
+        d_values.append(diag)
+        for i in range(k + 1, n):
+            accum = entry_map.get((i, k), zero)
+            for s in range(k):
+                lis = l_cols[s].get(i, zero)
+                lks = l_cols[s].get(k, zero)
+                if hermitian:
+                    accum = accum - lis * jnp.conj(lks) * d_values[s]
+                else:
+                    accum = accum - lis * lks * d_values[s]
+            lik = accum / diag
+            if bool(jnp.abs(lik) > 0.0):
+                l_cols[k][i] = lik
+    row = []
+    col = []
+    data = []
+    for j in range(n):
+        for i, value in sorted(l_cols[j].items()):
+            row.append(i)
+            col.append(j)
+            data.append(value)
+    if data:
+        data_arr = jnp.stack(data, axis=0)
+        row_arr = jnp.asarray(row, dtype=jnp.int32)
+        col_arr = jnp.asarray(col, dtype=jnp.int32)
+    else:
+        data_arr = jnp.zeros((0,), dtype=dtype)
+        row_arr = jnp.zeros((0,), dtype=jnp.int32)
+        col_arr = jnp.zeros((0,), dtype=jnp.int32)
+    d_arr = jnp.stack(d_values, axis=0) if d_values else jnp.zeros((0,), dtype=dtype)
+    return data_arr, row_arr, col_arr, d_arr
+
+
+def sparse_cho_structural(
+    x,
+    *,
+    to_coo_fn,
+    structured_part_fn,
+    is_structured_fn,
+    dtype,
+    hermitian: bool,
+):
+    data, row, col, d = sparse_ldl_structural(
+        x,
+        to_coo_fn=to_coo_fn,
+        structured_part_fn=structured_part_fn,
+        is_structured_fn=is_structured_fn,
+        dtype=dtype,
+        hermitian=hermitian,
+    )
+    sqrt_d = jnp.sqrt(d)
+    scaled = data * sqrt_d[col]
+    return scaled, row, col
+
+
+def sparse_is_pd_structural(
+    x,
+    *,
+    to_coo_fn,
+    structured_part_fn,
+    is_structured_fn,
+    dtype,
+    hermitian: bool,
+):
+    if not bool(is_structured_fn(x)):
+        return jnp.asarray(False)
+    _, _, _, d = sparse_ldl_structural(
+        x,
+        to_coo_fn=to_coo_fn,
+        structured_part_fn=structured_part_fn,
+        is_structured_fn=is_structured_fn,
+        dtype=dtype,
+        hermitian=hermitian,
+    )
+    if hermitian:
+        finite = jnp.all(jnp.isfinite(jnp.real(d))) & jnp.all(jnp.isfinite(jnp.imag(d)))
+        positive = jnp.all(jnp.real(d) > 0.0)
+    else:
+        finite = jnp.all(jnp.isfinite(d))
+        positive = jnp.all(d > 0.0)
+    return finite & positive
+
+
 def sparse_lowest_eig_real_symmetric(x, *, to_dense_fn):
     vals = jnp.linalg.eigvalsh(to_dense_fn(x))
     return vals[0]
@@ -307,16 +427,159 @@ def sparse_is_hpd_structural(x, *, is_hermitian_fn, structured_part_fn, to_dense
 
 def sparse_lu_via_jax_dense(x, *, as_csr_fn, to_dense_fn, from_dense_csr_fn, permutation_matrix_fn, complex_: bool):
     csr = as_csr_fn(x, label="sparse_core.lu")
-    a = to_dense_fn(csr)
-    perm, l, u = dense_sparse_lu_partial_pivot(a) if complex_ else dense_sparse_lu_partial_pivot_lax(a)
-    p = permutation_matrix_fn(perm)
-    l_sparse = from_dense_csr_fn(jnp.tril(l))
-    u_sparse = from_dense_csr_fn(jnp.triu(u))
+    del to_dense_fn, from_dense_csr_fn, complex_
+    coo = csr_to_coo(csr)
+    n = int(coo.rows)
+    zero = jnp.asarray(0, dtype=coo.data.dtype)
+    u_rows = [dict() for _ in range(n)]
+    for idx in range(int(coo.data.shape[0])):
+        row = int(coo.row[idx])
+        col = int(coo.col[idx])
+        value = coo.data[idx]
+        if col in u_rows[row]:
+            u_rows[row][col] = u_rows[row][col] + value
+        else:
+            u_rows[row][col] = value
+    l_rows = [{i: jnp.asarray(1, dtype=coo.data.dtype)} for i in range(n)]
+    perm = list(range(n))
+    for k in range(n):
+        pivot = max(range(k, n), key=lambda i: float(jnp.abs(u_rows[i].get(k, zero))))
+        if pivot != k:
+            u_rows[k], u_rows[pivot] = u_rows[pivot], u_rows[k]
+            perm[k], perm[pivot] = perm[pivot], perm[k]
+            for j in range(k):
+                vk = l_rows[k].get(j, zero)
+                vp = l_rows[pivot].get(j, zero)
+                if bool(jnp.abs(vk) > 0.0):
+                    l_rows[pivot][j] = vk
+                else:
+                    l_rows[pivot].pop(j, None)
+                if bool(jnp.abs(vp) > 0.0):
+                    l_rows[k][j] = vp
+                else:
+                    l_rows[k].pop(j, None)
+        pivot_value = u_rows[k].get(k, zero)
+        for i in range(k + 1, n):
+            entry = u_rows[i].get(k, zero)
+            if not bool(jnp.abs(entry) > 0.0):
+                continue
+            factor = entry / pivot_value
+            l_rows[i][k] = factor
+            pivot_row = list(u_rows[k].items())
+            for j, value in pivot_row:
+                if j < k:
+                    continue
+                updated = u_rows[i].get(j, zero) - factor * value
+                if bool(jnp.abs(updated) > 0.0):
+                    u_rows[i][j] = updated
+                else:
+                    u_rows[i].pop(j, None)
+            u_rows[i].pop(k, None)
+    l_data = []
+    l_row = []
+    l_col = []
+    u_data = []
+    u_row = []
+    u_col = []
+    for i in range(n):
+        for j, value in sorted(l_rows[i].items()):
+            if j <= i and bool(jnp.abs(value) > 0.0):
+                l_data.append(value)
+                l_row.append(i)
+                l_col.append(j)
+        for j, value in sorted(u_rows[i].items()):
+            if j >= i and bool(jnp.abs(value) > 0.0):
+                u_data.append(value)
+                u_row.append(i)
+                u_col.append(j)
+    l_data_arr = jnp.stack(l_data, axis=0) if l_data else jnp.zeros((0,), dtype=coo.data.dtype)
+    l_row_arr = jnp.asarray(l_row, dtype=jnp.int32) if l_row else jnp.zeros((0,), dtype=jnp.int32)
+    l_col_arr = jnp.asarray(l_col, dtype=jnp.int32) if l_col else jnp.zeros((0,), dtype=jnp.int32)
+    u_data_arr = jnp.stack(u_data, axis=0) if u_data else jnp.zeros((0,), dtype=coo.data.dtype)
+    u_row_arr = jnp.asarray(u_row, dtype=jnp.int32) if u_row else jnp.zeros((0,), dtype=jnp.int32)
+    u_col_arr = jnp.asarray(u_col, dtype=jnp.int32) if u_col else jnp.zeros((0,), dtype=jnp.int32)
+    p = permutation_matrix_fn(jnp.asarray(perm, dtype=jnp.int32))
+    l_sparse = type(csr)(
+        data=l_data_arr,
+        indices=l_col_arr,
+        indptr=coo_to_csr_indptr(l_row_arr, rows=n),
+        rows=n,
+        cols=n,
+        algebra=csr.algebra,
+    )
+    u_sparse = type(csr)(
+        data=u_data_arr,
+        indices=u_col_arr,
+        indptr=coo_to_csr_indptr(u_row_arr, rows=n),
+        rows=n,
+        cols=n,
+        algebra=csr.algebra,
+    )
     return p, l_sparse, u_sparse
 
 
 def sparse_direct_solve(x, b, *, to_dense_fn):
     return jnp.linalg.solve(to_dense_fn(x), b)
+
+
+def csr_to_coo(csr):
+    row = jnp.repeat(jnp.arange(csr.rows, dtype=jnp.int32), jnp.diff(csr.indptr))
+    return type("SparseCOOTmp", (), {"data": csr.data, "row": row, "col": csr.indices, "rows": csr.rows, "cols": csr.cols})()
+
+
+def coo_to_csr_indptr(row: jax.Array, *, rows: int) -> jax.Array:
+    counts = jnp.bincount(row, length=rows)
+    return jnp.concatenate([jnp.array([0], dtype=jnp.int32), jnp.cumsum(counts, dtype=jnp.int32)])
+
+
+def sparse_dense_power_ui(x, n: int, *, to_bcoo_fn, matmul_sparse_fn, to_dense_fn, identity_sparse_fn):
+    if n < 0:
+        raise ValueError("n must be >= 0")
+    base = to_bcoo_fn(x, label="sparse_core.power_ui.base")
+    result = identity_sparse_fn(base.rows, dtype=base.data.dtype)
+    exp = int(n)
+    while exp > 0:
+        if exp & 1:
+            result = matmul_sparse_fn(result, base)
+        exp >>= 1
+        if exp:
+            base = matmul_sparse_fn(base, base)
+    return to_dense_fn(result)
+
+
+def sparse_charpoly_from_traces(x, *, to_bcoo_fn, matmul_sparse_fn, trace_fn, identity_sparse_fn):
+    a = to_bcoo_fn(x, label="sparse_core.charpoly.base")
+    n = int(a.rows)
+    power = identity_sparse_fn(n, dtype=a.data.dtype)
+    power_sums = []
+    for _ in range(n):
+        power = matmul_sparse_fn(power, a)
+        power_sums.append(trace_fn(power))
+    dtype = jnp.asarray(power_sums[0]).dtype if power_sums else a.data.dtype
+    e = [jnp.asarray(1, dtype=dtype)]
+    coeffs = [jnp.asarray(1, dtype=dtype)]
+    for k in range(1, n + 1):
+        accum = jnp.asarray(0, dtype=dtype)
+        for i in range(1, k + 1):
+            accum = accum + ((-1) ** (i - 1)) * e[k - i] * power_sums[i - 1]
+        e_k = accum / jnp.asarray(k, dtype=dtype)
+        e.append(e_k)
+        coeffs.append(((-1) ** k) * e_k)
+    return jnp.stack(coeffs, axis=0)
+
+
+def sparse_dense_exp_taylor(x, *, to_bcoo_fn, matmul_sparse_fn, to_dense_fn, identity_sparse_fn, terms: int = 24):
+    a = to_bcoo_fn(x, label="sparse_core.exp.base")
+    n = int(a.rows)
+    dense_out = jnp.eye(n, dtype=a.data.dtype)
+    term = identity_sparse_fn(n, dtype=a.data.dtype)
+    factorial_dtype = jnp.real(jnp.asarray(0, dtype=a.data.dtype)).dtype
+    factorial = jnp.asarray(1.0, dtype=factorial_dtype)
+    for k in range(1, int(terms) + 1):
+        term = matmul_sparse_fn(term, a)
+        factorial = factorial * jnp.asarray(k, dtype=factorial.dtype)
+        dense_out = dense_out + to_dense_fn(term) / factorial
+    return dense_out
 
 
 __all__ = [
@@ -345,10 +608,16 @@ __all__ = [
     "sparse_structured_part_hermitian",
     "sparse_is_symmetric_structural",
     "sparse_is_hermitian_structural",
+    "sparse_ldl_structural",
+    "sparse_cho_structural",
+    "sparse_is_pd_structural",
     "sparse_lowest_eig_real_symmetric",
     "sparse_lowest_eig_hermitian",
     "sparse_is_spd_structural",
     "sparse_is_hpd_structural",
     "sparse_lu_via_jax_dense",
     "sparse_direct_solve",
+    "sparse_dense_power_ui",
+    "sparse_charpoly_from_traces",
+    "sparse_dense_exp_taylor",
 ]

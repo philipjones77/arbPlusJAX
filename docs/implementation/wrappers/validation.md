@@ -19,4 +19,4 @@ Validation compares arbPlusJAX against:
 ## Recent stress tests
 
 - loggamma: complex near the negative real axis; JAX basic matches C midpoint tightly, JAX point tracks mpmath.
-- bessel-k backend characterization run (pure JAX cuda_besselk): `experiments/benchmarks/results/cuda_besselk_compare_purejax_20260301/samples_256_seed_7/summary.csv`.
+- bessel-k backend characterization run (pure JAX cuda_besselk): `benchmarks/results/cuda_besselk_compare_purejax_20260301/samples_256_seed_7/summary.csv`.

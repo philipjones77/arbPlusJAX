@@ -16,6 +16,8 @@ Use each document for one primary job:
   - [function_naming.md](/home/phili/projects/arbplusJAX/docs/standards/function_naming.md)
 - reports placement and automation:
   - [report_standard.md](/home/phili/projects/arbplusJAX/docs/standards/report_standard.md)
+- root README placement and automation:
+  - [root_readme_standard.md](/home/phili/projects/arbplusJAX/docs/standards/root_readme_standard.md)
 - status placement and automation:
   - [status_standard.md](/home/phili/projects/arbplusJAX/docs/standards/status_standard.md)
 - precision and interval semantics:

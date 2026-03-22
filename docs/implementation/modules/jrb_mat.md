@@ -1,4 +1,4 @@
-Last updated: 2026-03-17T18:15:00Z
+Last updated: 2026-03-22T00:00:00Z
 
 # jrb_mat
 
@@ -60,6 +60,18 @@ Matrix-free operator and Krylov layer:
 - `jrb_mat_bcoo_operator(a)`
 - `jrb_mat_bcoo_operator_adjoint(a)`
 - `jrb_mat_bcoo_parametric_operator(indices, shape=...)`
+- `jrb_mat_dense_operator_plan_prepare(a)`
+- `jrb_mat_dense_operator_rmatvec_plan_prepare(a)`
+- `jrb_mat_dense_operator_adjoint_plan_prepare(a)`
+- `jrb_mat_shell_operator_plan_prepare(callback, context=...)`
+- `jrb_mat_finite_difference_operator_plan_prepare(function, base_point=..., ...)`
+- `jrb_mat_finite_difference_operator_plan_set_base(plan, base_point=..., ...)`
+- `jrb_mat_sparse_operator_plan_prepare(a)`
+- `jrb_mat_sparse_operator_rmatvec_plan_prepare(a)`
+- `jrb_mat_sparse_operator_adjoint_plan_prepare(a)`
+- `jrb_mat_block_sparse_operator_plan_prepare(a)`
+- `jrb_mat_vblock_sparse_operator_plan_prepare(a)`
+- `jrb_mat_bcoo_parametric_operator_plan_prepare(indices, data, shape=...)`
 - `jrb_mat_scipy_csr_operator(csr)`
 - `jrb_mat_bcoo_gershgorin_bounds(a, eps=...)`
 - `jrb_mat_bcoo_spectral_bounds_adaptive(a, steps=..., safety_margin=...)`
@@ -81,6 +93,8 @@ Matrix-free operator and Krylov layer:
 - `jrb_mat_trace_estimator_with_diagnostics_point(matvec, probes)`
 - `jrb_mat_logdet_slq_point(matvec, probes, steps)`
 - `jrb_mat_logdet_slq_with_diagnostics_point(matvec, probes, steps)`
+- `jrb_mat_logdet_solve_point(matvec, rhs, ...)`
+- `jrb_mat_logdet_solve_basic(matvec, rhs, ...)`
 - `jrb_mat_log_action_leja_point(matvec, x, degree=..., spectral_bounds=...)`
 - `jrb_mat_log_action_leja_with_diagnostics_point(...)`
 - `jrb_mat_hutchpp_trace_point(action_fn, sketch_probes, residual_probes)`
@@ -90,6 +104,38 @@ Matrix-free operator and Krylov layer:
 - `jrb_mat_bcoo_logdet_leja_hutchpp_with_diagnostics_point(a, sketch_probes, residual_probes, ...)`
 - `jrb_mat_bcoo_inverse_diagonal_point(a, overlap=..., block_size=..., correction_probes=...)`
 - `jrb_mat_bcoo_inverse_diagonal_with_diagnostics_point(...)`
+- `jrb_mat_minres_solve_action_point(matvec, rhs, preconditioner=..., **kwargs)`
+- `jrb_mat_minres_inverse_action_point(matvec, rhs, preconditioner=..., **kwargs)`
+- `jrb_mat_multi_shift_solve_point(matvec, rhs, shifts, symmetric=..., **kwargs)`
+- `jrb_mat_multi_shift_solve_symmetric_point(matvec, rhs, shifts, **kwargs)`
+- `jrb_mat_multi_shift_solve_spd_point(matvec, rhs, shifts, **kwargs)`
+- `jrb_mat_multi_shift_solve_basic(matvec, rhs, shifts, symmetric=..., **kwargs)`
+- `jrb_mat_eigsh_point(matvec, size=..., k=..., which=..., steps=...)`
+- `jrb_mat_eigsh_with_diagnostics_point(matvec, size=..., k=..., which=..., steps=...)`
+- `jrb_mat_eigsh_restarted_point(matvec, size=..., k=..., which=..., steps=..., restarts=..., block_size=...)`
+- `jrb_mat_eigsh_restarted_with_diagnostics_point(...)`
+- `jrb_mat_eigsh_block_point(matvec, size=..., k=..., which=..., steps=..., block_size=...)`
+- `jrb_mat_eigsh_block_with_diagnostics_point(...)`
+- `jrb_mat_eigsh_krylov_schur_point(matvec, size=..., k=..., which=..., steps=..., restarts=..., block_size=...)`
+- `jrb_mat_eigsh_krylov_schur_with_diagnostics_point(...)`
+- `jrb_mat_eigsh_davidson_point(matvec, size=..., k=..., which=..., subspace_iters=..., block_size=..., preconditioner=...)`
+- `jrb_mat_eigsh_davidson_with_diagnostics_point(...)`
+- `jrb_mat_eigsh_jacobi_davidson_point(matvec, size=..., k=..., which=..., subspace_iters=..., block_size=..., preconditioner=...)`
+- `jrb_mat_eigsh_jacobi_davidson_with_diagnostics_point(...)`
+- `jrb_mat_generalized_operator_plan_prepare(a_matvec, b_matvec, b_preconditioner=..., tol=..., atol=..., maxiter=...)`
+- `jrb_mat_geigsh_point(a_matvec, b_matvec, size=..., k=..., which=..., steps=..., b_preconditioner=...)`
+- `jrb_mat_geigsh_with_diagnostics_point(...)`
+- `jrb_mat_eigsh_shift_invert_point(matvec, size=..., shift=..., k=..., which=..., steps=..., preconditioner=...)`
+- `jrb_mat_eigsh_shift_invert_with_diagnostics_point(...)`
+- `jrb_mat_generalized_shift_invert_operator_plan_prepare(a_matvec, b_matvec, shift=..., preconditioner=..., tol=..., atol=..., maxiter=...)`
+- `jrb_mat_geigsh_shift_invert_point(a_matvec, b_matvec, size=..., shift=..., k=..., which=..., steps=..., preconditioner=...)`
+- `jrb_mat_geigsh_shift_invert_with_diagnostics_point(...)`
+- `jrb_mat_neigsh_point(matvec_builder, dmatvec_builder, size=..., lambda0=..., newton_iters=..., eig_steps=...)`
+- `jrb_mat_neigsh_with_diagnostics_point(...)`
+- `jrb_mat_peigsh_point(coeff_matvecs, size=..., lambda0=..., newton_iters=..., eig_steps=...)`
+- `jrb_mat_peigsh_with_diagnostics_point(...)`
+- `jrb_mat_eigsh_contour_point(matvec, size=..., center=..., radius=..., k=..., which=..., quadrature_order=..., block_size=..., preconditioner=...)`
+- `jrb_mat_eigsh_contour_with_diagnostics_point(...)`
 - `jrb_mat_rademacher_probes_like(x, key=..., num=...)`
 - `jrb_mat_normal_probes_like(x, key=..., num=...)`
 
@@ -125,6 +171,13 @@ Matrix-free layer:
 - this current selected-inversion subset is point-mode only and currently targets `diag(A^{-1})`; selected off-diagonal entries and `tr(A^{-1} dA)`-style surfaces remain future work
 - restarted Krylov support now exists for the matrix-free `expm` action path via repeated scaled-action application
 - block right-hand-side support now exists for the restarted `expm` action path through a batched matrix-free wrapper
+- multi-shift solve support now exists as a shared operator-plan path and is the current substrate for shifted solve benchmarking and future rational matrix-function work
+- partial-spectrum eigensolver support now includes restarted, block, Davidson, Jacobi-Davidson, shift-invert, and contour-filter entry points on the same operator substrate, but these families are still early implementations rather than fully hardened solver products
+- generalized Hermitian-definite partial-spectrum support now exists through `jrb_mat_geigsh_*`, including a generalized shift-invert spectral-transform path that applies `(A - sigma B)^{-1} B`
+- polynomial and nonlinear Hermitian point surfaces now exist through Newton refinement on the smallest-magnitude shift-invert eigenpair, with polynomial operators built automatically from coefficient operator families
+- those eigensolver paths now also expose diagnostics surfaces and the current Davidson/Jacobi-Davidson block retains and expands the trial subspace instead of collapsing back to a fixed-width basis each iteration
+- `logdet` and solve can now be returned together through `jrb_mat_logdet_solve_*`, with shared auxiliary metadata packaged in `matrix_free_core`
+- operator plans now also cover shell callbacks, finite-difference Jacobian-vector products, block/vblock sparse adapters, and a parameter-differentiable sparse `BCOO` closure path
 - Backward support now exists for the input/probe vector pathways through custom VJPs on:
   - `jrb_mat_funm_action_lanczos_point`
   - `jrb_mat_funm_integrand_lanczos_point`
@@ -160,7 +213,13 @@ Current diagnostic contract:
   - breakdown flag
   - adjoint-usage flag
   - gradient-support flag
-  - probe count
+- probe count
+  - primal residual
+  - adjoint residual
+  - regime/method/solver/structure codes
+  - convergence flag
+  - locked-count summary
+  - convergence metric
 - for Leja plus Hutch++ runs, `steps` records the used polynomial degree on the representative probe and `tail_norm` records the last Newton increment norm
 - `algorithm_code = 3` denotes the ordinary Leja plus Hutch++ path
 - `algorithm_code = 4` denotes the exact coordinate/eigenvector shortcut on the representative probe; in that case `steps = 1`
@@ -170,7 +229,7 @@ Current diagnostic contract:
   - explicit `adjoint` separation at the operator level on the complex side, while the real symmetric side reuses the same operator
   - verified hot-path implementation remains inside JAX execution: no SciPy calls, no NumPy host kernels, no callback ops, and no Python loops in the Krylov core
 
-## Not Yet Implemented
+## Not Yet Implemented / Not Yet Hardened
 
 Planned matrix-function families:
 - `jrb_mat_logm`
@@ -181,6 +240,12 @@ Planned matrix-function families:
 Planned lower-level substrate:
 - `qr`
 - Hessenberg / Schur-compatible reductions
+
+Still missing or incomplete on the current public matrix-free path:
+- broader operator-parameter adjoints beyond the sparse parametric operator-plan path
+- fully specified `basic` enclosure policy for stochastic estimators and solve-action families
+- mature locking / deflation / convergence-history policy for the newer eigensolver tranche
+- recycled Krylov basis reuse for repeated adjoints and rational matrix-function workflows
 
 ## Design Intent
 

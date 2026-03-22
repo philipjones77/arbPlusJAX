@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+from _source_tree_bootstrap import ensure_src_on_path
+
+ensure_src_on_path(__file__)
+
+
 import argparse
 from pathlib import Path
 
@@ -139,10 +144,18 @@ def build_cases(n: int):
     ]
 
 
+def _parse_case_filter(raw: str | None) -> set[str] | None:
+    if raw is None:
+        return None
+    out = {part.strip() for part in raw.split(",") if part.strip()}
+    return out or None
+
+
 def main():
     parser = argparse.ArgumentParser(description="Profile representative dense/sparse/matrix-free JAX matrix kernels.")
     parser.add_argument("--n", type=int, default=8)
     parser.add_argument("--repeats", type=int, default=4)
+    parser.add_argument("--cases", type=str, default=None, help="Comma-separated subset of case names to run.")
     parser.add_argument(
         "--output",
         type=Path,
@@ -151,7 +164,16 @@ def main():
     args = parser.parse_args()
 
     cfg = jax_diagnostics.config_from_env()
-    profiles = jax_diagnostics.profile_function_suite(build_cases(args.n), repeats=args.repeats, config=cfg)
+    cases = build_cases(args.n)
+    requested = _parse_case_filter(args.cases)
+    if requested is not None:
+        cases = [case for case in cases if case["name"] in requested]
+    print(
+        "[matrix_stack_diagnostics] cases:",
+        ",".join(case["name"] for case in cases),
+        flush=True,
+    )
+    profiles = jax_diagnostics.profile_function_suite(cases, repeats=args.repeats, config=cfg)
     path = jax_diagnostics.write_profile_report(args.output, profiles)
     print(path)
     for profile in profiles:

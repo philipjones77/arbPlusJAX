@@ -12,6 +12,7 @@ from . import arb_core
 from . import arb_mat
 from . import checks
 from . import double_interval as di
+from . import jrb_mat
 from . import mat_common
 from . import sparse_core
 from . import sparse_common as sc
@@ -79,6 +80,11 @@ def _as_real_rhs(x: jax.Array, label: str) -> jax.Array:
     arr = jnp.asarray(x, dtype=jnp.float64)
     checks.check(arr.ndim in (1, 2), f"{label}.ndim")
     return arr
+
+
+def _as_jrb_operator_sparse(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> sc.SparseBCOO:
+    bcoo = _as_bcoo(x, label="srb_mat.as_jrb_operator_sparse")
+    return sc.SparseBCOO(data=bcoo.data, indices=bcoo.indices, rows=bcoo.rows, cols=bcoo.cols, algebra="jrb")
 
 
 def _dense_interval_matrix(x, label: str) -> jax.Array:
@@ -175,6 +181,71 @@ def srb_mat_bcoo(data: jax.Array, indices: jax.Array, *, shape: tuple[int, int])
     )
 
 
+def srb_mat_interval_coo(data: jax.Array, row: jax.Array, col: jax.Array, *, shape: tuple[int, int]) -> sc.SparseIntervalCOO:
+    return sc.SparseIntervalCOO(
+        data=di.as_interval(data),
+        row=jnp.asarray(row, dtype=jnp.int32),
+        col=jnp.asarray(col, dtype=jnp.int32),
+        rows=int(shape[0]),
+        cols=int(shape[1]),
+        algebra="srb",
+    )
+
+
+def srb_mat_interval_csr(data: jax.Array, indices: jax.Array, indptr: jax.Array, *, shape: tuple[int, int]) -> sc.SparseIntervalCSR:
+    return sc.SparseIntervalCSR(
+        data=di.as_interval(data),
+        indices=jnp.asarray(indices, dtype=jnp.int32),
+        indptr=jnp.asarray(indptr, dtype=jnp.int32),
+        rows=int(shape[0]),
+        cols=int(shape[1]),
+        algebra="srb",
+    )
+
+
+def srb_mat_interval_bcoo(data: jax.Array, indices: jax.Array, *, shape: tuple[int, int]) -> sc.SparseIntervalBCOO:
+    return sc.SparseIntervalBCOO(
+        data=di.as_interval(data),
+        indices=jnp.asarray(indices, dtype=jnp.int32),
+        rows=int(shape[0]),
+        cols=int(shape[1]),
+        algebra="srb",
+    )
+
+
+def srb_mat_to_interval_sparse(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO):
+    return _interval_sparse_matrix(x, "srb_mat.to_interval_sparse")
+
+
+def srb_mat_interval_to_dense(x: sc.SparseIntervalCOO | sc.SparseIntervalCSR | sc.SparseIntervalBCOO) -> jax.Array:
+    return sc.sparse_interval_to_dense(x, algebra="srb", label="srb_mat.interval_to_dense")
+
+
+def srb_mat_interval_transpose(x: sc.SparseIntervalCOO | sc.SparseIntervalCSR | sc.SparseIntervalBCOO) -> sc.SparseIntervalBCOO:
+    return sc.sparse_interval_transpose(x, algebra="srb", label="srb_mat.interval_transpose")
+
+
+def srb_mat_interval_add(
+    x: sc.SparseIntervalCOO | sc.SparseIntervalCSR | sc.SparseIntervalBCOO,
+    y: sc.SparseIntervalCOO | sc.SparseIntervalCSR | sc.SparseIntervalBCOO,
+) -> sc.SparseIntervalBCOO:
+    return sc.sparse_interval_add(x, y, algebra="srb", label="srb_mat.interval_add")
+
+
+def srb_mat_interval_scale(
+    x: sc.SparseIntervalCOO | sc.SparseIntervalCSR | sc.SparseIntervalBCOO,
+    alpha,
+):
+    return sc.sparse_interval_scale(x, alpha, algebra="srb")
+
+
+def srb_mat_interval_matvec(
+    x: sc.SparseIntervalCOO | sc.SparseIntervalCSR | sc.SparseIntervalBCOO,
+    v: jax.Array,
+) -> jax.Array:
+    return sc.sparse_interval_matvec(x, di.as_interval(v), algebra="srb", label="srb_mat.interval_matvec")
+
+
 def srb_mat_from_dense_coo(a: jax.Array, *, tol: float = 0.0) -> sc.SparseCOO:
     a = _as_real_matrix(a, "srb_mat.from_dense_coo")
     mask = jnp.abs(a) > tol
@@ -232,9 +303,7 @@ def srb_mat_norm_inf(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Arra
 
 
 def srb_mat_trace_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
-    ix = _interval_sparse_matrix(x, "srb_mat.trace_basic")
-    dense = sc.sparse_interval_to_dense(ix, algebra="srb", label="srb_mat.trace_basic.dense")
-    return mat_common.interval_trace(dense)
+    return sc.sparse_interval_trace(_interval_sparse_matrix(x, "srb_mat.trace_basic"), algebra="srb", label="srb_mat.trace_basic")
 
 
 def srb_mat_norm_fro_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
@@ -244,17 +313,11 @@ def srb_mat_norm_fro_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> ja
 
 
 def srb_mat_norm_1_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
-    dense = sc.sparse_interval_to_dense(_interval_sparse_matrix(x, "srb_mat.norm_1_basic"), algebra="srb", label="srb_mat.norm_1_basic.dense")
-    abs_a = arb_core.arb_abs(dense)
-    col_sums = mat_common.interval_sum(abs_a, axis=-2)
-    return mat_common.interval_from_point(jnp.max(di.midpoint(col_sums), axis=-1))
+    return sc.sparse_interval_norm_1(_interval_sparse_matrix(x, "srb_mat.norm_1_basic"), algebra="srb", label="srb_mat.norm_1_basic")
 
 
 def srb_mat_norm_inf_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
-    dense = sc.sparse_interval_to_dense(_interval_sparse_matrix(x, "srb_mat.norm_inf_basic"), algebra="srb", label="srb_mat.norm_inf_basic.dense")
-    abs_a = arb_core.arb_abs(dense)
-    row_sums = mat_common.interval_sum(abs_a, axis=-1)
-    return mat_common.interval_from_point(jnp.max(di.midpoint(row_sums), axis=-1))
+    return sc.sparse_interval_norm_inf(_interval_sparse_matrix(x, "srb_mat.norm_inf_basic"), algebra="srb", label="srb_mat.norm_inf_basic")
 
 
 def srb_mat_submatrix(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, row_start: int, row_stop: int, col_start: int, col_stop: int) -> sc.SparseCOO:
@@ -456,31 +519,38 @@ def srb_mat_is_symmetric(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, *, rtol
 
 
 def srb_mat_is_spd(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
-    return sparse_core.sparse_is_spd_structural(
+    return sparse_core.sparse_is_pd_structural(
         x,
-        is_symmetric_fn=srb_mat_is_symmetric,
+        to_coo_fn=_to_coo_any,
         structured_part_fn=srb_mat_symmetric_part,
-        to_dense_fn=srb_mat_to_dense,
+        is_structured_fn=srb_mat_is_symmetric,
+        dtype=jnp.float64,
+        hermitian=False,
     )
 
 
 def srb_mat_cho(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> sc.SparseCSR:
-    return sparse_core.sparse_midpoint_cho_from_symmetric_part(
+    data, row, col = sparse_core.sparse_cho_structural(
         x,
+        to_coo_fn=_to_coo_any,
         structured_part_fn=srb_mat_symmetric_part,
-        to_dense_fn=srb_mat_to_dense,
-        from_dense_csr_fn=srb_mat_from_dense_csr,
+        is_structured_fn=srb_mat_is_symmetric,
+        dtype=jnp.float64,
+        hermitian=False,
     )
+    return srb_mat_coo_to_csr(srb_mat_coo(data, row, col, shape=srb_mat_shape(x)))
 
 
 def srb_mat_ldl(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> tuple[sc.SparseCSR, jax.Array]:
-    l, d = sparse_core.sparse_midpoint_ldl_from_cho(
+    data, row, col, d = sparse_core.sparse_ldl_structural(
         x,
-        cho_fn=srb_mat_cho,
-        to_dense_fn=srb_mat_to_dense,
-        diag_map_fn=lambda diag: diag * diag,
+        to_coo_fn=_to_coo_any,
+        structured_part_fn=srb_mat_symmetric_part,
+        is_structured_fn=srb_mat_is_symmetric,
+        dtype=jnp.float64,
+        hermitian=False,
     )
-    return srb_mat_from_dense_csr(jnp.tril(l)), d
+    return srb_mat_coo_to_csr(srb_mat_coo(data, row, col, shape=srb_mat_shape(x))), d
 
 
 def srb_mat_symmetric_part_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
@@ -514,27 +584,60 @@ def srb_mat_ldl_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> tuple[j
 
 
 def srb_mat_charpoly(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
-    return di.midpoint(arb_mat.arb_mat_charpoly(_dense_interval_matrix(x, "srb_mat.charpoly")))
+    coeffs = sparse_core.sparse_charpoly_from_traces(
+        x,
+        to_bcoo_fn=_as_bcoo,
+        matmul_sparse_fn=lambda xb, yb: sc.sparse_bcoo_matmul_sparse(xb, yb, algebra="srb", label="srb_mat.charpoly.matmul"),
+        trace_fn=srb_mat_trace,
+        identity_sparse_fn=lambda n, dtype: srb_mat_bcoo(
+            jnp.ones((n,), dtype=dtype),
+            jnp.stack([jnp.arange(n, dtype=jnp.int32), jnp.arange(n, dtype=jnp.int32)], axis=-1),
+            shape=(n, n),
+        ),
+    )
+    return jnp.real(coeffs)
 
 
 def srb_mat_charpoly_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
-    return arb_mat.arb_mat_charpoly(_dense_interval_matrix(x, "srb_mat.charpoly_basic"))
+    return mat_common.interval_from_point(srb_mat_charpoly(x))
 
 
 def srb_mat_pow_ui(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, n: int) -> jax.Array:
-    return di.midpoint(arb_mat.arb_mat_pow_ui(_dense_interval_matrix(x, "srb_mat.pow_ui"), n))
+    return sparse_core.sparse_dense_power_ui(
+        x,
+        n,
+        to_bcoo_fn=_as_bcoo,
+        matmul_sparse_fn=lambda xb, yb: sc.sparse_bcoo_matmul_sparse(xb, yb, algebra="srb", label="srb_mat.pow_ui.matmul"),
+        to_dense_fn=srb_mat_to_dense,
+        identity_sparse_fn=lambda size, dtype: srb_mat_bcoo(
+            jnp.ones((size,), dtype=dtype),
+            jnp.stack([jnp.arange(size, dtype=jnp.int32), jnp.arange(size, dtype=jnp.int32)], axis=-1),
+            shape=(size, size),
+        ),
+    )
 
 
 def srb_mat_pow_ui_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, n: int) -> jax.Array:
-    return arb_mat.arb_mat_pow_ui(_dense_interval_matrix(x, "srb_mat.pow_ui_basic"), n)
+    return mat_common.interval_from_point(srb_mat_pow_ui(x, n))
 
 
 def srb_mat_exp(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
-    return di.midpoint(arb_mat.arb_mat_exp(_dense_interval_matrix(x, "srb_mat.exp")))
+    return sparse_core.sparse_dense_exp_taylor(
+        x,
+        to_bcoo_fn=_as_bcoo,
+        matmul_sparse_fn=lambda xb, yb: sc.sparse_bcoo_matmul_sparse(xb, yb, algebra="srb", label="srb_mat.exp.matmul"),
+        to_dense_fn=srb_mat_to_dense,
+        identity_sparse_fn=lambda size, dtype: srb_mat_bcoo(
+            jnp.ones((size,), dtype=dtype),
+            jnp.stack([jnp.arange(size, dtype=jnp.int32), jnp.arange(size, dtype=jnp.int32)], axis=-1),
+            shape=(size, size),
+        ),
+        terms=24,
+    )
 
 
 def srb_mat_exp_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
-    return arb_mat.arb_mat_exp(_dense_interval_matrix(x, "srb_mat.exp_basic"))
+    return mat_common.interval_from_point(srb_mat_exp(x))
 
 
 def srb_mat_eigvalsh(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
@@ -552,6 +655,42 @@ def srb_mat_eigh(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> tuple[jax.Ar
 
 def srb_mat_eigh_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> tuple[jax.Array, jax.Array]:
     return arb_mat.arb_mat_eigh(_dense_interval_matrix(x, "srb_mat.eigh_basic"))
+
+
+def srb_mat_eigsh(
+    x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO,
+    *,
+    k: int = 6,
+    which: str = "largest",
+    steps: int | None = None,
+    v0: jax.Array | None = None,
+) -> tuple[jax.Array, jax.Array]:
+    plan = jrb_mat.jrb_mat_bcoo_operator_plan_prepare(_as_jrb_operator_sparse(x))
+    return jrb_mat.jrb_mat_eigsh_point(plan, size=int(x.rows), k=k, which=which, steps=steps, v0=v0)
+
+
+def srb_mat_eigsh_basic(
+    x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO,
+    *,
+    k: int = 6,
+    which: str = "largest",
+    steps: int | None = None,
+    v0: jax.Array | None = None,
+) -> tuple[jax.Array, jax.Array]:
+    values, vectors = srb_mat_eigsh(x, k=k, which=which, steps=steps, v0=v0)
+    return mat_common.interval_from_point(values), mat_common.interval_from_point(vectors)
+
+
+def srb_mat_operator_plan_prepare(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO):
+    return jrb_mat.jrb_mat_sparse_operator_plan_prepare(_as_jrb_operator_sparse(x))
+
+
+def srb_mat_operator_rmatvec_plan_prepare(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO):
+    return jrb_mat.jrb_mat_sparse_operator_rmatvec_plan_prepare(_as_jrb_operator_sparse(x))
+
+
+def srb_mat_operator_adjoint_plan_prepare(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO):
+    return jrb_mat.jrb_mat_sparse_operator_adjoint_plan_prepare(_as_jrb_operator_sparse(x))
 
 
 def srb_mat_matvec(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, v: jax.Array) -> jax.Array:
@@ -700,8 +839,8 @@ def srb_mat_solve(
     x = _as_bcoo(x, label="srb_mat.solve")
     b = _as_real_rhs(b, "srb_mat.solve")
     checks.check_equal(x.cols, b.shape[0], "srb_mat.solve.inner")
-    if x.rows <= 16:
-        return sparse_core.sparse_direct_solve(x, b, to_dense_fn=lambda a: srb_mat_to_dense(_as_csr(a, label="srb_mat.solve.dense")))
+    if x.rows <= 32:
+        return srb_mat_lu_solve_plan_apply(srb_mat_lu_solve_plan_prepare(x), b)
 
     def matvec(v):
         return sc.sparse_bcoo_matvec(x, v, algebra="srb", label="srb_mat.solve.apply")
@@ -831,9 +970,6 @@ def srb_mat_solve_transpose(x_or_plan, b: jax.Array) -> jax.Array:
         return srb_mat_triangular_solve(srb_mat_transpose(plan.l), y, lower=False, unit_diagonal=True)
     if bool(srb_mat_is_spd(x_or_plan)):
         return srb_mat_spd_solve(x_or_plan, b)
-    if sc.sparse_shape(x_or_plan, algebra="srb", label="srb_mat.solve_transpose.shape")[0] <= 16:
-        dense = srb_mat_to_dense(_as_csr(x_or_plan, label="srb_mat.solve_transpose.dense"))
-        return jnp.linalg.solve(dense.T, _as_real_rhs(b, "srb_mat.solve_transpose.rhs"))
     return srb_mat_solve(srb_mat_transpose(x_or_plan), b)
 
 
@@ -1366,6 +1502,11 @@ def srb_mat_eigh_jit(x):
     return srb_mat_eigh(x)
 
 
+@partial(jax.jit, static_argnames=("k", "which", "steps"))
+def srb_mat_eigsh_jit(x, *, k: int = 6, which: str = "largest", steps: int | None = None, v0: jax.Array | None = None):
+    return srb_mat_eigsh(x, k=k, which=which, steps=steps, v0=v0)
+
+
 def srb_mat_det_jit(x) -> jax.Array:
     return srb_mat_det(x)
 
@@ -1382,6 +1523,15 @@ __all__ = [
     "srb_mat_coo",
     "srb_mat_csr",
     "srb_mat_bcoo",
+    "srb_mat_interval_coo",
+    "srb_mat_interval_csr",
+    "srb_mat_interval_bcoo",
+    "srb_mat_to_interval_sparse",
+    "srb_mat_interval_to_dense",
+    "srb_mat_interval_transpose",
+    "srb_mat_interval_add",
+    "srb_mat_interval_scale",
+    "srb_mat_interval_matvec",
     "srb_mat_shape",
     "srb_mat_nnz",
     "srb_mat_zero",
@@ -1428,6 +1578,11 @@ __all__ = [
     "srb_mat_eigvalsh_basic",
     "srb_mat_eigh",
     "srb_mat_eigh_basic",
+    "srb_mat_eigsh",
+    "srb_mat_eigsh_basic",
+    "srb_mat_operator_plan_prepare",
+    "srb_mat_operator_rmatvec_plan_prepare",
+    "srb_mat_operator_adjoint_plan_prepare",
     "srb_mat_scale",
     "srb_mat_add",
     "srb_mat_sub",
@@ -1547,6 +1702,7 @@ __all__ = [
     "srb_mat_exp_jit",
     "srb_mat_eigvalsh_jit",
     "srb_mat_eigh_jit",
+    "srb_mat_eigsh_jit",
     "srb_mat_det",
     "srb_mat_det_basic",
     "srb_mat_det_jit",

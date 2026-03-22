@@ -4,7 +4,7 @@ Last updated: 2026-03-07T00:00:00Z
 
 Generated from `arbplusjax.function_provenance`.
 
-Summary: `entries=5811`, `arb_like=5472`, `alternative=282`, `new=57`.
+Summary: `entries=7365`, `arb_like=7022`, `alternative=286`, `new=57`.
 
 See the split reports for the actual registry tables:
 - `docs/status/reports/arb_like_functions.md`

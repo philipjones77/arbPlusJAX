@@ -136,6 +136,41 @@ def _abs_interval(x: jax.Array) -> jax.Array:
     return di.interval(jnp.zeros_like(mag), di._above(mag))
 
 
+def _rad_matrix(a: jax.Array) -> jax.Array:
+    return di.ubound_radius(arb_mat_as_matrix(a))
+
+
+def _sym_rad_matrix(a: jax.Array) -> jax.Array:
+    rad = _rad_matrix(a)
+    return 0.5 * (rad + jnp.swapaxes(rad, -2, -1))
+
+
+def _sym_perturbation_bound(a: jax.Array) -> jax.Array:
+    sym_rad = _sym_rad_matrix(a)
+    return di._above(jnp.linalg.norm(sym_rad, ord="fro", axis=(-2, -1)))
+
+
+def _tightened_real_eigvals_interval(values: jax.Array, bound: jax.Array) -> jax.Array:
+    return di.interval(di._below(values - bound[..., None]), di._above(values + bound[..., None]))
+
+
+def _tightened_real_eigvecs_interval(values: jax.Array, vectors: jax.Array, bound: jax.Array) -> jax.Array:
+    n = vectors.shape[-1]
+    if n == 1:
+        radius = jnp.broadcast_to(bound[..., None], values.shape)
+    else:
+        diffs = jnp.abs(values[..., :, None] - values[..., None, :])
+        huge = jnp.asarray(jnp.inf, dtype=values.dtype)
+        diffs = diffs + jnp.eye(n, dtype=values.dtype) * huge
+        gaps = jnp.min(diffs, axis=-1)
+        tiny = jnp.asarray(64.0 * jnp.finfo(values.dtype).eps, dtype=values.dtype)
+        radius = jnp.clip(bound[..., None] / jnp.maximum(gaps, tiny), 0.0, 1.0)
+    return di.interval(
+        di._below(vectors - radius[..., None, :]),
+        di._above(vectors + radius[..., None, :]),
+    )
+
+
 def _band_mask(rows: int, cols: int, lower_bandwidth: int, upper_bandwidth: int) -> jax.Array:
     i = jnp.arange(rows)[:, None]
     j = jnp.arange(cols)[None, :]
@@ -189,11 +224,23 @@ def arb_mat_matvec_basic(a: jax.Array, x: jax.Array) -> jax.Array:
 
 
 def arb_mat_rmatvec(a: jax.Array, x: jax.Array) -> jax.Array:
-    return arb_mat_matvec(arb_mat_transpose(a), x)
+    a = mat_common.as_interval_rect_matrix(a, "arb_mat.rmatvec.a")
+    x = arb_mat_as_vector(x)
+    checks.check_equal(a.shape[-3], x.shape[-2], "arb_mat.rmatvec.inner")
+    y = jnp.einsum("...ji,...j->...i", di.midpoint(a), _mid_vector(x))
+    out = mat_common.interval_from_point(y)
+    finite = jnp.all(jnp.isfinite(y), axis=-1)
+    return jnp.where(finite[..., None, None], out, mat_common.full_interval_like(out))
 
 
 def arb_mat_rmatvec_basic(a: jax.Array, x: jax.Array) -> jax.Array:
-    return arb_mat_matvec_basic(arb_mat_transpose(a), x)
+    a = mat_common.as_interval_rect_matrix(a, "arb_mat.rmatvec_basic.a")
+    x = arb_mat_as_vector(x)
+    checks.check_equal(a.shape[-3], x.shape[-2], "arb_mat.rmatvec_basic.inner")
+    prods = di.fast_mul(jnp.swapaxes(a, -3, -2), x[..., None, :, :])
+    out = mat_common.interval_sum(prods, axis=-1)
+    finite = jnp.all(jnp.isfinite(out), axis=(-2, -1))
+    return jnp.where(finite[..., None, None], out, mat_common.full_interval_like(out))
 
 
 def arb_mat_matvec_cached_prepare(a: jax.Array) -> jax.Array:
@@ -201,7 +248,7 @@ def arb_mat_matvec_cached_prepare(a: jax.Array) -> jax.Array:
 
 
 def arb_mat_rmatvec_cached_prepare(a: jax.Array) -> jax.Array:
-    return arb_mat_transpose(arb_mat_matvec_cached_prepare(a))
+    return jnp.swapaxes(mat_common.as_interval_rect_matrix(a, "arb_mat.rmatvec_cached_prepare"), -3, -2)
 
 
 def arb_mat_matvec_cached_prepare_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
@@ -227,8 +274,8 @@ def arb_mat_dense_matvec_plan_prepare_prec(
 def arb_mat_matvec_cached_apply(cache: jax.Array, x: jax.Array) -> jax.Array:
     cache = mat_common.as_dense_matvec_plan(cache, algebra="arb", label="arb_mat.matvec_cached_apply")
     x = arb_mat_as_vector(x)
-    matrix = _broadcast_interval_matrix_batch(arb_mat_as_matrix(cache.matrix), tuple(int(v) for v in x.shape[:-2]))
-    checks.check_equal(cache.rows, x.shape[-2], "arb_mat.matvec_cached_apply.inner")
+    matrix = _broadcast_interval_matrix_batch(mat_common.as_interval_rect_matrix(cache.matrix, "arb_mat.matvec_cached_apply.matrix"), tuple(int(v) for v in x.shape[:-2]))
+    checks.check_equal(cache.cols, x.shape[-2], "arb_mat.matvec_cached_apply.inner")
     prods = di.fast_mul(matrix, x[..., None, :, :])
     out = mat_common.interval_sum(prods, axis=-1)
     finite = jnp.all(jnp.isfinite(out), axis=(-2, -1))
@@ -250,7 +297,7 @@ def arb_mat_permutation_matrix(perm: jax.Array, *, dtype: jnp.dtype = jnp.float6
 
 
 def arb_mat_transpose(a: jax.Array) -> jax.Array:
-    return jnp.swapaxes(arb_mat_as_matrix(a), -3, -2)
+    return jnp.swapaxes(mat_common.as_interval_rect_matrix(a, "arb_mat.transpose"), -3, -2)
 
 
 def arb_mat_add(a: jax.Array, b: jax.Array) -> jax.Array:
@@ -362,7 +409,8 @@ def arb_mat_is_symmetric(a: jax.Array) -> jax.Array:
 
 def arb_mat_is_spd(a: jax.Array) -> jax.Array:
     _, ok = _mid_cholesky(a)
-    return ok
+    lam_min = jnp.min(jnp.linalg.eigvalsh(_mid_symmetric_part(a)), axis=-1)
+    return ok & (lam_min > _sym_perturbation_bound(a))
 
 
 def arb_mat_is_square(a: jax.Array) -> jax.Array:
@@ -542,6 +590,8 @@ def arb_mat_banded_matvec_basic(a: jax.Array, x: jax.Array, *, lower_bandwidth: 
 def arb_mat_cho(a: jax.Array) -> jax.Array:
     a = arb_mat_as_matrix(a)
     chol, ok = _mid_cholesky(a)
+    lam_min = jnp.min(jnp.linalg.eigvalsh(_mid_symmetric_part(a)), axis=-1)
+    ok = ok & (lam_min > _sym_perturbation_bound(a))
     out = mat_common.interval_from_point(chol)
     return jnp.where(ok[..., None, None, None], out, mat_common.full_interval_like(out))
 
@@ -590,12 +640,22 @@ def arb_mat_exp(a: jax.Array) -> jax.Array:
 
 def arb_mat_eigvalsh(a: jax.Array) -> jax.Array:
     values, _ = mat_common.real_symmetric_eigh(_mid_matrix(a))
-    return mat_common.interval_from_point(values)
+    out = _tightened_real_eigvals_interval(values, _sym_perturbation_bound(a))
+    finite = mat_common.interval_is_finite(out)
+    return jnp.where(finite[..., None], out, mat_common.full_interval_like(out))
 
 
 def arb_mat_eigh(a: jax.Array) -> tuple[jax.Array, jax.Array]:
     values, vectors = mat_common.real_symmetric_eigh(_mid_matrix(a))
-    return mat_common.interval_from_point(values), mat_common.interval_from_point(vectors)
+    bound = _sym_perturbation_bound(a)
+    values_out = _tightened_real_eigvals_interval(values, bound)
+    vectors_out = _tightened_real_eigvecs_interval(values, vectors, bound)
+    val_finite = mat_common.interval_is_finite(values_out)
+    vec_finite = jnp.all(mat_common.interval_is_finite(vectors_out), axis=(-2, -1))
+    return (
+        jnp.where(val_finite[..., None], values_out, mat_common.full_interval_like(values_out)),
+        jnp.where(vec_finite[..., None, None, None], vectors_out, mat_common.full_interval_like(vectors_out)),
+    )
 
 
 def arb_mat_dense_spd_solve_plan_prepare(a: jax.Array) -> mat_common.DenseCholeskySolvePlan:
@@ -2650,6 +2710,21 @@ arb_mat_2x2_det_batch_prec_jit = jax.jit(arb_mat_2x2_det_batch_prec, static_argn
 arb_mat_2x2_trace_batch_prec_jit = jax.jit(arb_mat_2x2_trace_batch_prec, static_argnames=("prec_bits",))
 
 
+def arb_mat_operator_plan_prepare(a: jax.Array):
+    from . import jrb_mat
+    return jrb_mat.jrb_mat_dense_operator_plan_prepare(a)
+
+
+def arb_mat_operator_rmatvec_plan_prepare(a: jax.Array):
+    from . import jrb_mat
+    return jrb_mat.jrb_mat_dense_operator_rmatvec_plan_prepare(a)
+
+
+def arb_mat_operator_adjoint_plan_prepare(a: jax.Array):
+    from . import jrb_mat
+    return jrb_mat.jrb_mat_dense_operator_adjoint_plan_prepare(a)
+
+
 __all__ = [
     "arb_mat_as_matrix",
     "arb_mat_as_vector",
@@ -2861,4 +2936,7 @@ __all__ = [
     "arb_mat_2x2_trace_batch_jit",
     "arb_mat_2x2_det_batch_prec_jit",
     "arb_mat_2x2_trace_batch_prec_jit",
+    "arb_mat_operator_plan_prepare",
+    "arb_mat_operator_rmatvec_plan_prepare",
+    "arb_mat_operator_adjoint_plan_prepare",
 ]

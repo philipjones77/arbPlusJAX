@@ -207,6 +207,41 @@ def scb_block_mat_transpose(x: sc.BlockSparseCOO | sc.BlockSparseCSR) -> sc.Bloc
     return scb_block_mat_coo(jnp.swapaxes(x.data, -1, -2), x.col, x.row, shape=(x.cols, x.rows), block_shape=(x.block_cols, x.block_rows))
 
 
+def scb_block_mat_conjugate_transpose(x: sc.BlockSparseCOO | sc.BlockSparseCSR) -> sc.BlockSparseCOO:
+    xt = scb_block_mat_transpose(x)
+    return scb_block_mat_coo(
+        jnp.conjugate(xt.data),
+        xt.row,
+        xt.col,
+        shape=(xt.rows, xt.cols),
+        block_shape=(xt.block_rows, xt.block_cols),
+    )
+
+
+def scb_block_mat_rmatvec(x: sc.BlockSparseCOO | sc.BlockSparseCSR, v: jax.Array) -> jax.Array:
+    return scb_block_mat_matvec(scb_block_mat_transpose(x), v)
+
+
+def scb_block_mat_adjoint_matvec(x: sc.BlockSparseCOO | sc.BlockSparseCSR, v: jax.Array) -> jax.Array:
+    return scb_block_mat_matvec(scb_block_mat_conjugate_transpose(x), v)
+
+
+def scb_block_mat_rmatvec_cached_prepare(x: sc.BlockSparseCOO | sc.BlockSparseCSR) -> sc.BlockSparseMatvecPlan:
+    return scb_block_mat_matvec_cached_prepare(scb_block_mat_transpose(x))
+
+
+def scb_block_mat_rmatvec_cached_apply(plan: sc.BlockSparseMatvecPlan, v: jax.Array) -> jax.Array:
+    return scb_block_mat_matvec_cached_apply(plan, v)
+
+
+def scb_block_mat_adjoint_matvec_cached_prepare(x: sc.BlockSparseCOO | sc.BlockSparseCSR) -> sc.BlockSparseMatvecPlan:
+    return scb_block_mat_matvec_cached_prepare(scb_block_mat_conjugate_transpose(x))
+
+
+def scb_block_mat_adjoint_matvec_cached_apply(plan: sc.BlockSparseMatvecPlan, v: jax.Array) -> jax.Array:
+    return scb_block_mat_matvec_cached_apply(plan, v)
+
+
 def scb_block_mat_matvec(x: sc.BlockSparseCOO | sc.BlockSparseCSR, v: jax.Array) -> jax.Array:
     if isinstance(x, sc.BlockSparseCSR):
         x = scb_block_mat_csr_to_coo(x)
@@ -288,6 +323,42 @@ def scb_block_mat_matvec_cached_apply_batch_padded(plan: sc.BlockSparseMatvecPla
     return scb_block_mat_matvec_cached_apply_batch_fixed(plan, padded)
 
 
+def scb_block_mat_rmatvec_batch_fixed(x: sc.BlockSparseCOO | sc.BlockSparseCSR, vs: jax.Array) -> jax.Array:
+    vs = _as_complex_matrix(vs, "scb_block_mat.rmatvec_batch_fixed")
+    return jax.vmap(lambda v: scb_block_mat_rmatvec(x, v))(vs)
+
+
+def scb_block_mat_rmatvec_batch_padded(x: sc.BlockSparseCOO | sc.BlockSparseCSR, vs: jax.Array, *, pad_to: int) -> jax.Array:
+    vs = _as_complex_matrix(vs, "scb_block_mat.rmatvec_batch_padded")
+    checks.check(pad_to >= vs.shape[0], "scb_block_mat.rmatvec_batch_padded.pad_to")
+    pad_count = int(pad_to - vs.shape[0])
+    padded = jnp.concatenate([vs, jnp.repeat(vs[-1:, :], pad_count, axis=0)], axis=0) if pad_count > 0 else vs
+    return scb_block_mat_rmatvec_batch_fixed(x, padded)
+
+
+def scb_block_mat_rmatvec_cached_apply_batch_fixed(plan: sc.BlockSparseMatvecPlan, vs: jax.Array) -> jax.Array:
+    vs = _as_complex_matrix(vs, "scb_block_mat.rmatvec_cached_apply_batch_fixed")
+    return jax.vmap(lambda v: scb_block_mat_rmatvec_cached_apply(plan, v))(vs)
+
+
+def scb_block_mat_rmatvec_cached_apply_batch_padded(plan: sc.BlockSparseMatvecPlan, vs: jax.Array, *, pad_to: int) -> jax.Array:
+    vs = _as_complex_matrix(vs, "scb_block_mat.rmatvec_cached_apply_batch_padded")
+    checks.check(pad_to >= vs.shape[0], "scb_block_mat.rmatvec_cached_apply_batch_padded.pad_to")
+    pad_count = int(pad_to - vs.shape[0])
+    padded = jnp.concatenate([vs, jnp.repeat(vs[-1:, :], pad_count, axis=0)], axis=0) if pad_count > 0 else vs
+    return scb_block_mat_rmatvec_cached_apply_batch_fixed(plan, padded)
+
+
+def scb_block_mat_adjoint_matvec_batch_fixed(x: sc.BlockSparseCOO | sc.BlockSparseCSR, vs: jax.Array) -> jax.Array:
+    vs = _as_complex_matrix(vs, "scb_block_mat.adjoint_matvec_batch_fixed")
+    return jax.vmap(lambda v: scb_block_mat_adjoint_matvec(x, v))(vs)
+
+
+def scb_block_mat_adjoint_matvec_cached_apply_batch_fixed(plan: sc.BlockSparseMatvecPlan, vs: jax.Array) -> jax.Array:
+    vs = _as_complex_matrix(vs, "scb_block_mat.adjoint_matvec_cached_apply_batch_fixed")
+    return jax.vmap(lambda v: scb_block_mat_adjoint_matvec_cached_apply(plan, v))(vs)
+
+
 def _bcsr_triangular_solve_vector(x: sc.BlockSparseCSR, b: jax.Array, *, lower: bool, unit_diagonal: bool) -> jax.Array:
     br = x.block_rows
     bc = x.block_cols
@@ -331,11 +402,12 @@ def scb_block_mat_lu(x: sc.BlockSparseCOO | sc.BlockSparseCSR) -> tuple[sc.Block
     Returns:
         (P, L, U) where P is permutation, L is lower triangular, U is upper triangular
     """
-    from . import scb_mat
-    
-    # Convert to dense, do LU, convert back to block sparse
     dense = scb_block_mat_to_dense(x)
-    perm, l, u = scb_mat._dense_sparse_lu_partial_pivot(dense)
+    lu, _, perm = lax.linalg.lu(dense)
+    n = dense.shape[-1]
+    eye = jnp.eye(n, dtype=dense.dtype)
+    l = jnp.tril(lu, k=-1) + eye
+    u = jnp.triu(lu)
     
     # Create permutation matrix as block sparse COO
     perm_data = jnp.ones((perm.shape[0],), dtype=jnp.complex128)
@@ -363,6 +435,38 @@ def scb_block_mat_lu(x: sc.BlockSparseCOO | sc.BlockSparseCSR) -> tuple[sc.Block
     u_sparse = scb_block_mat_from_dense_csr(jnp.triu(u), block_shape=(br, bc))
     
     return p_coo, l_sparse, u_sparse
+
+
+def scb_block_mat_lu_solve(
+    lu: tuple[sc.SparseCOO, sc.BlockSparseCSR, sc.BlockSparseCSR],
+    b: jax.Array,
+) -> jax.Array:
+    p, l, u = lu
+    p = sc.as_sparse_coo(p, algebra="scb", label="scb_block_mat.lu_solve.p")
+    rhs = jnp.asarray(b, dtype=jnp.complex128)
+    checks.check(rhs.ndim in (1, 2), "scb_block_mat.lu_solve.ndim")
+    pb = rhs[p.col] if rhs.ndim == 1 else rhs[p.col, :]
+    y = scb_block_mat_triangular_solve(l, pb, lower=True, unit_diagonal=True)
+    return scb_block_mat_triangular_solve(u, y, lower=False, unit_diagonal=False)
+
+
+def scb_block_mat_qr(x: sc.BlockSparseCOO | sc.BlockSparseCSR) -> tuple[jax.Array, sc.BlockSparseCSR]:
+    if isinstance(x, sc.BlockSparseCOO):
+        x = sc.as_block_sparse_coo(x, algebra="scb", label="scb_block_mat.qr")
+        br, bc = x.block_rows, x.block_cols
+    else:
+        x = sc.as_block_sparse_csr(x, algebra="scb", label="scb_block_mat.qr")
+        br, bc = x.block_rows, x.block_cols
+    q, r = jnp.linalg.qr(scb_block_mat_to_dense(x))
+    r_sparse = scb_block_mat_from_dense_csr(r, block_shape=(br, bc))
+    return q, r_sparse
+
+
+def scb_block_mat_qr_solve(qr: tuple[jax.Array, sc.BlockSparseCSR], b: jax.Array) -> jax.Array:
+    q, r = qr
+    rhs = jnp.asarray(b, dtype=jnp.complex128)
+    qh_b = jnp.conjugate(q.T) @ rhs if rhs.ndim == 1 else jnp.conjugate(q.T) @ rhs
+    return scb_block_mat_triangular_solve(r, qh_b, lower=False, unit_diagonal=False)
 
 
 def scb_block_mat_matmul_sparse(
@@ -425,6 +529,17 @@ def scb_block_mat_solve(
     rhs = jnp.asarray(b, dtype=jnp.complex128)
     checks.check(rhs.ndim in (1, 2), "scb_block_mat.solve.ndim")
     checks.check_equal(scb_block_mat_shape(x)[1], rhs.shape[0], "scb_block_mat.solve.inner")
+    dense_fallback = method == "gmres" and x0 is None and M is None and scb_block_mat_shape(x)[0] <= 256
+
+    if method == "lu":
+        return scb_block_mat_lu_solve(scb_block_mat_lu(x), rhs)
+    if method == "qr":
+        return scb_block_mat_qr_solve(scb_block_mat_qr(x), rhs)
+    if dense_fallback:
+        # The shared complex GMRES path is not yet robust on small explicit block systems.
+        # Use an explicit solve here rather than silently breaking the block-sparse public surface.
+        dense = scb_block_mat_to_dense(x)
+        return jnp.linalg.solve(dense, rhs if rhs.ndim == 2 else rhs[..., None])[..., 0] if rhs.ndim == 1 else jnp.linalg.solve(dense, rhs)
 
     def matvec(v):
         return scb_block_mat_matvec(x, v)
@@ -478,7 +593,19 @@ def scb_block_mat_solve_with_diagnostics(
     **kwargs,
 ) -> tuple[jax.Array, ScbBlockMatPointDiagnostics]:
     rhs = jnp.asarray(b)
-    return scb_block_mat_solve(x, b, **kwargs), _diagnostics(x, method=str(kwargs.get("method", "gmres")), rhs_rank=int(rhs.ndim))
+    method = str(kwargs.get("method", "gmres"))
+    direct = method in {"lu", "qr"} or (
+        method == "gmres"
+        and kwargs.get("x0") is None
+        and kwargs.get("M") is None
+        and scb_block_mat_shape(x)[0] <= 256
+    )
+    return scb_block_mat_solve(x, b, **kwargs), _diagnostics(
+        x,
+        method=method,
+        direct=direct,
+        rhs_rank=int(rhs.ndim),
+    )
 
 
 def scb_block_mat_det(x: sc.BlockSparseCOO | sc.BlockSparseCSR) -> jax.Array:
@@ -573,6 +700,21 @@ def scb_block_mat_matvec_jit(x, v: jax.Array) -> jax.Array:
     return scb_block_mat_matvec(x, v)
 
 
+def scb_block_mat_operator_plan_prepare(x):
+    from . import jcb_mat
+    return jcb_mat.jcb_mat_block_sparse_operator_plan_prepare(x)
+
+
+def scb_block_mat_operator_rmatvec_plan_prepare(x):
+    from . import jcb_mat
+    return jcb_mat.jcb_mat_block_sparse_operator_rmatvec_plan_prepare(x)
+
+
+def scb_block_mat_operator_adjoint_plan_prepare(x):
+    from . import jcb_mat
+    return jcb_mat.jcb_mat_block_sparse_operator_adjoint_plan_prepare(x)
+
+
 __all__ = [
     "scb_block_mat_shape",
     "scb_block_mat_block_shape",
@@ -585,8 +727,18 @@ __all__ = [
     "scb_block_mat_csr_to_coo",
     "scb_block_mat_to_dense",
     "scb_block_mat_transpose",
+    "scb_block_mat_conjugate_transpose",
+    "scb_block_mat_rmatvec",
+    "scb_block_mat_adjoint_matvec",
+    "scb_block_mat_rmatvec_cached_prepare",
+    "scb_block_mat_rmatvec_cached_apply",
+    "scb_block_mat_adjoint_matvec_cached_prepare",
+    "scb_block_mat_adjoint_matvec_cached_apply",
     "scb_block_mat_diag",
     "scb_block_mat_lu",
+    "scb_block_mat_lu_solve",
+    "scb_block_mat_qr",
+    "scb_block_mat_qr_solve",
     "scb_block_mat_matmul_sparse",
     "scb_block_mat_matvec",
     "scb_block_mat_matvec_cached_prepare",
@@ -595,6 +747,12 @@ __all__ = [
     "scb_block_mat_matvec_batch_padded",
     "scb_block_mat_matvec_cached_apply_batch_fixed",
     "scb_block_mat_matvec_cached_apply_batch_padded",
+    "scb_block_mat_rmatvec_batch_fixed",
+    "scb_block_mat_rmatvec_batch_padded",
+    "scb_block_mat_rmatvec_cached_apply_batch_fixed",
+    "scb_block_mat_rmatvec_cached_apply_batch_padded",
+    "scb_block_mat_adjoint_matvec_batch_fixed",
+    "scb_block_mat_adjoint_matvec_cached_apply_batch_fixed",
     "scb_block_mat_matmul_dense_rhs",
     "scb_block_mat_triangular_solve",
     "scb_block_mat_solve",
@@ -610,5 +768,8 @@ __all__ = [
     "scb_block_mat_matvec_cached_apply_with_diagnostics",
     "scb_block_mat_solve_with_diagnostics",
     "scb_block_mat_matvec_jit",
+    "scb_block_mat_operator_plan_prepare",
+    "scb_block_mat_operator_rmatvec_plan_prepare",
+    "scb_block_mat_operator_adjoint_plan_prepare",
     "ScbBlockMatPointDiagnostics",
 ]

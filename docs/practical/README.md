@@ -13,6 +13,7 @@ Use [implementation](/home/phili/projects/arbplusJAX/docs/implementation) for co
 - [benchmarking.md](/home/phili/projects/arbplusJAX/docs/practical/benchmarking.md): benchmark workflow, harness roles, and comparison policy
 - [numerical_guidance.md](/home/phili/projects/arbplusJAX/docs/practical/numerical_guidance.md): numerically informed operating guidance and guardrails
 - [dense_matrices.md](/home/phili/projects/arbplusJAX/docs/practical/dense_matrices.md): practical dense runtime guidance for direct dense, cached `matvec`, structured solve reuse, and padded batch tradeoffs
+- [matrix_free_adjoints.md](/home/phili/projects/arbplusJAX/docs/practical/matrix_free_adjoints.md): practical use of the matrix-free custom-adjoint Lanczos, Arnoldi, quadrature, and trace-estimator surfaces
 
 ## Related implementation references
 

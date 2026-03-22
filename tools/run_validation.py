@@ -84,7 +84,7 @@ def main() -> int:
         "--benchmark-profile",
         choices=("none", "quick", "full"),
         default="quick",
-        help="Run tools/run_benchmarks.py profile after smoke.",
+        help="Run benchmarks/run_benchmarks.py profile after smoke.",
     )
     args = parser.parse_args()
 
@@ -121,7 +121,7 @@ def main() -> int:
         tasks.append(
             Task(
                 name=f"benchmark-{args.benchmark_profile}",
-                cmd=[py, "tools/run_benchmarks.py", "--profile", args.benchmark_profile],
+                cmd=[py, "benchmarks/run_benchmarks.py", "--profile", args.benchmark_profile],
                 env_overrides=common_env,
             )
         )

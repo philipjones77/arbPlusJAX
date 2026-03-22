@@ -138,6 +138,48 @@ def _apply_perm_transpose_rhs(p: jax.Array, b: jax.Array) -> jax.Array:
     return mat_common.box_from_point(jnp.matmul(p_mid, b_mid))
 
 
+def _box_rad_parts(a: jax.Array) -> tuple[jax.Array, jax.Array]:
+    box = acb_mat_as_matrix(a)
+    re_rad = di.ubound_radius(acb_core.acb_real(box))
+    im_rad = di.ubound_radius(acb_core.acb_imag(box))
+    return re_rad, im_rad
+
+
+def _herm_rad_bound_matrix(a: jax.Array) -> jax.Array:
+    re_rad, im_rad = _box_rad_parts(a)
+    mag = di._above(jnp.sqrt(re_rad * re_rad + im_rad * im_rad))
+    return 0.5 * (mag + jnp.swapaxes(mag, -2, -1))
+
+
+def _herm_perturbation_bound(a: jax.Array) -> jax.Array:
+    rad = _herm_rad_bound_matrix(a)
+    return di._above(jnp.linalg.norm(rad, ord="fro", axis=(-2, -1)))
+
+
+def _tightened_complex_eigvals_box(values: jax.Array, bound: jax.Array) -> jax.Array:
+    real_iv = di.interval(di._below(jnp.real(values) - bound[..., None]), di._above(jnp.real(values) + bound[..., None]))
+    imag_zero = di.interval(jnp.zeros_like(real_iv[..., 0]), jnp.zeros_like(real_iv[..., 1]))
+    return acb_core.acb_box(real_iv, imag_zero)
+
+
+def _tightened_complex_eigvecs_box(values: jax.Array, vectors: jax.Array, bound: jax.Array) -> jax.Array:
+    n = vectors.shape[-1]
+    if n == 1:
+        radius = jnp.broadcast_to(bound[..., None], values.shape)
+    else:
+        diffs = jnp.abs(values[..., :, None] - values[..., None, :])
+        huge = jnp.asarray(jnp.inf, dtype=jnp.real(values).dtype)
+        diffs = diffs + jnp.eye(n, dtype=jnp.real(values).dtype) * huge
+        gaps = jnp.min(diffs, axis=-1)
+        tiny = jnp.asarray(64.0 * jnp.finfo(jnp.real(values).dtype).eps, dtype=jnp.real(values).dtype)
+        radius = jnp.clip(bound[..., None] / jnp.maximum(gaps, tiny), 0.0, 1.0)
+    vr = jnp.real(vectors)
+    vi = jnp.imag(vectors)
+    re_iv = di.interval(di._below(vr - radius[..., None, :]), di._above(vr + radius[..., None, :]))
+    im_iv = di.interval(di._below(vi - radius[..., None, :]), di._above(vi + radius[..., None, :]))
+    return acb_core.acb_box(re_iv, im_iv)
+
+
 def acb_mat_matmul(a: jax.Array, b: jax.Array) -> jax.Array:
     a = mat_common.as_box_rect_matrix(a, "acb_mat.matmul.a")
     b = mat_common.as_box_rect_matrix(b, "acb_mat.matmul.b")
@@ -179,11 +221,23 @@ def acb_mat_matvec_basic(a: jax.Array, x: jax.Array) -> jax.Array:
 
 
 def acb_mat_rmatvec(a: jax.Array, x: jax.Array) -> jax.Array:
-    return acb_mat_matvec(acb_mat_transpose(a), x)
+    a = mat_common.as_box_rect_matrix(a, "acb_mat.rmatvec.a")
+    x = acb_mat_as_vector(x)
+    checks.check_equal(a.shape[-3], x.shape[-2], "acb_mat.rmatvec.inner")
+    y = jnp.einsum("...ji,...j->...i", acb_core.acb_midpoint(a), _mid_vector(x))
+    out = mat_common.box_from_point(y)
+    finite = jnp.all(jnp.isfinite(jnp.real(y)) & jnp.isfinite(jnp.imag(y)), axis=-1)
+    return jnp.where(finite[..., None, None], out, mat_common.full_box_like(out))
 
 
 def acb_mat_rmatvec_basic(a: jax.Array, x: jax.Array) -> jax.Array:
-    return acb_mat_matvec_basic(acb_mat_transpose(a), x)
+    a = mat_common.as_box_rect_matrix(a, "acb_mat.rmatvec_basic.a")
+    x = acb_mat_as_vector(x)
+    checks.check_equal(a.shape[-3], x.shape[-2], "acb_mat.rmatvec_basic.inner")
+    prods = acb_core.acb_mul(jnp.swapaxes(a, -3, -2), x[..., None, :, :])
+    out = mat_common.box_sum(prods, axis=-1)
+    finite = jnp.all(jnp.isfinite(out), axis=(-2, -1))
+    return jnp.where(finite[..., None, None], out, mat_common.full_box_like(out))
 
 
 def acb_mat_matvec_cached_prepare(a: jax.Array) -> jax.Array:
@@ -191,7 +245,7 @@ def acb_mat_matvec_cached_prepare(a: jax.Array) -> jax.Array:
 
 
 def acb_mat_rmatvec_cached_prepare(a: jax.Array) -> jax.Array:
-    return acb_mat_transpose(acb_mat_matvec_cached_prepare(a))
+    return jnp.swapaxes(mat_common.as_box_rect_matrix(a, "acb_mat.rmatvec_cached_prepare"), -3, -2)
 
 
 def acb_mat_matvec_cached_prepare_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
@@ -217,8 +271,8 @@ def acb_mat_dense_matvec_plan_prepare_prec(
 def acb_mat_matvec_cached_apply(cache: jax.Array, x: jax.Array) -> jax.Array:
     cache = mat_common.as_dense_matvec_plan(cache, algebra="acb", label="acb_mat.matvec_cached_apply")
     x = acb_mat_as_vector(x)
-    matrix = _broadcast_box_matrix_batch(acb_mat_as_matrix(cache.matrix), tuple(int(v) for v in x.shape[:-2]))
-    checks.check_equal(cache.rows, x.shape[-2], "acb_mat.matvec_cached_apply.inner")
+    matrix = _broadcast_box_matrix_batch(mat_common.as_box_rect_matrix(cache.matrix, "acb_mat.matvec_cached_apply.matrix"), tuple(int(v) for v in x.shape[:-2]))
+    checks.check_equal(cache.cols, x.shape[-2], "acb_mat.matvec_cached_apply.inner")
     prods = acb_core.acb_mul(matrix, x[..., None, :, :])
     out = mat_common.box_sum(prods, axis=-1)
     finite = jnp.all(jnp.isfinite(out), axis=(-2, -1))
@@ -240,7 +294,7 @@ def acb_mat_permutation_matrix(perm: jax.Array, *, dtype: jnp.dtype = jnp.float6
 
 
 def acb_mat_transpose(a: jax.Array) -> jax.Array:
-    return jnp.swapaxes(acb_mat_as_matrix(a), -3, -2)
+    return jnp.swapaxes(mat_common.as_box_rect_matrix(a, "acb_mat.transpose"), -3, -2)
 
 
 def acb_mat_conjugate_transpose(a: jax.Array) -> jax.Array:
@@ -343,7 +397,8 @@ def acb_mat_is_hermitian(a: jax.Array) -> jax.Array:
 
 def acb_mat_is_hpd(a: jax.Array) -> jax.Array:
     _, ok = _mid_cholesky(a)
-    return ok
+    lam_min = jnp.min(jnp.linalg.eigvalsh(_mid_hermitian_part(a)), axis=-1)
+    return ok & (lam_min > _herm_perturbation_bound(a))
 
 
 def acb_mat_is_square(a: jax.Array) -> jax.Array:
@@ -528,6 +583,8 @@ def acb_mat_banded_matvec_basic(a: jax.Array, x: jax.Array, *, lower_bandwidth: 
 def acb_mat_cho(a: jax.Array) -> jax.Array:
     a = acb_mat_as_matrix(a)
     chol, ok = _mid_cholesky(a)
+    lam_min = jnp.min(jnp.linalg.eigvalsh(_mid_hermitian_part(a)), axis=-1)
+    ok = ok & (lam_min > _herm_perturbation_bound(a))
     out = mat_common.box_from_point(chol)
     return jnp.where(ok[..., None, None, None], out, mat_common.full_box_like(out))
 
@@ -575,12 +632,22 @@ def acb_mat_exp(a: jax.Array) -> jax.Array:
 
 def acb_mat_eigvalsh(a: jax.Array) -> jax.Array:
     values, _ = mat_common.complex_hermitian_eigh(_mid_matrix(a))
-    return mat_common.box_from_point(values)
+    out = _tightened_complex_eigvals_box(values, _herm_perturbation_bound(a))
+    finite = mat_common.box_is_finite(out)
+    return jnp.where(finite[..., None], out, mat_common.full_box_like(out))
 
 
 def acb_mat_eigh(a: jax.Array) -> tuple[jax.Array, jax.Array]:
     values, vectors = mat_common.complex_hermitian_eigh(_mid_matrix(a))
-    return mat_common.box_from_point(values), mat_common.box_from_point(vectors)
+    bound = _herm_perturbation_bound(a)
+    values_out = _tightened_complex_eigvals_box(values, bound)
+    vectors_out = _tightened_complex_eigvecs_box(values, vectors, bound)
+    val_finite = mat_common.box_is_finite(values_out)
+    vec_finite = jnp.all(mat_common.box_is_finite(vectors_out), axis=(-2, -1))
+    return (
+        jnp.where(val_finite[..., None], values_out, mat_common.full_box_like(values_out)),
+        jnp.where(vec_finite[..., None, None, None], vectors_out, mat_common.full_box_like(vectors_out)),
+    )
 
 
 def acb_mat_dense_hpd_solve_plan_prepare(a: jax.Array) -> mat_common.DenseCholeskySolvePlan:
@@ -2678,6 +2745,21 @@ acb_mat_2x2_det_batch_prec_jit = jax.jit(acb_mat_2x2_det_batch_prec, static_argn
 acb_mat_2x2_trace_batch_prec_jit = jax.jit(acb_mat_2x2_trace_batch_prec, static_argnames=("prec_bits",))
 
 
+def acb_mat_operator_plan_prepare(a: jax.Array):
+    from . import jcb_mat
+    return jcb_mat.jcb_mat_dense_operator_plan_prepare(a)
+
+
+def acb_mat_operator_rmatvec_plan_prepare(a: jax.Array):
+    from . import jcb_mat
+    return jcb_mat.jcb_mat_dense_operator_rmatvec_plan_prepare(a)
+
+
+def acb_mat_operator_adjoint_plan_prepare(a: jax.Array):
+    from . import jcb_mat
+    return jcb_mat.jcb_mat_dense_operator_adjoint_plan_prepare(a)
+
+
 __all__ = [
     "acb_mat_as_matrix",
     "acb_mat_as_vector",
@@ -2889,4 +2971,7 @@ __all__ = [
     "acb_mat_2x2_trace_batch_jit",
     "acb_mat_2x2_det_batch_prec_jit",
     "acb_mat_2x2_trace_batch_prec_jit",
+    "acb_mat_operator_plan_prepare",
+    "acb_mat_operator_rmatvec_plan_prepare",
+    "acb_mat_operator_adjoint_plan_prepare",
 ]

@@ -22,7 +22,7 @@ python benchmarks/bench_harness.py
 The standard runner is:
 
 ```bash
-python tools/run_benchmarks.py --profile quick
+python benchmarks/run_benchmarks.py --profile quick
 ```
 
 ## Backend stack
@@ -243,7 +243,7 @@ The repository bootstrap for tests, benchmarks, and notebooks now auto-discovers
 Manual shell bootstrap remains available:
 
 ```bash
-source tools/source_reference_env.sh
+source benchmarks/source_reference_env.sh
 ```
 
 Important distinction:

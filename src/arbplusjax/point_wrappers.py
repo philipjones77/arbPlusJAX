@@ -120,7 +120,7 @@ def arb_mat_permutation_matrix_point(perm: jax.Array, *, dtype: jnp.dtype = jnp.
 
 @partial(jax.jit, static_argnames=())
 def arb_mat_transpose_point(a: jax.Array) -> jax.Array:
-    return jnp.swapaxes(_arb_mat_point_matrix(a), -2, -1)
+    return jnp.swapaxes(di.midpoint(mat_common.as_interval_rect_matrix(a, "point_wrappers.arb_mat_transpose_point")), -2, -1)
 
 
 @partial(jax.jit, static_argnames=())
@@ -427,7 +427,10 @@ def arb_mat_dense_matvec_plan_apply_point(plan: mat_common.DenseMatvecPlan | jax
 
 
 def arb_mat_rmatvec_point(a: jax.Array, x: jax.Array) -> jax.Array:
-    return arb_mat_matvec_point(arb_mat_transpose_point(a), x)
+    a_mid = di.midpoint(mat_common.as_interval_rect_matrix(a, "point_wrappers.arb_mat_rmatvec_point"))
+    x_mid = _arb_mat_point_vector(x)
+    checks.check_equal(a_mid.shape[-2], x_mid.shape[-1], "point_wrappers.arb_mat_rmatvec_point.inner")
+    return jnp.einsum("...ji,...j->...i", a_mid, x_mid)
 
 
 def arb_mat_lu_solve_point(plan: mat_common.DenseLUSolvePlan | tuple[jax.Array, jax.Array, jax.Array], b: jax.Array) -> jax.Array:
@@ -703,7 +706,7 @@ def arb_mat_matvec_cached_prepare_point(a: jax.Array) -> jax.Array:
 
 
 def arb_mat_rmatvec_cached_prepare_point(a: jax.Array) -> jax.Array:
-    return jnp.swapaxes(_arb_mat_point_matrix(a), -2, -1)
+    return jnp.swapaxes(di.midpoint(mat_common.as_interval_rect_matrix(a, "point_wrappers.arb_mat_rmatvec_cached_prepare_point")), -2, -1)
 
 
 @partial(jax.jit, static_argnames=())
@@ -1048,7 +1051,10 @@ def acb_mat_dense_matvec_plan_apply_point(plan: mat_common.DenseMatvecPlan | jax
 
 
 def acb_mat_rmatvec_point(a: jax.Array, x: jax.Array) -> jax.Array:
-    return acb_mat_matvec_point(acb_mat_transpose_point(a), x)
+    a_mid = acb_core.acb_midpoint(mat_common.as_box_rect_matrix(a, "point_wrappers.acb_mat_rmatvec_point"))
+    x_mid = _acb_mat_point_vector(x)
+    checks.check_equal(a_mid.shape[-2], x_mid.shape[-1], "point_wrappers.acb_mat_rmatvec_point.inner")
+    return jnp.einsum("...ji,...j->...i", a_mid, x_mid)
 
 
 def acb_mat_lu_solve_point(plan: mat_common.DenseLUSolvePlan | tuple[jax.Array, jax.Array, jax.Array], b: jax.Array) -> jax.Array:
@@ -1297,7 +1303,7 @@ def acb_mat_matvec_cached_prepare_point(a: jax.Array) -> jax.Array:
 
 
 def acb_mat_rmatvec_cached_prepare_point(a: jax.Array) -> jax.Array:
-    return jnp.swapaxes(_acb_mat_point_matrix(a), -2, -1)
+    return jnp.swapaxes(acb_core.acb_midpoint(mat_common.as_box_rect_matrix(a, "point_wrappers.acb_mat_rmatvec_cached_prepare_point")), -2, -1)
 
 
 @partial(jax.jit, static_argnames=())
@@ -1443,12 +1449,12 @@ def acb_mat_permutation_matrix_point(perm: jax.Array, *, dtype: jnp.dtype = jnp.
 
 @partial(jax.jit, static_argnames=())
 def acb_mat_transpose_point(a: jax.Array) -> jax.Array:
-    return jnp.swapaxes(_acb_mat_point_matrix(a), -2, -1)
+    return jnp.swapaxes(acb_core.acb_midpoint(mat_common.as_box_rect_matrix(a, "point_wrappers.acb_mat_transpose_point")), -2, -1)
 
 
 @partial(jax.jit, static_argnames=())
 def acb_mat_conjugate_transpose_point(a: jax.Array) -> jax.Array:
-    return jnp.swapaxes(jnp.conj(_acb_mat_point_matrix(a)), -2, -1)
+    return jnp.swapaxes(jnp.conj(acb_core.acb_midpoint(mat_common.as_box_rect_matrix(a, "point_wrappers.acb_mat_conjugate_transpose_point"))), -2, -1)
 
 
 @partial(jax.jit, static_argnames=())

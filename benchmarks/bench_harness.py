@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+from _source_tree_bootstrap import ensure_src_on_path
+
+ensure_src_on_path(__file__)
+
+
 import argparse
 import ctypes
 import json
@@ -15,7 +20,7 @@ from typing import Any
 import numpy as np
 import platform
 
-from tools.reference_backends import apply_reference_env
+from benchmarks.reference_backends import apply_reference_env
 from tools.runtime_manifest import collect_runtime_manifest
 from tools.runtime_manifest import write_runtime_manifest
 
@@ -541,7 +546,7 @@ def main() -> int:
     base_outdir = Path(args.outdir) if args.outdir else None
     if base_outdir is None:
         stamp = time.strftime("%Y%m%dT%H%M%SZ", time.gmtime())
-        base_outdir = Path("experiments") / "benchmarks" / "results" / f"run_{stamp}"
+        base_outdir = Path("benchmarks") / "results" / f"run_{stamp}"
     base_outdir.mkdir(parents=True, exist_ok=True)
     manifest = collect_runtime_manifest(REPO_ROOT, jax_mode=os.getenv("JAX_PLATFORMS", "auto"), python_path=sys.executable)
     write_runtime_manifest(base_outdir, manifest)

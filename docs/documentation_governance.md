@@ -1,18 +1,19 @@
 # Documentation Governance
 
 Status: active
-Version: v1.1
-Date: 2026-03-17
+Version: v1.2
+Date: 2026-03-21
 
 ## Base Documents
 
 - `docs/architecture.md`
 - `docs/documentation_governance.md`
 - `docs/project_overview.md`
+- `docs/standards/jax_api_runtime_standard.md`
 
 ## Scope
 
-This repository adopts the smplJAX documentation placement standard as the governing structure for arbPlusJAX.
+This repository adopts the smplJAX documentation placement standard as the governing structure for IntegralFunctionsJAX.
 
 The repository should keep the `specs/objects/contracts/implementation` structure as a stable backbone:
 
@@ -28,7 +29,16 @@ This document defines:
 - the authority split between `docs/` and top-level `contracts/`
 - where new documents should be placed
 
+Repository-wide reusable standards for public JAX API shape, runtime config,
+parameter-change discipline, dtype policy including optional documented
+overrides, diagnostics, logging, recompilation discipline, and the rule that
+tests/benchmarks/software-comparison layers must not slow normal numerical
+evaluation belong under `docs/standards/`. The current canonical document for that topic is
+`docs/standards/jax_api_runtime_standard.md`.
+
 It does not define mathematical semantics. Those belong in `docs/specs/`.
+
+The current repo mapping should be maintained as a separate report under `docs/reports/`, not embedded in this governance file.
 
 ## Repository Layout
 
@@ -37,13 +47,33 @@ Preferred top-level structure:
 - `docs/`: documentation authority and explanation
 - `contracts/`: binding runtime and API guarantees
 - `src/`: executable implementation
-- `tests/`: conformance, regression
+- `tests/`: conformance and regression coverage
 - `examples/`: runnable demos and user-facing templates
 - `experiments/`: exploratory work, with each subfolder representing a separate experiment
 - `tools/`: repository tooling and maintenance scripts
 - `benchmarks/`: benchmark scripts and harness integration
-- `experiments/benchmarks/outputs/`: benchmark output artifact directory
-- additional standard folders such as `configs/`, `data/`, `output/`, `stuff/`, and `papers/` may be added when the repository starts using them directly
+- `benchmarks/results/`: canonical benchmark run artifact directory
+- `outputs/`: canonical top-level root whose named subfolders contain retained generated artifacts and other permanent run outputs
+- `data/`: local or shared datasets, including large generated inputs that do not belong under source or docs trees
+- `experiments/benchmarks/outputs/`: experiment-local benchmark diagnostics and scratch artifact directory
+- additional standard folders such as `configs/`, `stuff/`, and `papers/` may be added when the repository starts using them directly
+
+Artifact storage rule:
+
+- put permanent generated artifacts under named subfolders of `outputs/` unless a narrower canonical subroot already exists
+- keep benchmark run trees under `benchmarks/results/`
+- keep semi-permanent retained artifacts under named subfolders of `outputs/`
+- use `experiments/<name>/outputs/`, `artifacts/`, or `cache/` only for experiment-local material that has not been promoted into the canonical top-level `outputs/` tree
+- large data should not be committed casually into normal Git-tracked source trees; if versioned sharing on GitHub is required, use the repository's large-file path such as Git LFS or an external artifact store
+- top-level `results/` should not exist; if it appears, it should be treated as a legacy mistake and removed after migrating any needed contents
+
+Tools placement rule:
+
+- `tools/` is for repo utilities, maintenance scripts, report/status generators, packaging helpers, runtime/bootstrap helpers, and correctness-oriented harness entrypoints
+- `tools/` is not the home for benchmark implementations, benchmark comparisons, benchmark smoke scripts, or benchmark-specific launchers
+- benchmark-facing scripts belong under `benchmarks/`
+- example-facing runnable notebooks and scripts belong under `examples/`
+- exploratory or retained large-scale runs belong under `experiments/`
 
 ## Docs Layout
 
@@ -57,7 +87,13 @@ The `docs/` tree is organized as:
 - `theory/`
 - `implementation/`
 - `practical/`
+- `reports/`
 - `status/`
+
+The `docs/standards/` folder is the canonical home for cross-library and
+cross-subsystem standards such as documentation placement, naming conventions,
+runtime policy, public API shape, dtype policy, diagnostics policy, and logging
+discipline.
 
 Root-level `docs/` files are reserved for high-level entry documents such as:
 
@@ -77,78 +113,33 @@ Use this order when documents overlap:
 4. `docs/theory/`
 5. `docs/implementation/`
 6. `docs/practical/`
-7. `docs/status/`
+7. `docs/reports/`
+8. `docs/status/`
 
 Operational guarantees belong in `contracts/`, not under `docs/`.
 
 ## Placement Rules
 
 - semantic definitions and invariants go in `docs/specs/`
-- runtime/API obligations go in `contracts/`
+- runtime and API obligations go in `contracts/`
 - named runtime catalogs go in `docs/objects/`
 - derivations and explanations go in `docs/theory/`
-- code-structure notes, wrapper/module layout notes, and implementation mapping go in `docs/implementation/`
+- code-structure notes, wrapper or module layout notes, and implementation mapping go in `docs/implementation/`
+- cross-library or cross-subsystem standards for public APIs, runtime config, parameter-change behavior, dtype handling including optional overrides, diagnostics, logging, recompilation policy, and non-intrusive test/benchmark/comparison discipline go in `docs/standards/`
 - workflows, runbooks, benchmarking practice, and numerically informed operating guidance go in `docs/practical/`
+- function catalogs, function lists, repository inventories, and other report-style reference lists go in `docs/reports/`
 - roadmaps, current-state summaries, and active TODOs go in `docs/status/`
-- structural/process rules go in `docs/governance/` or this file
+- structural and process rules go in `docs/governance/` or this file
 
-## Current Repo Mapping
+## Mapping Rule
 
-High-level entry documents:
+Current repository mapping should be maintained in a separate report document:
 
-- `docs/architecture.md`
-- `docs/documentation_governance.md`
-- `docs/project_overview.md`
+- `docs/reports/current_repo_mapping.md`
 
-Governance/process docs:
+That report may list:
 
-- `docs/governance/engineering_policy.md`
-
-Current standards docs:
-
-- `docs/standards/documentation.md`
-- `docs/standards/function_naming.md`
-- `docs/standards/jax_surface_policy.md`
-- `docs/standards/precision.md`
-
-Current implementation docs:
-
-- `docs/implementation/build.md`
-- `docs/implementation/jax_setup.md`
-- `docs/implementation/linux_gpu_colab.md`
-- `docs/implementation/run_platform.md`
-- `docs/implementation/benchmarks.md`
-- `docs/implementation/benchmark_process.md`
-- `docs/implementation/testing_harness.md`
-- `docs/implementation/precision_guardrails_gpu.md`
-- `docs/implementation/matrix_logdet_landscape.md`
-- `docs/implementation/soft_ops_optional.md`
-- `docs/implementation/modules/`
-- `docs/implementation/wrappers/`
-- `docs/implementation/external/`
-
-Current practical docs:
-
-- `docs/practical/README.md`
-- `docs/practical/running.md`
-- `docs/practical/benchmarking.md`
-- `docs/practical/numerical_guidance.md`
-
-Current mapping note:
-
-- `docs/practical/` is a separate companion layer for run/use guidance
-- most current deep material remains in `docs/implementation/`
-- practical pages may link into implementation docs when operational detail already lives there
-
-Current status docs:
-
-- `docs/status/todo.md`
-- `docs/status/audit.md`
-- `docs/status/reports/`
-
-Current repo-root mapping notes:
-
-- `contracts/` now exists as the reserved home for binding runtime/API guarantees
-- `experiments/` now exists as the reserved home for exploratory subprojects
-- `experiments/benchmarks/outputs/` is the canonical benchmark artifact root
-- `experiments/benchmarks/results/` is the canonical benchmark run root
+- current high-level entry documents
+- current standards, theory, implementation, practical, and status documents
+- current repo-root mapping notes
+- transitional notes about legacy paths

@@ -26,6 +26,7 @@ Last updated: 2026-03-17T00:00:00Z
 - `external/`: separate implementation lineages integrated into this workspace
   - `ducc_review.md`
   - `parsinv_review.md`
+  - `strumpack_butterflypack_review.md`
 
 For practical runbooks, benchmarking guidance, and numerically informed operating notes, start from [docs/practical/README.md](/home/phili/projects/arbplusJAX/docs/practical/README.md).
 

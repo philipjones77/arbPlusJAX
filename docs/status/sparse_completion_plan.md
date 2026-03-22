@@ -114,6 +114,17 @@ The next sparse-native tranche should be:
 5. algorithm-level deduplication between dense and sparse where the numerical kernels genuinely overlap
 6. structured sparse plans beyond solve/matvec
 
+### Krylov Reuse And Shifted-Solve TODOs
+
+- add shared preconditioner-plan support at the sparse/operator layer
+- add multi-shift sparse solve support for rational matrix functions and trace/logdet estimators
+- add recycled Krylov support for sequences of closely related sparse solves
+- add block multi-RHS Krylov support with shared-basis reuse
+- prefer structured reuse where available:
+  - symmetric / SPD sparse real should prefer block CG, multi-shift CG, and recycled Lanczos
+  - Hermitian / HPD sparse complex should prefer Hermitian-specialized shared-basis solvers
+- keep rational node/pole selection separate from sparse operator reuse infrastructure
+
 ## Validation Entry Points
 
 - [test_srb_mat_chassis.py](/home/phili/projects/arbplusJAX/tests/test_srb_mat_chassis.py)

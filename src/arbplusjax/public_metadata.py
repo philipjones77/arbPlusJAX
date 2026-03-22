@@ -1,12 +1,25 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from inspect import Parameter, signature
 from typing import Callable, Container, Mapping
 
 
 _ALT_PREFIXES = ("boost_", "cuda_", "cusf_", "mpmath_", "scipy_", "shahen_")
 _EXPERIMENTAL_MODULES = {"boost_hypgeom", "cusf_compat", "jrb_mat", "jcb_mat", "shahen_double_gamma"}
 _STABLE_INTERVAL_MODES = ("point", "basic", "adaptive", "rigorous")
+_ALT_SUFFIXES = (
+    "_batch_prec_jit",
+    "_batch_jit",
+    "_batch_prec",
+    "_prec_jit",
+    "_point",
+    "_mode",
+    "_rigorous",
+    "_batch",
+    "_prec",
+    "_jit",
+)
 
 
 @dataclass(frozen=True)
@@ -20,7 +33,14 @@ class PublicFunctionMetadata:
     point_support: bool
     interval_support: bool
     interval_modes: tuple[str, ...]
+    value_kinds: tuple[str, ...]
+    implementation_options: tuple[str, ...]
+    implementation_versions: tuple[str, ...]
+    default_implementation: str
     method_tags: tuple[str, ...]
+    default_method: str | None
+    method_parameter_names: tuple[str, ...]
+    execution_strategies: tuple[str, ...]
     regime_tags: tuple[str, ...]
     derivative_status: str
     notes: str
@@ -32,6 +52,7 @@ def build_public_metadata_registry(
     interval_names: Container[str],
 ) -> dict[str, PublicFunctionMetadata]:
     metadata: dict[str, PublicFunctionMetadata] = {}
+    implementation_index = _build_implementation_index(public_registry)
     for public_name, fn in public_registry.items():
         module = fn.__module__.rsplit(".", 1)[-1]
         implementation_name = getattr(fn, "__name__", public_name)
@@ -48,7 +69,14 @@ def build_public_metadata_registry(
             point_support=point_support,
             interval_support=interval_support,
             interval_modes=_infer_interval_modes(point_support, interval_support),
+            value_kinds=_infer_value_kinds(public_name, family, module, point_support, interval_support),
+            implementation_options=_implementation_options(public_name, implementation_index),
+            implementation_versions=("current",),
+            default_implementation=public_name,
             method_tags=_infer_name_specific_method_tags(public_name, family),
+            default_method=_infer_default_method(fn),
+            method_parameter_names=_infer_method_parameter_names(fn),
+            execution_strategies=_infer_execution_strategies(public_name, family),
             regime_tags=_infer_name_specific_regime_tags(public_name, family),
             derivative_status=_infer_derivative_status(family, public_name, module),
             notes=_infer_notes(family, public_name, module, interval_support),
@@ -112,8 +140,155 @@ def _infer_interval_modes(point_support: bool, interval_support: bool) -> tuple[
     return _STABLE_INTERVAL_MODES
 
 
+def _infer_value_kinds(
+    name: str,
+    family: str,
+    module: str,
+    point_support: bool,
+    interval_support: bool,
+) -> tuple[str, ...]:
+    lower_name = name.lower()
+    lower_module = module.lower()
+    complex_only = lower_name.startswith("acb_") or lower_module.startswith("acb_")
+    real_only = lower_name.startswith("arb_") or lower_module.startswith("arb_")
+    if family == "matrix":
+        if complex_only:
+            kinds = ["complex_matrix"]
+            if interval_support:
+                kinds.append("complex_interval_matrix")
+            return tuple(kinds)
+        if real_only:
+            kinds = ["real_matrix"]
+            if interval_support:
+                kinds.append("real_interval_matrix")
+            return tuple(kinds)
+        kinds = ["real_matrix", "complex_matrix"]
+        if interval_support:
+            kinds.extend(["real_interval_matrix", "complex_interval_matrix"])
+        return tuple(kinds)
+
+    kinds: list[str] = []
+    if point_support:
+        if complex_only:
+            kinds.append("complex")
+        elif real_only:
+            kinds.append("real")
+        else:
+            kinds.extend(["real", "complex"])
+    if interval_support:
+        if complex_only:
+            kinds.append("complex_interval")
+        elif real_only:
+            kinds.append("real_interval")
+        else:
+            kinds.extend(["real_interval", "complex_interval"])
+    return tuple(kinds)
+
+
+def _normalize_implementation_base(name: str) -> str:
+    leaf = name.rsplit(".", 1)[-1].lower()
+    for prefix in _ALT_PREFIXES:
+        if leaf.startswith(prefix):
+            leaf = leaf[len(prefix) :]
+            break
+    for suffix in _ALT_SUFFIXES:
+        if leaf.endswith(suffix):
+            leaf = leaf[: -len(suffix)]
+            break
+    if leaf.startswith(("arb_", "acb_")):
+        leaf = leaf[4:]
+    return leaf
+
+
+def _build_implementation_index(public_registry: Mapping[str, Callable]) -> dict[str, tuple[str, ...]]:
+    grouped: dict[str, set[str]] = {}
+    for candidate in public_registry:
+        if "." in candidate:
+            continue
+        base = _normalize_implementation_base(candidate)
+        grouped.setdefault(base, set()).add(candidate)
+    return {base: tuple(sorted(values)) for base, values in grouped.items()}
+
+
+def _implementation_options(name: str, implementation_index: Mapping[str, tuple[str, ...]]) -> tuple[str, ...]:
+    target = _normalize_implementation_base(name)
+    matches = set(implementation_index.get(target, ()))
+    if not matches:
+        return (name,)
+    matches.add(name)
+    return tuple(sorted(matches))
+
+
 def _infer_method_tags(family: str) -> tuple[str, ...]:
     return ("direct", "mode_dispatch")
+
+
+def _infer_default_method(fn: Callable) -> str | None:
+    try:
+        params = signature(fn).parameters
+    except Exception:
+        return None
+    method = params.get("method")
+    if method is None:
+        return None
+    if method.default is Parameter.empty:
+        return None
+    if isinstance(method.default, str):
+        return method.default
+    return str(method.default)
+
+
+def _infer_method_parameter_names(fn: Callable) -> tuple[str, ...]:
+    try:
+        params = signature(fn).parameters
+    except Exception:
+        return ()
+    reserved = {
+        "mode",
+        "prec_bits",
+        "dps",
+        "dtype",
+        "jit",
+        "pad_to",
+        "pad_value",
+        "return_diagnostics",
+        "method",
+    }
+    out: list[str] = []
+    for name, param in params.items():
+        if name in reserved:
+            continue
+        if param.kind not in (Parameter.POSITIONAL_OR_KEYWORD, Parameter.KEYWORD_ONLY):
+            continue
+        if param.default is Parameter.empty:
+            continue
+        out.append(name)
+    return tuple(out)
+
+
+def _infer_execution_strategies(name: str, family: str) -> tuple[str, ...]:
+    lowered = name.lower()
+    strategies: list[str] = []
+    if family == "matrix":
+        strategies.append("dense")
+        if "cached" in lowered:
+            strategies.append("cached")
+        if "matvec" in lowered or "rmatvec" in lowered:
+            strategies.append("matvec")
+        if "solve" in lowered or "lu" in lowered or "qr" in lowered:
+            strategies.append("factorized")
+        if "banded" in lowered:
+            strategies.append("structured")
+        return tuple(dict.fromkeys(strategies))
+    if "cached" in lowered:
+        strategies.append("cached")
+    if "batch" in lowered:
+        strategies.append("batched")
+    if family in {"bessel", "gamma", "hypergeometric", "integration", "barnes", "core"}:
+        strategies.append("direct")
+    if "tail" in lowered:
+        strategies.append("tail")
+    return tuple(dict.fromkeys(strategies or ["direct"]))
 
 
 def _infer_name_specific_method_tags(name: str, family: str) -> tuple[str, ...]:

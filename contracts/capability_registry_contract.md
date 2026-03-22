@@ -30,6 +30,7 @@ Each row in `functions` must describe a public function with the current metadat
 
 - identity fields such as `name`, `qualified_name`, `module`, `implementation_name`, and `family`
 - stability and support fields such as `stability`, `point_support`, `interval_support`, and `interval_modes`
+- selection fields such as `value_kinds`, `implementation_options`, `implementation_versions`, `default_implementation`, `default_method`, `method_parameter_names`, and `execution_strategies`
 - method and regime descriptors such as `method_tags`, `regime_tags`, and `derivative_status`
 - notes and engineering annotations
 - downstream routing fields `downstream_supported` and `downstream_aliases`

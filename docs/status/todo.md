@@ -1,4 +1,4 @@
-Last updated: 2026-03-15T18:30:00Z
+Last updated: 2026-03-21T18:40:00Z
 
 # TODO
 
@@ -22,7 +22,7 @@ Current phase snapshot:
 - `done`
   - root-level [tests](/home/phili/projects/arbplusJAX/tests) and [benchmarks](/home/phili/projects/arbplusJAX/benchmarks) remain the canonical run surfaces
   - dedicated test orchestration exists in `tools/run_test_harness.py`
-  - dedicated benchmark orchestration exists in `tools/run_benchmarks.py` and `tools/run_harness_profile.py`
+  - dedicated benchmark orchestration exists in `benchmarks/run_benchmarks.py` and `benchmarks/run_harness_profile.py`
   - Windows, Linux, and Google Colab run instructions are documented
   - repo-root VS Code workspace files exist for generic, Linux, and Windows usage
 - `in_progress`
@@ -137,8 +137,45 @@ Current phase snapshot:
       - [example_dense_matrix_surface.ipynb](/home/phili/projects/arbplusJAX/examples/example_dense_matrix_surface.ipynb)
     - tests: [test_arb_mat_chassis.py](/home/phili/projects/arbplusJAX/tests/test_arb_mat_chassis.py), [test_acb_mat_chassis.py](/home/phili/projects/arbplusJAX/tests/test_acb_mat_chassis.py), [test_mat_modes.py](/home/phili/projects/arbplusJAX/tests/test_mat_modes.py)
 
-- Jones matrix-free real/complex chassis: `done` for first workstream, `in_progress` for deeper operator AD
+- Jones matrix-free real/complex chassis: `done` for point-mode public chassis, `in_progress` for deeper operator AD and advanced eigensolver families
   - tracked completion plan: [matrix_free_completion_plan.md](/home/phili/projects/arbplusJAX/docs/status/matrix_free_completion_plan.md)
+  - current closure state:
+    - `jrb_mat` and `jcb_mat` point-mode chassis are now green in their dedicated chassis suites after the latest Davidson/Jacobi-Davidson hardening pass
+    - shared midpoint Krylov solve scaffolding now lives in `matrix_free_core` instead of duplicated Jones wrappers
+    - operator-plan JIT paths for matrix-function actions now bypass the plan/custom-VJP tracer failure mode
+    - SLQ estimators now handle complete orthogonal probe families correctly for exact small-basis cases without polluting probe gradients
+    - operator-plan surfaces now also cover shell, finite-difference, block-sparse, vblock-sparse, and parameter-differentiable sparse `BCOO` plan construction
+    - dense, sparse, block-sparse, and variable-block-sparse storage modules now expose thin operator-plan adapter wrappers into the Jones/operator layer
+    - unified `logdet_solve` result surfaces now exist in `jrb_mat` / `jcb_mat`, backed by reusable result metadata in `matrix_free_core`
+    - eigensolver diagnostics surfaces now exist across Lanczos/Arnoldi, block, restarted, Krylov-Schur, Davidson, Jacobi-Davidson, shift-invert, and contour entry points
+    - complex Hermitian action/integrand paths now prefer Hermitian Lanczos-backed projected kernels instead of generic Arnoldi where applicable
+  - next infrastructure tranche should deepen the new `basic` semantics, richer restarted/deflated eigensolver policy, and more reusable operator diagnostics
+  - ownership rule to finish and keep explicit:
+    - `matrix_free_core` owns reusable substrate only
+    - `jrb_mat` / `jcb_mat` own the canonical public matrix-free/operator solver surface
+    - `arb_mat` / `acb_mat`, `srb_mat` / `scb_mat`, and block/vblock sparse storage modules should expose only thin storage-to-operator adapter wrappers into the Jones layer for cross-representation iterative functionality
+  - PETSc-inspired JAX-native completion TODO for dense-equivalent operator functionality:
+    - extend the current preconditioned `minres` support into a more principled flexible-preconditioner / richer-structure policy in `jrb_mat` / `jcb_mat`
+    - first JAX-native Krylov-Schur-style restart, Davidson/Jacobi-Davidson-style block eigensolver APIs, shift-invert, and contour-filter eigensolver APIs now exist in `jrb_mat` / `jcb_mat` on top of reusable subspace/filter substrate in `matrix_free_core`
+    - continue hardening those eigensolver families beyond the current operator-native tranche, especially richer locking/restart policy and stronger correction-equation policy on top of the now-landed residual-history/deflation metadata
+    - generalized Hermitian-definite, generalized shift-invert, and first Hermitian polynomial/nonlinear point eigensolver fronts are now landed in `jrb_mat` / `jcb_mat`
+    - PETSc/SLEPc remain benchmark-oracle only through [benchmark_matrix_backend_candidates.py](/home/phili/projects/arbplusJAX/benchmarks/benchmark_matrix_backend_candidates.py), not governed runtime backends
+    - add contour-integral matrix-function infrastructure with reusable quadrature/spectral-transform substrate in `matrix_free_core`
+    - add polynomial and rational spectral-transform infrastructure in `matrix_free_core` with broader public solver/action exposure in `jrb_mat` / `jcb_mat`
+    - add a unified operator-first `logdet_solve` abstraction for dense, sparse, and matrix-free SPD workflows:
+      - target contract: one repo-owned surface returning `(logdet, solve_result, aux)`
+      - `aux` should carry reusable state for backward rules and repeated solves rather than forcing backward passes to reconstruct the full factorization/estimator state
+      - differentiation policy should stay repo-owned through custom JVP/VJP rules, even when the forward path later delegates to optional external backends
+      - first implementation target should remain JAX-native matrix-free / sparse SPD paths; external hierarchical backends stay optional benchmarked backends behind the same contract
+    - evaluate a TFP `fastgp`-style rational multi-shift logdet path for SPD operators:
+      - target scope: matrix-free `jrb_mat` first, with sparse `BCOO` convenience wrappers second
+      - core ingredients: Lanczos tridiagonalisation, partial-fraction / rational approximation of `log`, batched multi-shift tridiagonal solves, Hutchinson or Hutch++ trace estimation, and JAX-native preconditioners
+      - positioning: benchmarked alternative to existing SLQ and Leja+Hutch++ paths, not an immediate replacement
+      - acceptance bar: better accuracy/runtime tradeoff than SLQ on at least some SPD kernel/precision families, without breaking current AD guarantees
+    - add preconditioned block eigensolver coverage in `jrb_mat` / `jcb_mat`
+    - keep these capabilities AD-safe and JAX-native; PETSc/SLEPc remain design/oracle references and optional external backends, not the governed runtime backend
+  - placement rule:
+    - SLEPc-inspired JAX-native functionality must continue to land in `matrix_free_core` plus public `jrb_mat` / `jcb_mat`, not in dense/sparse storage modules
   - `jrb_mat` implemented families:
     - dense operator adapters
     - operator apply
@@ -171,16 +208,18 @@ Current phase snapshot:
     - structured diagnostics wrappers for action/trace/logdet
     - restarted and block-RHS `expm` action wrappers
   - not yet implemented:
-    - operator-parameter adjoints
-    - sparse/operator harness profile
-    - dense full `logm` / `sqrtm` / `rootm` / `signm`
+    - broader operator-parameter adjoints beyond the now-landed dense/sparse/shell parameter-differentiable operator-plan paths
+    - flexible-preconditioner policy beyond the current shared preconditioned `minres` path
+    - deeper locking/restart policy and correction-equation hardening for the now-landed Davidson/Jacobi-Davidson/shift-invert/contour eigensolver tranche
+    - contour-integral matrix functions plus broader rational/polynomial spectral-transform infrastructure
+    - fully specified `basic` enclosure policy for all stochastic and solve-action families
   - tests and benchmarks:
     - [test_jrb_mat_chassis.py](/home/phili/projects/arbplusJAX/tests/test_jrb_mat_chassis.py)
     - [test_jcb_mat_chassis.py](/home/phili/projects/arbplusJAX/tests/test_jcb_mat_chassis.py)
     - [benchmark_matrix_free_krylov.py](/home/phili/projects/arbplusJAX/benchmarks/benchmark_matrix_free_krylov.py)
     - [matrix_free_krylov_benchmark.md](/home/phili/projects/arbplusJAX/docs/status/reports/matrix_free_krylov_benchmark.md)
 
-- Sparse real/complex point chassis: `done` for point surface, `planned` for interval/box sparse modes
+- Sparse real/complex point chassis: `done` for point surface, `in_progress` for broader interval/box four-mode sparse coverage
   - `srb_mat` / `scb_mat` implemented point families:
     - `COO` / `CSR` / `BCOO`
     - `shape`, `nnz`, `zero`, `identity`, permutation
@@ -197,7 +236,7 @@ Current phase snapshot:
     - pivoted sparse-fronted `lu` and `lu_solve`
     - structured Householder `qr`, `qr_r`, `qr_apply_q`, `qr_explicit_q`, `qr_solve`
   - not yet implemented:
-    - sparse interval/box storage and four-mode wrappers
+    - extend the now-landed sparse interval/box storage wrappers into fuller four-mode wrapper coverage
     - stronger symbolic/numeric sparse direct-factorization package
   - tests and benchmarks:
     - [test_srb_mat_chassis.py](/home/phili/projects/arbplusJAX/tests/test_srb_mat_chassis.py)
@@ -215,13 +254,17 @@ Current phase snapshot:
     - transpose
     - block `matvec`
     - cached block `matvec` prepare/apply
+    - block `rmatvec` and cached `rmatvec` prepare/apply
     - fixed/padded batch block `matvec`
+    - fixed/padded batch block `rmatvec`
     - block x dense-RHS `matmul`
     - block triangular solve
     - iterative block solve
+    - LU / LU-solve wrappers
+    - QR / QR-solve wrappers
   - not yet implemented:
     - variable block-size storage
-    - block direct factorizations
+    - true block-native direct factorizations beyond the current explicit dense-backed fallback wrappers
     - interval/box block-sparse modes
   - tests and benchmarks:
     - [test_srb_block_mat_chassis.py](/home/phili/projects/arbplusJAX/tests/test_srb_block_mat_chassis.py)
@@ -234,13 +277,15 @@ Current phase snapshot:
     - variable-block `COO` / `CSR`
     - dense conversion
     - `matvec`
+    - `rmatvec`
+    - cached `matvec`
+    - cached `rmatvec`
     - dense-RHS `matmul`
     - variable-block triangular solve
     - direct `lu` / `lu_solve`
     - direct `qr` / `qr_solve`
   - current constraint:
     - direct factorization assumes square row/column partitions
-    - no cached variable-block matvec yet
     - no interval/box variable-block sparse modes
   - tests:
     - [test_srb_vblock_mat_chassis.py](/home/phili/projects/arbplusJAX/tests/test_srb_vblock_mat_chassis.py)
@@ -248,7 +293,7 @@ Current phase snapshot:
     - [test_vblock_sparse_point_api.py](/home/phili/projects/arbplusJAX/tests/test_vblock_sparse_point_api.py)
 
 - Coverage gaps still open: `planned` or `in_progress`
-  - sparse interval/box modes and four-mode sparse wrappers
+  - broader interval/box four-mode sparse wrappers on top of the now-landed sparse interval/box storage/public wrapper layer
   - stronger symbolic/numeric sparse direct-factorization quality beyond the current point-mode LU/QR layer
   - multivariate Bessel
   - incomplete multivariate-Bessel-type routines
@@ -272,7 +317,7 @@ Current phase snapshot:
 - Added explicit asymptotic remainder inflation for real bessel rigorous/adaptive interval bounds; added integer-crossing guards for `Y/K` interval APIs (real + complex box wrappers).
 - Enforced source zip filename format in `tools/package_repo.py`: `<repo>_source_YYYY-MM-DD.zip` with validation for custom output paths.
 - Added `cuda_besselk` backend with four-mode usage (point/basic/rigorous/adaptive) implemented in pure JAX (no CUDA dependency).
-- Added `cuda_besselk` to benchmark harness and ran characterization against existing `besselk` backends (`experiments/benchmarks/results/cuda_besselk_compare_purejax_20260301/samples_256_seed_7/summary.csv`).
+- Added `cuda_besselk` to benchmark harness and ran characterization against existing `besselk` backends (`benchmarks/results/cuda_besselk_compare_purejax_20260301/samples_256_seed_7/summary.csv`).
 - Added `cusf_compat` module in this workspace with `cusf_*` prefixed APIs (functions + helpers) and four-mode support (`point|basic|rigorous|adaptive`) for hypergeometric/Bessel/erf pathways.
 - Added `boost_hypgeom` module with Boost-prefixed hypergeometric APIs and helper aliases in four modes (`point|basic|rigorous|adaptive`), with docs and tests.
 

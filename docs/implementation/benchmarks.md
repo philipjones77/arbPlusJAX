@@ -2,13 +2,13 @@ Last updated: 2026-03-04T00:00:00Z
 
 # Benchmarks
 
-`benchmarks/bench_harness.py` compares arbPlusJAX against multiple backends and writes sweep outputs under `experiments/benchmarks/results/`.
+`benchmarks/bench_harness.py` compares arbPlusJAX against multiple backends and writes sweep outputs under `benchmarks/results/`.
 
 For the backend roles and comparison policy, see [testing_harness.md](/home/phili/projects/arbplusJAX/docs/implementation/testing_harness.md).
 
 Default runner:
 ```bash
-python tools/run_benchmarks.py --profile quick
+python benchmarks/run_benchmarks.py --profile quick
 ```
 This runner auto-detects a C/FLINT build (`ARB_C_REF_DIR`, `../flint/build`, `../arb/build`, or `stuff/migration/c_chassis/build`) and passes it to the harness when available.
 It also enables `--jax-batch` by default for stability/performance (disable with `--no-jax-batch`).
@@ -55,7 +55,7 @@ export WOLFRAM_CLOUD_URL="https://www.wolframcloud.com/obj/pajones/arbplusjax-be
 
 Status:
 - Local Windows: validated via `wolframscript.exe` when the install dir is set.
-- Cloud: not validated unless a run includes `mathematica_cloud` in `experiments/benchmarks/results`.
+- Cloud: not validated unless a run includes `mathematica_cloud` in `benchmarks/results`.
 
 JAX batch timing:
 ```bash
@@ -74,10 +74,10 @@ python benchmarks/benchmark_loggamma_compare.py --arb-repo "C:\Users\phili\OneDr
 
 Native Boost adapter:
 ```bash
-tools/run_boost_ref_adapter.sh
+benchmarks/run_boost_ref_adapter.sh
 ```
 This wrapper builds and runs a native C++ Boost-based adapter on demand.
-You can pass it directly to `--boost-ref-cmd`, or just use `python tools/run_benchmarks.py --with-boost`.
+You can pass it directly to `--boost-ref-cmd`, or just use `python benchmarks/run_benchmarks.py --with-boost`.
 
 Fallback adapter:
 ```bash
@@ -98,19 +98,19 @@ Result retention policy:
 ## New Functionality Process (Optional but recommended)
 1. Run chassis/parity tests.
 2. Run quick benchmark sweep:
-   - `python tools/run_benchmarks.py --profile quick`
+   - `python benchmarks/run_benchmarks.py --profile quick`
 3. For functions with SciPy/JAX-SciPy equivalents, include those baselines.
 4. If available, include mpmath and Mathematica references.
 5. If available, include Boost via `--with-boost --boost-ref-cmd "<command>"`.
 6. Generate a report:
-   - `python tools/bench_report.py --run <run_dir> --out experiments/benchmarks/results/<run_dir>/report.md`
+   - `python benchmarks/bench_report.py --run <run_dir> --out benchmarks/results/<run_dir>/report.md`
 7. Keep only curated summaries; avoid committing full raw run trees.
 
 ## Recent runs
 
-- `run_20260225T022435Z`: bessel suite, 5000 samples, warmup timing, updated bessel bounds (`experiments/benchmarks/results/run_20260225T022435Z`).
-- `run_20260225T021959Z`: bessel suite, 5000 samples, warmup timing, asymptotic bessel eval (`experiments/benchmarks/results/run_20260225T021959Z`).
-- `loggamma-compare-2026-02-25T03:42:10Z`: loggamma compare tool run (real+complex + branch-cut stress), see the experiment-side run artifacts under `experiments/benchmarks/results/`.
+- `run_20260225T022435Z`: bessel suite, 5000 samples, warmup timing, updated bessel bounds (`benchmarks/results/run_20260225T022435Z`).
+- `run_20260225T021959Z`: bessel suite, 5000 samples, warmup timing, asymptotic bessel eval (`benchmarks/results/run_20260225T021959Z`).
+- `loggamma-compare-2026-02-25T03:42:10Z`: loggamma compare tool run (real+complex + branch-cut stress), see the experiment-side run artifacts under `benchmarks/results/`.
 
 ## Notes
 Containment is measured by testing whether JAX intervals are contained in the C Arb intervals, and whether point outputs fall inside the C intervals.

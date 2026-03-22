@@ -6,6 +6,7 @@ import jax
 import jax.numpy as jnp
 
 from . import acb_core
+from . import arb_core
 from . import checks
 from . import double_interval as di
 from . import kernel_helpers as kh
@@ -1063,6 +1064,122 @@ def _segment_box_sum(values: jax.Array, segment_ids: jax.Array, *, num_segments:
     return acb_core.acb_box(re, im)
 
 
+def sparse_interval_trace(
+    x: SparseIntervalCOO | SparseIntervalCSR | SparseIntervalBCOO,
+    *,
+    algebra: str,
+    label: str,
+) -> jax.Array:
+    zero = mat_common.interval_from_point(jnp.asarray(0.0, dtype=jnp.float64))
+    if isinstance(x, SparseIntervalCOO):
+        x = as_sparse_interval_coo(x, algebra=algebra, label=label)
+        mask = x.row == x.col
+        return mat_common.interval_sum(jnp.where(mask[:, None], x.data, zero[None, :]), axis=0)
+    if isinstance(x, SparseIntervalCSR):
+        x = as_sparse_interval_csr(x, algebra=algebra, label=label)
+        row_ids = csr_row_ids(x.indptr, rows=x.rows, nnz=x.data.shape[0])
+        mask = row_ids == x.indices
+        return mat_common.interval_sum(jnp.where(mask[:, None], x.data, zero[None, :]), axis=0)
+    x = as_sparse_interval_bcoo(x, algebra=algebra, label=label)
+    mask = x.indices[:, 0] == x.indices[:, 1]
+    return mat_common.interval_sum(jnp.where(mask[:, None], x.data, zero[None, :]), axis=0)
+
+
+def sparse_box_trace(
+    x: SparseBoxCOO | SparseBoxCSR | SparseBoxBCOO,
+    *,
+    algebra: str,
+    label: str,
+) -> jax.Array:
+    zero = mat_common.box_from_point(jnp.asarray(0.0 + 0.0j, dtype=jnp.complex128))
+    if isinstance(x, SparseBoxCOO):
+        x = as_sparse_box_coo(x, algebra=algebra, label=label)
+        mask = x.row == x.col
+        return mat_common.box_sum(jnp.where(mask[:, None], x.data, zero[None, :]), axis=0)
+    if isinstance(x, SparseBoxCSR):
+        x = as_sparse_box_csr(x, algebra=algebra, label=label)
+        row_ids = csr_row_ids(x.indptr, rows=x.rows, nnz=x.data.shape[0])
+        mask = row_ids == x.indices
+        return mat_common.box_sum(jnp.where(mask[:, None], x.data, zero[None, :]), axis=0)
+    x = as_sparse_box_bcoo(x, algebra=algebra, label=label)
+    mask = x.indices[:, 0] == x.indices[:, 1]
+    return mat_common.box_sum(jnp.where(mask[:, None], x.data, zero[None, :]), axis=0)
+
+
+def sparse_interval_norm_1(
+    x: SparseIntervalCOO | SparseIntervalCSR | SparseIntervalBCOO,
+    *,
+    algebra: str,
+    label: str,
+) -> jax.Array:
+    if isinstance(x, SparseIntervalCOO):
+        x = as_sparse_interval_coo(x, algebra=algebra, label=label)
+        sums = _segment_interval_sum(arb_core.arb_abs(x.data), x.col, num_segments=x.cols)
+    elif isinstance(x, SparseIntervalCSR):
+        x = as_sparse_interval_csr(x, algebra=algebra, label=label)
+        sums = _segment_interval_sum(arb_core.arb_abs(x.data), x.indices, num_segments=x.cols)
+    else:
+        x = as_sparse_interval_bcoo(x, algebra=algebra, label=label)
+        sums = _segment_interval_sum(arb_core.arb_abs(x.data), x.indices[:, 1], num_segments=x.cols)
+    return mat_common.interval_from_point(jnp.max(di.midpoint(sums), axis=-1))
+
+
+def sparse_interval_norm_inf(
+    x: SparseIntervalCOO | SparseIntervalCSR | SparseIntervalBCOO,
+    *,
+    algebra: str,
+    label: str,
+) -> jax.Array:
+    if isinstance(x, SparseIntervalCOO):
+        x = as_sparse_interval_coo(x, algebra=algebra, label=label)
+        sums = _segment_interval_sum(arb_core.arb_abs(x.data), x.row, num_segments=x.rows)
+    elif isinstance(x, SparseIntervalCSR):
+        x = as_sparse_interval_csr(x, algebra=algebra, label=label)
+        row_ids = csr_row_ids(x.indptr, rows=x.rows, nnz=x.data.shape[0])
+        sums = _segment_interval_sum(arb_core.arb_abs(x.data), row_ids, num_segments=x.rows)
+    else:
+        x = as_sparse_interval_bcoo(x, algebra=algebra, label=label)
+        sums = _segment_interval_sum(arb_core.arb_abs(x.data), x.indices[:, 0], num_segments=x.rows)
+    return mat_common.interval_from_point(jnp.max(di.midpoint(sums), axis=-1))
+
+
+def sparse_box_norm_1(
+    x: SparseBoxCOO | SparseBoxCSR | SparseBoxBCOO,
+    *,
+    algebra: str,
+    label: str,
+) -> jax.Array:
+    if isinstance(x, SparseBoxCOO):
+        x = as_sparse_box_coo(x, algebra=algebra, label=label)
+        sums = _segment_interval_sum(acb_core.acb_abs(x.data), x.col, num_segments=x.cols)
+    elif isinstance(x, SparseBoxCSR):
+        x = as_sparse_box_csr(x, algebra=algebra, label=label)
+        sums = _segment_interval_sum(acb_core.acb_abs(x.data), x.indices, num_segments=x.cols)
+    else:
+        x = as_sparse_box_bcoo(x, algebra=algebra, label=label)
+        sums = _segment_interval_sum(acb_core.acb_abs(x.data), x.indices[:, 1], num_segments=x.cols)
+    return mat_common.box_from_point(jnp.max(di.midpoint(sums), axis=-1))
+
+
+def sparse_box_norm_inf(
+    x: SparseBoxCOO | SparseBoxCSR | SparseBoxBCOO,
+    *,
+    algebra: str,
+    label: str,
+) -> jax.Array:
+    if isinstance(x, SparseBoxCOO):
+        x = as_sparse_box_coo(x, algebra=algebra, label=label)
+        sums = _segment_interval_sum(acb_core.acb_abs(x.data), x.row, num_segments=x.rows)
+    elif isinstance(x, SparseBoxCSR):
+        x = as_sparse_box_csr(x, algebra=algebra, label=label)
+        row_ids = csr_row_ids(x.indptr, rows=x.rows, nnz=x.data.shape[0])
+        sums = _segment_interval_sum(acb_core.acb_abs(x.data), row_ids, num_segments=x.rows)
+    else:
+        x = as_sparse_box_bcoo(x, algebra=algebra, label=label)
+        sums = _segment_interval_sum(acb_core.acb_abs(x.data), x.indices[:, 0], num_segments=x.rows)
+    return mat_common.box_from_point(jnp.max(di.midpoint(sums), axis=-1))
+
+
 def sparse_interval_matvec(
     x: SparseIntervalCOO | SparseIntervalCSR | SparseIntervalBCOO,
     v: jax.Array,
@@ -1460,6 +1577,12 @@ __all__ = [
     "sparse_complex_to_box_sparse",
     "sparse_interval_to_dense",
     "sparse_box_to_dense",
+    "sparse_interval_trace",
+    "sparse_box_trace",
+    "sparse_interval_norm_1",
+    "sparse_interval_norm_inf",
+    "sparse_box_norm_1",
+    "sparse_box_norm_inf",
     "sparse_interval_matvec",
     "sparse_box_matvec",
     "sparse_interval_matmul_dense_rhs",

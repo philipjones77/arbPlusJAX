@@ -6,10 +6,9 @@ comparison scripts.
 It also remains the repo-root benchmark package used by the pytest-facing smoke
 and harness entrypoints. `experiments/benchmarks/` does not replace it.
 
-Benchmark experiments and their generated artifacts are canonicalized under
-`experiments/benchmarks/`:
+Benchmark results and experiment-side diagnostics are split as:
 
-- run trees: `experiments/benchmarks/results/`
+- run trees: `benchmarks/results/`
 - generated reports and diagnostics: `experiments/benchmarks/outputs/`
 
 This directory is intentionally separate from `tests/`.
@@ -34,7 +33,7 @@ Benchmark governance and pytest marker policy:
   - `pytest -m "benchmark_compare and benchmark_matrix"`
   - `pytest -m benchmark_official`
   - `pytest -m "benchmark_transform and benchmark_gpu"`
-- Use `tools/run_benchmarks.py` or `tools/run_harness_profile.py` for real sweeps and reporting.
+- Use `benchmarks/run_benchmarks.py` or `benchmarks/run_harness_profile.py` for real sweeps and reporting.
 - Do not treat full benchmark sweeps as part of the normal correctness harness.
 
 Primary entry points:
@@ -67,11 +66,11 @@ Transform benchmark entry points:
 Every `bench_harness.py` run now writes `runtime_manifest.json` into the benchmark output directory so benchmark reports carry the same environment header schema as `tools/run_test_harness.py --outdir ...`.
 
 Recommended invocations:
-- Quick sweep: `python tools/run_benchmarks.py --profile quick`
-- Full sweep: `python tools/run_benchmarks.py --profile full`
-- Markdown report from latest run: `python tools/bench_report.py`
-- Matrix workbook report: `python tools/matrix_surface_workbook.py`
+- Quick sweep: `python benchmarks/run_benchmarks.py --profile quick`
+- Full sweep: `python benchmarks/run_benchmarks.py --profile full`
+- Markdown report from latest run: `python benchmarks/bench_report.py`
+- Matrix workbook report: `python benchmarks/matrix_surface_workbook.py`
 
 Optional Boost baseline:
-- Pass `--boost-ref-cmd "<command>"` to `tools/run_benchmarks.py` or set `BOOST_REF_CMD`.
+- Pass `--boost-ref-cmd "<command>"` to `benchmarks/run_benchmarks.py` or set `BOOST_REF_CMD`.
 - The command must follow the stdin/stdout JSON contract documented in `boost_ref_adapter_template.py`.

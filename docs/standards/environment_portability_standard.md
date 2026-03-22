@@ -105,7 +105,7 @@ separate code layout.
 Portability-critical entrypoints should remain:
 
 - `tools/run_test_harness.py`
-- `tools/run_benchmarks.py`
+- `benchmarks/run_benchmarks.py`
 
 These entrypoints should remain the preferred cross-environment launch surfaces.
 

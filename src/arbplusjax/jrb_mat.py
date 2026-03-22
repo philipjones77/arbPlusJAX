@@ -42,6 +42,8 @@ from . import iterative_solvers
 from . import mat_common
 from . import matrix_free_basic
 from . import matrix_free_core
+from . import srb_block_mat
+from . import srb_vblock_mat
 from . import sparse_common
 
 
@@ -65,6 +67,17 @@ class JrbMatKrylovDiagnostics(NamedTuple):
     used_adjoint: jax.Array
     gradient_supported: jax.Array
     probe_count: jax.Array
+    primal_residual: jax.Array = jnp.asarray(0.0, dtype=jnp.float64)
+    adjoint_residual: jax.Array = jnp.asarray(0.0, dtype=jnp.float64)
+    regime_code: jax.Array = jnp.asarray(-1, dtype=jnp.int32)
+    method_code: jax.Array = jnp.asarray(-1, dtype=jnp.int32)
+    solver_code: jax.Array = jnp.asarray(-1, dtype=jnp.int32)
+    structure_code: jax.Array = jnp.asarray(-1, dtype=jnp.int32)
+    converged: jax.Array = jnp.asarray(False)
+    locked_count: jax.Array = jnp.asarray(0, dtype=jnp.int32)
+    convergence_metric: jax.Array = jnp.asarray(jnp.inf, dtype=jnp.float64)
+    residual_history: jax.Array = jnp.asarray([jnp.inf], dtype=jnp.float64)
+    deflated_count: jax.Array = jnp.asarray(0, dtype=jnp.int32)
 
 
 class JrbMatSelectedInverseDiagnostics(NamedTuple):
@@ -134,6 +147,108 @@ def _jrb_interval_sum(xs: jax.Array, axis: int = -1) -> jax.Array:
     lo = jnp.sum(xs[..., 0], axis=axis)
     hi = jnp.sum(xs[..., 1], axis=axis)
     return di.interval(di._below(lo), di._above(hi))
+
+
+def _jrb_structure_tag(*, symmetric: bool = False, spd: bool = False) -> str:
+    if spd:
+        return "spd"
+    if symmetric:
+        return "symmetric"
+    return "general"
+
+
+def _jrb_attach_diag(diag: JrbMatKrylovDiagnostics, *, regime: str, method: str, structure: str, work_units, primal_residual=0.0, adjoint_residual=0.0, note: str = ""):
+    return matrix_free_core.attach_krylov_metadata(
+        diag,
+        regime=regime,
+        method=method,
+        structure=structure,
+        work_units=work_units,
+        primal_residual=primal_residual,
+        adjoint_residual=adjoint_residual,
+        note=note,
+    )
+
+
+def _jrb_update_convergence(
+    diag: JrbMatKrylovDiagnostics,
+    *,
+    converged,
+    convergence_metric,
+    locked_count: int | jax.Array = 0,
+    residual_history=None,
+    deflated_count: int | jax.Array | None = None,
+):
+    if residual_history is None:
+        existing = jnp.asarray(getattr(diag, "residual_history", jnp.asarray([diag.tail_norm], dtype=jnp.float64)), dtype=jnp.float64)
+        residual_history = jnp.where(jnp.all(jnp.isfinite(existing)), existing, jnp.asarray([convergence_metric], dtype=jnp.float64))
+    if deflated_count is None:
+        deflated_count = locked_count
+    return diag._replace(
+        converged=jnp.asarray(converged),
+        locked_count=jnp.asarray(locked_count, dtype=jnp.int32),
+        convergence_metric=jnp.asarray(convergence_metric, dtype=jnp.float64),
+        residual_history=jnp.asarray(residual_history, dtype=jnp.float64),
+        deflated_count=jnp.asarray(deflated_count, dtype=jnp.int32),
+    )
+
+
+def _jrb_eig_residuals(matvec, vals: jax.Array, vecs: jax.Array) -> jax.Array:
+    if vecs.ndim != 2:
+        return jnp.asarray([], dtype=jnp.float64)
+    applied = jax.vmap(lambda col: _jrb_apply_operator_mid(matvec, _jrb_point_interval(col)), in_axes=1, out_axes=1)(vecs)
+    residual = applied - vecs * jnp.asarray(vals, dtype=applied.dtype)[None, :]
+    return jnp.linalg.norm(residual, axis=0)
+
+
+def _jrb_eig_diagnostics(
+    matvec,
+    vals: jax.Array,
+    vecs: jax.Array,
+    *,
+    algorithm_code: int,
+    steps,
+    basis_dim,
+    restart_count=0,
+    structure: str = "symmetric",
+    method: str = "lanczos",
+    tol: float = 1e-3,
+):
+    residuals = _jrb_eig_residuals(matvec, vals, vecs)
+    max_residual = jnp.max(residuals) if residuals.size else jnp.asarray(0.0, dtype=jnp.float64)
+    requested = vals.shape[-1] if vals.ndim > 0 else 1
+    converged_mask = residuals <= jnp.asarray(tol, dtype=jnp.float64)
+    converged_count = jnp.sum(converged_mask.astype(jnp.int32)) if residuals.size else jnp.asarray(0, dtype=jnp.int32)
+    diag = matrix_free_core.krylov_diagnostics(
+        JrbMatKrylovDiagnostics,
+        algorithm_code=algorithm_code,
+        steps=steps,
+        basis_dim=basis_dim,
+        beta0=1.0,
+        tail_norm=max_residual,
+        breakdown=False,
+        used_adjoint=False,
+        gradient_supported=True,
+        probe_count=requested,
+        restart_count=restart_count,
+    )
+    diag = _jrb_attach_diag(
+        diag,
+        regime="structured",
+        method=method,
+        structure=structure,
+        work_units=steps,
+        primal_residual=max_residual,
+        note="matrix_free.eigsh",
+    )
+    return _jrb_update_convergence(
+        diag,
+        converged=converged_count >= requested,
+        convergence_metric=max_residual,
+        locked_count=requested,
+        residual_history=residuals if residuals.size else jnp.asarray([max_residual], dtype=jnp.float64),
+        deflated_count=converged_count,
+    )
 
 
 def jrb_mat_matmul_point(a: jax.Array, b: jax.Array) -> jax.Array:
@@ -345,12 +460,56 @@ def jrb_mat_dense_operator_plan_prepare(a: jax.Array):
     return matrix_free_core.dense_operator_plan(_jrb_mid_matrix(a), orientation="forward", algebra="jrb")
 
 
+def jrb_mat_dense_parametric_operator_plan_prepare(a: jax.Array):
+    return matrix_free_core.parametric_dense_operator_plan(_jrb_mid_matrix(a), orientation="forward", algebra="jrb")
+
+
+def jrb_mat_shell_operator_plan_prepare(callback, *, context=None):
+    return matrix_free_core.shell_operator_plan(callback, context=context, orientation="forward", algebra="jrb")
+
+
 def jrb_mat_dense_operator_rmatvec_plan_prepare(a: jax.Array):
     return matrix_free_core.dense_operator_plan(_jrb_mid_matrix(a), orientation="transpose", algebra="jrb")
 
 
+def jrb_mat_dense_parametric_operator_rmatvec_plan_prepare(a: jax.Array):
+    return matrix_free_core.parametric_dense_operator_plan(_jrb_mid_matrix(a), orientation="transpose", algebra="jrb")
+
+
 def jrb_mat_dense_operator_adjoint_plan_prepare(a: jax.Array):
     return matrix_free_core.dense_operator_plan(_jrb_mid_matrix(a), orientation="transpose", algebra="jrb")
+
+
+def jrb_mat_dense_parametric_operator_adjoint_plan_prepare(a: jax.Array):
+    return matrix_free_core.parametric_dense_operator_plan(_jrb_mid_matrix(a), orientation="transpose", algebra="jrb")
+
+
+def jrb_mat_finite_difference_operator_plan_prepare(
+    function,
+    *,
+    base_point,
+    base_value=None,
+    context=None,
+    relative_error: float = 1e-7,
+    umin: float = 1e-6,
+):
+    return matrix_free_core.finite_difference_operator_plan(
+        function,
+        base_point=_jrb_operator_vector(base_point),
+        base_value=None if base_value is None else jnp.asarray(base_value, dtype=jnp.float64),
+        context=context,
+        algebra="jrb",
+        relative_error=relative_error,
+        umin=umin,
+    )
+
+
+def jrb_mat_finite_difference_operator_plan_set_base(plan, *, base_point, base_value=None):
+    return matrix_free_core.finite_difference_operator_plan_set_base(
+        plan,
+        base_point=_jrb_operator_vector(base_point),
+        base_value=None if base_value is None else jnp.asarray(base_value, dtype=jnp.float64),
+    )
 
 
 def _jrb_sparse_to_bcoo(x):
@@ -458,6 +617,54 @@ def jrb_mat_sparse_operator_adjoint_plan_prepare(a: sparse_common.SparseCOO | sp
     return jrb_mat_bcoo_operator_adjoint_plan_prepare(_jrb_sparse_to_bcoo(a))
 
 
+def jrb_mat_block_sparse_operator_plan_prepare(a):
+    return matrix_free_core.oriented_shell_operator_plan(
+        context=a,
+        algebra="jrb",
+        orientation="forward",
+        forward_callback=lambda v, mat: srb_block_mat.srb_block_mat_matvec(mat, v),
+        transpose_callback=lambda v, mat: srb_block_mat.srb_block_mat_rmatvec(mat, v),
+    )
+
+
+def jrb_mat_block_sparse_operator_rmatvec_plan_prepare(a):
+    return matrix_free_core.oriented_shell_operator_plan(
+        context=a,
+        algebra="jrb",
+        orientation="transpose",
+        forward_callback=lambda v, mat: srb_block_mat.srb_block_mat_matvec(mat, v),
+        transpose_callback=lambda v, mat: srb_block_mat.srb_block_mat_rmatvec(mat, v),
+    )
+
+
+def jrb_mat_block_sparse_operator_adjoint_plan_prepare(a):
+    return jrb_mat_block_sparse_operator_rmatvec_plan_prepare(a)
+
+
+def jrb_mat_vblock_sparse_operator_plan_prepare(a):
+    return matrix_free_core.oriented_shell_operator_plan(
+        context=a,
+        algebra="jrb",
+        orientation="forward",
+        forward_callback=lambda v, mat: srb_vblock_mat.srb_vblock_mat_matvec(mat, v),
+        transpose_callback=lambda v, mat: srb_vblock_mat.srb_vblock_mat_rmatvec(mat, v),
+    )
+
+
+def jrb_mat_vblock_sparse_operator_rmatvec_plan_prepare(a):
+    return matrix_free_core.oriented_shell_operator_plan(
+        context=a,
+        algebra="jrb",
+        orientation="transpose",
+        forward_callback=lambda v, mat: srb_vblock_mat.srb_vblock_mat_matvec(mat, v),
+        transpose_callback=lambda v, mat: srb_vblock_mat.srb_vblock_mat_rmatvec(mat, v),
+    )
+
+
+def jrb_mat_vblock_sparse_operator_adjoint_plan_prepare(a):
+    return jrb_mat_vblock_sparse_operator_rmatvec_plan_prepare(a)
+
+
 def jrb_mat_symmetric_operator(a: jax.Array):
     return jrb_mat_dense_operator(a)
 
@@ -509,6 +716,38 @@ def jrb_mat_cg_fixed_iterations(*, num_matvecs: int):
     return matrix_free_core.matfree_adjoints.cg_fixed_iterations(num_matvecs=num_matvecs)
 
 
+def jrb_mat_jacobi_preconditioner_plan_prepare(a):
+    if isinstance(a, matrix_free_core.OperatorPlan):
+        if a.kind == "dense":
+            return matrix_free_core.dense_jacobi_preconditioner_plan(a.payload, algebra="jrb")
+        if a.kind == "sparse_bcoo":
+            return matrix_free_core.sparse_bcoo_jacobi_preconditioner_plan(
+                a.payload,
+                as_sparse_bcoo=sparse_common.as_sparse_bcoo,
+                algebra="jrb",
+            )
+        if a.kind == "finite_difference":
+            return matrix_free_core.finite_difference_jacobi_preconditioner_plan(
+                a,
+                midpoint_vector=di.midpoint,
+                sparse_bcoo_matvec=sparse_common.sparse_bcoo_matvec,
+                dtype=jnp.float64,
+                algebra="jrb",
+            )
+        raise ValueError(f"unsupported operator plan kind for Jacobi preconditioner: {a.kind}")
+    if isinstance(a, (sparse_common.SparseCOO, sparse_common.SparseCSR, sparse_common.SparseBCOO)):
+        return matrix_free_core.sparse_bcoo_jacobi_preconditioner_plan(
+            _jrb_sparse_to_bcoo(a),
+            as_sparse_bcoo=sparse_common.as_sparse_bcoo,
+            algebra="jrb",
+        )
+    return matrix_free_core.dense_jacobi_preconditioner_plan(_jrb_mid_matrix(a), algebra="jrb")
+
+
+def jrb_mat_shell_preconditioner_plan_prepare(callback, *, context=None):
+    return matrix_free_core.shell_preconditioner_plan(callback, context=context, orientation="forward", algebra="jrb")
+
+
 def jrb_mat_solve_action_point(
     matvec,
     b: jax.Array,
@@ -533,6 +772,14 @@ def jrb_mat_solve_action_point(
     return value
 
 
+def jrb_mat_solve_action_symmetric_point(matvec, b: jax.Array, **kwargs) -> jax.Array:
+    return jrb_mat_solve_action_point(matvec, b, symmetric=True, **kwargs)
+
+
+def jrb_mat_solve_action_spd_point(matvec, b: jax.Array, **kwargs) -> jax.Array:
+    return jrb_mat_solve_action_point(matvec, b, symmetric=True, **kwargs)
+
+
 def jrb_mat_solve_action_basic(
     matvec,
     b: jax.Array,
@@ -545,8 +792,8 @@ def jrb_mat_solve_action_basic(
     preconditioner=None,
     prec_bits: int = di.DEFAULT_PREC_BITS,
 ) -> jax.Array:
-    return matrix_free_basic.solve_action_basic(
-        jrb_mat_solve_action_point,
+    value, _ = matrix_free_basic.solve_action_with_diagnostics_basic(
+        jrb_mat_solve_action_with_diagnostics_point,
         matvec,
         b,
         x0=x0,
@@ -557,7 +804,9 @@ def jrb_mat_solve_action_basic(
         preconditioner=preconditioner,
         round_output=_jrb_round_basic,
         prec_bits=prec_bits,
+        invalidate_output=_full_interval_like,
     )
+    return value
 
 
 def jrb_mat_solve_action_with_diagnostics_point(
@@ -572,15 +821,50 @@ def jrb_mat_solve_action_with_diagnostics_point(
     preconditioner=None,
 ):
     b = jrb_mat_as_interval_vector(b)
-    b_mid = _jrb_mid_vector(b)
-    x0_mid = None if x0 is None else _jrb_mid_vector(x0)
-    mv = lambda v: _jrb_apply_operator_mid(matvec, _jrb_point_interval(v))
-    precond = None if preconditioner is None else (lambda v: _jrb_apply_operator_mid(preconditioner, _jrb_point_interval(v)))
-    solver = iterative_solvers.cg if symmetric else iterative_solvers.gmres
-    x_mid, info = solver(mv, b_mid, x0=x0_mid, tol=tol, atol=atol, maxiter=maxiter, M=precond)
+    x_mid, info, residual, rhs_norm = matrix_free_core.krylov_solve_midpoint(
+        matvec,
+        b,
+        x0=x0,
+        tol=tol,
+        atol=atol,
+        maxiter=maxiter,
+        preconditioner=preconditioner,
+        solver="cg" if symmetric else "gmres",
+        midpoint_vector=_jrb_mid_vector,
+        lift_vector=_jrb_point_interval,
+        sparse_bcoo_matvec=sparse_common.sparse_bcoo_matvec,
+        dtype=jnp.float64,
+    )
     out = _jrb_point_interval(x_mid)
     finite = jnp.all(jnp.isfinite(x_mid), axis=-1)
-    return jnp.where(finite[..., None], out, _full_interval_like(out)), info
+    diag = JrbMatKrylovDiagnostics(
+        algorithm_code=jnp.asarray(5 if symmetric else 6, dtype=jnp.int32),
+        steps=jnp.asarray(info["iterations"], dtype=jnp.int32),
+        basis_dim=jnp.asarray(info["iterations"], dtype=jnp.int32),
+        restart_count=jnp.asarray(0, dtype=jnp.int32),
+        beta0=jnp.asarray(rhs_norm, dtype=jnp.float64),
+        tail_norm=jnp.asarray(info["residuals"][-1], dtype=jnp.float64),
+        breakdown=jnp.asarray(False),
+        used_adjoint=jnp.asarray(False),
+        gradient_supported=jnp.asarray(True),
+        probe_count=jnp.asarray(1, dtype=jnp.int32),
+    )
+    diag = _jrb_attach_diag(
+        diag,
+        regime="structured" if symmetric else "iterative",
+        method="cg" if symmetric else "gmres",
+        structure=_jrb_structure_tag(symmetric=symmetric),
+        work_units=info["iterations"],
+        primal_residual=residual,
+        adjoint_residual=0.0,
+        note="matrix_free.solve_action",
+    )
+    diag = _jrb_update_convergence(
+        diag,
+        converged=info["converged"],
+        convergence_metric=residual,
+    )
+    return jnp.where(finite[..., None], out, _full_interval_like(out)), diag
 
 
 def jrb_mat_solve_action_with_diagnostics_basic(
@@ -607,7 +891,180 @@ def jrb_mat_solve_action_with_diagnostics_basic(
         preconditioner=preconditioner,
         round_output=_jrb_round_basic,
         prec_bits=prec_bits,
+        invalidate_output=_full_interval_like,
     )
+
+
+def jrb_mat_minres_solve_action_point(
+    matvec,
+    b: jax.Array,
+    *,
+    x0: jax.Array | None = None,
+    tol: float = 1e-8,
+    atol: float = 0.0,
+    maxiter: int | None = None,
+    preconditioner=None,
+) -> jax.Array:
+    value, _ = jrb_mat_minres_solve_action_with_diagnostics_point(
+        matvec,
+        b,
+        x0=x0,
+        tol=tol,
+        atol=atol,
+        maxiter=maxiter,
+        preconditioner=preconditioner,
+    )
+    return value
+
+
+def jrb_mat_minres_solve_action_with_diagnostics_point(
+    matvec,
+    b: jax.Array,
+    *,
+    x0: jax.Array | None = None,
+    tol: float = 1e-8,
+    atol: float = 0.0,
+    maxiter: int | None = None,
+    preconditioner=None,
+):
+    b = jrb_mat_as_interval_vector(b)
+    x_mid, info, residual, rhs_norm = matrix_free_core.krylov_solve_midpoint(
+        matvec,
+        b,
+        x0=x0,
+        tol=tol,
+        atol=atol,
+        maxiter=maxiter,
+        preconditioner=preconditioner,
+        solver="minres",
+        midpoint_vector=_jrb_mid_vector,
+        lift_vector=_jrb_point_interval,
+        sparse_bcoo_matvec=sparse_common.sparse_bcoo_matvec,
+        dtype=jnp.float64,
+    )
+    out = _jrb_point_interval(x_mid)
+    finite = jnp.all(jnp.isfinite(x_mid), axis=-1)
+    diag = JrbMatKrylovDiagnostics(
+        algorithm_code=jnp.asarray(7, dtype=jnp.int32),
+        steps=jnp.asarray(info["iterations"], dtype=jnp.int32),
+        basis_dim=jnp.asarray(info["iterations"], dtype=jnp.int32),
+        restart_count=jnp.asarray(0, dtype=jnp.int32),
+        beta0=jnp.asarray(rhs_norm, dtype=jnp.float64),
+        tail_norm=jnp.asarray(info["residuals"][-1], dtype=jnp.float64),
+        breakdown=jnp.asarray(False),
+        used_adjoint=jnp.asarray(False),
+        gradient_supported=jnp.asarray(True),
+        probe_count=jnp.asarray(1, dtype=jnp.int32),
+    )
+    diag = _jrb_attach_diag(
+        diag,
+        regime="structured",
+        method="minres",
+        structure="symmetric",
+        work_units=info["iterations"],
+        primal_residual=residual,
+        adjoint_residual=0.0,
+        note="matrix_free.minres_solve_action",
+    )
+    diag = _jrb_update_convergence(
+        diag,
+        converged=info["converged"],
+        convergence_metric=residual,
+    )
+    return jnp.where(finite[..., None], out, _full_interval_like(out)), diag
+
+
+def jrb_mat_minres_inverse_action_point(
+    matvec,
+    x: jax.Array,
+    *,
+    x0: jax.Array | None = None,
+    tol: float = 1e-8,
+    atol: float = 0.0,
+    maxiter: int | None = None,
+    preconditioner=None,
+) -> jax.Array:
+    return jrb_mat_minres_solve_action_point(matvec, x, x0=x0, tol=tol, atol=atol, maxiter=maxiter, preconditioner=preconditioner)
+
+
+def jrb_mat_minres_solve_action_basic(
+    matvec,
+    b: jax.Array,
+    *,
+    x0: jax.Array | None = None,
+    tol: float = 1e-8,
+    atol: float = 0.0,
+    maxiter: int | None = None,
+    preconditioner=None,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+):
+    value, _ = matrix_free_basic.solve_action_with_diagnostics_basic(
+        jrb_mat_minres_solve_action_with_diagnostics_point,
+        matvec,
+        b,
+        x0=x0,
+        tol=tol,
+        atol=atol,
+        maxiter=maxiter,
+        preconditioner=preconditioner,
+        round_output=_jrb_round_basic,
+        prec_bits=prec_bits,
+        invalidate_output=_full_interval_like,
+    )
+    return value
+
+
+def jrb_mat_minres_solve_action_with_diagnostics_basic(
+    matvec,
+    b: jax.Array,
+    *,
+    x0: jax.Array | None = None,
+    tol: float = 1e-8,
+    atol: float = 0.0,
+    maxiter: int | None = None,
+    preconditioner=None,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+):
+    return matrix_free_basic.solve_action_with_diagnostics_basic(
+        jrb_mat_minres_solve_action_with_diagnostics_point,
+        matvec,
+        b,
+        x0=x0,
+        tol=tol,
+        atol=atol,
+        maxiter=maxiter,
+        preconditioner=preconditioner,
+        round_output=_jrb_round_basic,
+        prec_bits=prec_bits,
+        invalidate_output=_full_interval_like,
+    )
+
+
+def jrb_mat_minres_inverse_action_basic(
+    matvec,
+    x: jax.Array,
+    *,
+    x0: jax.Array | None = None,
+    tol: float = 1e-8,
+    atol: float = 0.0,
+    maxiter: int | None = None,
+    preconditioner=None,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    value, _ = matrix_free_basic.inverse_action_with_diagnostics_basic(
+        jrb_mat_minres_solve_action_with_diagnostics_point,
+        matvec,
+        x,
+        x0=x0,
+        tol=tol,
+        atol=atol,
+        maxiter=maxiter,
+        preconditioner=preconditioner,
+        round_output=_jrb_round_basic,
+        prec_bits=prec_bits,
+        invalidate_output=_full_interval_like,
+    )
+    return value
 
 
 def jrb_mat_inverse_action_point(
@@ -633,6 +1090,14 @@ def jrb_mat_inverse_action_point(
     )
 
 
+def jrb_mat_inverse_action_symmetric_point(matvec, x: jax.Array, **kwargs) -> jax.Array:
+    return jrb_mat_inverse_action_point(matvec, x, symmetric=True, **kwargs)
+
+
+def jrb_mat_inverse_action_spd_point(matvec, x: jax.Array, **kwargs) -> jax.Array:
+    return jrb_mat_inverse_action_point(matvec, x, symmetric=True, **kwargs)
+
+
 def jrb_mat_inverse_action_basic(
     matvec,
     x: jax.Array,
@@ -645,8 +1110,8 @@ def jrb_mat_inverse_action_basic(
     preconditioner=None,
     prec_bits: int = di.DEFAULT_PREC_BITS,
 ) -> jax.Array:
-    return matrix_free_basic.inverse_action_basic(
-        jrb_mat_inverse_action_point,
+    value, _ = matrix_free_basic.inverse_action_with_diagnostics_basic(
+        jrb_mat_inverse_action_with_diagnostics_point,
         matvec,
         x,
         x0=x0,
@@ -657,7 +1122,9 @@ def jrb_mat_inverse_action_basic(
         preconditioner=preconditioner,
         round_output=_jrb_round_basic,
         prec_bits=prec_bits,
+        invalidate_output=_full_interval_like,
     )
+    return value
 
 
 def jrb_mat_inverse_action_with_diagnostics_point(
@@ -707,6 +1174,78 @@ def jrb_mat_inverse_action_with_diagnostics_basic(
         preconditioner=preconditioner,
         round_output=_jrb_round_basic,
         prec_bits=prec_bits,
+        invalidate_output=_full_interval_like,
+    )
+
+
+def jrb_mat_multi_shift_solve_point(
+    matvec,
+    rhs: jax.Array,
+    shifts: jax.Array,
+    *,
+    tol: float = 1e-8,
+    atol: float = 0.0,
+    maxiter: int | None = None,
+    symmetric: bool = True,
+    preconditioner=None,
+) -> jax.Array:
+    rhs = jrb_mat_as_interval_vector(rhs)
+    plan = matrix_free_core.make_shifted_solve_plan(
+        matvec,
+        shifts,
+        preconditioner=preconditioner,
+        solver="multi_shift_cg" if symmetric else "multi_shift_gmres",
+        algebra="jrb",
+        structured=_jrb_structure_tag(symmetric=symmetric),
+    )
+    mids = matrix_free_core.multi_shift_solve_point(
+        plan,
+        rhs,
+        apply_operator=iterative_solvers,
+        midpoint_vector=di.midpoint,
+        sparse_bcoo_matvec=sparse_common.sparse_bcoo_matvec,
+        dtype=jnp.float64,
+        tol=tol,
+        atol=atol,
+        maxiter=maxiter,
+    )
+    out = jax.vmap(_jrb_point_interval)(mids)
+    finite = jnp.all(jnp.isfinite(mids), axis=-1)
+    return jnp.where(finite[..., None, None], out, _full_interval_like(out))
+
+
+def jrb_mat_multi_shift_solve_symmetric_point(matvec, rhs: jax.Array, shifts: jax.Array, **kwargs) -> jax.Array:
+    return jrb_mat_multi_shift_solve_point(matvec, rhs, shifts, symmetric=True, **kwargs)
+
+
+def jrb_mat_multi_shift_solve_spd_point(matvec, rhs: jax.Array, shifts: jax.Array, **kwargs) -> jax.Array:
+    return jrb_mat_multi_shift_solve_point(matvec, rhs, shifts, symmetric=True, **kwargs)
+
+
+def jrb_mat_multi_shift_solve_basic(
+    matvec,
+    rhs: jax.Array,
+    shifts: jax.Array,
+    *,
+    tol: float = 1e-8,
+    atol: float = 0.0,
+    maxiter: int | None = None,
+    symmetric: bool = True,
+    preconditioner=None,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return _jrb_round_basic(
+        jrb_mat_multi_shift_solve_point(
+            matvec,
+            rhs,
+            shifts,
+            tol=tol,
+            atol=atol,
+            maxiter=maxiter,
+            symmetric=symmetric,
+            preconditioner=preconditioner,
+        ),
+        prec_bits,
     )
 
 
@@ -724,6 +1263,10 @@ def jrb_mat_bcoo_parametric_operator(indices: jax.Array, *, shape: tuple[int, in
         return jax.ops.segment_sum(vals, row_ids, rows)
 
     return matvec
+
+
+def jrb_mat_bcoo_parametric_operator_plan_prepare(indices: jax.Array, data: jax.Array, *, shape: tuple[int, int]):
+    return matrix_free_core.parametric_bcoo_operator_plan(indices, data, shape=shape, dtype=jnp.float64, algebra="jrb")
 
 
 def jrb_mat_scipy_csr_operator(csr):
@@ -911,7 +1454,7 @@ def jrb_mat_bcoo_inverse_diagonal_point(
     block_size: int = 16,
     correction_probes: int = 0,
     key: jax.Array | None = None,
-    tol: float = 1e-6,
+    tol: float = 1e-3,
     atol: float = 0.0,
     maxiter: int | None = None,
 ) -> jax.Array:
@@ -935,7 +1478,7 @@ def jrb_mat_bcoo_inverse_diagonal_with_diagnostics_point(
     block_size: int = 16,
     correction_probes: int = 0,
     key: jax.Array | None = None,
-    tol: float = 1e-6,
+    tol: float = 1e-3,
     atol: float = 0.0,
     maxiter: int | None = None,
 ) -> tuple[jax.Array, JrbMatSelectedInverseDiagnostics]:
@@ -1704,6 +2247,55 @@ def _jrb_mat_lanczos_tridiag_state_point(matvec, x: jax.Array, steps: int):
     return basis, T, beta0, betas
 
 
+def _jrb_mat_lanczos_tridiag_state_bucketed_point(matvec, x: jax.Array, effective_steps: int, max_steps: int):
+    x = jrb_mat_as_interval_vector(x)
+    if max_steps <= 0:
+        raise ValueError("max_steps must be > 0")
+    v0 = _jrb_mid_vector(x)
+    beta0 = jnp.linalg.norm(v0)
+    if max_steps > int(v0.shape[-1]):
+        raise ValueError("max_steps must be <= vector dimension")
+    q0 = v0 / jnp.maximum(beta0, jnp.asarray(1e-30, dtype=jnp.float64))
+    dim = q0.shape[-1]
+    effective_steps = jnp.clip(jnp.asarray(effective_steps, dtype=jnp.int32), 1, jnp.asarray(max_steps, dtype=jnp.int32))
+
+    def body(carry, _):
+        q_prev, q_curr, beta_prev, basis, alphas, betas, k = carry
+
+        def do_step(state):
+            q_prev, q_curr, beta_prev, basis, alphas, betas, k = state
+            z = _jrb_apply_operator_mid(matvec, _jrb_point_interval(q_curr))
+            alpha = jnp.vdot(q_curr, z).real
+            r = z - alpha * q_curr - beta_prev * q_prev
+            mask = (jnp.arange(max_steps, dtype=jnp.int32) < k).astype(jnp.float64)
+            proj = (basis @ r) * mask
+            r = r - proj @ basis
+            beta = jnp.linalg.norm(r)
+            q_next = jnp.where(beta > 1e-30, r / beta, jnp.zeros_like(r))
+            basis = basis.at[k].set(q_curr)
+            alphas = alphas.at[k].set(alpha)
+            betas = betas.at[k].set(beta)
+            return (q_curr, q_next, beta, basis, alphas, betas, k + 1)
+
+        return lax.cond(k < effective_steps, do_step, lambda state: state, carry), None
+
+    init_basis = jnp.zeros((max_steps, dim), dtype=jnp.float64)
+    init_alphas = jnp.zeros((max_steps,), dtype=jnp.float64)
+    init_betas = jnp.zeros((max_steps,), dtype=jnp.float64)
+    init = (
+        jnp.zeros_like(q0),
+        q0,
+        jnp.asarray(0.0, dtype=jnp.float64),
+        init_basis,
+        init_alphas,
+        init_betas,
+        jnp.asarray(0, dtype=jnp.int32),
+    )
+    (_, _, _, basis, alphas, betas, _), _ = lax.scan(body, init, xs=None, length=max_steps)
+    T = jnp.diag(alphas) + jnp.diag(betas[:-1], 1) + jnp.diag(betas[:-1], -1)
+    return basis, T, beta0, betas
+
+
 def jrb_mat_lanczos_tridiag_point(matvec, x: jax.Array, steps: int):
     basis, T, beta0, _ = _jrb_mat_lanczos_tridiag_state_point(matvec, x, steps)
     return basis, T, beta0
@@ -1722,6 +2314,1236 @@ def jrb_mat_lanczos_diagnostics_point(matvec, x: jax.Array, steps: int) -> JrbMa
         tail_norm=tail_norm,
         breakdown=breakdown,
     )
+
+
+def _jrb_eigsh_start_vector(size: int) -> jax.Array:
+    values = jnp.linspace(1.0, 2.0, int(size), dtype=jnp.float64)
+    return _jrb_point_interval(values)
+
+
+def _jrb_eigsh_select_indices(evals: jax.Array, k: int, which: str) -> jax.Array:
+    code = which.lower()
+    if code in {"largest", "la", "lm"}:
+        return jnp.arange(evals.shape[0] - k, evals.shape[0], dtype=jnp.int32)
+    if code in {"smallest", "sa", "sm"}:
+        return jnp.arange(0, k, dtype=jnp.int32)
+    raise ValueError("which must be one of {'largest', 'smallest', 'la', 'sa', 'lm', 'sm'}")
+
+
+def _jrb_eigsh_start_block(size: int, block_size: int) -> jax.Array:
+    base = jnp.linspace(1.0, 2.0, int(size), dtype=jnp.float64)[:, None]
+    offsets = jnp.linspace(0.0, 1.0, int(block_size), dtype=jnp.float64)[None, :]
+    return base + offsets
+
+
+def _jrb_eigsh_mid_block(v0, *, size: int, block_size: int) -> jax.Array:
+    if v0 is None:
+        return _jrb_eigsh_start_block(size, block_size)
+    arr = jnp.asarray(v0)
+    if arr.ndim == 3 and arr.shape[-1] == 2:
+        return di.midpoint(arr)
+    return jnp.asarray(arr, dtype=jnp.float64)
+
+
+def _jrb_apply_operator_block_mid(matvec, block: jax.Array) -> jax.Array:
+    return jax.vmap(lambda col: _jrb_apply_operator_mid(matvec, _jrb_point_interval(col)), in_axes=1, out_axes=1)(block)
+
+
+def _jrb_orthonormalize_columns(block: jax.Array) -> jax.Array:
+    return matrix_free_core.orthonormalize_columns(block)
+
+
+def _jrb_ritz_pairs_from_basis(matvec, basis: jax.Array, *, k: int, which: str) -> tuple[jax.Array, jax.Array]:
+    return matrix_free_core.ritz_pairs_from_basis(
+        lambda q: _jrb_apply_operator_block_mid(matvec, q),
+        basis,
+        k=k,
+        which=which,
+        hermitian=True,
+    )
+
+
+def _jrb_apply_preconditioner_mid(preconditioner, x: jax.Array) -> jax.Array:
+    return matrix_free_core.preconditioner_apply_midpoint(
+        preconditioner,
+        x,
+        midpoint_vector=_jrb_operator_vector,
+        sparse_bcoo_matvec=sparse_common.sparse_bcoo_matvec,
+        dtype=jnp.float64,
+    )
+
+
+def _jrb_expand_subspace_with_corrections(
+    basis: jax.Array,
+    vecs: jax.Array,
+    residuals: jax.Array,
+    *,
+    vals: jax.Array | None = None,
+    target_cols: int,
+    which: str = "largest",
+    lock_tol: float = 1e-4,
+    preconditioner=None,
+    jacobi_davidson: bool = False,
+) -> jax.Array:
+    max_new_cols = max(0, min(int(target_cols) - int(basis.shape[1]), int(residuals.shape[1])))
+    if vals is not None and max_new_cols > 0:
+        order = matrix_free_core.eig_expansion_column_order(vals, residuals, which=which, lock_tol=lock_tol)
+        chosen = order[:max_new_cols]
+        vecs = vecs[:, chosen]
+        residuals = residuals[:, chosen]
+    corrections = residuals
+    residual_norms = jnp.linalg.norm(corrections, axis=0, keepdims=True)
+    safe_norms = jnp.where(residual_norms > 1e-12, residual_norms, 1.0)
+    corrections = corrections / safe_norms
+    if preconditioner is not None:
+        corrections = jax.vmap(lambda col: _jrb_apply_preconditioner_mid(preconditioner, col), in_axes=1, out_axes=1)(corrections)
+    if jacobi_davidson:
+        coeffs = jnp.sum(vecs * corrections, axis=0, keepdims=True)
+        projected = corrections - vecs * coeffs
+        proj_norms = jnp.linalg.norm(projected, axis=0, keepdims=True)
+        corrections = jnp.where(
+            proj_norms > 1e-12,
+            projected / jnp.where(proj_norms > 1e-12, proj_norms, 1.0),
+            0.0,
+        )
+    correction_norms = jnp.linalg.norm(corrections, axis=0, keepdims=True)
+    corrections = jnp.where(correction_norms > 1e-10, corrections, 0.0)
+    trial = jnp.concatenate([basis, corrections], axis=1)
+    basis_next = _jrb_orthonormalize_columns(trial)
+    if basis_next.shape[1] < target_cols:
+        pad = basis[:, : target_cols - basis_next.shape[1]]
+        basis_next = _jrb_orthonormalize_columns(jnp.concatenate([basis_next, pad], axis=1))
+    return basis_next[:, :target_cols]
+
+
+def _jrb_restart_basis_from_pairs(
+    *,
+    actual_block: int,
+    vals: jax.Array,
+    vecs: jax.Array,
+    residuals: jax.Array,
+    which: str,
+    lock_tol: float,
+    refill_basis: jax.Array | None = None,
+) -> jax.Array:
+    return matrix_free_core.eig_restart_basis_from_pairs(
+        vecs,
+        vals,
+        residuals,
+        target_cols=actual_block,
+        which=which,
+        lock_tol=lock_tol,
+        refill_basis=refill_basis,
+    )
+
+
+def _jrb_shifted_solve_mid(matvec, rhs_mid: jax.Array, *, shift, preconditioner=None, tol: float = 1e-8, atol: float = 0.0, maxiter: int | None = None) -> jax.Array:
+    shift_arr = jnp.asarray(shift, dtype=jnp.complex128)
+
+    if isinstance(matvec, matrix_free_core.OperatorPlan):
+        def mv(v):
+            base = matrix_free_core.operator_apply_midpoint(
+                matvec,
+                v,
+                midpoint_vector=lambda y: jnp.asarray(y, dtype=jnp.complex128),
+                sparse_bcoo_matvec=sparse_common.sparse_bcoo_matvec,
+                dtype=jnp.complex128,
+            )
+            return base - shift_arr * jnp.asarray(v, dtype=jnp.complex128)
+    else:
+        def real_apply(v):
+            return _jrb_apply_operator_mid(matvec, _jrb_point_interval(v))
+
+        def mv(v):
+            return matrix_free_core.complexify_real_linear_operator(real_apply, v) - shift_arr * jnp.asarray(v, dtype=jnp.complex128)
+
+    precond = None
+    if preconditioner is not None:
+        precond = lambda v: jnp.asarray(_jrb_apply_preconditioner_mid(preconditioner, _jrb_point_interval(jnp.real(v))), dtype=jnp.float64) + 1j * jnp.asarray(_jrb_apply_preconditioner_mid(preconditioner, _jrb_point_interval(jnp.imag(v))), dtype=jnp.float64)
+    out, _ = iterative_solvers.gmres(mv, jnp.asarray(rhs_mid, dtype=jnp.complex128), tol=tol, atol=atol, maxiter=maxiter, M=precond)
+    return out
+
+
+def _jrb_spd_solve_mid(matvec, rhs_mid: jax.Array, *, preconditioner=None, tol: float = 1e-8, atol: float = 0.0, maxiter: int | None = None) -> jax.Array:
+    x_mid, _info, _residual, _rhs_norm = matrix_free_core.krylov_solve_midpoint(
+        matvec,
+        _jrb_point_interval(rhs_mid),
+        x0=None,
+        tol=tol,
+        atol=atol,
+        maxiter=maxiter,
+        preconditioner=preconditioner,
+        solver="cg",
+        midpoint_vector=_jrb_mid_vector,
+        lift_vector=_jrb_point_interval,
+        sparse_bcoo_matvec=sparse_common.sparse_bcoo_matvec,
+        dtype=jnp.float64,
+    )
+    return x_mid
+
+
+def _jrb_generalized_shifted_solve_mid(
+    a_matvec,
+    b_matvec,
+    rhs_mid: jax.Array,
+    *,
+    shift,
+    preconditioner=None,
+    tol: float = 1e-8,
+    atol: float = 0.0,
+    maxiter: int | None = None,
+) -> jax.Array:
+    shift_arr = jnp.asarray(shift, dtype=jnp.complex128)
+
+    def mv(v):
+        av = matrix_free_core.complexify_real_linear_operator(
+            lambda x: _jrb_apply_operator_mid(a_matvec, _jrb_point_interval(x)),
+            v,
+        )
+        bv = matrix_free_core.complexify_real_linear_operator(
+            lambda x: _jrb_apply_operator_mid(b_matvec, _jrb_point_interval(x)),
+            v,
+        )
+        return av - shift_arr * bv
+
+    precond = None
+    if preconditioner is not None:
+        precond = lambda v: jnp.asarray(
+            _jrb_apply_preconditioner_mid(preconditioner, _jrb_point_interval(jnp.real(v))),
+            dtype=jnp.float64,
+        ) + 1j * jnp.asarray(
+            _jrb_apply_preconditioner_mid(preconditioner, _jrb_point_interval(jnp.imag(v))),
+            dtype=jnp.float64,
+        )
+    out, _ = iterative_solvers.gmres(mv, jnp.asarray(rhs_mid, dtype=jnp.complex128), tol=tol, atol=atol, maxiter=maxiter, M=precond)
+    return out
+
+
+def _jrb_generalized_eig_residuals(a_matvec, b_matvec, vals: jax.Array, vecs: jax.Array) -> jax.Array:
+    if vecs.ndim != 2:
+        return jnp.asarray([], dtype=jnp.float64)
+    applied_a = _jrb_apply_operator_block_mid(a_matvec, vecs)
+    applied_b = _jrb_apply_operator_block_mid(b_matvec, vecs)
+    residual = applied_a - applied_b * jnp.asarray(vals, dtype=applied_a.dtype)[None, :]
+    return jnp.linalg.norm(residual, axis=0)
+
+
+def _jrb_generalized_eig_diagnostics(
+    a_matvec,
+    b_matvec,
+    vals: jax.Array,
+    vecs: jax.Array,
+    *,
+    algorithm_code: int,
+    steps,
+    basis_dim,
+    restart_count=0,
+    tol: float = 1e-3,
+):
+    residuals = _jrb_generalized_eig_residuals(a_matvec, b_matvec, vals, vecs)
+    max_residual = jnp.max(residuals) if residuals.size else jnp.asarray(0.0, dtype=jnp.float64)
+    requested = vals.shape[-1] if vals.ndim > 0 else 1
+    converged_mask = residuals <= jnp.asarray(tol, dtype=jnp.float64)
+    converged_count = jnp.sum(converged_mask.astype(jnp.int32)) if residuals.size else jnp.asarray(0, dtype=jnp.int32)
+    diag = matrix_free_core.krylov_diagnostics(
+        JrbMatKrylovDiagnostics,
+        algorithm_code=algorithm_code,
+        steps=steps,
+        basis_dim=basis_dim,
+        beta0=1.0,
+        tail_norm=max_residual,
+        breakdown=False,
+        used_adjoint=False,
+        gradient_supported=True,
+        probe_count=requested,
+        restart_count=restart_count,
+    )
+    diag = _jrb_attach_diag(
+        diag,
+        regime="structured",
+        method="lanczos",
+        structure="spd",
+        work_units=steps,
+        primal_residual=max_residual,
+        note="matrix_free.generalized_eigsh",
+    )
+    return _jrb_update_convergence(
+        diag,
+        converged=converged_count >= requested,
+        convergence_metric=max_residual,
+        locked_count=requested,
+        residual_history=residuals if residuals.size else jnp.asarray([max_residual], dtype=jnp.float64),
+        deflated_count=converged_count,
+    )
+
+
+def jrb_mat_generalized_operator_plan_prepare(
+    a_matvec,
+    b_matvec,
+    *,
+    b_preconditioner=None,
+    tol: float = 1e-8,
+    atol: float = 0.0,
+    maxiter: int | None = None,
+):
+    return matrix_free_core.generalized_shell_operator_plan(
+        lambda v, context: _jrb_apply_operator_mid(context["a_matvec"], _jrb_point_interval(v)),
+        lambda rhs, context: _jrb_spd_solve_mid(
+            context["b_matvec"],
+            rhs,
+            preconditioner=context["b_preconditioner"],
+            tol=context["tol"],
+            atol=context["atol"],
+            maxiter=context["maxiter"],
+        ),
+        context={
+            "a_matvec": a_matvec,
+            "b_matvec": b_matvec,
+            "b_preconditioner": b_preconditioner,
+            "tol": float(tol),
+            "atol": float(atol),
+            "maxiter": maxiter,
+        },
+        orientation="forward",
+        algebra="jrb",
+    )
+
+
+def jrb_mat_eigsh_point(
+    matvec,
+    *,
+    size: int,
+    k: int = 6,
+    which: str = "largest",
+    steps: int | None = None,
+    v0: jax.Array | None = None,
+) -> tuple[jax.Array, jax.Array]:
+    size = int(size)
+    if size <= 0:
+        raise ValueError("size must be > 0")
+    if k <= 0 or k > size:
+        raise ValueError("k must satisfy 0 < k <= size")
+    resolved_steps = min(size, max(int(k) + 2, 2 * int(k) + 8)) if steps is None else int(steps)
+    if resolved_steps <= 0 or resolved_steps > size:
+        raise ValueError("steps must satisfy 0 < steps <= size")
+    if k > resolved_steps:
+        raise ValueError("k must be <= steps")
+    start = _jrb_eigsh_start_vector(size) if v0 is None else jrb_mat_as_interval_vector(v0)
+    basis, projected, _ = jrb_mat_lanczos_tridiag_point(matvec, start, resolved_steps)
+    evals, coeffs = jnp.linalg.eigh(projected)
+    indices = _jrb_eigsh_select_indices(evals, k, which)
+    selected_vals = evals[indices]
+    selected_coeffs = coeffs[:, indices]
+    vectors = basis.T @ selected_coeffs
+    norms = jnp.maximum(jnp.linalg.norm(vectors, axis=0), jnp.asarray(1e-30, dtype=jnp.float64))
+    vectors = vectors / norms[None, :]
+    return selected_vals, vectors
+
+
+def jrb_mat_eigsh_basic(
+    matvec,
+    *,
+    size: int,
+    k: int = 6,
+    which: str = "largest",
+    steps: int | None = None,
+    v0: jax.Array | None = None,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> tuple[jax.Array, jax.Array]:
+    values, vectors = jrb_mat_eigsh_point(matvec, size=size, k=k, which=which, steps=steps, v0=v0)
+    return _jrb_round_basic(_jrb_point_interval(values), prec_bits), _jrb_round_basic(_jrb_point_interval(vectors), prec_bits)
+
+
+def jrb_mat_eigsh_with_diagnostics_point(
+    matvec,
+    *,
+    size: int,
+    k: int = 6,
+    which: str = "largest",
+    steps: int | None = None,
+    v0: jax.Array | None = None,
+    tol: float = 1e-3,
+) -> tuple[jax.Array, jax.Array, JrbMatKrylovDiagnostics]:
+    vals, vecs = jrb_mat_eigsh_point(matvec, size=size, k=k, which=which, steps=steps, v0=v0)
+    resolved_steps = min(size, max(int(k) + 2, 2 * int(k) + 8)) if steps is None else int(steps)
+    diag = _jrb_eig_diagnostics(matvec, vals, vecs, algorithm_code=8, steps=resolved_steps, basis_dim=resolved_steps, method="lanczos", tol=tol)
+    return vals, vecs, diag
+
+
+def jrb_mat_eigsh_block_point(
+    matvec,
+    *,
+    size: int,
+    k: int = 6,
+    which: str = "largest",
+    block_size: int | None = None,
+    subspace_iters: int = 4,
+    v0: jax.Array | None = None,
+) -> tuple[jax.Array, jax.Array]:
+    size = int(size)
+    actual_block = int(k if block_size is None else block_size)
+    if actual_block < k:
+        raise ValueError("block_size must be >= k")
+    basis = _jrb_orthonormalize_columns(_jrb_eigsh_mid_block(v0, size=size, block_size=actual_block))
+
+    def body(q, _):
+        return _jrb_orthonormalize_columns(_jrb_apply_operator_block_mid(matvec, q)), None
+
+    basis, _ = lax.scan(body, basis, xs=None, length=int(subspace_iters))
+    return _jrb_ritz_pairs_from_basis(matvec, basis, k=k, which=which)
+
+
+def jrb_mat_eigsh_block_with_diagnostics_point(
+    matvec,
+    *,
+    size: int,
+    k: int = 6,
+    which: str = "largest",
+    block_size: int | None = None,
+    subspace_iters: int = 4,
+    v0: jax.Array | None = None,
+    tol: float = 1e-3,
+) -> tuple[jax.Array, jax.Array, JrbMatKrylovDiagnostics]:
+    vals, vecs = jrb_mat_eigsh_block_point(matvec, size=size, k=k, which=which, block_size=block_size, subspace_iters=subspace_iters, v0=v0)
+    diag = _jrb_eig_diagnostics(matvec, vals, vecs, algorithm_code=9, steps=subspace_iters, basis_dim=int(k if block_size is None else block_size), method="lanczos", tol=tol)
+    return vals, vecs, diag
+
+
+def jrb_mat_eigsh_restarted_point(
+    matvec,
+    *,
+    size: int,
+    k: int = 6,
+    which: str = "largest",
+    steps: int = 4,
+    restarts: int = 2,
+    block_size: int | None = None,
+    v0: jax.Array | None = None,
+) -> tuple[jax.Array, jax.Array]:
+    size = int(size)
+    actual_block = int(k if block_size is None else block_size)
+    if actual_block < k:
+        raise ValueError("block_size must be >= k")
+    basis = _jrb_orthonormalize_columns(_jrb_eigsh_mid_block(v0, size=size, block_size=actual_block))
+    restart_tol = matrix_free_core.eig_restart_lock_tolerance(steps=steps, restarts=restarts)
+    keep_count = min(actual_block, basis.shape[1])
+
+    def iterate(q):
+        def body(q_inner, _):
+            return _jrb_orthonormalize_columns(_jrb_apply_operator_block_mid(matvec, q_inner)), None
+        q_out, _ = lax.scan(body, q, xs=None, length=int(steps))
+        vals, vecs = _jrb_ritz_pairs_from_basis(matvec, q_out, k=keep_count, which=which)
+        residuals = _jrb_apply_operator_block_mid(matvec, vecs) - vecs * vals[None, :]
+        return _jrb_restart_basis_from_pairs(
+            actual_block=actual_block,
+            vals=vals,
+            vecs=vecs,
+            residuals=residuals,
+            which=which,
+            lock_tol=restart_tol,
+            refill_basis=q_out,
+        )
+
+    for _ in range(int(restarts)):
+        basis = iterate(basis)
+
+    return _jrb_ritz_pairs_from_basis(matvec, basis, k=k, which=which)
+
+
+def jrb_mat_eigsh_restarted_with_diagnostics_point(
+    matvec,
+    *,
+    size: int,
+    k: int = 6,
+    which: str = "largest",
+    steps: int = 4,
+    restarts: int = 2,
+    block_size: int | None = None,
+    v0: jax.Array | None = None,
+    tol: float = 1e-3,
+) -> tuple[jax.Array, jax.Array, JrbMatKrylovDiagnostics]:
+    vals, vecs = jrb_mat_eigsh_restarted_point(
+        matvec,
+        size=size,
+        k=k,
+        which=which,
+        steps=steps,
+        restarts=restarts,
+        block_size=block_size,
+        v0=v0,
+    )
+    diag = _jrb_eig_diagnostics(
+        matvec,
+        vals,
+        vecs,
+        algorithm_code=10,
+        steps=steps,
+        basis_dim=int(k if block_size is None else block_size),
+        restart_count=restarts,
+        method="lanczos",
+        tol=tol,
+    )
+    return vals, vecs, diag
+
+
+def jrb_mat_eigsh_krylov_schur_point(
+    matvec,
+    *,
+    size: int,
+    k: int = 6,
+    which: str = "largest",
+    steps: int = 4,
+    restarts: int = 2,
+    block_size: int | None = None,
+    v0: jax.Array | None = None,
+) -> tuple[jax.Array, jax.Array]:
+    size = int(size)
+    actual_block = int(k if block_size is None else block_size)
+    if actual_block < k:
+        raise ValueError("block_size must be >= k")
+    basis0 = _jrb_eigsh_mid_block(v0, size=size, block_size=actual_block)
+    basis = matrix_free_core.restarted_subspace_iteration_point(
+        lambda q: _jrb_apply_operator_block_mid(matvec, q),
+        basis0,
+        subspace_iters=int(steps),
+        restarts=int(restarts),
+        k=k,
+        which=which,
+        hermitian=True,
+    )
+    keep_count = min(actual_block, basis.shape[1])
+    vals, vecs = _jrb_ritz_pairs_from_basis(matvec, basis, k=keep_count, which=which)
+    residuals = _jrb_apply_operator_block_mid(matvec, vecs) - vecs * vals[None, :]
+    basis = _jrb_restart_basis_from_pairs(
+        actual_block=actual_block,
+        vals=vals,
+        vecs=vecs,
+        residuals=residuals,
+        which=which,
+        lock_tol=1e-4,
+        refill_basis=basis,
+    )
+    return _jrb_ritz_pairs_from_basis(matvec, basis, k=k, which=which)
+
+
+def jrb_mat_eigsh_krylov_schur_with_diagnostics_point(
+    matvec,
+    *,
+    size: int,
+    k: int = 6,
+    which: str = "largest",
+    steps: int = 4,
+    restarts: int = 2,
+    block_size: int | None = None,
+    v0: jax.Array | None = None,
+    tol: float = 1e-3,
+) -> tuple[jax.Array, jax.Array, JrbMatKrylovDiagnostics]:
+    vals, vecs = jrb_mat_eigsh_krylov_schur_point(
+        matvec,
+        size=size,
+        k=k,
+        which=which,
+        steps=steps,
+        restarts=restarts,
+        block_size=block_size,
+        v0=v0,
+    )
+    diag = _jrb_eig_diagnostics(
+        matvec,
+        vals,
+        vecs,
+        algorithm_code=11,
+        steps=steps,
+        basis_dim=int(k if block_size is None else block_size),
+        restart_count=restarts,
+        method="lanczos",
+        tol=tol,
+    )
+    return vals, vecs, diag
+
+
+def jrb_mat_eigsh_davidson_point(
+    matvec,
+    *,
+    size: int,
+    k: int = 6,
+    which: str = "largest",
+    subspace_iters: int = 4,
+    block_size: int | None = None,
+    preconditioner=None,
+    v0: jax.Array | None = None,
+    tol: float = 1e-4,
+) -> tuple[jax.Array, jax.Array]:
+    size = int(size)
+    actual_block = int(k if block_size is None else block_size)
+    if actual_block < k:
+        raise ValueError("block_size must be >= k")
+    basis = _jrb_orthonormalize_columns(_jrb_eigsh_mid_block(v0, size=size, block_size=actual_block))
+
+    target_cols = min(size, max(actual_block, k))
+    lock_tol = max(float(tol), matrix_free_core.eig_restart_lock_tolerance(steps=subspace_iters, restarts=1))
+    for _ in range(int(subspace_iters)):
+        keep_count = min(actual_block, basis.shape[1])
+        vals, vecs = _jrb_ritz_pairs_from_basis(matvec, basis, k=keep_count, which=which)
+        applied = _jrb_apply_operator_block_mid(matvec, vecs)
+        residuals = applied - vecs * vals[None, :]
+        basis_seed = _jrb_restart_basis_from_pairs(
+            actual_block=min(actual_block, basis.shape[1]),
+            vals=vals,
+            vecs=vecs,
+            residuals=residuals,
+            which=which,
+            lock_tol=lock_tol,
+            refill_basis=basis,
+        )
+        target_cols = min(size, basis_seed.shape[1] + min(actual_block, residuals.shape[1]))
+        basis = _jrb_expand_subspace_with_corrections(
+            basis_seed,
+            vecs,
+            residuals,
+            vals=vals,
+            target_cols=target_cols,
+            which=which,
+            lock_tol=lock_tol,
+            preconditioner=preconditioner,
+            jacobi_davidson=False,
+        )
+    return _jrb_ritz_pairs_from_basis(matvec, basis, k=k, which=which)
+
+
+def jrb_mat_eigsh_davidson_with_diagnostics_point(
+    matvec,
+    *,
+    size: int,
+    k: int = 6,
+    which: str = "largest",
+    subspace_iters: int = 4,
+    block_size: int | None = None,
+    preconditioner=None,
+    v0: jax.Array | None = None,
+    tol: float = 1e-3,
+) -> tuple[jax.Array, jax.Array, JrbMatKrylovDiagnostics]:
+    vals, vecs = jrb_mat_eigsh_davidson_point(
+        matvec,
+        size=size,
+        k=k,
+        which=which,
+        subspace_iters=subspace_iters,
+        block_size=block_size,
+        preconditioner=preconditioner,
+        v0=v0,
+        tol=tol,
+    )
+    diag = _jrb_eig_diagnostics(matvec, vals, vecs, algorithm_code=12, steps=subspace_iters, basis_dim=int(k if block_size is None else block_size), method="lanczos", tol=tol)
+    return vals, vecs, diag
+
+
+def jrb_mat_eigsh_jacobi_davidson_point(
+    matvec,
+    *,
+    size: int,
+    k: int = 6,
+    which: str = "largest",
+    subspace_iters: int = 4,
+    block_size: int | None = None,
+    preconditioner=None,
+    v0: jax.Array | None = None,
+    tol: float = 1e-4,
+) -> tuple[jax.Array, jax.Array]:
+    size = int(size)
+    actual_block = int(k if block_size is None else block_size)
+    if actual_block < k:
+        raise ValueError("block_size must be >= k")
+    basis = _jrb_orthonormalize_columns(_jrb_eigsh_mid_block(v0, size=size, block_size=actual_block))
+
+    target_cols = min(size, max(actual_block, k))
+    lock_tol = max(float(tol), matrix_free_core.eig_restart_lock_tolerance(steps=subspace_iters, restarts=1))
+    for _ in range(int(subspace_iters)):
+        keep_count = min(actual_block, basis.shape[1])
+        vals, vecs = _jrb_ritz_pairs_from_basis(matvec, basis, k=keep_count, which=which)
+        applied = _jrb_apply_operator_block_mid(matvec, vecs)
+        residuals = applied - vecs * vals[None, :]
+        basis_seed = _jrb_restart_basis_from_pairs(
+            actual_block=min(actual_block, basis.shape[1]),
+            vals=vals,
+            vecs=vecs,
+            residuals=residuals,
+            which=which,
+            lock_tol=lock_tol,
+            refill_basis=basis,
+        )
+        target_cols = min(size, basis_seed.shape[1] + min(actual_block, residuals.shape[1]))
+        basis = _jrb_expand_subspace_with_corrections(
+            basis_seed,
+            vecs,
+            residuals,
+            vals=vals,
+            target_cols=target_cols,
+            which=which,
+            lock_tol=lock_tol,
+            preconditioner=preconditioner,
+            jacobi_davidson=True,
+        )
+    return _jrb_ritz_pairs_from_basis(matvec, basis, k=k, which=which)
+
+
+def jrb_mat_eigsh_jacobi_davidson_with_diagnostics_point(
+    matvec,
+    *,
+    size: int,
+    k: int = 6,
+    which: str = "largest",
+    subspace_iters: int = 4,
+    block_size: int | None = None,
+    preconditioner=None,
+    v0: jax.Array | None = None,
+    tol: float = 1e-6,
+) -> tuple[jax.Array, jax.Array, JrbMatKrylovDiagnostics]:
+    vals, vecs = jrb_mat_eigsh_jacobi_davidson_point(
+        matvec,
+        size=size,
+        k=k,
+        which=which,
+        subspace_iters=subspace_iters,
+        block_size=block_size,
+        preconditioner=preconditioner,
+        v0=v0,
+        tol=tol,
+    )
+    diag = _jrb_eig_diagnostics(matvec, vals, vecs, algorithm_code=13, steps=subspace_iters, basis_dim=int(k if block_size is None else block_size), method="lanczos", tol=tol)
+    return vals, vecs, diag
+
+
+def jrb_mat_geigsh_point(
+    a_matvec,
+    b_matvec,
+    *,
+    size: int,
+    k: int = 6,
+    which: str = "largest",
+    steps: int | None = None,
+    v0: jax.Array | None = None,
+    b_preconditioner=None,
+    tol: float = 1e-8,
+    atol: float = 0.0,
+    maxiter: int | None = None,
+) -> tuple[jax.Array, jax.Array]:
+    plan = jrb_mat_generalized_operator_plan_prepare(
+        a_matvec,
+        b_matvec,
+        b_preconditioner=b_preconditioner,
+        tol=tol,
+        atol=atol,
+        maxiter=maxiter,
+    )
+    return jrb_mat_eigsh_point(plan, size=size, k=k, which=which, steps=steps, v0=v0)
+
+
+def jrb_mat_geigsh_with_diagnostics_point(
+    a_matvec,
+    b_matvec,
+    *,
+    size: int,
+    k: int = 6,
+    which: str = "largest",
+    steps: int | None = None,
+    v0: jax.Array | None = None,
+    b_preconditioner=None,
+    tol: float = 1e-3,
+    solve_tol: float = 1e-8,
+    atol: float = 0.0,
+    maxiter: int | None = None,
+) -> tuple[jax.Array, jax.Array, JrbMatKrylovDiagnostics]:
+    vals, vecs = jrb_mat_geigsh_point(
+        a_matvec,
+        b_matvec,
+        size=size,
+        k=k,
+        which=which,
+        steps=steps,
+        v0=v0,
+        b_preconditioner=b_preconditioner,
+        tol=solve_tol,
+        atol=atol,
+        maxiter=maxiter,
+    )
+    resolved_steps = min(size, max(int(k) + 2, 2 * int(k) + 8)) if steps is None else int(steps)
+    diag = _jrb_generalized_eig_diagnostics(
+        a_matvec,
+        b_matvec,
+        vals,
+        vecs,
+        algorithm_code=16,
+        steps=resolved_steps,
+        basis_dim=resolved_steps,
+        tol=tol,
+    )
+    return vals, vecs, diag
+
+
+def jrb_mat_shift_invert_operator_plan_prepare(
+    matvec,
+    *,
+    shift,
+    preconditioner=None,
+    tol: float = 1e-8,
+    atol: float = 0.0,
+    maxiter: int | None = None,
+):
+    return matrix_free_core.shell_operator_plan(
+        lambda v, context: jnp.asarray(
+            jnp.real(
+                _jrb_shifted_solve_mid(
+                    context["matvec"],
+                    jnp.asarray(v, dtype=jnp.float64),
+                    shift=context["shift"],
+                    preconditioner=context["preconditioner"],
+                    tol=context["tol"],
+                    atol=context["atol"],
+                    maxiter=context["maxiter"],
+                )
+            ),
+            dtype=jnp.float64,
+        ),
+        context={
+            "matvec": matvec,
+            "shift": jnp.asarray(shift, dtype=jnp.float64),
+            "preconditioner": preconditioner,
+            "tol": float(tol),
+            "atol": float(atol),
+            "maxiter": maxiter,
+        },
+        orientation="forward",
+        algebra="jrb",
+    )
+
+
+def jrb_mat_generalized_shift_invert_operator_plan_prepare(
+    a_matvec,
+    b_matvec,
+    *,
+    shift,
+    preconditioner=None,
+    tol: float = 1e-8,
+    atol: float = 0.0,
+    maxiter: int | None = None,
+):
+    return matrix_free_core.shell_operator_plan(
+        lambda v, context: jnp.asarray(
+            jnp.real(
+                _jrb_generalized_shifted_solve_mid(
+                    context["a_matvec"],
+                    context["b_matvec"],
+                    _jrb_apply_operator_mid(context["b_matvec"], _jrb_point_interval(jnp.asarray(v, dtype=jnp.float64))),
+                    shift=context["shift"],
+                    preconditioner=context["preconditioner"],
+                    tol=context["tol"],
+                    atol=context["atol"],
+                    maxiter=context["maxiter"],
+                )
+            ),
+            dtype=jnp.float64,
+        ),
+        context={
+            "a_matvec": a_matvec,
+            "b_matvec": b_matvec,
+            "shift": jnp.asarray(shift, dtype=jnp.float64),
+            "preconditioner": preconditioner,
+            "tol": float(tol),
+            "atol": float(atol),
+            "maxiter": maxiter,
+        },
+        orientation="forward",
+        algebra="jrb",
+    )
+
+
+def jrb_mat_eigsh_shift_invert_point(
+    matvec,
+    *,
+    size: int,
+    shift,
+    k: int = 6,
+    which: str = "largest",
+    steps: int | None = None,
+    preconditioner=None,
+    v0: jax.Array | None = None,
+) -> tuple[jax.Array, jax.Array]:
+    plan = jrb_mat_shift_invert_operator_plan_prepare(matvec, shift=shift, preconditioner=preconditioner)
+    vals, vecs = jrb_mat_eigsh_point(plan, size=size, k=k, which=which, steps=steps, v0=v0)
+    mids = jnp.asarray(vals, dtype=jnp.complex128)
+    mapped = jnp.asarray(shift, dtype=jnp.complex128) + 1.0 / mids
+    return _jrb_point_interval(jnp.real(mapped)), _jrb_point_interval(jnp.real(vecs))
+
+
+def jrb_mat_eigsh_shift_invert_with_diagnostics_point(
+    matvec,
+    *,
+    size: int,
+    shift,
+    k: int = 6,
+    which: str = "largest",
+    steps: int | None = None,
+    preconditioner=None,
+    v0: jax.Array | None = None,
+    tol: float = 1e-6,
+) -> tuple[jax.Array, jax.Array, JrbMatKrylovDiagnostics]:
+    vals, vecs = jrb_mat_eigsh_shift_invert_point(
+        matvec,
+        size=size,
+        shift=shift,
+        k=k,
+        which=which,
+        steps=steps,
+        preconditioner=preconditioner,
+        v0=v0,
+    )
+    resolved_steps = min(size, max(int(k) + 2, 2 * int(k) + 8)) if steps is None else int(steps)
+    diag = _jrb_eig_diagnostics(matvec, di.midpoint(vals), di.midpoint(vecs), algorithm_code=14, steps=resolved_steps, basis_dim=resolved_steps, method="gmres", tol=tol)
+    return vals, vecs, diag
+
+
+def jrb_mat_geigsh_shift_invert_point(
+    a_matvec,
+    b_matvec,
+    *,
+    size: int,
+    shift,
+    k: int = 6,
+    which: str = "largest",
+    steps: int | None = None,
+    preconditioner=None,
+    v0: jax.Array | None = None,
+) -> tuple[jax.Array, jax.Array]:
+    plan = jrb_mat_generalized_shift_invert_operator_plan_prepare(
+        a_matvec,
+        b_matvec,
+        shift=shift,
+        preconditioner=preconditioner,
+    )
+    vals, vecs = jrb_mat_eigsh_point(plan, size=size, k=k, which=which, steps=steps, v0=v0)
+    mids = jnp.asarray(vals, dtype=jnp.complex128)
+    mapped = jnp.asarray(shift, dtype=jnp.complex128) + 1.0 / mids
+    return _jrb_point_interval(jnp.real(mapped)), _jrb_point_interval(jnp.real(vecs))
+
+
+def jrb_mat_geigsh_shift_invert_with_diagnostics_point(
+    a_matvec,
+    b_matvec,
+    *,
+    size: int,
+    shift,
+    k: int = 6,
+    which: str = "largest",
+    steps: int | None = None,
+    preconditioner=None,
+    v0: jax.Array | None = None,
+    tol: float = 1e-6,
+) -> tuple[jax.Array, jax.Array, JrbMatKrylovDiagnostics]:
+    vals, vecs = jrb_mat_geigsh_shift_invert_point(
+        a_matvec,
+        b_matvec,
+        size=size,
+        shift=shift,
+        k=k,
+        which=which,
+        steps=steps,
+        preconditioner=preconditioner,
+        v0=v0,
+    )
+    resolved_steps = min(size, max(int(k) + 2, 2 * int(k) + 8)) if steps is None else int(steps)
+    diag = _jrb_generalized_eig_diagnostics(
+        a_matvec,
+        b_matvec,
+        di.midpoint(vals),
+        di.midpoint(vecs),
+        algorithm_code=17,
+        steps=resolved_steps,
+        basis_dim=resolved_steps,
+        tol=tol,
+    )
+    return vals, vecs, diag
+
+
+def _jrb_nep_scalar_residual(matvec, vec_mid: jax.Array) -> jax.Array:
+    applied = _jrb_apply_operator_mid(matvec, _jrb_point_interval(vec_mid))
+    denom = jnp.maximum(jnp.vdot(vec_mid, vec_mid), jnp.asarray(1e-30, dtype=jnp.float64))
+    return jnp.asarray(jnp.vdot(vec_mid, applied) / denom, dtype=jnp.float64)
+
+
+def _jrb_polynomial_operator_plan_prepare(coeff_matvecs, lam):
+    coeffs = tuple(jnp.asarray(lam, dtype=jnp.float64) ** i for i in range(len(coeff_matvecs)))
+    return matrix_free_core.shell_operator_plan(
+        lambda v, context: sum(
+            context["coeffs"][i] * _jrb_apply_operator_mid(context["ops"][i], _jrb_point_interval(jnp.asarray(v, dtype=jnp.float64)))
+            for i in range(len(context["ops"]))
+        ),
+        context={"ops": tuple(coeff_matvecs), "coeffs": coeffs},
+        orientation="forward",
+        algebra="jrb",
+    )
+
+
+def _jrb_polynomial_derivative_operator_plan_prepare(coeff_matvecs, lam):
+    coeffs = tuple(
+        jnp.asarray(i, dtype=jnp.float64) * (jnp.asarray(lam, dtype=jnp.float64) ** (i - 1))
+        for i in range(len(coeff_matvecs))
+    )
+    return matrix_free_core.shell_operator_plan(
+        lambda v, context: sum(
+            context["coeffs"][i] * _jrb_apply_operator_mid(context["ops"][i], _jrb_point_interval(jnp.asarray(v, dtype=jnp.float64)))
+            for i in range(1, len(context["ops"]))
+        ),
+        context={"ops": tuple(coeff_matvecs), "coeffs": coeffs},
+        orientation="forward",
+        algebra="jrb",
+    )
+
+
+def jrb_mat_neigsh_point(
+    matvec_builder,
+    dmatvec_builder,
+    *,
+    size: int,
+    lambda0,
+    newton_iters: int = 4,
+    eig_steps: int = 6,
+    v0: jax.Array | None = None,
+    preconditioner_builder=None,
+    tol: float = 1e-8,
+) -> tuple[jax.Array, jax.Array]:
+    lam = jnp.asarray(lambda0, dtype=jnp.float64)
+    vec = _jrb_mid_vector(_jrb_eigsh_start_vector(size) if v0 is None else jrb_mat_as_interval_vector(v0))
+    for _ in range(int(newton_iters)):
+        op = matvec_builder(lam)
+        prec = None if preconditioner_builder is None else preconditioner_builder(lam)
+        vals, vecs = jrb_mat_eigsh_shift_invert_point(
+            op,
+            size=size,
+            shift=0.0,
+            k=1,
+            which="largest",
+            steps=eig_steps,
+            preconditioner=prec,
+            v0=_jrb_point_interval(vec),
+        )
+        vec = di.midpoint(vecs)[:, 0]
+        residual = di.midpoint(vals)[0]
+        if jnp.abs(residual) <= jnp.asarray(tol, dtype=jnp.float64):
+            break
+        dop = dmatvec_builder(lam)
+        derivative = _jrb_nep_scalar_residual(dop, vec)
+        safe_derivative = jnp.where(jnp.abs(derivative) > tol, derivative, jnp.asarray(1.0, dtype=jnp.float64))
+        lam = lam - residual / safe_derivative
+    return _jrb_point_interval(jnp.asarray([lam], dtype=jnp.float64)), _jrb_point_interval(vec[:, None])
+
+
+def jrb_mat_neigsh_with_diagnostics_point(
+    matvec_builder,
+    dmatvec_builder,
+    *,
+    size: int,
+    lambda0,
+    newton_iters: int = 4,
+    eig_steps: int = 6,
+    v0: jax.Array | None = None,
+    preconditioner_builder=None,
+    tol: float = 1e-8,
+) -> tuple[jax.Array, jax.Array, JrbMatKrylovDiagnostics]:
+    lam = jnp.asarray(lambda0, dtype=jnp.float64)
+    vec = _jrb_mid_vector(_jrb_eigsh_start_vector(size) if v0 is None else jrb_mat_as_interval_vector(v0))
+    residual_history = []
+    for _ in range(int(newton_iters)):
+        op = matvec_builder(lam)
+        prec = None if preconditioner_builder is None else preconditioner_builder(lam)
+        vals, vecs = jrb_mat_eigsh_shift_invert_point(
+            op,
+            size=size,
+            shift=0.0,
+            k=1,
+            which="largest",
+            steps=eig_steps,
+            preconditioner=prec,
+            v0=_jrb_point_interval(vec),
+        )
+        vec = di.midpoint(vecs)[:, 0]
+        residual = di.midpoint(vals)[0]
+        residual_history.append(jnp.abs(residual))
+        if jnp.abs(residual) <= jnp.asarray(tol, dtype=jnp.float64):
+            break
+        dop = dmatvec_builder(lam)
+        derivative = _jrb_nep_scalar_residual(dop, vec)
+        safe_derivative = jnp.where(jnp.abs(derivative) > tol, derivative, jnp.asarray(1.0, dtype=jnp.float64))
+        lam = lam - residual / safe_derivative
+    vals_out = _jrb_point_interval(jnp.asarray([lam], dtype=jnp.float64))
+    vecs_out = _jrb_point_interval(vec[:, None])
+    history = jnp.asarray(residual_history if residual_history else [0.0], dtype=jnp.float64)
+    diag = matrix_free_core.krylov_diagnostics(
+        JrbMatKrylovDiagnostics,
+        algorithm_code=18,
+        steps=eig_steps,
+        basis_dim=size,
+        beta0=1.0,
+        tail_norm=history[-1],
+        breakdown=False,
+        used_adjoint=False,
+        gradient_supported=True,
+        probe_count=1,
+        restart_count=newton_iters,
+    )
+    diag = _jrb_attach_diag(
+        diag,
+        regime="structured",
+        method="lanczos",
+        structure="symmetric",
+        work_units=eig_steps,
+        primal_residual=history[-1],
+        note="matrix_free.neigsh",
+    )
+    diag = _jrb_update_convergence(
+        diag,
+        converged=history[-1] <= jnp.asarray(tol, dtype=jnp.float64),
+        convergence_metric=history[-1],
+        locked_count=1,
+        residual_history=history,
+        deflated_count=1 if history[-1] <= jnp.asarray(tol, dtype=jnp.float64) else 0,
+    )
+    return vals_out, vecs_out, diag
+
+
+def jrb_mat_peigsh_point(
+    coeff_matvecs,
+    *,
+    size: int,
+    lambda0,
+    newton_iters: int = 4,
+    eig_steps: int = 6,
+    v0: jax.Array | None = None,
+    tol: float = 1e-8,
+) -> tuple[jax.Array, jax.Array]:
+    return jrb_mat_neigsh_point(
+        lambda lam: _jrb_polynomial_operator_plan_prepare(coeff_matvecs, lam),
+        lambda lam: _jrb_polynomial_derivative_operator_plan_prepare(coeff_matvecs, lam),
+        size=size,
+        lambda0=lambda0,
+        newton_iters=newton_iters,
+        eig_steps=eig_steps,
+        v0=v0,
+        tol=tol,
+    )
+
+
+def jrb_mat_peigsh_with_diagnostics_point(
+    coeff_matvecs,
+    *,
+    size: int,
+    lambda0,
+    newton_iters: int = 4,
+    eig_steps: int = 6,
+    v0: jax.Array | None = None,
+    tol: float = 1e-8,
+) -> tuple[jax.Array, jax.Array, JrbMatKrylovDiagnostics]:
+    vals, vecs, diag = jrb_mat_neigsh_with_diagnostics_point(
+        lambda lam: _jrb_polynomial_operator_plan_prepare(coeff_matvecs, lam),
+        lambda lam: _jrb_polynomial_derivative_operator_plan_prepare(coeff_matvecs, lam),
+        size=size,
+        lambda0=lambda0,
+        newton_iters=newton_iters,
+        eig_steps=eig_steps,
+        v0=v0,
+        tol=tol,
+    )
+    return vals, vecs, diag._replace(algorithm_code=jnp.asarray(19, dtype=jnp.int32))
+
+
+def jrb_mat_eigsh_contour_point(
+    matvec,
+    *,
+    size: int,
+    center,
+    radius,
+    k: int = 6,
+    which: str = "largest",
+    quadrature_order: int = 8,
+    block_size: int | None = None,
+    preconditioner=None,
+    v0: jax.Array | None = None,
+) -> tuple[jax.Array, jax.Array]:
+    size = int(size)
+    actual_block = int(k if block_size is None else block_size)
+    if actual_block < k:
+        raise ValueError("block_size must be >= k")
+    basis0 = jnp.asarray(_jrb_eigsh_mid_block(v0, size=size, block_size=actual_block), dtype=jnp.complex128)
+
+    def solve_shifted_block(shift, block):
+        return jax.vmap(
+            lambda col: _jrb_shifted_solve_mid(matvec, col, shift=shift, preconditioner=preconditioner),
+            in_axes=1,
+            out_axes=1,
+        )(block)
+
+    filtered = matrix_free_core.contour_filter_subspace_point(
+        solve_shifted_block,
+        basis0,
+        center=center,
+        radius=radius,
+        quadrature_order=int(quadrature_order),
+    )
+    vals, vecs = matrix_free_core.ritz_pairs_from_basis(
+        lambda q: jax.vmap(
+            lambda col: (
+                matrix_free_core.operator_apply_midpoint(
+                    matvec,
+                    col,
+                    midpoint_vector=lambda y: jnp.asarray(y, dtype=jnp.complex128),
+                    sparse_bcoo_matvec=sparse_common.sparse_bcoo_matvec,
+                    dtype=jnp.complex128,
+                )
+                if isinstance(matvec, matrix_free_core.OperatorPlan)
+                else matrix_free_core.complexify_real_linear_operator(
+                    lambda y: _jrb_apply_operator_mid(matvec, _jrb_point_interval(y)),
+                    col,
+                )
+            ),
+            in_axes=1,
+            out_axes=1,
+        )(q),
+        filtered,
+        k=k,
+        which=which,
+        hermitian=True,
+    )
+    return _jrb_point_interval(jnp.real(vals)), _jrb_point_interval(jnp.real(vecs))
+
+
+def jrb_mat_eigsh_contour_with_diagnostics_point(
+    matvec,
+    *,
+    size: int,
+    center,
+    radius,
+    k: int = 6,
+    which: str = "largest",
+    quadrature_order: int = 8,
+    block_size: int | None = None,
+    preconditioner=None,
+    v0: jax.Array | None = None,
+    tol: float = 1e-6,
+) -> tuple[jax.Array, jax.Array, JrbMatKrylovDiagnostics]:
+    vals, vecs = jrb_mat_eigsh_contour_point(
+        matvec,
+        size=size,
+        center=center,
+        radius=radius,
+        k=k,
+        which=which,
+        quadrature_order=quadrature_order,
+        block_size=block_size,
+        preconditioner=preconditioner,
+        v0=v0,
+    )
+    diag = _jrb_eig_diagnostics(matvec, di.midpoint(vals), di.midpoint(vecs), algorithm_code=15, steps=quadrature_order, basis_dim=int(k if block_size is None else block_size), method="gmres", tol=tol)
+    return vals, vecs, diag
 
 
 def _jrb_mat_funm_action_lanczos_point_base(matvec, x: jax.Array, dense_funm, steps: int):
@@ -1823,6 +3645,28 @@ def jrb_mat_log_action_lanczos_point(matvec, x: jax.Array, steps: int) -> jax.Ar
     return jrb_mat_funm_action_lanczos_point(matvec, x, jrb_mat_dense_funm_sym_eigh_point(jnp.log), steps)
 
 
+def jrb_mat_log_action_symmetric_point(matvec, x: jax.Array, steps: int) -> jax.Array:
+    return jrb_mat_log_action_lanczos_point(matvec, x, steps)
+
+
+def jrb_mat_log_action_spd_point(matvec, x: jax.Array, steps: int) -> jax.Array:
+    return jrb_mat_log_action_lanczos_point(matvec, x, steps)
+
+
+def _jrb_action_basic_from_diagnostics(point_with_diagnostics_fn, matvec, x: jax.Array, *args, prec_bits: int, **kwargs) -> jax.Array:
+    value, _ = matrix_free_basic.action_with_diagnostics_basic(
+        point_with_diagnostics_fn,
+        matvec,
+        x,
+        *args,
+        round_output=_jrb_round_basic,
+        prec_bits=prec_bits,
+        invalidate_output=_full_interval_like,
+        **kwargs,
+    )
+    return value
+
+
 def jrb_mat_log_action_lanczos_basic(
     matvec,
     x: jax.Array,
@@ -1830,18 +3674,19 @@ def jrb_mat_log_action_lanczos_basic(
     *,
     prec_bits: int = di.DEFAULT_PREC_BITS,
 ) -> jax.Array:
-    return matrix_free_basic.action_basic(
-        jrb_mat_log_action_lanczos_point,
-        matvec,
-        x,
-        steps,
-        round_output=_jrb_round_basic,
-        prec_bits=prec_bits,
-    )
+    return _jrb_action_basic_from_diagnostics(jrb_mat_log_action_lanczos_with_diagnostics_point, matvec, x, steps, prec_bits=prec_bits)
 
 
 def jrb_mat_sqrt_action_lanczos_point(matvec, x: jax.Array, steps: int) -> jax.Array:
     return jrb_mat_funm_action_lanczos_point(matvec, x, jrb_mat_dense_funm_sym_eigh_point(jnp.sqrt), steps)
+
+
+def jrb_mat_sqrt_action_symmetric_point(matvec, x: jax.Array, steps: int) -> jax.Array:
+    return jrb_mat_sqrt_action_lanczos_point(matvec, x, steps)
+
+
+def jrb_mat_sqrt_action_spd_point(matvec, x: jax.Array, steps: int) -> jax.Array:
+    return jrb_mat_sqrt_action_lanczos_point(matvec, x, steps)
 
 
 def jrb_mat_sqrt_action_lanczos_basic(
@@ -1851,14 +3696,7 @@ def jrb_mat_sqrt_action_lanczos_basic(
     *,
     prec_bits: int = di.DEFAULT_PREC_BITS,
 ) -> jax.Array:
-    return matrix_free_basic.action_basic(
-        jrb_mat_sqrt_action_lanczos_point,
-        matvec,
-        x,
-        steps,
-        round_output=_jrb_round_basic,
-        prec_bits=prec_bits,
-    )
+    return _jrb_action_basic_from_diagnostics(jrb_mat_sqrt_action_lanczos_with_diagnostics_point, matvec, x, steps, prec_bits=prec_bits)
 
 
 def jrb_mat_root_action_lanczos_point(matvec, x: jax.Array, *, degree: int, steps: int) -> jax.Array:
@@ -1873,6 +3711,14 @@ def jrb_mat_root_action_lanczos_point(matvec, x: jax.Array, *, degree: int, step
     )
 
 
+def jrb_mat_root_action_symmetric_point(matvec, x: jax.Array, *, degree: int, steps: int) -> jax.Array:
+    return jrb_mat_root_action_lanczos_point(matvec, x, degree=degree, steps=steps)
+
+
+def jrb_mat_root_action_spd_point(matvec, x: jax.Array, *, degree: int, steps: int) -> jax.Array:
+    return jrb_mat_root_action_lanczos_point(matvec, x, degree=degree, steps=steps)
+
+
 def jrb_mat_root_action_lanczos_basic(
     matvec,
     x: jax.Array,
@@ -1881,19 +3727,26 @@ def jrb_mat_root_action_lanczos_basic(
     steps: int,
     prec_bits: int = di.DEFAULT_PREC_BITS,
 ) -> jax.Array:
-    return matrix_free_basic.action_basic(
-        jrb_mat_root_action_lanczos_point,
+    return _jrb_action_basic_from_diagnostics(
+        jrb_mat_root_action_lanczos_with_diagnostics_point,
         matvec,
         x,
         degree=degree,
         steps=steps,
-        round_output=_jrb_round_basic,
         prec_bits=prec_bits,
     )
 
 
 def jrb_mat_sign_action_lanczos_point(matvec, x: jax.Array, steps: int) -> jax.Array:
     return jrb_mat_funm_action_lanczos_point(matvec, x, jrb_mat_dense_funm_sym_eigh_point(jnp.sign), steps)
+
+
+def jrb_mat_sign_action_symmetric_point(matvec, x: jax.Array, steps: int) -> jax.Array:
+    return jrb_mat_sign_action_lanczos_point(matvec, x, steps)
+
+
+def jrb_mat_sign_action_spd_point(matvec, x: jax.Array, steps: int) -> jax.Array:
+    return jrb_mat_sign_action_lanczos_point(matvec, x, steps)
 
 
 def jrb_mat_sign_action_lanczos_basic(
@@ -1903,18 +3756,19 @@ def jrb_mat_sign_action_lanczos_basic(
     *,
     prec_bits: int = di.DEFAULT_PREC_BITS,
 ) -> jax.Array:
-    return matrix_free_basic.action_basic(
-        jrb_mat_sign_action_lanczos_point,
-        matvec,
-        x,
-        steps,
-        round_output=_jrb_round_basic,
-        prec_bits=prec_bits,
-    )
+    return _jrb_action_basic_from_diagnostics(jrb_mat_sign_action_lanczos_with_diagnostics_point, matvec, x, steps, prec_bits=prec_bits)
 
 
 def jrb_mat_sin_action_lanczos_point(matvec, x: jax.Array, steps: int) -> jax.Array:
     return jrb_mat_funm_action_lanczos_point(matvec, x, jrb_mat_dense_funm_sym_eigh_point(jnp.sin), steps)
+
+
+def jrb_mat_sin_action_symmetric_point(matvec, x: jax.Array, steps: int) -> jax.Array:
+    return jrb_mat_sin_action_lanczos_point(matvec, x, steps)
+
+
+def jrb_mat_sin_action_spd_point(matvec, x: jax.Array, steps: int) -> jax.Array:
+    return jrb_mat_sin_action_lanczos_point(matvec, x, steps)
 
 
 def jrb_mat_sin_action_lanczos_basic(
@@ -1924,18 +3778,19 @@ def jrb_mat_sin_action_lanczos_basic(
     *,
     prec_bits: int = di.DEFAULT_PREC_BITS,
 ) -> jax.Array:
-    return matrix_free_basic.action_basic(
-        jrb_mat_sin_action_lanczos_point,
-        matvec,
-        x,
-        steps,
-        round_output=_jrb_round_basic,
-        prec_bits=prec_bits,
-    )
+    return _jrb_action_basic_from_diagnostics(jrb_mat_sin_action_lanczos_with_diagnostics_point, matvec, x, steps, prec_bits=prec_bits)
 
 
 def jrb_mat_cos_action_lanczos_point(matvec, x: jax.Array, steps: int) -> jax.Array:
     return jrb_mat_funm_action_lanczos_point(matvec, x, jrb_mat_dense_funm_sym_eigh_point(jnp.cos), steps)
+
+
+def jrb_mat_cos_action_symmetric_point(matvec, x: jax.Array, steps: int) -> jax.Array:
+    return jrb_mat_cos_action_lanczos_point(matvec, x, steps)
+
+
+def jrb_mat_cos_action_spd_point(matvec, x: jax.Array, steps: int) -> jax.Array:
+    return jrb_mat_cos_action_lanczos_point(matvec, x, steps)
 
 
 def jrb_mat_cos_action_lanczos_basic(
@@ -1945,18 +3800,19 @@ def jrb_mat_cos_action_lanczos_basic(
     *,
     prec_bits: int = di.DEFAULT_PREC_BITS,
 ) -> jax.Array:
-    return matrix_free_basic.action_basic(
-        jrb_mat_cos_action_lanczos_point,
-        matvec,
-        x,
-        steps,
-        round_output=_jrb_round_basic,
-        prec_bits=prec_bits,
-    )
+    return _jrb_action_basic_from_diagnostics(jrb_mat_cos_action_lanczos_with_diagnostics_point, matvec, x, steps, prec_bits=prec_bits)
 
 
 def jrb_mat_sinh_action_lanczos_point(matvec, x: jax.Array, steps: int) -> jax.Array:
     return jrb_mat_funm_action_lanczos_point(matvec, x, jrb_mat_dense_funm_sym_eigh_point(jnp.sinh), steps)
+
+
+def jrb_mat_sinh_action_symmetric_point(matvec, x: jax.Array, steps: int) -> jax.Array:
+    return jrb_mat_sinh_action_lanczos_point(matvec, x, steps)
+
+
+def jrb_mat_sinh_action_spd_point(matvec, x: jax.Array, steps: int) -> jax.Array:
+    return jrb_mat_sinh_action_lanczos_point(matvec, x, steps)
 
 
 def jrb_mat_sinh_action_lanczos_basic(
@@ -1966,18 +3822,19 @@ def jrb_mat_sinh_action_lanczos_basic(
     *,
     prec_bits: int = di.DEFAULT_PREC_BITS,
 ) -> jax.Array:
-    return matrix_free_basic.action_basic(
-        jrb_mat_sinh_action_lanczos_point,
-        matvec,
-        x,
-        steps,
-        round_output=_jrb_round_basic,
-        prec_bits=prec_bits,
-    )
+    return _jrb_action_basic_from_diagnostics(jrb_mat_sinh_action_lanczos_with_diagnostics_point, matvec, x, steps, prec_bits=prec_bits)
 
 
 def jrb_mat_cosh_action_lanczos_point(matvec, x: jax.Array, steps: int) -> jax.Array:
     return jrb_mat_funm_action_lanczos_point(matvec, x, jrb_mat_dense_funm_sym_eigh_point(jnp.cosh), steps)
+
+
+def jrb_mat_cosh_action_symmetric_point(matvec, x: jax.Array, steps: int) -> jax.Array:
+    return jrb_mat_cosh_action_lanczos_point(matvec, x, steps)
+
+
+def jrb_mat_cosh_action_spd_point(matvec, x: jax.Array, steps: int) -> jax.Array:
+    return jrb_mat_cosh_action_lanczos_point(matvec, x, steps)
 
 
 def jrb_mat_cosh_action_lanczos_basic(
@@ -1987,18 +3844,19 @@ def jrb_mat_cosh_action_lanczos_basic(
     *,
     prec_bits: int = di.DEFAULT_PREC_BITS,
 ) -> jax.Array:
-    return matrix_free_basic.action_basic(
-        jrb_mat_cosh_action_lanczos_point,
-        matvec,
-        x,
-        steps,
-        round_output=_jrb_round_basic,
-        prec_bits=prec_bits,
-    )
+    return _jrb_action_basic_from_diagnostics(jrb_mat_cosh_action_lanczos_with_diagnostics_point, matvec, x, steps, prec_bits=prec_bits)
 
 
 def jrb_mat_tanh_action_lanczos_point(matvec, x: jax.Array, steps: int) -> jax.Array:
     return jrb_mat_funm_action_lanczos_point(matvec, x, jrb_mat_dense_funm_sym_eigh_point(jnp.tanh), steps)
+
+
+def jrb_mat_tanh_action_symmetric_point(matvec, x: jax.Array, steps: int) -> jax.Array:
+    return jrb_mat_tanh_action_lanczos_point(matvec, x, steps)
+
+
+def jrb_mat_tanh_action_spd_point(matvec, x: jax.Array, steps: int) -> jax.Array:
+    return jrb_mat_tanh_action_lanczos_point(matvec, x, steps)
 
 
 def jrb_mat_tanh_action_lanczos_basic(
@@ -2008,14 +3866,7 @@ def jrb_mat_tanh_action_lanczos_basic(
     *,
     prec_bits: int = di.DEFAULT_PREC_BITS,
 ) -> jax.Array:
-    return matrix_free_basic.action_basic(
-        jrb_mat_tanh_action_lanczos_point,
-        matvec,
-        x,
-        steps,
-        round_output=_jrb_round_basic,
-        prec_bits=prec_bits,
-    )
+    return _jrb_action_basic_from_diagnostics(jrb_mat_tanh_action_lanczos_with_diagnostics_point, matvec, x, steps, prec_bits=prec_bits)
 
 
 def jrb_mat_log_action_lanczos_dense_point(a: jax.Array, x: jax.Array, steps: int) -> jax.Array:
@@ -2065,6 +3916,14 @@ def jrb_mat_pow_action_lanczos_point(matvec, x: jax.Array, *, exponent: int, ste
     )
 
 
+def jrb_mat_pow_action_symmetric_point(matvec, x: jax.Array, *, exponent: int, steps: int) -> jax.Array:
+    return jrb_mat_pow_action_lanczos_point(matvec, x, exponent=exponent, steps=steps)
+
+
+def jrb_mat_pow_action_spd_point(matvec, x: jax.Array, *, exponent: int, steps: int) -> jax.Array:
+    return jrb_mat_pow_action_lanczos_point(matvec, x, exponent=exponent, steps=steps)
+
+
 def jrb_mat_pow_action_lanczos_basic(
     matvec,
     x: jax.Array,
@@ -2073,13 +3932,12 @@ def jrb_mat_pow_action_lanczos_basic(
     steps: int,
     prec_bits: int = di.DEFAULT_PREC_BITS,
 ) -> jax.Array:
-    return matrix_free_basic.action_basic(
-        jrb_mat_pow_action_lanczos_point,
+    return _jrb_action_basic_from_diagnostics(
+        jrb_mat_pow_action_lanczos_with_diagnostics_point,
         matvec,
         x,
         exponent=exponent,
         steps=steps,
-        round_output=_jrb_round_basic,
         prec_bits=prec_bits,
     )
 
@@ -2123,6 +3981,14 @@ def jrb_mat_expm_action_lanczos_restarted_point(
         jrb_mat_as_interval_vector(x),
         restarts=restarts,
     )
+
+
+def jrb_mat_expm_action_symmetric_point(matvec, x: jax.Array, *, steps: int, restarts: int = 1) -> jax.Array:
+    return jrb_mat_expm_action_lanczos_restarted_point(matvec, x, steps=steps, restarts=restarts)
+
+
+def jrb_mat_expm_action_spd_point(matvec, x: jax.Array, *, steps: int, restarts: int = 1) -> jax.Array:
+    return jrb_mat_expm_action_lanczos_restarted_point(matvec, x, steps=steps, restarts=restarts)
 
 
 def jrb_mat_expm_action_lanczos_block_point(
@@ -2209,6 +4075,7 @@ def jrb_mat_trace_estimator_point(matvec, probes: jax.Array) -> jax.Array:
         probes,
         di.as_interval,
         lambda v: jrb_mat_trace_integrand_point(matvec, v),
+        probe_midpoint=di.midpoint,
     )
 
 
@@ -2217,6 +4084,7 @@ def jrb_mat_logdet_slq_point(matvec, probes: jax.Array, steps: int) -> jax.Array
         probes,
         di.as_interval,
         lambda v: jrb_mat_funm_trace_integrand_lanczos_point(matvec, v, jnp.log, steps=steps),
+        probe_midpoint=di.midpoint,
     )
 
 
@@ -2266,11 +4134,46 @@ def _jrb_mat_logdet_slq_point_plan_kernel(matvec, probes: jax.Array, steps: int)
         probes,
         di.as_interval,
         lambda v: _jrb_mat_funm_integrand_lanczos_point_base(matvec, v, dense_funm, steps),
+        probe_midpoint=di.midpoint,
+    )
+
+
+def _jrb_mat_logdet_slq_point_plan_kernel_bucketed(matvec, probes: jax.Array, *, effective_steps: int, max_steps: int) -> jax.Array:
+    dense_funm = jrb_mat_dense_funm_sym_eigh_point(jnp.log)
+
+    def integrand(v):
+        basis, projected, beta0 = _jrb_mat_lanczos_tridiag_state_bucketed_point(matvec, v, effective_steps, max_steps)[:3]
+        del basis
+        active = jnp.clip(jnp.asarray(effective_steps, dtype=jnp.int32), 1, jnp.asarray(max_steps, dtype=jnp.int32))
+        active_mask = jnp.arange(max_steps, dtype=jnp.int32) < active
+        active_matrix = active_mask[:, None] & active_mask[None, :]
+        masked_projected = jnp.where(active_matrix, projected, jnp.zeros_like(projected))
+        masked_projected = masked_projected + jnp.diag(jnp.where(active_mask, 0.0, 1.0))
+        e1 = jnp.zeros((max_steps,), dtype=jnp.float64).at[0].set(jnp.asarray(1.0, dtype=jnp.float64))
+        value = (beta0**2) * jnp.vdot(e1, dense_funm(masked_projected) @ e1)
+        return jnp.asarray(jnp.real(value), dtype=jnp.float64)
+
+    return mat_common.estimator_mean(
+        probes,
+        di.as_interval,
+        integrand,
+        probe_midpoint=di.midpoint,
     )
 
 
 def _jrb_mat_det_slq_point_plan_kernel(matvec, probes: jax.Array, steps: int) -> jax.Array:
     return matrix_free_core.det_from_logdet(_jrb_mat_logdet_slq_point_plan_kernel(matvec, probes, steps))
+
+
+def _jrb_mat_det_slq_point_plan_kernel_bucketed(matvec, probes: jax.Array, *, effective_steps: int, max_steps: int) -> jax.Array:
+    return matrix_free_core.det_from_logdet(
+        _jrb_mat_logdet_slq_point_plan_kernel_bucketed(
+            matvec,
+            probes,
+            effective_steps=effective_steps,
+            max_steps=max_steps,
+        )
+    )
 
 
 def jrb_mat_funm_action_lanczos_with_diagnostics_point(
@@ -2279,11 +4182,13 @@ def jrb_mat_funm_action_lanczos_with_diagnostics_point(
     dense_funm,
     steps: int,
 ) -> tuple[jax.Array, JrbMatKrylovDiagnostics]:
-    return mat_common.action_with_diagnostics(
+    value, diag = mat_common.action_with_diagnostics(
         lambda xx: jrb_mat_funm_action_lanczos_point(matvec, xx, dense_funm, steps),
         lambda xx: jrb_mat_lanczos_diagnostics_point(matvec, xx, steps),
         x,
     )
+    diag = _jrb_update_convergence(diag, converged=jnp.isfinite(diag.tail_norm), convergence_metric=diag.tail_norm)
+    return value, diag
 
 
 def jrb_mat_log_action_lanczos_with_diagnostics_point(
@@ -2299,6 +4204,32 @@ def jrb_mat_log_action_lanczos_with_diagnostics_point(
     )
 
 
+def jrb_mat_log_action_lanczos_with_diagnostics_basic(
+    matvec,
+    x: jax.Array,
+    *,
+    steps: int,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+):
+    return matrix_free_basic.action_with_diagnostics_basic(
+        jrb_mat_log_action_lanczos_with_diagnostics_point,
+        matvec,
+        x,
+        steps=steps,
+        round_output=_jrb_round_basic,
+        prec_bits=prec_bits,
+        invalidate_output=_full_interval_like,
+    )
+
+
+def jrb_mat_log_action_symmetric_with_diagnostics_point(matvec, x: jax.Array, steps: int):
+    return jrb_mat_log_action_lanczos_with_diagnostics_point(matvec, x, steps)
+
+
+def jrb_mat_log_action_spd_with_diagnostics_point(matvec, x: jax.Array, steps: int):
+    return jrb_mat_log_action_lanczos_with_diagnostics_point(matvec, x, steps)
+
+
 def jrb_mat_sqrt_action_lanczos_with_diagnostics_point(
     matvec,
     x: jax.Array,
@@ -2310,6 +4241,14 @@ def jrb_mat_sqrt_action_lanczos_with_diagnostics_point(
         jrb_mat_dense_funm_sym_eigh_point(jnp.sqrt),
         steps,
     )
+
+
+def jrb_mat_sqrt_action_symmetric_with_diagnostics_point(matvec, x: jax.Array, steps: int):
+    return jrb_mat_sqrt_action_lanczos_with_diagnostics_point(matvec, x, steps)
+
+
+def jrb_mat_sqrt_action_spd_with_diagnostics_point(matvec, x: jax.Array, steps: int):
+    return jrb_mat_sqrt_action_lanczos_with_diagnostics_point(matvec, x, steps)
 
 
 def jrb_mat_root_action_lanczos_with_diagnostics_point(
@@ -2330,6 +4269,14 @@ def jrb_mat_root_action_lanczos_with_diagnostics_point(
     )
 
 
+def jrb_mat_root_action_symmetric_with_diagnostics_point(matvec, x: jax.Array, *, degree: int, steps: int):
+    return jrb_mat_root_action_lanczos_with_diagnostics_point(matvec, x, degree=degree, steps=steps)
+
+
+def jrb_mat_root_action_spd_with_diagnostics_point(matvec, x: jax.Array, *, degree: int, steps: int):
+    return jrb_mat_root_action_lanczos_with_diagnostics_point(matvec, x, degree=degree, steps=steps)
+
+
 def jrb_mat_sign_action_lanczos_with_diagnostics_point(
     matvec,
     x: jax.Array,
@@ -2341,6 +4288,14 @@ def jrb_mat_sign_action_lanczos_with_diagnostics_point(
         jrb_mat_dense_funm_sym_eigh_point(jnp.sign),
         steps,
     )
+
+
+def jrb_mat_sign_action_symmetric_with_diagnostics_point(matvec, x: jax.Array, steps: int):
+    return jrb_mat_sign_action_lanczos_with_diagnostics_point(matvec, x, steps)
+
+
+def jrb_mat_sign_action_spd_with_diagnostics_point(matvec, x: jax.Array, steps: int):
+    return jrb_mat_sign_action_lanczos_with_diagnostics_point(matvec, x, steps)
 
 
 def jrb_mat_sin_action_lanczos_with_diagnostics_point(
@@ -2356,6 +4311,14 @@ def jrb_mat_sin_action_lanczos_with_diagnostics_point(
     )
 
 
+def jrb_mat_sin_action_symmetric_with_diagnostics_point(matvec, x: jax.Array, steps: int):
+    return jrb_mat_sin_action_lanczos_with_diagnostics_point(matvec, x, steps)
+
+
+def jrb_mat_sin_action_spd_with_diagnostics_point(matvec, x: jax.Array, steps: int):
+    return jrb_mat_sin_action_lanczos_with_diagnostics_point(matvec, x, steps)
+
+
 def jrb_mat_cos_action_lanczos_with_diagnostics_point(
     matvec,
     x: jax.Array,
@@ -2367,6 +4330,14 @@ def jrb_mat_cos_action_lanczos_with_diagnostics_point(
         jrb_mat_dense_funm_sym_eigh_point(jnp.cos),
         steps,
     )
+
+
+def jrb_mat_cos_action_symmetric_with_diagnostics_point(matvec, x: jax.Array, steps: int):
+    return jrb_mat_cos_action_lanczos_with_diagnostics_point(matvec, x, steps)
+
+
+def jrb_mat_cos_action_spd_with_diagnostics_point(matvec, x: jax.Array, steps: int):
+    return jrb_mat_cos_action_lanczos_with_diagnostics_point(matvec, x, steps)
 
 
 def jrb_mat_sinh_action_lanczos_with_diagnostics_point(
@@ -2382,6 +4353,14 @@ def jrb_mat_sinh_action_lanczos_with_diagnostics_point(
     )
 
 
+def jrb_mat_sinh_action_symmetric_with_diagnostics_point(matvec, x: jax.Array, steps: int):
+    return jrb_mat_sinh_action_lanczos_with_diagnostics_point(matvec, x, steps)
+
+
+def jrb_mat_sinh_action_spd_with_diagnostics_point(matvec, x: jax.Array, steps: int):
+    return jrb_mat_sinh_action_lanczos_with_diagnostics_point(matvec, x, steps)
+
+
 def jrb_mat_cosh_action_lanczos_with_diagnostics_point(
     matvec,
     x: jax.Array,
@@ -2395,6 +4374,14 @@ def jrb_mat_cosh_action_lanczos_with_diagnostics_point(
     )
 
 
+def jrb_mat_cosh_action_symmetric_with_diagnostics_point(matvec, x: jax.Array, steps: int):
+    return jrb_mat_cosh_action_lanczos_with_diagnostics_point(matvec, x, steps)
+
+
+def jrb_mat_cosh_action_spd_with_diagnostics_point(matvec, x: jax.Array, steps: int):
+    return jrb_mat_cosh_action_lanczos_with_diagnostics_point(matvec, x, steps)
+
+
 def jrb_mat_tanh_action_lanczos_with_diagnostics_point(
     matvec,
     x: jax.Array,
@@ -2406,6 +4393,14 @@ def jrb_mat_tanh_action_lanczos_with_diagnostics_point(
         jrb_mat_dense_funm_sym_eigh_point(jnp.tanh),
         steps,
     )
+
+
+def jrb_mat_tanh_action_symmetric_with_diagnostics_point(matvec, x: jax.Array, steps: int):
+    return jrb_mat_tanh_action_lanczos_with_diagnostics_point(matvec, x, steps)
+
+
+def jrb_mat_tanh_action_spd_with_diagnostics_point(matvec, x: jax.Array, steps: int):
+    return jrb_mat_tanh_action_lanczos_with_diagnostics_point(matvec, x, steps)
 
 
 def jrb_mat_logdet_slq_symmetric_point(matvec, probes: jax.Array, steps: int) -> jax.Array:
@@ -2446,13 +4441,29 @@ def jrb_mat_logdet_slq_with_diagnostics_point(
     probes: jax.Array,
     steps: int,
 ) -> tuple[jax.Array, JrbMatKrylovDiagnostics]:
-    return mat_common.estimator_with_diagnostics(
+    value, diag = mat_common.estimator_with_diagnostics(
         probes,
         coerce_probes=di.as_interval,
         estimator_fn=lambda xs: jrb_mat_logdet_slq_point(matvec, xs, steps),
         diagnostics_fn=lambda first: jrb_mat_lanczos_diagnostics_point(matvec, first, steps),
         algorithm_code=2,
     )
+    diag = _jrb_attach_diag(
+        diag,
+        regime="structured",
+        method="lanczos",
+        structure="spd",
+        work_units=steps,
+        primal_residual=diag.tail_norm,
+        adjoint_residual=0.0,
+        note="matrix_free.logdet_slq",
+    )
+    diag = _jrb_update_convergence(
+        diag,
+        converged=jnp.isfinite(diag.tail_norm),
+        convergence_metric=diag.tail_norm,
+    )
+    return value, diag
 
 
 def jrb_mat_logdet_slq_with_diagnostics_basic(
@@ -2470,6 +4481,7 @@ def jrb_mat_logdet_slq_with_diagnostics_basic(
         lift_scalar=_jrb_point_interval,
         round_output=_jrb_round_basic,
         prec_bits=prec_bits,
+        invalidate_output=_full_interval_like,
     )
 
 
@@ -2479,6 +4491,16 @@ def jrb_mat_det_slq_with_diagnostics_point(
     steps: int,
 ) -> tuple[jax.Array, JrbMatKrylovDiagnostics]:
     value, diag = jrb_mat_logdet_slq_with_diagnostics_point(matvec, probes, steps)
+    diag = _jrb_attach_diag(
+        diag,
+        regime="structured",
+        method="lanczos",
+        structure="spd",
+        work_units=steps,
+        primal_residual=diag.primal_residual,
+        adjoint_residual=diag.adjoint_residual,
+        note="matrix_free.det_slq",
+    )
     return matrix_free_core.det_from_logdet(value), diag
 
 
@@ -2497,6 +4519,76 @@ def jrb_mat_det_slq_with_diagnostics_basic(
         lift_scalar=_jrb_point_interval,
         round_output=_jrb_round_basic,
         prec_bits=prec_bits,
+        invalidate_output=_full_interval_like,
+    )
+
+
+def jrb_mat_logdet_solve_point(
+    matvec,
+    rhs: jax.Array,
+    probes: jax.Array,
+    steps: int,
+    *,
+    x0: jax.Array | None = None,
+    tol: float = 1e-8,
+    atol: float = 0.0,
+    maxiter: int | None = None,
+    symmetric: bool = True,
+    preconditioner=None,
+) -> matrix_free_core.LogdetSolveResult:
+    solve_value, solve_diag = jrb_mat_solve_action_with_diagnostics_point(
+        matvec,
+        rhs,
+        x0=x0,
+        tol=tol,
+        atol=atol,
+        maxiter=maxiter,
+        symmetric=symmetric,
+        preconditioner=preconditioner,
+    )
+    logdet_value, logdet_diag = jrb_mat_logdet_slq_with_diagnostics_point(matvec, probes, steps)
+    return matrix_free_core.make_logdet_solve_result(
+        logdet=logdet_value,
+        solve=solve_value,
+        operator=matvec,
+        logdet_diagnostics=logdet_diag,
+        solve_diagnostics=solve_diag,
+        preconditioner=preconditioner,
+        structured=_jrb_structure_tag(symmetric=symmetric, spd=symmetric),
+        algebra="jrb",
+    )
+
+
+def jrb_mat_logdet_solve_basic(
+    matvec,
+    rhs: jax.Array,
+    probes: jax.Array,
+    steps: int,
+    *,
+    x0: jax.Array | None = None,
+    tol: float = 1e-8,
+    atol: float = 0.0,
+    maxiter: int | None = None,
+    symmetric: bool = True,
+    preconditioner=None,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> matrix_free_core.LogdetSolveResult:
+    result = jrb_mat_logdet_solve_point(
+        matvec,
+        rhs,
+        probes,
+        steps,
+        x0=x0,
+        tol=tol,
+        atol=atol,
+        maxiter=maxiter,
+        symmetric=symmetric,
+        preconditioner=preconditioner,
+    )
+    return matrix_free_core.LogdetSolveResult(
+        logdet=_jrb_round_basic(_jrb_point_interval(result.logdet), prec_bits),
+        solve=_jrb_round_basic(result.solve, prec_bits),
+        aux=result.aux,
     )
 
 
@@ -2555,6 +4647,17 @@ jrb_mat_matvec_basic_jit = jax.jit(jrb_mat_matvec_basic)
 jrb_mat_solve_basic_jit = jax.jit(jrb_mat_solve_basic)
 jrb_mat_triangular_solve_basic_jit = jax.jit(jrb_mat_triangular_solve_basic, static_argnames=("lower", "unit_diagonal"))
 jrb_mat_lu_basic_jit = jax.jit(jrb_mat_lu_basic)
+_jrb_mat_operator_apply_point_jit_callable = jax.jit(jrb_mat_operator_apply_point, static_argnames=("matvec",))
+_jrb_mat_operator_apply_point_jit_plan = jax.jit(jrb_mat_operator_apply_point)
+
+
+def jrb_mat_operator_apply_point_jit(matvec, x: jax.Array) -> jax.Array:
+    if isinstance(matvec, matrix_free_core.OperatorPlan):
+        return _jrb_mat_operator_apply_point_jit_plan(matvec, x)
+    return _jrb_mat_operator_apply_point_jit_callable(matvec, x)
+
+
+jrb_mat_rmatvec_point_jit = jax.jit(jrb_mat_rmatvec_point)
 
 _jrb_mat_expm_action_basic_jit_callable = jax.jit(jrb_mat_expm_action_basic, static_argnames=("matvec", "terms"))
 _jrb_mat_expm_action_basic_jit_plan = jax.jit(jrb_mat_expm_action_basic, static_argnames=("terms",))
@@ -2572,7 +4675,7 @@ _jrb_mat_solve_action_point_jit_callable = jax.jit(
 )
 _jrb_mat_solve_action_point_jit_plan = jax.jit(
     jrb_mat_solve_action_point,
-    static_argnames=("tol", "atol", "maxiter", "symmetric", "preconditioner"),
+    static_argnames=("tol", "atol", "maxiter", "symmetric"),
 )
 
 
@@ -2582,13 +4685,29 @@ def jrb_mat_solve_action_point_jit(matvec, b: jax.Array, **kwargs) -> jax.Array:
     return _jrb_mat_solve_action_point_jit_callable(matvec, b, **kwargs)
 
 
+_jrb_mat_minres_solve_action_point_jit_callable = jax.jit(
+    jrb_mat_minres_solve_action_point,
+    static_argnames=("matvec", "tol", "atol", "maxiter", "preconditioner"),
+)
+_jrb_mat_minres_solve_action_point_jit_plan = jax.jit(
+    jrb_mat_minres_solve_action_point,
+    static_argnames=("tol", "atol", "maxiter"),
+)
+
+
+def jrb_mat_minres_solve_action_point_jit(matvec, b: jax.Array, **kwargs) -> jax.Array:
+    if isinstance(matvec, matrix_free_core.OperatorPlan):
+        return _jrb_mat_minres_solve_action_point_jit_plan(matvec, b, **kwargs)
+    return _jrb_mat_minres_solve_action_point_jit_callable(matvec, b, **kwargs)
+
+
 _jrb_mat_inverse_action_point_jit_callable = jax.jit(
     jrb_mat_inverse_action_point,
     static_argnames=("matvec", "tol", "atol", "maxiter", "symmetric", "preconditioner"),
 )
 _jrb_mat_inverse_action_point_jit_plan = jax.jit(
     jrb_mat_inverse_action_point,
-    static_argnames=("tol", "atol", "maxiter", "symmetric", "preconditioner"),
+    static_argnames=("tol", "atol", "maxiter", "symmetric"),
 )
 
 
@@ -2598,8 +4717,28 @@ def jrb_mat_inverse_action_point_jit(matvec, x: jax.Array, **kwargs) -> jax.Arra
     return _jrb_mat_inverse_action_point_jit_callable(matvec, x, **kwargs)
 
 
+_jrb_mat_minres_inverse_action_point_jit_callable = jax.jit(
+    jrb_mat_minres_inverse_action_point,
+    static_argnames=("matvec", "tol", "atol", "maxiter", "preconditioner"),
+)
+_jrb_mat_minres_inverse_action_point_jit_plan = jax.jit(
+    jrb_mat_minres_inverse_action_point,
+    static_argnames=("tol", "atol", "maxiter"),
+)
+
+
+def jrb_mat_minres_inverse_action_point_jit(matvec, x: jax.Array, **kwargs) -> jax.Array:
+    if isinstance(matvec, matrix_free_core.OperatorPlan):
+        return _jrb_mat_minres_inverse_action_point_jit_plan(matvec, x, **kwargs)
+    return _jrb_mat_minres_inverse_action_point_jit_callable(matvec, x, **kwargs)
+
+
 _jrb_mat_logdet_slq_point_jit_callable = jax.jit(jrb_mat_logdet_slq_point, static_argnames=("matvec", "steps"))
 _jrb_mat_logdet_slq_point_jit_plan = jax.jit(_jrb_mat_logdet_slq_point_plan_kernel, static_argnames=("steps",))
+_jrb_mat_logdet_slq_point_jit_plan_bucketed = jax.jit(
+    _jrb_mat_logdet_slq_point_plan_kernel_bucketed,
+    static_argnames=("max_steps",),
+)
 
 
 def jrb_mat_logdet_slq_point_jit(matvec, probes: jax.Array, steps: int) -> jax.Array:
@@ -2610,12 +4749,168 @@ def jrb_mat_logdet_slq_point_jit(matvec, probes: jax.Array, steps: int) -> jax.A
 
 _jrb_mat_det_slq_point_jit_callable = jax.jit(jrb_mat_det_slq_point, static_argnames=("matvec", "steps"))
 _jrb_mat_det_slq_point_jit_plan = jax.jit(_jrb_mat_det_slq_point_plan_kernel, static_argnames=("steps",))
+_jrb_mat_det_slq_point_jit_plan_bucketed = jax.jit(
+    _jrb_mat_det_slq_point_plan_kernel_bucketed,
+    static_argnames=("max_steps",),
+)
 
 
 def jrb_mat_det_slq_point_jit(matvec, probes: jax.Array, steps: int) -> jax.Array:
     if isinstance(matvec, matrix_free_core.OperatorPlan):
         return _jrb_mat_det_slq_point_jit_plan(matvec, probes, steps=steps)
     return _jrb_mat_det_slq_point_jit_callable(matvec, probes, steps=steps)
+
+
+def _jrb_mat_log_action_lanczos_point_plan_kernel(matvec, x: jax.Array, *, steps: int) -> jax.Array:
+    return _jrb_mat_funm_action_lanczos_point_base(matvec, x, jrb_mat_dense_funm_sym_eigh_point(jnp.log), steps)
+
+
+_jrb_mat_log_action_lanczos_point_jit_callable = jax.jit(jrb_mat_log_action_lanczos_point, static_argnames=("matvec", "steps"))
+_jrb_mat_log_action_lanczos_point_jit_plan = jax.jit(_jrb_mat_log_action_lanczos_point_plan_kernel, static_argnames=("steps",))
+
+
+def jrb_mat_log_action_lanczos_point_jit(matvec, x: jax.Array, steps: int) -> jax.Array:
+    if isinstance(matvec, matrix_free_core.OperatorPlan):
+        return _jrb_mat_log_action_lanczos_point_jit_plan(matvec, x, steps=steps)
+    return _jrb_mat_log_action_lanczos_point_jit_callable(matvec, x, steps=steps)
+
+
+def _jrb_mat_sqrt_action_lanczos_point_plan_kernel(matvec, x: jax.Array, *, steps: int) -> jax.Array:
+    return _jrb_mat_funm_action_lanczos_point_base(matvec, x, jrb_mat_dense_funm_sym_eigh_point(jnp.sqrt), steps)
+
+
+_jrb_mat_sqrt_action_lanczos_point_jit_callable = jax.jit(jrb_mat_sqrt_action_lanczos_point, static_argnames=("matvec", "steps"))
+_jrb_mat_sqrt_action_lanczos_point_jit_plan = jax.jit(_jrb_mat_sqrt_action_lanczos_point_plan_kernel, static_argnames=("steps",))
+
+
+def jrb_mat_sqrt_action_lanczos_point_jit(matvec, x: jax.Array, steps: int) -> jax.Array:
+    if isinstance(matvec, matrix_free_core.OperatorPlan):
+        return _jrb_mat_sqrt_action_lanczos_point_jit_plan(matvec, x, steps=steps)
+    return _jrb_mat_sqrt_action_lanczos_point_jit_callable(matvec, x, steps=steps)
+
+
+def _jrb_mat_sign_action_lanczos_point_plan_kernel(matvec, x: jax.Array, *, steps: int) -> jax.Array:
+    return _jrb_mat_funm_action_lanczos_point_base(matvec, x, jrb_mat_dense_funm_sym_eigh_point(jnp.sign), steps)
+
+
+_jrb_mat_sign_action_lanczos_point_jit_callable = jax.jit(jrb_mat_sign_action_lanczos_point, static_argnames=("matvec", "steps"))
+_jrb_mat_sign_action_lanczos_point_jit_plan = jax.jit(_jrb_mat_sign_action_lanczos_point_plan_kernel, static_argnames=("steps",))
+
+
+def jrb_mat_sign_action_lanczos_point_jit(matvec, x: jax.Array, steps: int) -> jax.Array:
+    if isinstance(matvec, matrix_free_core.OperatorPlan):
+        return _jrb_mat_sign_action_lanczos_point_jit_plan(matvec, x, steps=steps)
+    return _jrb_mat_sign_action_lanczos_point_jit_callable(matvec, x, steps=steps)
+
+
+def _jrb_mat_pow_action_lanczos_point_plan_kernel(matvec, x: jax.Array, *, exponent: int, steps: int) -> jax.Array:
+    return _jrb_mat_funm_action_lanczos_point_base(
+        matvec,
+        x,
+        jrb_mat_dense_funm_sym_eigh_point(lambda vals: jnp.power(vals, exponent)),
+        steps,
+    )
+
+
+_jrb_mat_pow_action_lanczos_point_jit_callable = jax.jit(jrb_mat_pow_action_lanczos_point, static_argnames=("matvec", "exponent", "steps"))
+_jrb_mat_pow_action_lanczos_point_jit_plan = jax.jit(_jrb_mat_pow_action_lanczos_point_plan_kernel, static_argnames=("exponent", "steps"))
+
+
+def jrb_mat_pow_action_lanczos_point_jit(matvec, x: jax.Array, *, exponent: int, steps: int) -> jax.Array:
+    if isinstance(matvec, matrix_free_core.OperatorPlan):
+        return _jrb_mat_pow_action_lanczos_point_jit_plan(matvec, x, exponent=exponent, steps=steps)
+    return _jrb_mat_pow_action_lanczos_point_jit_callable(matvec, x, exponent=exponent, steps=steps)
+
+
+_jrb_mat_eigsh_point_jit_callable = jax.jit(
+    jrb_mat_eigsh_point,
+    static_argnames=("matvec", "size", "k", "which", "steps"),
+)
+_jrb_mat_eigsh_point_jit_plan = jax.jit(
+    jrb_mat_eigsh_point,
+    static_argnames=("size", "k", "which", "steps"),
+)
+
+
+def jrb_mat_eigsh_point_jit(
+    matvec,
+    *,
+    size: int,
+    k: int = 6,
+    which: str = "largest",
+    steps: int | None = None,
+    v0: jax.Array | None = None,
+) -> tuple[jax.Array, jax.Array]:
+    if isinstance(matvec, matrix_free_core.OperatorPlan):
+        return _jrb_mat_eigsh_point_jit_plan(matvec, size=size, k=k, which=which, steps=steps, v0=v0)
+    return _jrb_mat_eigsh_point_jit_callable(matvec, size=size, k=k, which=which, steps=steps, v0=v0)
+
+
+_jrb_mat_multi_shift_solve_point_jit_callable = jax.jit(
+    jrb_mat_multi_shift_solve_point,
+    static_argnames=("matvec", "tol", "atol", "maxiter", "symmetric", "preconditioner"),
+)
+_jrb_mat_multi_shift_solve_point_jit_plan = jax.jit(
+    jrb_mat_multi_shift_solve_point,
+    static_argnames=("tol", "atol", "maxiter", "symmetric"),
+)
+
+
+def jrb_mat_multi_shift_solve_point_jit(matvec, rhs: jax.Array, shifts: jax.Array, **kwargs) -> jax.Array:
+    if isinstance(matvec, matrix_free_core.OperatorPlan):
+        return _jrb_mat_multi_shift_solve_point_jit_plan(matvec, rhs, shifts, **kwargs)
+    return _jrb_mat_multi_shift_solve_point_jit_callable(matvec, rhs, shifts, **kwargs)
+
+
+_jrb_mat_eigsh_block_point_jit_callable = jax.jit(
+    jrb_mat_eigsh_block_point,
+    static_argnames=("matvec", "size", "k", "which", "block_size", "subspace_iters"),
+)
+_jrb_mat_eigsh_block_point_jit_plan = jax.jit(
+    jrb_mat_eigsh_block_point,
+    static_argnames=("size", "k", "which", "block_size", "subspace_iters"),
+)
+
+
+def jrb_mat_eigsh_block_point_jit(
+    matvec,
+    *,
+    size: int,
+    k: int = 6,
+    which: str = "largest",
+    block_size: int | None = None,
+    subspace_iters: int = 4,
+    v0: jax.Array | None = None,
+) -> tuple[jax.Array, jax.Array]:
+    if isinstance(matvec, matrix_free_core.OperatorPlan):
+        return _jrb_mat_eigsh_block_point_jit_plan(matvec, size=size, k=k, which=which, block_size=block_size, subspace_iters=subspace_iters, v0=v0)
+    return _jrb_mat_eigsh_block_point_jit_callable(matvec, size=size, k=k, which=which, block_size=block_size, subspace_iters=subspace_iters, v0=v0)
+
+
+_jrb_mat_eigsh_restarted_point_jit_callable = jax.jit(
+    jrb_mat_eigsh_restarted_point,
+    static_argnames=("matvec", "size", "k", "which", "steps", "restarts", "block_size"),
+)
+_jrb_mat_eigsh_restarted_point_jit_plan = jax.jit(
+    jrb_mat_eigsh_restarted_point,
+    static_argnames=("size", "k", "which", "steps", "restarts", "block_size"),
+)
+
+
+def jrb_mat_eigsh_restarted_point_jit(
+    matvec,
+    *,
+    size: int,
+    k: int = 6,
+    which: str = "largest",
+    steps: int = 4,
+    restarts: int = 2,
+    block_size: int | None = None,
+    v0: jax.Array | None = None,
+) -> tuple[jax.Array, jax.Array]:
+    if isinstance(matvec, matrix_free_core.OperatorPlan):
+        return _jrb_mat_eigsh_restarted_point_jit_plan(matvec, size=size, k=k, which=which, steps=steps, restarts=restarts, block_size=block_size, v0=v0)
+    return _jrb_mat_eigsh_restarted_point_jit_callable(matvec, size=size, k=k, which=which, steps=steps, restarts=restarts, block_size=block_size, v0=v0)
 
 
 __all__ = [
@@ -2653,28 +4948,59 @@ __all__ = [
     "jrb_mat_dense_operator_adjoint",
     "jrb_mat_dense_operator_rmatvec",
     "jrb_mat_dense_operator_plan_prepare",
+    "jrb_mat_dense_parametric_operator_plan_prepare",
+    "jrb_mat_shell_operator_plan_prepare",
     "jrb_mat_dense_operator_rmatvec_plan_prepare",
+    "jrb_mat_dense_parametric_operator_rmatvec_plan_prepare",
     "jrb_mat_dense_operator_adjoint_plan_prepare",
+    "jrb_mat_dense_parametric_operator_adjoint_plan_prepare",
+    "jrb_mat_finite_difference_operator_plan_prepare",
+    "jrb_mat_finite_difference_operator_plan_set_base",
     "jrb_mat_bcoo_operator",
     "jrb_mat_bcoo_operator_adjoint",
     "jrb_mat_bcoo_operator_rmatvec",
     "jrb_mat_bcoo_operator_plan_prepare",
     "jrb_mat_bcoo_operator_rmatvec_plan_prepare",
     "jrb_mat_bcoo_operator_adjoint_plan_prepare",
+    "jrb_mat_block_sparse_operator_plan_prepare",
+    "jrb_mat_block_sparse_operator_rmatvec_plan_prepare",
+    "jrb_mat_block_sparse_operator_adjoint_plan_prepare",
+    "jrb_mat_vblock_sparse_operator_plan_prepare",
+    "jrb_mat_vblock_sparse_operator_rmatvec_plan_prepare",
+    "jrb_mat_vblock_sparse_operator_adjoint_plan_prepare",
     "jrb_mat_operator_plan_apply",
+    "jrb_mat_operator_apply_point_jit",
     "jrb_mat_rmatvec_point",
     "jrb_mat_rmatvec_basic",
+    "jrb_mat_rmatvec_point_jit",
     "jrb_mat_lanczos_tridiag_adjoint",
     "jrb_mat_cg_fixed_iterations",
+    "jrb_mat_jacobi_preconditioner_plan_prepare",
+    "jrb_mat_shell_preconditioner_plan_prepare",
     "jrb_mat_solve_action_point",
+    "jrb_mat_solve_action_symmetric_point",
+    "jrb_mat_solve_action_spd_point",
+    "jrb_mat_minres_solve_action_point",
     "jrb_mat_solve_action_basic",
     "jrb_mat_solve_action_with_diagnostics_point",
     "jrb_mat_solve_action_with_diagnostics_basic",
+    "jrb_mat_minres_solve_action_basic",
+    "jrb_mat_minres_solve_action_with_diagnostics_point",
+    "jrb_mat_minres_solve_action_with_diagnostics_basic",
     "jrb_mat_inverse_action_point",
+    "jrb_mat_inverse_action_symmetric_point",
+    "jrb_mat_inverse_action_spd_point",
+    "jrb_mat_minres_inverse_action_point",
+    "jrb_mat_minres_inverse_action_basic",
     "jrb_mat_inverse_action_basic",
     "jrb_mat_inverse_action_with_diagnostics_point",
     "jrb_mat_inverse_action_with_diagnostics_basic",
+    "jrb_mat_multi_shift_solve_point",
+    "jrb_mat_multi_shift_solve_symmetric_point",
+    "jrb_mat_multi_shift_solve_spd_point",
+    "jrb_mat_multi_shift_solve_basic",
     "jrb_mat_bcoo_parametric_operator",
+    "jrb_mat_bcoo_parametric_operator_plan_prepare",
     "jrb_mat_scipy_csr_operator",
     "jrb_mat_bcoo_gershgorin_bounds",
     "jrb_mat_bcoo_spectral_bounds_adaptive",
@@ -2686,28 +5012,74 @@ __all__ = [
     "jrb_mat_expm_action_basic",
     "jrb_mat_lanczos_tridiag_point",
     "jrb_mat_lanczos_diagnostics_point",
+    "jrb_mat_eigsh_point",
+    "jrb_mat_eigsh_with_diagnostics_point",
+    "jrb_mat_eigsh_basic",
+    "jrb_mat_eigsh_block_point",
+    "jrb_mat_eigsh_block_with_diagnostics_point",
+    "jrb_mat_eigsh_restarted_point",
+    "jrb_mat_eigsh_restarted_with_diagnostics_point",
+    "jrb_mat_eigsh_krylov_schur_point",
+    "jrb_mat_eigsh_krylov_schur_with_diagnostics_point",
+    "jrb_mat_eigsh_davidson_point",
+    "jrb_mat_eigsh_davidson_with_diagnostics_point",
+    "jrb_mat_eigsh_jacobi_davidson_point",
+    "jrb_mat_eigsh_jacobi_davidson_with_diagnostics_point",
+    "jrb_mat_generalized_operator_plan_prepare",
+    "jrb_mat_geigsh_point",
+    "jrb_mat_geigsh_with_diagnostics_point",
+    "jrb_mat_generalized_shift_invert_operator_plan_prepare",
+    "jrb_mat_geigsh_shift_invert_point",
+    "jrb_mat_geigsh_shift_invert_with_diagnostics_point",
+    "jrb_mat_neigsh_point",
+    "jrb_mat_neigsh_with_diagnostics_point",
+    "jrb_mat_peigsh_point",
+    "jrb_mat_peigsh_with_diagnostics_point",
+    "jrb_mat_shift_invert_operator_plan_prepare",
+    "jrb_mat_eigsh_shift_invert_point",
+    "jrb_mat_eigsh_shift_invert_with_diagnostics_point",
+    "jrb_mat_eigsh_contour_point",
+    "jrb_mat_eigsh_contour_with_diagnostics_point",
     "jrb_mat_funm_action_lanczos_point",
     "jrb_mat_funm_action_lanczos_with_diagnostics_point",
     "jrb_mat_funm_integrand_lanczos_point",
     "jrb_mat_dense_funm_sym_eigh_point",
     "jrb_mat_funm_action_lanczos_dense_point",
     "jrb_mat_log_action_lanczos_point",
+    "jrb_mat_log_action_symmetric_point",
+    "jrb_mat_log_action_spd_point",
     "jrb_mat_log_action_lanczos_basic",
     "jrb_mat_sqrt_action_lanczos_point",
+    "jrb_mat_sqrt_action_symmetric_point",
+    "jrb_mat_sqrt_action_spd_point",
     "jrb_mat_sqrt_action_lanczos_basic",
     "jrb_mat_root_action_lanczos_point",
+    "jrb_mat_root_action_symmetric_point",
+    "jrb_mat_root_action_spd_point",
     "jrb_mat_root_action_lanczos_basic",
     "jrb_mat_sign_action_lanczos_point",
+    "jrb_mat_sign_action_symmetric_point",
+    "jrb_mat_sign_action_spd_point",
     "jrb_mat_sign_action_lanczos_basic",
     "jrb_mat_sin_action_lanczos_point",
+    "jrb_mat_sin_action_symmetric_point",
+    "jrb_mat_sin_action_spd_point",
     "jrb_mat_sin_action_lanczos_basic",
     "jrb_mat_cos_action_lanczos_point",
+    "jrb_mat_cos_action_symmetric_point",
+    "jrb_mat_cos_action_spd_point",
     "jrb_mat_cos_action_lanczos_basic",
     "jrb_mat_sinh_action_lanczos_point",
+    "jrb_mat_sinh_action_symmetric_point",
+    "jrb_mat_sinh_action_spd_point",
     "jrb_mat_sinh_action_lanczos_basic",
     "jrb_mat_cosh_action_lanczos_point",
+    "jrb_mat_cosh_action_symmetric_point",
+    "jrb_mat_cosh_action_spd_point",
     "jrb_mat_cosh_action_lanczos_basic",
     "jrb_mat_tanh_action_lanczos_point",
+    "jrb_mat_tanh_action_symmetric_point",
+    "jrb_mat_tanh_action_spd_point",
     "jrb_mat_tanh_action_lanczos_basic",
     "jrb_mat_log_action_lanczos_dense_point",
     "jrb_mat_sqrt_action_lanczos_dense_point",
@@ -2719,6 +5091,8 @@ __all__ = [
     "jrb_mat_cosh_action_lanczos_dense_point",
     "jrb_mat_tanh_action_lanczos_dense_point",
     "jrb_mat_expm_action_lanczos_restarted_point",
+    "jrb_mat_expm_action_symmetric_point",
+    "jrb_mat_expm_action_spd_point",
     "jrb_mat_expm_action_lanczos_block_point",
     "jrb_mat_expm_action_lanczos_restarted_with_diagnostics_point",
     "jrb_mat_trace_integrand_point",
@@ -2733,15 +5107,36 @@ __all__ = [
     "jrb_mat_det_slq_basic",
     "jrb_mat_det_slq_with_diagnostics_point",
     "jrb_mat_det_slq_with_diagnostics_basic",
+    "jrb_mat_logdet_solve_point",
+    "jrb_mat_logdet_solve_basic",
     "jrb_mat_log_action_lanczos_with_diagnostics_point",
+    "jrb_mat_log_action_lanczos_with_diagnostics_basic",
+    "jrb_mat_log_action_symmetric_with_diagnostics_point",
+    "jrb_mat_log_action_spd_with_diagnostics_point",
     "jrb_mat_sqrt_action_lanczos_with_diagnostics_point",
+    "jrb_mat_sqrt_action_symmetric_with_diagnostics_point",
+    "jrb_mat_sqrt_action_spd_with_diagnostics_point",
     "jrb_mat_root_action_lanczos_with_diagnostics_point",
+    "jrb_mat_root_action_symmetric_with_diagnostics_point",
+    "jrb_mat_root_action_spd_with_diagnostics_point",
     "jrb_mat_sign_action_lanczos_with_diagnostics_point",
+    "jrb_mat_sign_action_symmetric_with_diagnostics_point",
+    "jrb_mat_sign_action_spd_with_diagnostics_point",
     "jrb_mat_sin_action_lanczos_with_diagnostics_point",
+    "jrb_mat_sin_action_symmetric_with_diagnostics_point",
+    "jrb_mat_sin_action_spd_with_diagnostics_point",
     "jrb_mat_cos_action_lanczos_with_diagnostics_point",
+    "jrb_mat_cos_action_symmetric_with_diagnostics_point",
+    "jrb_mat_cos_action_spd_with_diagnostics_point",
     "jrb_mat_sinh_action_lanczos_with_diagnostics_point",
+    "jrb_mat_sinh_action_symmetric_with_diagnostics_point",
+    "jrb_mat_sinh_action_spd_with_diagnostics_point",
     "jrb_mat_cosh_action_lanczos_with_diagnostics_point",
+    "jrb_mat_cosh_action_symmetric_with_diagnostics_point",
+    "jrb_mat_cosh_action_spd_with_diagnostics_point",
     "jrb_mat_tanh_action_lanczos_with_diagnostics_point",
+    "jrb_mat_tanh_action_symmetric_with_diagnostics_point",
+    "jrb_mat_tanh_action_spd_with_diagnostics_point",
     "jrb_mat_log_action_leja_point",
     "jrb_mat_log_action_leja_with_diagnostics_point",
     "jrb_mat_hutchpp_trace_point",
@@ -2766,11 +5161,27 @@ __all__ = [
     "jrb_mat_triangular_solve_basic_jit",
     "jrb_mat_lu_basic_jit",
     "jrb_mat_expm_action_basic_jit",
+    "jrb_mat_solve_action_point_jit",
+    "jrb_mat_minres_solve_action_point_jit",
+    "jrb_mat_inverse_action_point_jit",
+    "jrb_mat_minres_inverse_action_point_jit",
+    "jrb_mat_logdet_slq_point_jit",
+    "jrb_mat_det_slq_point_jit",
+    "jrb_mat_log_action_lanczos_point_jit",
+    "jrb_mat_sqrt_action_lanczos_point_jit",
+    "jrb_mat_sign_action_lanczos_point_jit",
+    "jrb_mat_pow_action_lanczos_point_jit",
+    "jrb_mat_eigsh_point_jit",
+    "jrb_mat_multi_shift_solve_point_jit",
+    "jrb_mat_eigsh_block_point_jit",
+    "jrb_mat_eigsh_restarted_point_jit",
     "jrb_mat_logm",
     "jrb_mat_sqrtm",
     "jrb_mat_rootm",
     "jrb_mat_signm",
     "jrb_mat_pow_action_lanczos_point",
+    "jrb_mat_pow_action_symmetric_point",
+    "jrb_mat_pow_action_spd_point",
     "jrb_mat_pow_action_lanczos_basic",
     "jrb_mat_pow_action_lanczos_dense_point",
     "jrb_mat_pow_action_lanczos_with_diagnostics_point",

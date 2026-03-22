@@ -1,5 +1,10 @@
 from __future__ import annotations
 
+from _source_tree_bootstrap import ensure_src_on_path
+
+ensure_src_on_path(__file__)
+
+
 import argparse
 import ctypes
 import os
@@ -440,7 +445,7 @@ def _git_commit(repo_root: Path) -> str:
 
 def _log_run(tool: str, command: str, notes: str = "") -> None:
     repo_root = Path(__file__).resolve().parents[1]
-    results_dir = repo_root / "results"
+    results_dir = repo_root / "outputs" / "audits" / "hypgeom_compare"
     results_dir.mkdir(parents=True, exist_ok=True)
     log_path = results_dir / "runs.csv"
     if not log_path.exists():
@@ -456,7 +461,7 @@ def _log_run(tool: str, command: str, notes: str = "") -> None:
 
 def _write_report(tool: str, command: str, rows: list[tuple[str, bool, float]], elapsed_s: float, ok: bool) -> Path:
     repo_root = Path(__file__).resolve().parents[1]
-    results_dir = repo_root / "results"
+    results_dir = repo_root / "outputs" / "audits" / "hypgeom_compare"
     results_dir.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     report_path = results_dir / f"{tool}_{timestamp}.txt"
