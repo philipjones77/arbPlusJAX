@@ -45,6 +45,7 @@ __all__ = [
     "double_gamma",
     "hypgeom_wrappers",
     "iterative_solvers",
+    "jax_diagnostics",
     "jcb_mat",
     "jrb_mat",
     "matfree_adjoints",

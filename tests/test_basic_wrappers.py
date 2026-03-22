@@ -3,9 +3,11 @@ import jax.numpy as jnp
 
 from arbplusjax import baseline_wrappers as bw
 from arbplusjax import arb_calc, acb_calc
+from arbplusjax import checks
 from arbplusjax import double_interval as di
 from arbplusjax import api
 from arbplusjax import double_gamma as bdg
+from arbplusjax import kernel_helpers as kh
 from arbplusjax import point_wrappers as pw
 
 
@@ -263,6 +265,41 @@ def test_api_calc_interval_batch_fastpaths_match_direct_kernels():
     crigorous = api.eval_interval_batch("acb_calc_integrate_line", ac, bc, mode="rigorous", dtype="float32", pad_to=8, integrand="sin", n_steps=16, prec_bits=53)
     crigorous_expected = acb_calc.acb_calc_integrate_line_batch_padded_rigorous(ac, bc, pad_to=8, integrand="sin", n_steps=16, prec_bits=53)
     _check(bool(jnp.allclose(crigorous, crigorous_expected, rtol=1e-5, atol=1e-5, equal_nan=True)))
+
+
+def test_kernel_helpers_padding_trimming_and_point_conversions():
+    x = jnp.array([[1.0, 2.0], [3.0, 4.0]], dtype=jnp.float32)
+    y = jnp.array([[5.0, 6.0], [7.0, 8.0]], dtype=jnp.float32)
+    padded, n = kh.pad_batch_args((x, y), pad_to=4, pad_value=-1.0)
+    _check(n == 2)
+    _check(padded[0].shape == (4, 2))
+    _check(bool(jnp.allclose(padded[0][2:], -1.0)))
+    _check(bool(jnp.allclose(kh.trim_batch_out(padded[0], n), x)))
+
+    mixed_padded, mixed_n = kh.pad_mixed_batch_args_repeat_last((x, 3.0), pad_to=3)
+    _check(mixed_n == 2)
+    _check(mixed_padded[0].shape == (3, 2))
+    _check(bool(jnp.allclose(mixed_padded[0][-1], x[-1])))
+
+    interval_mid = kh.midpoint_from_interval_like(di.interval(jnp.array([1.0]), jnp.array([3.0])))
+    _check(bool(jnp.allclose(interval_mid, jnp.array([2.0]))))
+
+    boxed = kh.point_box(jnp.array([1.0 + 2.0j], dtype=jnp.complex64))
+    _check(boxed.shape == (1, 4))
+
+
+def test_checks_contract_helpers_raise_on_bad_inputs():
+    try:
+        checks.check_in_set("bad", ("basic", "rigorous"), "mode")
+        _check(False)
+    except ValueError as exc:
+        _check("mode" in str(exc))
+
+    try:
+        checks.check_last_dim(jnp.ones((2, 3), dtype=jnp.float32), 4, "tail")
+        _check(False)
+    except ValueError as exc:
+        _check("expected last dimension" in str(exc))
 
 
 def test_api_barnes_family_point_batch_uses_direct_point_kernels():

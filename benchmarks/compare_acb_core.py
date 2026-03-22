@@ -14,6 +14,10 @@ import jax.numpy as jnp
 import numpy as np
 
 from arbplusjax import acb_core
+from benchmarks.schema import BenchmarkRecord
+from benchmarks.schema import BenchmarkReport
+from benchmarks.schema import write_benchmark_report
+from tools.runtime_manifest import collect_runtime_manifest
 
 
 class DI(ctypes.Structure):
@@ -89,19 +93,24 @@ def call_unary(lib, fn_name: str, x: np.ndarray) -> np.ndarray:
     return out
 
 
-def report(name: str, c_out: np.ndarray, j_out: np.ndarray, rtol: float, atol: float = 0.0) -> bool:
+def report(name: str, c_out: np.ndarray, j_out: np.ndarray, rtol: float, atol: float = 0.0) -> tuple[bool, float]:
     ok = np.allclose(c_out, j_out, rtol=rtol, atol=atol, equal_nan=True)
     with np.errstate(invalid="ignore"):
         diff = np.abs(c_out - j_out)
     finite = np.isfinite(diff)
     max_diff = float(np.max(diff[finite])) if np.any(finite) else 0.0
     print(f"{name:16s} | ok={ok} | max_abs_diff={max_diff:.3e}")
-    return ok
+    return ok, max_diff
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Compare acb core C and JAX kernels.")
     parser.add_argument("--samples", type=int, default=12000)
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=Path("experiments/benchmarks/outputs/scalar/compare_acb_core.json"),
+    )
     args = parser.parse_args()
 
     di_env = os.getenv("DI_REF_LIB", "")
@@ -117,16 +126,46 @@ def main() -> int:
     rng = np.random.default_rng(2112)
     x = random_boxes(rng, args.samples, 6.0)
 
+    records: list[BenchmarkRecord] = []
     ok = True
-    ok &= report("acb_exp", call_unary(lib, "acb_exp_ref", x), np.asarray(acb_core.acb_exp_batch_jit(jnp.asarray(x))), rtol=3e-13, atol=2e-14)
-    ok &= report("acb_log", call_unary(lib, "acb_log_ref", x), np.asarray(acb_core.acb_log_batch_jit(jnp.asarray(x))), rtol=3e-13, atol=2e-14)
-    ok &= report("acb_sqrt", call_unary(lib, "acb_sqrt_ref", x), np.asarray(acb_core.acb_sqrt_batch_jit(jnp.asarray(x))), rtol=3e-13, atol=2e-14)
-    ok &= report("acb_sin", call_unary(lib, "acb_sin_ref", x), np.asarray(acb_core.acb_sin_batch_jit(jnp.asarray(x))), rtol=3e-12, atol=2e-14)
-    ok &= report("acb_cos", call_unary(lib, "acb_cos_ref", x), np.asarray(acb_core.acb_cos_batch_jit(jnp.asarray(x))), rtol=3e-12, atol=2e-14)
-    ok &= report("acb_tan", call_unary(lib, "acb_tan_ref", x), np.asarray(acb_core.acb_tan_batch_jit(jnp.asarray(x))), rtol=5e-12, atol=2e-14)
-    ok &= report("acb_sinh", call_unary(lib, "acb_sinh_ref", x), np.asarray(acb_core.acb_sinh_batch_jit(jnp.asarray(x))), rtol=3e-12, atol=2e-14)
-    ok &= report("acb_cosh", call_unary(lib, "acb_cosh_ref", x), np.asarray(acb_core.acb_cosh_batch_jit(jnp.asarray(x))), rtol=3e-12, atol=2e-14)
-    ok &= report("acb_tanh", call_unary(lib, "acb_tanh_ref", x), np.asarray(acb_core.acb_tanh_batch_jit(jnp.asarray(x))), rtol=3e-12, atol=2e-14)
+    for name, c_name, j_out, rtol, atol in (
+        ("acb_exp", "acb_exp_ref", np.asarray(acb_core.acb_exp_batch_jit(jnp.asarray(x))), 3e-13, 2e-14),
+        ("acb_log", "acb_log_ref", np.asarray(acb_core.acb_log_batch_jit(jnp.asarray(x))), 3e-13, 2e-14),
+        ("acb_sqrt", "acb_sqrt_ref", np.asarray(acb_core.acb_sqrt_batch_jit(jnp.asarray(x))), 3e-13, 2e-14),
+        ("acb_sin", "acb_sin_ref", np.asarray(acb_core.acb_sin_batch_jit(jnp.asarray(x))), 3e-12, 2e-14),
+        ("acb_cos", "acb_cos_ref", np.asarray(acb_core.acb_cos_batch_jit(jnp.asarray(x))), 3e-12, 2e-14),
+        ("acb_tan", "acb_tan_ref", np.asarray(acb_core.acb_tan_batch_jit(jnp.asarray(x))), 5e-12, 2e-14),
+        ("acb_sinh", "acb_sinh_ref", np.asarray(acb_core.acb_sinh_batch_jit(jnp.asarray(x))), 3e-12, 2e-14),
+        ("acb_cosh", "acb_cosh_ref", np.asarray(acb_core.acb_cosh_batch_jit(jnp.asarray(x))), 3e-12, 2e-14),
+        ("acb_tanh", "acb_tanh_ref", np.asarray(acb_core.acb_tanh_batch_jit(jnp.asarray(x))), 3e-12, 2e-14),
+    ):
+        c_out = call_unary(lib, c_name, x)
+        case_ok, max_diff = report(name, c_out, j_out, rtol=rtol, atol=atol)
+        ok &= case_ok
+        records.append(
+            BenchmarkRecord(
+                benchmark_name="compare_acb_core.py",
+                concern="core_accuracy",
+                category="scalar",
+                implementation="jax_vs_c_ref",
+                operation=name,
+                device="cpu",
+                dtype="complex128",
+                accuracy_abs=max_diff,
+                notes=f"rtol={rtol}, atol={atol}, ok={case_ok}",
+            )
+        )
+
+    write_benchmark_report(
+        args.output,
+        BenchmarkReport(
+            benchmark_name="compare_acb_core.py",
+            concern="core_accuracy",
+            category="scalar",
+            records=tuple(records),
+            environment=collect_runtime_manifest(Path(__file__).resolve().parents[1], jax_mode="auto"),
+        ),
+    )
 
     print(f"\nresult: {'PASS' if ok else 'FAIL'}")
     return 0 if ok else 2

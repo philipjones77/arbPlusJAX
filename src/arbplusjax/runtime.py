@@ -1,3 +1,150 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from dataclasses import field
+from pathlib import Path
+from typing import Any
+
+import jax.numpy as jnp
+
+from . import jax_diagnostics
+from . import precision
+
+
+@dataclass(frozen=True)
+class BatchConfig:
+    fixed_batch_size: int | None = None
+    pad_to: int | None = None
+    warmup: bool = True
+
+
+@dataclass(frozen=True)
+class PrecisionConfig:
+    dps: int = 50
+    prec_bits: int | None = None
+    dtype: str = "float64"
+
+
+@dataclass(frozen=True)
+class RuntimeConfig:
+    jax_mode: str = "auto"
+    precision: PrecisionConfig = field(default_factory=PrecisionConfig)
+    batch: BatchConfig = field(default_factory=BatchConfig)
+    diagnostics: jax_diagnostics.JaxDiagnosticsConfig = field(default_factory=jax_diagnostics.JaxDiagnosticsConfig)
+    compile_cache_dir: str | None = None
+
+
+def normalize_prec_bits(*, dps: int = 50, prec_bits: int | None = None) -> int:
+    return int(prec_bits) if prec_bits is not None else precision.dps_to_bits(int(dps))
+
+
+def normalize_dtype(dtype: str | jnp.dtype | None = None) -> jnp.dtype:
+    if dtype is None:
+        return jnp.dtype(jnp.float64 if precision.jax_x64_enabled() else jnp.float32)
+    return jnp.dtype(dtype)
+
+
+def resolve_real_dtype(dtype: str | jnp.dtype | None = None) -> jnp.dtype:
+    resolved = normalize_dtype(dtype)
+    if jnp.issubdtype(resolved, jnp.complexfloating):
+        return jnp.dtype(jnp.float64 if resolved == jnp.dtype(jnp.complex128) else jnp.float32)
+    if not jnp.issubdtype(resolved, jnp.floating):
+        raise ValueError(f"expected a floating dtype, got {resolved}")
+    return resolved
+
+
+def resolve_complex_dtype(dtype: str | jnp.dtype | None = None) -> jnp.dtype:
+    resolved = normalize_dtype(dtype)
+    if jnp.issubdtype(resolved, jnp.complexfloating):
+        return resolved
+    real_dtype = resolve_real_dtype(resolved)
+    return jnp.dtype(jnp.complex128 if real_dtype == jnp.dtype(jnp.float64) else jnp.complex64)
+
+
+def diagnostics_config(
+    *,
+    enabled: bool = False,
+    capture_jaxpr: bool = False,
+    capture_hlo: bool = False,
+    trace_execution: bool = False,
+    trace_dir: str | None = None,
+) -> jax_diagnostics.JaxDiagnosticsConfig:
+    return jax_diagnostics.JaxDiagnosticsConfig(
+        enabled=enabled,
+        capture_jaxpr=capture_jaxpr,
+        capture_hlo=capture_hlo,
+        trace_execution=trace_execution,
+        trace_dir=trace_dir,
+    )
+
+
+def build_runtime_config(
+    *,
+    jax_mode: str = "auto",
+    dtype: str = "float64",
+    dps: int = 50,
+    prec_bits: int | None = None,
+    fixed_batch_size: int | None = None,
+    pad_to: int | None = None,
+    warmup: bool = True,
+    diagnostics: jax_diagnostics.JaxDiagnosticsConfig | None = None,
+    compile_cache_dir: str | None = None,
+) -> RuntimeConfig:
+    return RuntimeConfig(
+        jax_mode=jax_mode,
+        precision=PrecisionConfig(dps=int(dps), prec_bits=normalize_prec_bits(dps=dps, prec_bits=prec_bits), dtype=str(dtype)),
+        batch=BatchConfig(fixed_batch_size=fixed_batch_size, pad_to=pad_to, warmup=warmup),
+        diagnostics=diagnostics or jax_diagnostics.JaxDiagnosticsConfig(),
+        compile_cache_dir=compile_cache_dir,
+    )
+
+
+def cpu_runtime(**kwargs: Any) -> RuntimeConfig:
+    return build_runtime_config(jax_mode="cpu", **kwargs)
+
+
+def gpu_runtime(**kwargs: Any) -> RuntimeConfig:
+    return build_runtime_config(jax_mode="gpu", **kwargs)
+
+
+def runtime_env(config: RuntimeConfig) -> dict[str, str]:
+    env: dict[str, str] = {"JAX_ENABLE_X64": "1" if resolve_real_dtype(config.precision.dtype) == jnp.dtype(jnp.float64) else "0"}
+    if config.jax_mode == "cpu":
+        env["JAX_PLATFORMS"] = "cpu"
+    elif config.jax_mode == "gpu":
+        env["JAX_PLATFORMS"] = "cuda"
+    if config.compile_cache_dir:
+        env["JAX_COMPILATION_CACHE_DIR"] = config.compile_cache_dir
+        env["JAX_ENABLE_COMPILATION_CACHE"] = "1"
+    return env
+
+
+def runtime_manifest(repo_root: str | Path, *, config: RuntimeConfig | None = None, python_path: str = "") -> dict[str, Any]:
+    from tools.runtime_manifest import collect_runtime_manifest
+
+    cfg = config or build_runtime_config()
+    manifest = collect_runtime_manifest(Path(repo_root), jax_mode=cfg.jax_mode, python_path=python_path)
+    manifest["runtime"] = {
+        "dtype": cfg.precision.dtype,
+        "dps": cfg.precision.dps,
+        "prec_bits": cfg.precision.prec_bits,
+        "batch": {
+            "fixed_batch_size": cfg.batch.fixed_batch_size,
+            "pad_to": cfg.batch.pad_to,
+            "warmup": cfg.batch.warmup,
+        },
+        "diagnostics": {
+            "enabled": cfg.diagnostics.enabled,
+            "capture_jaxpr": cfg.diagnostics.capture_jaxpr,
+            "capture_hlo": cfg.diagnostics.capture_hlo,
+            "trace_execution": cfg.diagnostics.trace_execution,
+            "trace_dir": cfg.diagnostics.trace_dir,
+        },
+        "env_overrides": runtime_env(cfg),
+    }
+    return manifest
+
+
 from .acb_calc import (
     acb_calc_integrate_line,
     acb_calc_integrate_line_batch_jit,
@@ -748,6 +895,19 @@ from .partitions import (
 )
 
 __all__ = [
+    "BatchConfig",
+    "PrecisionConfig",
+    "RuntimeConfig",
+    "normalize_prec_bits",
+    "normalize_dtype",
+    "resolve_real_dtype",
+    "resolve_complex_dtype",
+    "diagnostics_config",
+    "build_runtime_config",
+    "cpu_runtime",
+    "gpu_runtime",
+    "runtime_env",
+    "runtime_manifest",
     "acb_calc_integrate_line",
     "acb_calc_integrate_line_batch_jit",
     "acb_calc_integrate_line_batch_prec_jit",

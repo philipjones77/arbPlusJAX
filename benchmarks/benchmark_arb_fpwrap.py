@@ -17,6 +17,10 @@ import jax.numpy as jnp
 import numpy as np
 
 from arbplusjax import arb_fpwrap
+from benchmarks.schema import BenchmarkRecord
+from benchmarks.schema import BenchmarkReport
+from benchmarks.schema import write_benchmark_report
+from tools.runtime_manifest import collect_runtime_manifest
 
 
 def _git_commit(repo_root: Path) -> str:
@@ -29,7 +33,7 @@ def _git_commit(repo_root: Path) -> str:
 
 
 def _log_run(tool: str, command: str, notes: str = "") -> None:
-    repo_root = Path(__file__).resolve().parents[2]
+    repo_root = Path(__file__).resolve().parents[1]
     results_dir = repo_root / "migration" / "results"
     results_dir.mkdir(parents=True, exist_ok=True)
     log_path = results_dir / "runs.csv"
@@ -49,32 +53,81 @@ def main() -> int:
     parser.add_argument("--samples", type=int, default=200000)
     parser.add_argument("--which", type=str, default="exp", choices=["exp", "log"])
     parser.add_argument("--complex", action="store_true")
+    parser.add_argument("--runs", type=int, default=5)
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=Path("experiments/benchmarks/outputs/scalar/benchmark_arb_fpwrap.json"),
+    )
     args = parser.parse_args()
 
     rng = np.random.default_rng(2213)
     if args.complex:
         z = jnp.asarray(rng.normal(size=args.samples) + 1j * rng.normal(size=args.samples))
         fn = jax.jit(arb_fpwrap.arb_fpwrap_cdouble_exp if args.which == "exp" else arb_fpwrap.arb_fpwrap_cdouble_log)
-        fn(z).block_until_ready()
         t0 = time.perf_counter()
-        out = fn(z)
-        out.block_until_ready()
+        fn(z).block_until_ready()
+        t1 = time.perf_counter()
+        warm_times: list[float] = []
+        for _ in range(args.runs):
+            s0 = time.perf_counter()
+            out = fn(z)
+            out.block_until_ready()
+            warm_times.append(time.perf_counter() - s0)
+        alt_z = z[: max(8, args.samples // 2)]
+        t2 = time.perf_counter()
+        fn(alt_z).block_until_ready()
+        t3 = time.perf_counter()
+        dtype = str(z.dtype)
+        operation = f"arb_fpwrap_cdouble_{args.which}"
     else:
         x = jnp.asarray(rng.uniform(0.1, 2.0, size=args.samples))
         fn = jax.jit(arb_fpwrap.arb_fpwrap_double_exp if args.which == "exp" else arb_fpwrap.arb_fpwrap_double_log)
-        fn(x).block_until_ready()
         t0 = time.perf_counter()
-        out = fn(x)
-        out.block_until_ready()
-    t1 = time.perf_counter()
-    ms = (t1 - t0) * 1000.0
+        fn(x).block_until_ready()
+        t1 = time.perf_counter()
+        warm_times = []
+        for _ in range(args.runs):
+            s0 = time.perf_counter()
+            out = fn(x)
+            out.block_until_ready()
+            warm_times.append(time.perf_counter() - s0)
+        alt_x = x[: max(8, args.samples // 2)]
+        t2 = time.perf_counter()
+        fn(alt_x).block_until_ready()
+        t3 = time.perf_counter()
+        dtype = str(x.dtype)
+        operation = f"arb_fpwrap_double_{args.which}"
+    ms = (sum(warm_times) / len(warm_times)) * 1000.0
+
+    report = BenchmarkReport(
+        benchmark_name="benchmark_arb_fpwrap.py",
+        concern="scalar_speed",
+        category="scalar",
+        records=(
+            BenchmarkRecord(
+                benchmark_name="benchmark_arb_fpwrap.py",
+                concern="scalar_speed",
+                category="scalar",
+                implementation="repo_native",
+                operation=operation,
+                device=jax.default_backend(),
+                dtype=dtype,
+                cold_time_s=t1 - t0,
+                warm_time_s=sum(warm_times) / len(warm_times),
+                recompile_time_s=t3 - t2,
+            ),
+        ),
+        environment=collect_runtime_manifest(Path(__file__).resolve().parents[1], jax_mode="auto"),
+    )
+    write_benchmark_report(args.output, report)
 
     label = f"{'c' if args.complex else 'r'}{args.which}"
-    print(f"arb_fpwrap ({label}) | samples={args.samples} | time_ms={ms:.2f}")
+    print(f"arb_fpwrap ({label}) | samples={args.samples} | warm_time_ms={ms:.2f}")
     _log_run(
-        \"benchmark_arb_fpwrap\",
-        f\"benchmark_arb_fpwrap.py --samples {args.samples} --which {args.which}{' --complex' if args.complex else ''}\",
-        f\"time_ms={ms:.2f}\",
+        "benchmark_arb_fpwrap",
+        f"benchmark_arb_fpwrap.py --samples {args.samples} --which {args.which}{' --complex' if args.complex else ''} --runs {args.runs}",
+        f"warm_time_ms={ms:.2f}",
     )
     return 0
 

@@ -60,10 +60,12 @@ Default fallback is `stuff/migration/c_chassis/build_linux_wsl`.
 ## Notebooks
 
 - `example_core_modes_sweep.ipynb`
+- `example_core_scalar_surface.ipynb`
 - `example_special_modes_sweep.ipynb`
 - `example_bessel_modes_sweep.ipynb`
 - `example_hypgeom_robust_modes_sweep.ipynb`
 - `example_all_modes_sweep.ipynb`
+- `example_api_surface.ipynb`
 - `example_large_sweeps_progress.ipynb`
 - `example_calc_modes_demo.ipynb`
 - `example_dense_matrix_surface.ipynb`
@@ -76,6 +78,14 @@ These notebooks compare the four modes (`point`, `basic`, `adaptive`, `rigorous`
 - accuracy/containment versus C reference (`mean_abs_err`, `containment_rate`)
 
 All run via `benchmarks/run_harness_profile.py` for consistent output.
+
+For core scalar examples:
+- `example_core_scalar_surface.ipynb` is the standards-aligned canonical notebook for the core numeric scalar tranche
+- it covers direct public API usage for `arb_core`, `acb_core`, `arf`, `acf`, `fmpr`, `fmpzi`, and `arb_fpwrap`
+
+For API examples:
+- `example_api_surface.ipynb` is the dedicated API/runtime routing notebook
+- it covers direct-vs-routed `api.evaluate()` usage, validation, benchmark summaries, and simple timing plots
 
 For calc examples, note the layering:
 - names like `acb_calc_integrate_line`, `acb_calc_integrate_gl_auto_deg`, and `acb_calc_integrate_taylor` are different numerical methods
@@ -106,3 +116,12 @@ Start from template:
 ```bash
 cp examples/inputs/example_run_suite/example_run_template.json examples/inputs/example_run_suite/example_run.json
 ```
+
+The scripted suite now writes under:
+
+- `examples/outputs/example_run_suite/<run_name>/runtime_manifest.json`
+- `examples/outputs/example_run_suite/<run_name>/summary.md`
+- `examples/outputs/example_run_suite/<run_name>/profile_backend_time.svg`
+- `examples/outputs/example_run_suite/<run_name>/api_surface_warm_time.svg`
+
+It also runs the existing official API benchmark and matrix diagnostics entrypoints when enabled in the config.

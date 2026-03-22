@@ -4,6 +4,16 @@
   "jax_mode": "cpu",
   "jax_dtype": "float64",
   "c_ref_dir": "/home/phili/projects/arbplusJAX/stuff/migration/c_chassis/build_linux_wsl",
+  "api_benchmark": {
+    "enabled": true,
+    "warmup": 1,
+    "runs": 5
+  },
+  "matrix_diagnostics": {
+    "enabled": true,
+    "n": 8,
+    "repeats": 4
+  },
   "profiles": [
     {
       "name": "core",

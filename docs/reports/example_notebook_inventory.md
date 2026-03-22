@@ -1,4 +1,4 @@
-Last updated: 2026-03-22T00:00:00Z
+Last updated: 2026-03-22T22:15:00Z
 
 # Example Notebook Inventory
 
@@ -16,9 +16,11 @@ Current notebook root:
 ## Current Notebooks
 
 - `example_all_modes_sweep.ipynb`
+- `example_api_surface.ipynb`
 - `example_bessel_modes_sweep.ipynb`
 - `example_calc_modes_demo.ipynb`
 - `example_core_modes_sweep.ipynb`
+- `example_core_scalar_surface.ipynb`
 - `example_dense_matrix_surface.ipynb`
 - `example_dense_structured_spectral.ipynb`
 - `example_hypgeom_robust_modes_sweep.ipynb`
@@ -32,6 +34,7 @@ Current notebook root:
 Current notebook coverage:
 
 - `example_core_modes_sweep.ipynb`
+- `example_core_scalar_surface.ipynb`
 
 Status:
 
@@ -117,15 +120,11 @@ Recommended additions:
 
 Current notebook coverage:
 
-- partially covered indirectly by modes and calc notebooks
+- `example_api_surface.ipynb`
 
 Status:
 
-- missing dedicated notebook
-
-Recommended additions:
-
-- `example_api_surface.ipynb`
+- covered
 
 ### Analytic / algebraic families
 
