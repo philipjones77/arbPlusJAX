@@ -253,6 +253,7 @@ Status: `in_progress`
   - reusable midpoint Krylov solve scaffolding now lives in `matrix_free_core`
     rather than duplicated wrappers
   - direct owner tests now exist for `matrix_free_core`
+  - direct owner tests now exist for `krylov_solvers`
   - eigensolver diagnostics surfaces exist across Lanczos, Arnoldi, restarted,
     block, Krylov-Schur, Davidson, Jacobi-Davidson, shift-invert, and contour
     entry points
@@ -260,7 +261,7 @@ Status: `in_progress`
 ### Core Operator Infrastructure
 
 - `in_progress`
-  - add direct owner tests for `krylov_solvers` and `iterative_solvers`
+  - add a direct owner test for `iterative_solvers`
   - deepen the new `basic` semantics for operator-first surfaces
   - harden flexible-preconditioner policy beyond the current shared
     preconditioned `minres` path
@@ -534,18 +535,22 @@ Status: `in_progress`
 
 Highest priority:
 - add
+  [test_sparse_common_contracts.py](/tests/test_sparse_common_contracts.py)
+- add
+  [test_iterative_solvers_contracts.py](/tests/test_iterative_solvers_contracts.py)
+- add
+  [test_soft_types_contracts.py](/tests/test_soft_types_contracts.py)
+- add
+  [test_validation_contracts.py](/tests/test_validation_contracts.py)
+
+Next priority:
+- add
   [test_krylov_solvers_contracts.py](/tests/test_krylov_solvers_contracts.py)
 - add
   [test_transform_common_contracts.py](/tests/test_transform_common_contracts.py)
 
-Next priority:
-- add
-  [test_sparse_common_contracts.py](/tests/test_sparse_common_contracts.py)
-- add
-  [test_iterative_solvers_contracts.py](/tests/test_iterative_solvers_contracts.py)
-
 Execution order:
-1. Add the two highest-priority direct-owner tests above.
+1. Add the four highest-priority direct-owner tests above.
 2. Re-run the CPU chassis and profile suite.
 3. Expand AD and compile-behavior assertions where those tests expose weak
    spots.

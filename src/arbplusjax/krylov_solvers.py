@@ -24,7 +24,7 @@ def _safe_divide(a: jax.Array, b: jax.Array, eps: float = 1e-30) -> jax.Array:
     return jnp.where(jnp.abs(b) > eps, a / b, 0.0)
 
 
-@partial(jax.jit, static_argnames=("maxiter", "restart"))
+@partial(jax.jit, static_argnames=("matvec", "maxiter", "restart", "M"))
 def gmres(
     matvec,
     b: jax.Array,
@@ -111,7 +111,8 @@ def gmres(
         
         # Use QR decomposition for least squares
         Q, R = jnp.linalg.qr(H)
-        y = jnp.linalg.solve(R[:restart, :restart], Q[:restart, :].T @ e1)
+        qt_e1 = Q.T @ e1
+        y = jnp.linalg.solve(R[:restart, :restart], qt_e1[:restart])
         
         # Update solution
         x_out = x_in + V[:, :restart] @ y
@@ -133,7 +134,7 @@ def gmres(
     
     num_cycles = (maxiter + restart - 1) // restart
     (x_final, iters), (residuals, _) = jax.lax.scan(
-        lambda c, _: (body_fn(c), body_fn(c)[1]),
+        lambda c, _: body_fn(c),
         (x, 0),
         None,
         length=num_cycles
@@ -143,7 +144,7 @@ def gmres(
     return x_final, info
 
 
-@partial(jax.jit, static_argnames=("maxiter",))
+@partial(jax.jit, static_argnames=("matvec", "maxiter", "M"))
 def cg(
     matvec,
     b: jax.Array,
@@ -204,13 +205,8 @@ def cg(
         
         return (x_new, r_new, z_new, p_new, rznew, iter_count + 1), (residual, converged)
     
-    def cond_fn(carry):
-        _, r_curr, _, _, _, iter_count = carry
-        residual = _norm(r_curr)
-        return (residual >= tol_threshold) & (iter_count < maxiter)
-    
     (x_final, _, _, _, _, iters), (residuals, _) = jax.lax.scan(
-        lambda c, _: (body_fn(c), body_fn(c)[1]),
+        lambda c, _: body_fn(c),
         (x, r, z, p, rzold, 0),
         None,
         length=maxiter
@@ -220,7 +216,7 @@ def cg(
     return x_final, info
 
 
-@partial(jax.jit, static_argnames=("maxiter",))
+@partial(jax.jit, static_argnames=("matvec", "maxiter", "M"))
 def bicgstab(
     matvec,
     b: jax.Array,
@@ -283,13 +279,8 @@ def bicgstab(
         
         return (x_new, r_new, r_tilde, p_new, v_new, rho_new, alpha_new, omega_new, iter_count + 1), (residual, converged)
     
-    def cond_fn(carry):
-        _, r_curr, _, _, _, _, _, _, iter_count = carry
-        residual = _norm(r_curr)
-        return (residual >= tol_threshold) & (iter_count < maxiter)
-    
     (x_final, _, _, _, _, _, _, _, iters), (residuals, _) = jax.lax.scan(
-        lambda c, _: (body_fn(c), body_fn(c)[1]),
+        lambda c, _: body_fn(c),
         (x, r, r_tilde, p, v, rho, alpha, omega, 0),
         None,
         length=maxiter

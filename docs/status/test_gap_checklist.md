@@ -126,19 +126,16 @@ clearer if each eventually had a more explicit owner.
 - `block_sparse_core`
 - `sparse_core`
 - `iterative_solvers`
-  Covered indirectly through matrix-free public surfaces.
+- `krylov_solvers`
+- `transform_common`
 - `kernel_helpers`
   Covered indirectly through stable-kernel and special-function surfaces.
-- `krylov_solvers`
-  Covered indirectly through `jrb_mat` / `jcb_mat`.
 - `mat_common`
   Covered indirectly through dense matrix tests.
 - `sampling_helpers`
   Covered indirectly through stochastic/logdet paths.
 - `sparse_common`
   Covered indirectly through sparse matrix chassis tests.
-- `transform_common`
-  Covered indirectly through DFT/NUFFT surfaces.
 
 ### Metadata, support, and validation
 
@@ -160,19 +157,22 @@ focused test file instead of relying on incidental coverage.
 
 ### Highest priority
 
-- `krylov_solvers`
-  Add a direct solver-layer contract test instead of relying only on matrix-free
-  public surfaces.
-- `transform_common`
-  Add a direct transform-helper contract file instead of relying only on DFT and
-  NUFFT surface tests.
+- `sparse_common`
+  Add a direct sparse-common contract file for shared sparse dataclasses,
+  batching, and canonicalization helpers.
+- `iterative_solvers`
+  Add a direct iterative-solver contract file for the non-Krylov wrapper layer
+  used by sparse and matrix-free surfaces.
+- `soft_types`
+  Add a direct test owner for the lightweight dtype/container typing helpers.
+- `validation`
+  Add a direct test owner for shared validation helpers rather than relying only
+  on runtime/API call sites.
 
 ### Next priority
 
 - `sparse_common`
-- `krylov_solvers`
 - `iterative_solvers`
-- `transform_common`
 - `soft_types`
 - `validation`
 
@@ -180,16 +180,20 @@ focused test file instead of relying on incidental coverage.
 
 The first concrete additions should be:
 
-- `tests/test_krylov_solvers_contracts.py`
-- `tests/test_transform_common_contracts.py`
+- `tests/test_sparse_common_contracts.py`
+- `tests/test_iterative_solvers_contracts.py`
+- `tests/test_soft_types_contracts.py`
+- `tests/test_validation_contracts.py`
 
 Then, if that is green:
-- `tests/test_krylov_solvers_contracts.py`
-- `tests/test_transform_common_contracts.py`
+- `tests/test_sparse_common_contracts.py`
+- `tests/test_iterative_solvers_contracts.py`
+- `tests/test_soft_types_contracts.py`
+- `tests/test_validation_contracts.py`
 
 ## 5. Execution Order
 
-1. Add direct-owner tests for the two highest-priority modules above.
+1. Add direct-owner tests for the four highest-priority modules above.
 2. Re-run the CPU chassis/profile suite.
 3. Expand AD and compile-behavior assertions where those new tests expose weak spots.
 4. Add the second-priority shared-infra test files.
