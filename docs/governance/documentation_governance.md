@@ -42,9 +42,14 @@ The current repo mapping should be maintained as a separate report under `docs/r
 
 Landing pages and section indexes should also be generated rather than hand-maintained:
 
+- `README.md`
 - `docs/index.md`
 - `docs/project_overview.md`
 - `docs/governance/README.md`
+- `docs/implementation/README.md`
+- `docs/implementation/modules/README.md`
+- `docs/implementation/wrappers/README.md`
+- `docs/implementation/external/README.md`
 - `docs/standards/README.md`
 - `docs/reports/README.md`
 - `docs/status/README.md`
@@ -115,6 +120,11 @@ The `docs/` tree is organized as:
 - `reports/`
 - `status/`
 
+Large documentation subtrees should have a section `README.md` when they act as
+browsable indexes rather than single-document folders. Those README surfaces
+should be generated once the subtree becomes large enough that hand-maintained
+lists drift.
+
 The `docs/standards/` folder is the canonical home for cross-library and
 cross-subsystem standards such as documentation placement, naming conventions,
 runtime policy, public API shape, dtype policy, diagnostics policy, and logging
@@ -155,6 +165,22 @@ Operational guarantees belong in `contracts/`, not under `docs/`.
 - function catalogs, function lists, repository inventories, and other report-style reference lists go in `docs/reports/`
 - roadmaps, current-state summaries, and active TODOs go in `docs/status/`
 - structural and process rules go in `docs/governance/` or this file
+
+## Implementation Naming Rule
+
+Implementation-facing markdown under `docs/implementation/` and its indexed
+subtrees should use the suffix:
+
+- `*_implementation.md`
+
+This applies to:
+
+- direct implementation notes in `docs/implementation/`
+- module notes in `docs/implementation/modules/`
+- wrapper notes in `docs/implementation/wrappers/`
+- external lineage reviews in `docs/implementation/external/`
+
+The only exception is generated section indexes named `README.md`.
 
 ## Mapping Rule
 

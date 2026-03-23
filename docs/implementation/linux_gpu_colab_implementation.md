@@ -114,5 +114,5 @@ for p in run_dir.glob('run_*'):
 ## 5) Windows compatibility note
 
 These additions are additive only:
-- Existing PowerShell commands in `README.md` and `docs/implementation/build.md` stay valid.
+- Existing PowerShell commands in `README.md` and `docs/implementation/build_implementation.md` stay valid.
 - CI now runs chassis tests on both Ubuntu and Windows.

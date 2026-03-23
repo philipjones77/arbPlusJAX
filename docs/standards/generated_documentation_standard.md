@@ -27,6 +27,10 @@ The following surfaces should be generated rather than maintained by hand:
 - `docs/index.md`
 - `docs/project_overview.md`
 - `docs/governance/README.md`
+- `docs/implementation/README.md`
+- `docs/implementation/modules/README.md`
+- `docs/implementation/wrappers/README.md`
+- `docs/implementation/external/README.md`
 - `docs/standards/README.md`
 - `docs/notation/README.md`
 - `docs/reports/README.md`
@@ -37,6 +41,15 @@ The following surfaces should be generated rather than maintained by hand:
 If another docs landing page becomes a repeated source of drift, move it under
 the same generator policy.
 
+## Implementation Doc Naming Rule
+
+Implementation-facing markdown under `docs/implementation/` and its indexed
+subtrees should use the suffix:
+
+- `*_implementation.md`
+
+Generated section indexes remain `README.md`.
+
 ## Generation Source Rule
 
 Generated docs should be derived from:
@@ -44,6 +57,7 @@ Generated docs should be derived from:
 - stable repo structure
 - generated indexes
 - canonical standards/governance references
+- filesystem-driven folder inventories where section indexes are required
 
 They should not depend on machine-local absolute paths or hand-maintained file
 lists.

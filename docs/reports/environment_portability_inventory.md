@@ -61,8 +61,8 @@ Status:
 
 ## Current WSL / Colab Docs
 
-- [run_platform.md](/docs/implementation/run_platform.md)
-- [linux_gpu_colab.md](/docs/implementation/linux_gpu_colab.md)
+- [run_platform_implementation.md](/docs/implementation/run_platform_implementation.md)
+- [linux_gpu_colab_implementation.md](/docs/implementation/linux_gpu_colab_implementation.md)
 - [running.md](/docs/practical/running.md)
 
 ## Current Strengths

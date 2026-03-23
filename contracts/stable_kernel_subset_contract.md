@@ -48,6 +48,6 @@ The corresponding batch helpers are part of the same stable subset:
 
 - `src/arbplusjax/stable_kernels.py`
 - `src/arbplusjax/capability_registry.py`
-- `docs/implementation/stable_kernel_subset.md`
+- `docs/implementation/stable_kernel_subset_implementation.md`
 - `tests/test_stable_kernels.py`
 

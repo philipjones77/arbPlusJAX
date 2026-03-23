@@ -180,8 +180,8 @@ Tests should enforce both sides of this contract:
 - `src/arbplusjax/scb_mat.py`
 - `src/arbplusjax/jrb_mat.py`
 - `src/arbplusjax/jcb_mat.py`
-- `docs/implementation/matrix_stack.md`
-- `docs/implementation/external/slepc.md`
+- `docs/implementation/matrix_stack_implementation.md`
+- `docs/implementation/slepc_inspired_jax_implementation.md`
 - `benchmarks/benchmark_dense_matrix_surface.py`
 - `benchmarks/benchmark_sparse_matrix_surface.py`
 - `benchmarks/benchmark_matrix_free_krylov.py`

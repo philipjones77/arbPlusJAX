@@ -546,10 +546,10 @@ Status: `in_progress`
     reports
   - keep naming cleanup moving toward canonical mathematical names with
     implementation selection, rather than provenance-prefixed public names
-  - keep `docs/implementation/modules/arb_mat.md`,
-    `docs/implementation/modules/acb_mat.md`,
-    `docs/implementation/modules/jrb_mat.md`, and
-    `docs/implementation/modules/jcb_mat.md` aligned with source
+  - keep `docs/implementation/modules/arb_mat_implementation.md`,
+    `docs/implementation/modules/acb_mat_implementation.md`,
+    `docs/implementation/modules/jrb_mat_implementation.md`, and
+    `docs/implementation/modules/jcb_mat_implementation.md` aligned with source
 
 ## Priority test-owner additions
 

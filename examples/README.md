@@ -100,7 +100,7 @@ For matrix-free adjoint examples:
 - `example_matrix_free_adjoints.py` demonstrates direct scripted use of the matrix-free custom-adjoint surfaces outside the notebook flow
 
 Dense matrix documentation:
-- implementation overview: [dense_matrix_tranche.md](/docs/implementation/dense_matrix_tranche.md)
+- implementation overview: [dense_matrix_tranche_implementation.md](/docs/implementation/dense_matrix_tranche_implementation.md)
 - practical runbook: [dense_matrices.md](/docs/practical/dense_matrices.md)
 
 ## Scripted suite runs

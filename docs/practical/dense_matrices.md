@@ -61,9 +61,9 @@ If you are tuning runtime:
 
 Implementation details:
 
-- [dense_matrix_tranche.md](/docs/implementation/dense_matrix_tranche.md)
-- [arb_mat.md](/docs/implementation/modules/arb_mat.md)
-- [acb_mat.md](/docs/implementation/modules/acb_mat.md)
+- [dense_matrix_tranche_implementation.md](/docs/implementation/dense_matrix_tranche_implementation.md)
+- [arb_mat_implementation.md](/docs/implementation/modules/arb_mat_implementation.md)
+- [acb_mat_implementation.md](/docs/implementation/modules/acb_mat_implementation.md)
 
 Validation and performance:
 

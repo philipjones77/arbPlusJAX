@@ -176,6 +176,8 @@ automatically:
 - `docs/index.md`
 - `docs/project_overview.md`
 - docs section `README.md` files that are generated indexes
+- implementation subtree `README.md` files when those folders act as indexed
+  document catalogs
 
 See
 [generated_documentation_standard.md](/docs/standards/generated_documentation_standard.md)

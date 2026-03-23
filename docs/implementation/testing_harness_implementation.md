@@ -267,5 +267,5 @@ That is consistent with the current implementation in `benchmarks/bench_harness.
 
 - [bench_harness.py](/benchmarks/bench_harness.py)
 - [bench_registry.py](/benchmarks/bench_registry.py)
-- [benchmarks.md](/docs/implementation/benchmarks.md)
-- [benchmark_process.md](/docs/implementation/benchmark_process.md)
+- [benchmarks_implementation.md](/docs/implementation/benchmarks_implementation.md)
+- [benchmark_process_implementation.md](/docs/implementation/benchmark_process_implementation.md)

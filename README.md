@@ -20,17 +20,20 @@ It is not the official Arb project.
 - tests: `python tools/run_test_harness.py --profile chassis --jax-mode cpu`
 - benchmarks: `python benchmarks/run_benchmarks.py --profile quick`
 - runtime check: `python tools/check_jax_runtime.py --quick-bench`
-- examples: see [README.md](examples/README.md)
+- examples: see [examples/README.md](/examples/README.md)
 
 Tests, benchmarks, and notebooks are expected to run against the source tree in `src/arbplusjax` by default.
 
 ## Documentation Entry Points
 
-- standards: [README.md](docs/standards/README.md)
-- reports: [README.md](docs/reports/README.md)
-- status: [README.md](docs/status/README.md)
-- practical run guidance: [README.md](docs/practical/README.md)
-- implementation notes: [README.md](docs/implementation/README.md)
+- docs index: [docs/index.md](/docs/index.md)
+- project overview: [docs/project_overview.md](/docs/project_overview.md)
+- standards: [docs/standards/README.md](/docs/standards/README.md)
+- reports: [docs/reports/README.md](/docs/reports/README.md)
+- status: [docs/status/README.md](/docs/status/README.md)
+- theory: [docs/theory/README.md](/docs/theory/README.md)
+- practical run guidance: [docs/practical/README.md](/docs/practical/README.md)
+- implementation notes: [docs/implementation/README.md](/docs/implementation/README.md)
 
 ## Install
 
@@ -50,4 +53,4 @@ PYTHONPATH=src python -m pytest tests -q -m "not parity"
 
 - JAX is the primary implementation surface.
 - Reference software and external engines are validation/comparison layers, not the default runtime path.
-- See [NOTICE](NOTICE) for acknowledgments and reference links.
+- See [NOTICE](/NOTICE) for acknowledgments and reference links.

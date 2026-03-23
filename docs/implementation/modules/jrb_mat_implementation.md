@@ -198,7 +198,7 @@ Current benchmark coverage:
 - [benchmark_matrix_free_krylov.py](/benchmarks/benchmark_matrix_free_krylov.py)
 - current report: [matrix_free_krylov_benchmark.md](/docs/status/reports/matrix_free_krylov_benchmark.md)
 - optional JSON sanity snapshot: `python tools/slq_logdet_contract_report.py`
-- broader method comparison note: [matrix_logdet_landscape.md](/docs/implementation/matrix_logdet_landscape.md)
+- broader method comparison note: [matrix_logdet_landscape_implementation.md](/docs/implementation/matrix_logdet_landscape_implementation.md)
 - theory note for the sparse SPD Leja path: [sparse_symmetric_leja_hutchpp_logdet.md](/docs/theory/sparse_symmetric_leja_hutchpp_logdet.md)
 
 Current diagnostic contract:

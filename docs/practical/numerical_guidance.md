@@ -27,6 +27,6 @@ This page is for the practical question: what tends to work numerically in this 
 
 ## Detailed references
 
-- [precision_guardrails_gpu.md](/docs/implementation/precision_guardrails_gpu.md)
-- [matrix_logdet_landscape.md](/docs/implementation/matrix_logdet_landscape.md)
-- [soft_ops_optional.md](/docs/implementation/soft_ops_optional.md)
+- [precision_guardrails_gpu_implementation.md](/docs/implementation/precision_guardrails_gpu_implementation.md)
+- [matrix_logdet_landscape_implementation.md](/docs/implementation/matrix_logdet_landscape_implementation.md)
+- [soft_ops_optional_implementation.md](/docs/implementation/soft_ops_optional_implementation.md)

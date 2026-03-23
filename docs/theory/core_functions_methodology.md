@@ -568,6 +568,6 @@ These then continue into the module’s precision and batched variants.
 
 - [arb_core.py](/src/arbplusjax/arb_core.py)
 - [acb_core.py](/src/arbplusjax/acb_core.py)
-- [arb_core.md](/docs/implementation/modules/arb_core.md)
-- [acb_core.md](/docs/implementation/modules/acb_core.md)
+- [arb_core_implementation.md](/docs/implementation/modules/arb_core_implementation.md)
+- [acb_core_implementation.md](/docs/implementation/modules/acb_core_implementation.md)
 - [elementary_functions_methodology.md](/docs/theory/elementary_functions_methodology.md)

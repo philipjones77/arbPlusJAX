@@ -17,14 +17,14 @@ Use [implementation](/docs/implementation) for code structure, module layout, wr
 
 ## Related implementation references
 
-- [build.md](/docs/implementation/build.md)
-- [run_platform.md](/docs/implementation/run_platform.md)
-- [linux_gpu_colab.md](/docs/implementation/linux_gpu_colab.md)
-- [benchmarks.md](/docs/implementation/benchmarks.md)
-- [benchmark_process.md](/docs/implementation/benchmark_process.md)
-- [testing_harness.md](/docs/implementation/testing_harness.md)
-- [precision_guardrails_gpu.md](/docs/implementation/precision_guardrails_gpu.md)
-- [matrix_logdet_landscape.md](/docs/implementation/matrix_logdet_landscape.md)
-- [soft_ops_optional.md](/docs/implementation/soft_ops_optional.md)
+- [build_implementation.md](/docs/implementation/build_implementation.md)
+- [run_platform_implementation.md](/docs/implementation/run_platform_implementation.md)
+- [linux_gpu_colab_implementation.md](/docs/implementation/linux_gpu_colab_implementation.md)
+- [benchmarks_implementation.md](/docs/implementation/benchmarks_implementation.md)
+- [benchmark_process_implementation.md](/docs/implementation/benchmark_process_implementation.md)
+- [testing_harness_implementation.md](/docs/implementation/testing_harness_implementation.md)
+- [precision_guardrails_gpu_implementation.md](/docs/implementation/precision_guardrails_gpu_implementation.md)
+- [matrix_logdet_landscape_implementation.md](/docs/implementation/matrix_logdet_landscape_implementation.md)
+- [soft_ops_optional_implementation.md](/docs/implementation/soft_ops_optional_implementation.md)
 
 These remain implementation documents. The `docs/practical/` pages are a separate operational layer that points to them where useful.

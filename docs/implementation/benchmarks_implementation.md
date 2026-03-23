@@ -4,7 +4,7 @@ Last updated: 2026-03-04T00:00:00Z
 
 `benchmarks/bench_harness.py` compares arbPlusJAX against multiple backends and writes sweep outputs under `benchmarks/results/`.
 
-For the backend roles and comparison policy, see [testing_harness.md](/docs/implementation/testing_harness.md).
+For the backend roles and comparison policy, see [testing_harness_implementation.md](/docs/implementation/testing_harness_implementation.md).
 
 Default runner:
 ```bash

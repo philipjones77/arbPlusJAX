@@ -52,8 +52,8 @@ The block and variable-block sparse container families in the same module follow
 - `src/arbplusjax/sparse_common.py`
 - `src/arbplusjax/srb_mat.py`
 - `src/arbplusjax/scb_mat.py`
-- `docs/implementation/modules/jrb_mat.md`
-- `docs/implementation/modules/jcb_mat.md`
+- `docs/implementation/modules/jrb_mat_implementation.md`
+- `docs/implementation/modules/jcb_mat_implementation.md`
 - `tests/test_srb_mat_chassis.py`
 - `tests/test_scb_mat_chassis.py`
 - `tests/test_jrb_mat_chassis.py`

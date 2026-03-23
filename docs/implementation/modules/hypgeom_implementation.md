@@ -240,7 +240,7 @@ Recent benchmarks:
   - `spherical_bessel_j`, `spherical_bessel_y`, `modified_spherical_bessel_i`, `modified_spherical_bessel_k`
   - family-specific series, seed formulas, integer-order recurrences, and large-`|z|` asymptotics
 - These are point surfaces today and are exposed through both `arbplusjax.special.bessel` and `arbplusjax.api`.
-- Detailed implementation note: `docs/implementation/modules/special_bessel.md`.
+- Detailed implementation note: `docs/implementation/modules/special_bessel_implementation.md`.
 
 ## Precision differences and constants
 

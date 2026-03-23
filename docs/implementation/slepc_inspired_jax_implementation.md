@@ -73,6 +73,6 @@ What is still open is solver-product depth, not missing baseline surface:
 ## Cross References
 
 - status matrix: [matrix_free_completion_plan.md](/docs/status/matrix_free_completion_plan.md)
-- placement rules: [matrix_stack.md](/docs/implementation/matrix_stack.md)
-- real module surface: [jrb_mat.md](/docs/implementation/modules/jrb_mat.md)
-- complex module surface: [jcb_mat.md](/docs/implementation/modules/jcb_mat.md)
+- placement rules: [matrix_stack_implementation.md](/docs/implementation/matrix_stack_implementation.md)
+- real module surface: [jrb_mat_implementation.md](/docs/implementation/modules/jrb_mat_implementation.md)
+- complex module surface: [jcb_mat_implementation.md](/docs/implementation/modules/jcb_mat_implementation.md)

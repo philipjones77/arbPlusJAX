@@ -26,7 +26,7 @@ scripts. Those belong under `benchmarks/`.
 - regenerate reports:
   - `python tools/check_generated_reports.py`
 - regenerate docs indexes:
-  - `python tools/update_docs_indexes.py`
+  - `python tools/generate_docs_indexes.py`
 - regenerate example notebooks:
   - `python tools/generate_example_notebooks.py`
 - package source bundle:
@@ -57,9 +57,13 @@ scripts. Those belong under `benchmarks/`.
 - `custom_core_report.py`
   - Generates the curated custom-core status report layered on top of the core/point status data.
 
+- `generate_docs_indexes.py`
+  - Regenerates the repo-root `README.md`, docs landing pages, and generated section indexes including the implementation subtree indexes.
+  - Use after adding/removing docs, reports, status files, or indexed implementation notes.
+
 - `update_docs_indexes.py`
-  - Regenerates the root `README.md` and the generated `docs/reports/README.md` and `docs/status/README.md` indexes.
-  - Use after adding/removing report or status docs, or when root README content rules change.
+  - Legacy compatibility wrapper around `generate_docs_indexes.py`.
+  - Prefer the canonical generator directly in new docs and scripts.
 
 - `generate_example_notebooks.py`
   - Regenerates the managed example notebooks in `examples/`.

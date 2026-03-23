@@ -233,6 +233,6 @@ For the concrete arbPlusJAX definitions referenced in this note, see:
 
 - [precision_standard.md](/docs/standards/precision_standard.md)
 - [governance/architecture.md](/docs/governance/architecture.md)
-- [ball_wrappers.md](/docs/implementation/wrappers/ball_wrappers.md)
-- [baseline_wrappers.md](/docs/implementation/wrappers/baseline_wrappers.md)
-- [hypgeom_wrappers.md](/docs/implementation/wrappers/hypgeom_wrappers.md)
+- [ball_wrappers_implementation.md](/docs/implementation/wrappers/ball_wrappers_implementation.md)
+- [baseline_wrappers_implementation.md](/docs/implementation/wrappers/baseline_wrappers_implementation.md)
+- [hypgeom_wrappers_implementation.md](/docs/implementation/wrappers/hypgeom_wrappers_implementation.md)

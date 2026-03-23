@@ -305,7 +305,7 @@ MANUAL_IMPLEMENTATIONS: tuple[ImplementationEntry, ...] = (
 
 MANUAL_FUNCTION_ENTRIES: tuple[FunctionEntry, ...] = tuple(
     [
-        FunctionEntry(name, name, base, "alternative", "Julia/BarnesDoubleGamma.jl-derived alternative implementation", "double_gamma", modes, tightening, ("docs/implementation/modules/double_gamma.md",), note)
+        FunctionEntry(name, name, base, "alternative", "Julia/BarnesDoubleGamma.jl-derived alternative implementation", "double_gamma", modes, tightening, ("docs/implementation/modules/double_gamma_implementation.md",), note)
         for name, base, modes, tightening, note in (
             ("bdg_log_barnesdoublegamma", "log_barnesdoublegamma", "point", "point-only or helper path", "Julia-derived alternative implementation of the Barnes double-gamma logarithm."),
             ("bdg_barnesdoublegamma", "barnesdoublegamma", "point", "point-only or helper path", "Julia-derived alternative implementation of the Barnes double-gamma value."),
@@ -558,11 +558,11 @@ def _references(category: str, module: str, base_name: str) -> tuple[str, ...]:
     elif category == "arb_like" and module in {"arb_core", "acb_core"}:
         refs.append("docs/status/reports/core_function_status.md")
     elif category == "alternative" and "boost" in module:
-        refs.append("docs/implementation/external/boost_hypgeom.md")
+        refs.append("docs/implementation/external/boost_hypgeom_implementation.md")
     elif category == "alternative" and "cusf" in module.lower():
-        refs.append("docs/implementation/external/cusf_compat.md")
+        refs.append("docs/implementation/external/cusf_compat_implementation.md")
     elif category == "new" and module:
-        refs.append(f"docs/implementation/modules/{module}.md")
+        refs.append(f"docs/implementation/modules/{module}_implementation.md")
     return tuple(refs)
 
 

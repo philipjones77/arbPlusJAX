@@ -69,7 +69,7 @@ Design notes:
 - Thin Python dispatch only at API entry.
 - JAX-first kernels for point evaluation.
 - Interval and box modes routed through existing arb/acb kernels and mode wrappers.
-- Source inventory and provenance are documented in `boost_math_hypgeom_inventory.md`.
+- Source inventory and provenance are documented in `boost_math_hypgeom_inventory_implementation.md`.
 
 Current backlog:
 
