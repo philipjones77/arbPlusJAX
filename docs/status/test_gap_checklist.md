@@ -111,9 +111,9 @@ clearer if each eventually had a more explicit owner.
 - `core_wrappers`
   Directly covered by `tests/test_core_wrappers_contracts.py`.
 - `dft_wrappers`
-  Covered indirectly through DFT chassis tests.
+  Directly covered by `tests/test_dft_wrappers_contracts.py`.
 - `dirichlet_wrappers`
-  Covered indirectly through Dirichlet chassis tests.
+  Directly covered by `tests/test_dirichlet_wrappers_contracts.py`.
 - `double_interval_wrappers`
   Directly covered by `tests/test_double_interval_wrappers_contracts.py`.
 - `hypgeom_wrappers`
@@ -121,7 +121,7 @@ clearer if each eventually had a more explicit owner.
 - `mat_wrappers`
   Directly covered by `tests/test_mat_wrappers_contracts.py`.
 - `modular_elliptic_wrappers`
-  Covered indirectly through elliptic/modular chassis tests.
+  Directly covered by `tests/test_modular_elliptic_wrappers_contracts.py`.
 - `poly_wrappers`
   Directly covered by `tests/test_poly_wrappers_contracts.py`.
 - `wrappers_common`
@@ -169,6 +169,9 @@ The latest concrete additions are:
 - `tests/test_mat_wrappers_contracts.py`
 - `tests/test_hypgeom_wrappers_contracts.py`
 - `tests/test_poly_wrappers_contracts.py`
+- `tests/test_dft_wrappers_contracts.py`
+- `tests/test_dirichlet_wrappers_contracts.py`
+- `tests/test_modular_elliptic_wrappers_contracts.py`
 - `tests/test_wrappers_common_contracts.py`
 - `tests/test_double_interval_wrappers_contracts.py`
 - `tests/test_core_wrappers_contracts.py`

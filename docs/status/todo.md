@@ -166,12 +166,14 @@ Status: `in_progress`
     test surface
 - `in_progress`
   - continue tightening wrapper ownership for the remaining indirect wrapper
-    modules beyond the now-landed `hypgeom_wrappers` and `poly_wrappers`
+    modules beyond the now-landed `hypgeom_wrappers`, `poly_wrappers`,
+    `dft_wrappers`, `dirichlet_wrappers`, and `modular_elliptic_wrappers`
   - direct owner tests now exist for `ball_wrappers`,
     `baseline_wrappers`, and `mat_wrappers`
   - direct owner tests now exist for `wrappers_common`, `core_wrappers`,
     `calc_wrappers`, and `double_interval_wrappers`
-  - direct owner tests now exist for `hypgeom_wrappers` and `poly_wrappers`
+  - direct owner tests now exist for `hypgeom_wrappers`, `poly_wrappers`,
+    `dft_wrappers`, `dirichlet_wrappers`, and `modular_elliptic_wrappers`
   - direct owner tests now exist for `checks`, `coeffs`, and `precision`
   - keep precision-routing and dtype policy explicit instead of letting wrapper
     behavior drift by family
