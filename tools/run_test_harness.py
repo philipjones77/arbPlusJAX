@@ -135,7 +135,11 @@ def main() -> int:
         default="chassis",
         help="Named test profile to run.",
     )
-    parser.add_argument("--python", default="", help="Python interpreter to use. Default: auto-detect envs/jax.")
+    parser.add_argument(
+        "--python",
+        default="",
+        help="Python interpreter to use. Default: prefer the shared jax interpreter on Linux, otherwise auto-detect envs/jax.",
+    )
     parser.add_argument("--jax-mode", choices=("auto", "cpu", "gpu"), default="auto")
     parser.add_argument("--with-parity", action="store_true", help="Only used by --profile full.")
     parser.add_argument("--with-bench-smoke", action="store_true", help="Only used by --profile full.")

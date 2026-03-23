@@ -7,10 +7,22 @@ import sys
 from pathlib import Path
 
 
+def _system_name() -> str:
+    return platform.system().lower()
+
+
+def _is_windows() -> bool:
+    return _system_name().startswith("win")
+
+
+def _is_linux() -> bool:
+    return _system_name() == "linux"
+
+
 def _candidates() -> list[Path]:
     out: list[Path] = []
     home = Path.home()
-    if platform.system().lower().startswith("win"):
+    if _is_windows():
         user = Path(os.environ.get("USERPROFILE", str(home)))
         out.extend(
             [
@@ -29,7 +41,7 @@ def _candidates() -> list[Path]:
 
 
 def resolve_python(explicit: str | None = None) -> str:
-    # Highest priority: explicit CLI path
+    # Highest priority: explicit CLI path.
     if explicit:
         p = Path(explicit)
         if p.exists():
@@ -38,7 +50,7 @@ def resolve_python(explicit: str | None = None) -> str:
         if found:
             return found
 
-    # Next: environment override
+    # Next: environment override.
     env = os.getenv("ARBPLUSJAX_PYTHON", "").strip()
     if env:
         p = Path(env)
@@ -48,23 +60,27 @@ def resolve_python(explicit: str | None = None) -> str:
         if found:
             return found
 
-    # Next: well-known jax env locations
+    # On Linux, the default interpreter policy is the shared JAX environment.
+    # Prefer that well-known env before any ambient interpreter fallback so
+    # harnesses/examples/benchmarks all route through the same runtime by
+    # default unless the caller explicitly overrides it.
     for cand in _candidates():
         if cand.exists():
             return str(cand)
 
-    # Next: activated conda env named jax
+    # Next: activated conda env named jax.
     conda_prefix = os.getenv("CONDA_PREFIX", "").strip()
     conda_env = os.getenv("CONDA_DEFAULT_ENV", "").strip().lower()
     if conda_prefix and conda_env == "jax":
-        if platform.system().lower().startswith("win"):
+        if _is_windows():
             cand = Path(conda_prefix) / "python.exe"
         else:
             cand = Path(conda_prefix) / "bin" / "python"
         if cand.exists():
             return str(cand)
 
-    # Fallback: current interpreter
+    # Final fallback: current interpreter.
+    # Linux still falls back here when no JAX env can be resolved.
     return sys.executable
 
 

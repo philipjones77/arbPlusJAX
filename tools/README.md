@@ -85,6 +85,7 @@ scripts. Those belong under `benchmarks/`.
 
 - `python_resolver.py`
   - Resolves the preferred Python interpreter and JAX platform environment.
+  - On Linux, the default interpreter policy is the shared `jax` environment unless a caller explicitly overrides it.
   - This is a support module for harness scripts.
 
 - `source_tree_bootstrap.py`

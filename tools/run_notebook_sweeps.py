@@ -79,7 +79,11 @@ def _stream_cmd(cmd: list[str], cwd: Path, env: dict[str, str], label: str, hear
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run larger benchmark sweeps with notebook-friendly progress logs.")
-    parser.add_argument("--python", default="", help="Python interpreter to use. Default: auto-detect envs/jax.")
+    parser.add_argument(
+        "--python",
+        default="",
+        help="Python interpreter to use. Default: prefer the shared jax interpreter on Linux, otherwise auto-detect envs/jax.",
+    )
     parser.add_argument("--jax-mode", choices=("auto", "cpu", "gpu"), default="auto", help="Set JAX_PLATFORMS.")
     parser.add_argument("--jax-dtype", choices=("float64", "float32"), default="float64", help="JAX dtype for JAX backends.")
     parser.add_argument("--samples", default="2000,5000,10000", help="Comma-separated sample sizes.")

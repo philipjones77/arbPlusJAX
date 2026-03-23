@@ -75,7 +75,11 @@ def _stream_task(task: Task, cwd: Path, heartbeat_s: int) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run tests/benchmarks with live status on Linux or Windows.")
-    parser.add_argument("--python", default="", help="Python interpreter to use. Default: auto-detect envs/jax.")
+    parser.add_argument(
+        "--python",
+        default="",
+        help="Python interpreter to use. Default: prefer the shared jax interpreter on Linux, otherwise auto-detect envs/jax.",
+    )
     parser.add_argument("--jax-mode", choices=("auto", "cpu", "gpu"), default="auto", help="Set JAX_PLATFORMS.")
     parser.add_argument("--heartbeat", type=int, default=20, help="Heartbeat interval seconds.")
     parser.add_argument("--skip-tests", action="store_true", help="Skip pytest tests/.")
