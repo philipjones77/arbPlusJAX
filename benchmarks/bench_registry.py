@@ -23,6 +23,43 @@ class FunctionSpec:
     c_lib: str | None
     c_fn: str | None
 
+    def default_interval_reference_backend(self) -> str | None:
+        if self.c_lib and self.c_fn:
+            return "c_arb"
+        return None
+
+    def default_high_precision_reference_backend(self) -> str | None:
+        if self.mpmath:
+            return "mpmath"
+        return None
+
+    def default_float_reference_backend(self) -> str | None:
+        if self.scipy:
+            return "scipy"
+        return None
+
+    def default_comparison_backend_order(self) -> tuple[str, ...]:
+        order: list[str] = []
+        interval = self.default_interval_reference_backend()
+        high_precision = self.default_high_precision_reference_backend()
+        float_backend = self.default_float_reference_backend()
+        if interval:
+            order.append(interval)
+        if high_precision:
+            order.append(high_precision)
+        if float_backend:
+            order.append(float_backend)
+        if self.jax_point:
+            order.append("jax_point")
+        return tuple(order)
+
+    def comparison_backend_fields(self) -> dict[str, str | None]:
+        return {
+            "interval": self.default_interval_reference_backend(),
+            "high_precision": self.default_high_precision_reference_backend(),
+            "float": self.default_float_reference_backend(),
+        }
+
 
 # Categories control input generation in the harness.
 # - real_scalar: real inputs, interval radius around each point
