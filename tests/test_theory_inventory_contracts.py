@@ -16,6 +16,8 @@ def test_theory_index_references_current_methodology_notes() -> None:
         "bessel_family_methodology.md",
         "gamma_family_methodology.md",
         "hypergeometric_family_methodology.md",
+        "matrix_free_operator_methodology.md",
+        "sparse_block_vblock_methodology.md",
         "barnes_double_gamma_methodology.md",
         "transform_fft_nufft_methodology.md",
     ):

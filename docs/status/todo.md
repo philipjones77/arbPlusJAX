@@ -436,10 +436,8 @@ Status: `in_progress`
     only listing older notes
   - dedicated methodology notes now exist for gamma-family and transform/NUFFT
     surfaces
-- `in_progress`
-  - add sparse/block/vblock production methodology
-  - add matrix-free production methodology beyond the current logdet-specific
-    note
+  - dedicated methodology notes now exist for sparse/block/vblock and
+    matrix-free production surfaces
 
 - `done`
   - canonical public entry points exist for `tail_integral`,
