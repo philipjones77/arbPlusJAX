@@ -86,11 +86,11 @@ POLICY_TEXT = """Last updated: 2026-03-07T00:00:00Z
 
 ENGINEERING_POLICY_TEXT = """Last updated: 2026-03-07T00:00:00Z
 
-# Engineering Policy
+# Engineering Standard
 
 ## Scope
 
-This policy applies to canonical Arb-like functions, alternative implementations, and repo-defined mathematical families.
+This standard applies to canonical Arb-like functions, alternative implementations, and repo-defined mathematical families.
 
 ## Engineering contract
 
@@ -1024,7 +1024,7 @@ def render_registry_summary() -> str:
         "- `docs/status/reports/new_functions.md`",
         "- `docs/status/reports/function_implementation_index.md`",
         "",
-        "See `docs/standards/function_naming.md` for the naming and provenance policy.",
+        "See `docs/standards/function_naming_standard.md` for the naming and provenance policy.",
         "",
     ]
     return "\n".join(lines)

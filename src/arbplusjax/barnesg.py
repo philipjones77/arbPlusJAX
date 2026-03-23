@@ -10,7 +10,7 @@ Provenance:
 - classification: arb_like
 - base_names: barnesg
 - module lineage: repo Barnes G implementation used by the Arb-like surface
-- naming policy: see docs/standards/function_naming.md
+- naming policy: see docs/standards/function_naming_standard.md
 - registry report: see docs/status/reports/function_implementation_index.md
 """
 
@@ -28,7 +28,7 @@ PROVENANCE = {
     "classification": "arb_like",
     "base_names": ("barnesg",),
     "module_lineage": "repo Barnes G implementation used by the Arb-like surface",
-    "naming_policy": "docs/standards/function_naming.md",
+    "naming_policy": "docs/standards/function_naming_standard.md",
     "registry_report": "docs/status/reports/function_implementation_index.md",
 }
 

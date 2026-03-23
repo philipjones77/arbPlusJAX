@@ -33,14 +33,21 @@ def _find_lib(build_dir: Path, names: list[str]) -> Path | None:
 
 
 def default_paths() -> tuple[Path | None, Path | None]:
-    repo_root = Path(__file__).resolve().parents[2]
-    build_dir = repo_root / "migration" / "c_chassis" / "build"
-    if not build_dir.exists():
-        return None, None
-
-    di = _find_lib(build_dir, ["double_interval_ref.dll", "libdouble_interval_ref.dll", "libdouble_interval_ref.so", "libdouble_interval_ref.dylib"])
-    core = _find_lib(build_dir, ["arb_core_ref.dll", "libarb_core_ref.dll", "libarb_core_ref.so", "libarb_core_ref.dylib"])
-    return di, core
+    repo_root = Path(__file__).resolve().parents[1]
+    candidates = [
+        repo_root / "migration" / "c_chassis" / "build",
+        repo_root / "migration" / "c_chassis" / "build_linux_wsl",
+        repo_root / "stuff" / "migration" / "c_chassis" / "build",
+        repo_root / "stuff" / "migration" / "c_chassis" / "build_linux_wsl",
+    ]
+    for build_dir in candidates:
+        if not build_dir.exists():
+            continue
+        di = _find_lib(build_dir, ["double_interval_ref.dll", "libdouble_interval_ref.dll", "libdouble_interval_ref.so", "libdouble_interval_ref.dylib"])
+        core = _find_lib(build_dir, ["arb_core_ref.dll", "libarb_core_ref.dll", "libarb_core_ref.so", "libarb_core_ref.dylib"])
+        if di is not None and core is not None:
+            return di, core
+    return None, None
 
 
 def load_lib(di_path: Path, core_path: Path):
@@ -109,9 +116,15 @@ def main() -> int:
     )
     args = parser.parse_args()
 
+    ref_dir_env = os.getenv("ARB_C_REF_DIR", "")
+    if ref_dir_env:
+        ref_dir = Path(ref_dir_env)
+        d_di = _find_lib(ref_dir, ["double_interval_ref.dll", "libdouble_interval_ref.dll", "libdouble_interval_ref.so", "libdouble_interval_ref.dylib"])
+        d_core = _find_lib(ref_dir, ["arb_core_ref.dll", "libarb_core_ref.dll", "libarb_core_ref.so", "libarb_core_ref.dylib"])
+    else:
+        d_di, d_core = default_paths()
     di_env = os.getenv("DI_REF_LIB", "")
     core_env = os.getenv("ARB_CORE_REF_LIB", "")
-    d_di, d_core = default_paths()
     di_path = Path(di_env) if di_env else d_di
     core_path = Path(core_env) if core_env else d_core
     if di_path is None or core_path is None or not di_path.exists() or not core_path.exists():

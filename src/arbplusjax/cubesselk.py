@@ -6,7 +6,7 @@ Provenance:
 - classification: alternative
 - preferred public family: cuda_besselk
 - module lineage: CUDA/CubesselK-inspired alternative Bessel-K implementation
-- naming policy: see docs/standards/function_naming.md
+- naming policy: see docs/standards/function_naming_standard.md
 - registry report: see docs/status/reports/function_implementation_index.md
 """
 
@@ -25,7 +25,7 @@ PROVENANCE = {
     "base_name": "besselk",
     "preferred_prefix": "cuda",
     "module_lineage": "CUDA/CubesselK-inspired alternative Bessel-K implementation",
-    "naming_policy": "docs/standards/function_naming.md",
+    "naming_policy": "docs/standards/function_naming_standard.md",
     "registry_report": "docs/status/reports/function_implementation_index.md",
 }
 

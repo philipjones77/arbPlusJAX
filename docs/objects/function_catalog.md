@@ -8,6 +8,6 @@ Current governed sources:
 - generated implementation index: [function_implementation_index.md](/home/phili/projects/arbplusJAX/docs/status/reports/function_implementation_index.md)
 - generated provenance registry: [function_provenance_registry.md](/home/phili/projects/arbplusJAX/docs/status/reports/function_provenance_registry.md)
 - generated engineering status: [function_engineering_status.md](/home/phili/projects/arbplusJAX/docs/status/reports/function_engineering_status.md)
-- naming policy: [function_naming.md](/home/phili/projects/arbplusJAX/docs/standards/function_naming.md)
+- naming policy: [function_naming_standard.md](/home/phili/projects/arbplusJAX/docs/standards/function_naming_standard.md)
 
 Use this section for stable named catalogs. Use `docs/status/reports/` for generated status artifacts.

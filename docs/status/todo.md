@@ -47,6 +47,12 @@ Status: `in_progress`
     flow now writes a suite-level runtime manifest, summary markdown, and SVG
     plots under
     [examples/outputs/example_run_suite/](/home/phili/projects/arbplusJAX/examples/outputs/example_run_suite/)
+  - canonical notebook execution now exists through
+    [run_example_notebooks.py](/home/phili/projects/arbplusJAX/tools/run_example_notebooks.py),
+    which executes the standards-aligned notebook surfaces and retains
+    executed notebooks plus runtime/summary artifacts in the owning
+    [examples/outputs/](/home/phili/projects/arbplusJAX/examples/outputs/)
+    folders
   - the existing official API benchmark
     [benchmark_api_surface.py](/home/phili/projects/arbplusJAX/benchmarks/benchmark_api_surface.py)
     now emits the shared benchmark-report JSON schema instead of only printing
@@ -65,7 +71,7 @@ Status: `in_progress`
 
 ## 1. Core Numeric Scalars
 
-Status: `in_progress`
+Status: `done`
 
 - `done`
   - direct test owners exist for the main scalar chassis:
@@ -82,13 +88,19 @@ Status: `in_progress`
     `compare_arb_core.py` and `compare_acb_core.py`
     now emit shared benchmark-report JSON for scalar accuracy artifacts
 - `in_progress`
-  - continue closing the remaining Arb/FLINT parity gap for the scalar core
-    modules listed in the missing-C snapshot below
-  - continue hardening specialized rigorous dispatch in uneven scalar families
-    instead of relying on generic wrapper inflation
-- `planned`
-  - add direct status rollups for which scalar families are genuinely
-    specialized-rigorous versus still wrapper-level
+  - none
+- `done`
+  - CPU direct-owner and parity slices now run against the repo-local WSL C
+    reference builds through the shared parity-path helper
+  - direct scalar status rollup now exists in
+    [core_numeric_scalars_status.md](/home/phili/projects/arbplusJAX/docs/reports/core_numeric_scalars_status.md),
+    including the distinction between true interval/box scalar kernels
+    (`arb_core`, `acb_core`) and point-only helper scalar families
+    (`arf`, `acf`, `fmpr`, `fmpzi`, `arb_fpwrap`)
+  - canonical CPU notebook outputs now exist for the scalar/API tranche under
+    [example_core_scalar_surface](/home/phili/projects/arbplusJAX/examples/outputs/example_core_scalar_surface)
+    and
+    [example_api_surface](/home/phili/projects/arbplusJAX/examples/outputs/example_api_surface)
 
 ## 2. Interval / Box / Precision Modes
 

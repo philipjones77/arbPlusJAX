@@ -101,8 +101,8 @@ def build_capability_registry() -> dict[str, object]:
         "generated_at": _generated_at(),
         "source": "arbplusjax.capability_registry",
         "policy_refs": [
-            "docs/standards/jax_surface_policy.md",
-            "docs/governance/engineering_policy.md",
+            "docs/standards/jax_surface_policy_standard.md",
+            "docs/standards/engineering_standard.md",
         ],
         "downstream_kernels": downstream,
         "functions": functions,

@@ -10,7 +10,7 @@ Provenance:
 - classification: new
 - base_names: elliptic_k, elliptic_e
 - module lineage: repo-defined elliptic helper family
-- naming policy: see docs/standards/function_naming.md
+- naming policy: see docs/standards/function_naming_standard.md
 - registry report: see docs/status/reports/function_implementation_index.md
 """
 
@@ -29,7 +29,7 @@ PROVENANCE = {
     "classification": "new",
     "base_names": ("elliptic_k", "elliptic_e"),
     "module_lineage": "repo-defined elliptic helper family",
-    "naming_policy": "docs/standards/function_naming.md",
+    "naming_policy": "docs/standards/function_naming_standard.md",
     "registry_report": "docs/status/reports/function_implementation_index.md",
 }
 

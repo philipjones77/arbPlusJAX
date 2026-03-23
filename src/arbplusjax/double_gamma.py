@@ -9,7 +9,7 @@ provider prefix in the public name, so this module exports the `bdg_*` family.
 Provenance:
 - classification: alternative
 - module lineage: Julia/BarnesDoubleGamma.jl-derived implementation family
-- naming policy: see docs/standards/function_naming.md
+- naming policy: see docs/standards/function_naming_standard.md
 - registry report: see docs/status/reports/function_implementation_index.md
 """
 
@@ -40,7 +40,7 @@ PROVENANCE = {
     "base_names": ("barnesdoublegamma", "barnesgamma2", "normalizeddoublegamma", "double_sine"),
     "preferred_prefix": "bdg",
     "module_lineage": "Julia/BarnesDoubleGamma.jl-derived implementation family",
-    "naming_policy": "docs/standards/function_naming.md",
+    "naming_policy": "docs/standards/function_naming_standard.md",
     "registry_report": "docs/status/reports/function_implementation_index.md",
 }
 def _complex_loggamma(z: jax.Array) -> jax.Array:

@@ -6,8 +6,8 @@ Date: 2026-03-21
 
 ## Base Documents
 
-- `docs/architecture.md`
-- `docs/documentation_governance.md`
+- `docs/governance/architecture.md`
+- `docs/governance/documentation_governance.md`
 - `docs/project_overview.md`
 - `docs/standards/jax_api_runtime_standard.md`
 
@@ -95,11 +95,11 @@ cross-subsystem standards such as documentation placement, naming conventions,
 runtime policy, public API shape, dtype policy, diagnostics policy, and logging
 discipline.
 
-Root-level `docs/` files are reserved for high-level entry documents such as:
+High-level governance entry documents should live under `docs/governance/`. Cross-tree landing pages may stay at the docs root when they serve the whole documentation tree. The current entry documents are:
 
-- `architecture.md`
-- `documentation_governance.md`
-- `project_overview.md`
+- `docs/governance/architecture.md`
+- `docs/governance/documentation_governance.md`
+- `docs/project_overview.md`
 
 ## Authority Split
 

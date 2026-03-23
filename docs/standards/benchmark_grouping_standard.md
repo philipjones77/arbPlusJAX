@@ -10,7 +10,7 @@ This document defines how benchmark functionality is grouped in this repo.
 
 Use it together with:
 
-- [benchmark_validation_policy.md](/home/phili/projects/arbplusJAX/docs/standards/benchmark_validation_policy.md)
+- [benchmark_validation_policy_standard.md](/home/phili/projects/arbplusJAX/docs/standards/benchmark_validation_policy_standard.md)
 - [jax_api_runtime_standard.md](/home/phili/projects/arbplusJAX/docs/standards/jax_api_runtime_standard.md)
 
 The goal is to keep benchmark organization consistent across:
@@ -29,7 +29,7 @@ This document owns:
 
 It does not define benchmark output schema details or benchmark measurement
 policy. Those belong to
-[benchmark_validation_policy.md](/home/phili/projects/arbplusJAX/docs/standards/benchmark_validation_policy.md).
+[benchmark_validation_policy_standard.md](/home/phili/projects/arbplusJAX/docs/standards/benchmark_validation_policy_standard.md).
 
 ## Grouping Axes
 

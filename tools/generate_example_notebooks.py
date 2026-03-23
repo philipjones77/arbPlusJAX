@@ -29,6 +29,7 @@ def _common_setup_cells(example_name: str):
             "import os\n"
             "import subprocess\n"
             "import sys\n"
+            "import textwrap\n"
             "from pathlib import Path\n"
             "\n"
             "import matplotlib.pyplot as plt\n"
@@ -73,7 +74,9 @@ def _common_setup_cells(example_name: str):
             "print('jax_mode:', JAX_MODE)\n"
             "print('jax_dtype:', JAX_DTYPE)\n"
             "runtime = run([PYTHON, 'tools/check_jax_runtime.py'], capture=True)\n"
-            "print(runtime.stdout)"
+            "print(runtime.stdout)\n"
+            "runtime_payload = json.loads(runtime.stdout)\n"
+            "(EXAMPLE_OUTPUT_ROOT / f'runtime_{JAX_MODE}.json').write_text(json.dumps(runtime_payload, indent=2) + '\\n', encoding='utf-8')"
         ),
     ]
 
@@ -163,7 +166,8 @@ def _core_scalar_notebook() -> list:
             "], capture=True)\n"
             "print(tests.stdout)\n"
             "if tests.stderr:\n"
-            "    print(tests.stderr)"
+            "    print(tests.stderr)\n"
+            "(EXAMPLE_OUTPUT_ROOT / f'pytest_{JAX_MODE}.txt').write_text(tests.stdout + ('\\n' + tests.stderr if tests.stderr else ''), encoding='utf-8')"
         ),
         nbf.v4.new_markdown_cell(
             "## Benchmark Summary\n\n"
@@ -174,13 +178,28 @@ def _core_scalar_notebook() -> list:
             "bench_dir.mkdir(parents=True, exist_ok=True)\n"
             "run([PYTHON, 'benchmarks/benchmark_arf.py', '--samples', '4096', '--which', 'add', '--runs', '3', '--output', str(bench_dir / 'benchmark_arf.json')])\n"
             "run([PYTHON, 'benchmarks/benchmark_arb_fpwrap.py', '--samples', '4096', '--which', 'exp', '--runs', '3', '--output', str(bench_dir / 'benchmark_arb_fpwrap.json')])\n"
+            "run([PYTHON, 'benchmarks/benchmark_acf.py', '--samples', '4096', '--which', 'mul', '--runs', '3', '--output', str(bench_dir / 'benchmark_acf.json')])\n"
+            "run([PYTHON, 'benchmarks/benchmark_fmpr.py', '--samples', '4096', '--which', 'mul', '--runs', '3', '--output', str(bench_dir / 'benchmark_fmpr.json')])\n"
+            "run([PYTHON, 'benchmarks/benchmark_fmpzi.py', '--samples', '4096', '--which', 'add', '--runs', '3', '--output', str(bench_dir / 'benchmark_fmpzi.json')])\n"
+            "run([PYTHON, 'benchmarks/benchmark_core_scalar_batch_padding.py', '--samples', '4099', '--pad-multiple', '128', '--runs', '3', '--output', str(bench_dir / 'benchmark_core_scalar_batch_padding.json')])\n"
             "bench_payloads = []\n"
             "for path in sorted(bench_dir.glob('*.json')):\n"
             "    payload = json.loads(path.read_text())\n"
             "    for row in payload['records']:\n"
-            "        bench_payloads.append(row)\n"
+                "        bench_payloads.append(row)\n"
             "bench_df = pd.DataFrame(bench_payloads)\n"
+            "bench_df.to_csv(EXAMPLE_OUTPUT_ROOT / f'benchmark_summary_{JAX_MODE}.csv', index=False)\n"
             "display(bench_df[['operation', 'cold_time_s', 'warm_time_s', 'recompile_time_s']])"
+        ),
+        nbf.v4.new_markdown_cell(
+            "## Batch Padding Speed\n\n"
+            "Measure padded versus unpadded API batch execution separately. "
+            "This is distinct from the correctness or containment sweeps."
+        ),
+        nbf.v4.new_code_cell(
+            "batch_padding_df = bench_df[bench_df['implementation'].isin(['api_batch_unpadded', 'api_batch_padded'])].copy()\n"
+            "batch_padding_df.to_csv(EXAMPLE_OUTPUT_ROOT / f'batch_padding_summary_{JAX_MODE}.csv', index=False)\n"
+            "display(batch_padding_df[['operation', 'implementation', 'warm_time_s', 'recompile_time_s']])"
         ),
         nbf.v4.new_markdown_cell(
             "## Comparison Summary\n\n"
@@ -192,14 +211,18 @@ def _core_scalar_notebook() -> list:
             "    [PYTHON, 'benchmarks/compare_arb_core.py', '--samples', '256', '--output', str(EXAMPLE_OUTPUT_ROOT / 'compare_arb_core.json')],\n"
             "    [PYTHON, 'benchmarks/compare_acb_core.py', '--samples', '256', '--output', str(EXAMPLE_OUTPUT_ROOT / 'compare_acb_core.json')],\n"
             "]\n"
+            "comparison_rows = []\n"
             "for cmd in compare_cmds:\n"
             "    try:\n"
             "        completed = subprocess.run(cmd, cwd=REPO_ROOT, env=RUN_ENV, text=True, capture_output=True, check=True)\n"
             "        print(completed.stdout)\n"
+            "        comparison_rows.append({'script': cmd[1], 'status': 'ok', 'stdout': completed.stdout[-2000:], 'stderr': completed.stderr[-2000:]})\n"
             "    except subprocess.CalledProcessError as exc:\n"
             "        print('comparison unavailable or failed for', cmd[1])\n"
             "        print(exc.stdout)\n"
-            "        print(exc.stderr)"
+            "        print(exc.stderr)\n"
+            "        comparison_rows.append({'script': cmd[1], 'status': 'failed_or_unavailable', 'stdout': (exc.stdout or '')[-2000:], 'stderr': (exc.stderr or '')[-2000:]})\n"
+            "(EXAMPLE_OUTPUT_ROOT / f'comparison_status_{JAX_MODE}.json').write_text(json.dumps(comparison_rows, indent=2) + '\\n', encoding='utf-8')"
         ),
         nbf.v4.new_markdown_cell(
             "## Plots\n\n"
@@ -211,16 +234,54 @@ def _core_scalar_notebook() -> list:
             "    if col in plot_df.columns:\n"
             "        plot_df[col] = pd.to_numeric(plot_df[col], errors='coerce')\n"
             "summary = plot_df.groupby('backend', dropna=False)[['time_ms', 'containment_rate']].mean(numeric_only=True).sort_values('time_ms')\n"
+            "summary.to_csv(EXAMPLE_OUTPUT_ROOT / f'profile_backend_summary_{JAX_MODE}.csv')\n"
             "fig, axes = plt.subplots(1, 2, figsize=(12, 4))\n"
             "summary['time_ms'].plot(kind='bar', ax=axes[0], title='Mean Time (ms)', color='#b85c38')\n"
             "summary['containment_rate'].plot(kind='bar', ax=axes[1], title='Mean Containment', color='#41535d')\n"
             "fig.tight_layout()\n"
+            "fig.savefig(EXAMPLE_OUTPUT_ROOT / f'profile_backend_summary_{JAX_MODE}.png', dpi=160, bbox_inches='tight')\n"
             "plt.show()"
+        ),
+        nbf.v4.new_code_cell(
+            "if not batch_padding_df.empty:\n"
+            "    pad_pivot = batch_padding_df.pivot(index='operation', columns='implementation', values='warm_time_s')\n"
+            "    ax = pad_pivot.plot(kind='bar', figsize=(10, 4), title='Batch Padding Warm Time')\n"
+            "    ax.set_ylabel('warm_time_s')\n"
+            "    plt.tight_layout()\n"
+            "    plt.savefig(EXAMPLE_OUTPUT_ROOT / f'batch_padding_warm_time_{JAX_MODE}.png', dpi=160, bbox_inches='tight')\n"
+            "    plt.show()"
         ),
         nbf.v4.new_markdown_cell(
             "## Optional Diagnostics\n\n"
             "Use the matrix/compile diagnostics tools only when compile traces or memory deltas are needed. "
             "The scalar tranche here keeps those optional."
+        ),
+        nbf.v4.new_code_cell(
+            "summary_lines = [\n"
+            "    f'# Example Core Scalar Surface Summary ({JAX_MODE})',\n"
+            "    '',\n"
+            "    f'- python: `{PYTHON}`',\n"
+            "    f'- backend: `{runtime_payload[\"platform\"]}`',\n"
+            "    f'- devices: `{runtime_payload[\"devices\"]}`',\n"
+            "    f'- benchmark_rows: `{len(bench_df)}`',\n"
+            "    f'- profile_rows: `{len(profile_df)}`',\n"
+            "    f'- comparison_rows: `{len(comparison_rows)}`',\n"
+            "    f'- batch_padding_rows: `{len(batch_padding_df)}`',\n"
+            "    '',\n"
+            "    '## Benchmark Operations',\n"
+            "    '',\n"
+            "]\n"
+            "for op in sorted(set(bench_df['operation'].tolist())):\n"
+            "    summary_lines.append(f'- `{op}`')\n"
+            "summary_lines.extend(['', '## Backend Summary', ''])\n"
+            "for row in summary.reset_index().to_dict(orient='records'):\n"
+            "    summary_lines.append(f\"- `{row['backend']}`: mean_time_ms={row['time_ms']:.6g}, mean_containment={row['containment_rate']:.6g}\")\n"
+            "if not batch_padding_df.empty:\n"
+            "    summary_lines.extend(['', '## Batch Padding Speed', ''])\n"
+            "    for row in batch_padding_df.to_dict(orient='records'):\n"
+            "        summary_lines.append(f\"- `{row['operation']}` / `{row['implementation']}`: warm={row['warm_time_s']:.6g}s, recompile={row['recompile_time_s']:.6g}s\")\n"
+            "(EXAMPLE_OUTPUT_ROOT / f'summary_{JAX_MODE}.md').write_text('\\n'.join(summary_lines) + '\\n', encoding='utf-8')\n"
+            "display('\\n'.join(summary_lines[:16]))"
         ),
     ]
     return cells
@@ -292,7 +353,8 @@ def _api_surface_notebook() -> list:
             "], capture=True)\n"
             "print(tests.stdout)\n"
             "if tests.stderr:\n"
-            "    print(tests.stderr)"
+            "    print(tests.stderr)\n"
+            "(EXAMPLE_OUTPUT_ROOT / f'pytest_{JAX_MODE}.txt').write_text(tests.stdout + ('\\n' + tests.stderr if tests.stderr else ''), encoding='utf-8')"
         ),
         nbf.v4.new_markdown_cell(
             "## Benchmark Summary\n\n"
@@ -300,6 +362,7 @@ def _api_surface_notebook() -> list:
         ),
         nbf.v4.new_code_cell(
             "summary = api_df.groupby(['operation', 'implementation'])[['cold_time_s', 'warm_time_s', 'recompile_time_s']].mean(numeric_only=True)\n"
+            "summary.reset_index().to_csv(EXAMPLE_OUTPUT_ROOT / f'api_benchmark_summary_{JAX_MODE}.csv', index=False)\n"
             "display(summary)"
         ),
         nbf.v4.new_markdown_cell(
@@ -312,6 +375,17 @@ def _api_surface_notebook() -> list:
             "display(api_df[['operation', 'implementation', 'warm_time_s']].sort_values(['operation', 'implementation']))"
         ),
         nbf.v4.new_markdown_cell(
+            "## Diagnostics\n\n"
+            "Run the existing matrix diagnostics entrypoint to capture compile, steady-state, and recompile behavior for representative routed matrix surfaces."
+        ),
+        nbf.v4.new_code_cell(
+            "diag_report = EXAMPLE_OUTPUT_ROOT / f'api_matrix_diagnostics_{JAX_MODE}.json'\n"
+            "run([PYTHON, 'benchmarks/benchmark_matrix_stack_diagnostics.py', '--n', '4', '--repeats', '2', '--output', str(diag_report)])\n"
+            "diag_df = pd.DataFrame(json.loads(diag_report.read_text()))\n"
+            "diag_df.to_csv(EXAMPLE_OUTPUT_ROOT / f'api_matrix_diagnostics_{JAX_MODE}.csv', index=False)\n"
+            "display(diag_df[['name', 'compile_ms', 'steady_ms_median', 'recompile_new_shape_ms', 'peak_rss_delta_mb']])"
+        ),
+        nbf.v4.new_markdown_cell(
             "## Plots\n\n"
             "Plot cold/warm/recompile timing by operation and implementation."
         ),
@@ -320,12 +394,33 @@ def _api_surface_notebook() -> list:
             "ax = pivot.plot(kind='bar', figsize=(10, 4), title='API Warm Time by Operation')\n"
             "ax.set_ylabel('warm_time_s')\n"
             "plt.tight_layout()\n"
+            "plt.savefig(EXAMPLE_OUTPUT_ROOT / f'api_warm_time_{JAX_MODE}.png', dpi=160, bbox_inches='tight')\n"
             "plt.show()"
         ),
         nbf.v4.new_markdown_cell(
             "## Optional Diagnostics\n\n"
             "For compile/memory diagnostics beyond the API benchmark, use `benchmark_matrix_stack_diagnostics.py` "
             "or the JAX diagnostics helpers explicitly."
+        ),
+        nbf.v4.new_code_cell(
+            "summary_lines = [\n"
+            "    f'# Example API Surface Summary ({JAX_MODE})',\n"
+            "    '',\n"
+            "    f'- python: `{PYTHON}`',\n"
+            "    f'- backend: `{runtime_payload[\"platform\"]}`',\n"
+            "    f'- api_rows: `{len(api_df)}`',\n"
+            "    f'- diagnostics_rows: `{len(diag_df)}`',\n"
+            "    '',\n"
+            "    '## Routed Operations',\n"
+            "    '',\n"
+            "]\n"
+            "for row in summary.reset_index().to_dict(orient='records'):\n"
+            "    summary_lines.append(f\"- `{row['operation']}` / `{row['implementation']}`: warm={row['warm_time_s']:.6g}s, cold={row['cold_time_s']:.6g}s, recompile={row['recompile_time_s']:.6g}s\")\n"
+            "summary_lines.extend(['', '## Diagnostics Cases', ''])\n"
+            "for row in diag_df.to_dict(orient='records'):\n"
+            "    summary_lines.append(f\"- `{row['name']}`: compile_ms={row['compile_ms']:.6g}, steady_ms_median={row['steady_ms_median']:.6g}, recompile_new_shape_ms={row['recompile_new_shape_ms']:.6g}\")\n"
+            "(EXAMPLE_OUTPUT_ROOT / f'summary_{JAX_MODE}.md').write_text('\\n'.join(summary_lines) + '\\n', encoding='utf-8')\n"
+            "display('\\n'.join(summary_lines[:16]))"
         ),
     ]
     return cells

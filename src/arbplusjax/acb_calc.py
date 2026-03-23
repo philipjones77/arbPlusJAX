@@ -10,7 +10,7 @@ Provenance:
 - classification: arb_like
 - base_names: calc_integrate_line, calc_integrate, calc_integrate_gl_auto_deg, calc_integrate_taylor
 - module lineage: Arb/FLINT-style calc/integration surface
-- naming policy: see docs/standards/function_naming.md
+- naming policy: see docs/standards/function_naming_standard.md
 - registry report: see docs/status/reports/function_implementation_index.md
 """
 
@@ -38,7 +38,7 @@ PROVENANCE = {
         "calc_integrate_taylor",
     ),
     "module_lineage": "Arb/FLINT-style calc/integration surface",
-    "naming_policy": "docs/standards/function_naming.md",
+    "naming_policy": "docs/standards/function_naming_standard.md",
     "registry_report": "docs/status/reports/function_implementation_index.md",
 }
 

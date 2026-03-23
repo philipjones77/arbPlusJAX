@@ -1245,11 +1245,15 @@ _MODULE_NAMES = (
     "fmpzi",
     "fmpr",
     "hypgeom",
+    "jcb_mat",
+    "jrb_mat",
     "mag",
     "partitions",
+    "scb_mat",
     "scb_block_mat",
     "scb_vblock_mat",
     "special.bessel",
+    "srb_mat",
     "srb_block_mat",
     "srb_vblock_mat",
     "shahen_double_gamma",
@@ -1644,7 +1648,9 @@ def evaluate(
 def _chunked_apply(fn: Callable, args: tuple[object, ...], chunk_size: int) -> jax.Array:
     if chunk_size <= 0:
         raise ValueError("chunk_size must be > 0")
-    n = _batch_size(args)
+    n = mixed_batch_size_or_none(args)
+    if n is None:
+        raise ValueError("chunked batch application requires array arguments with a detectable shared batch size")
     if n <= chunk_size:
         return fn(*args)
 
@@ -1663,15 +1669,19 @@ def eval_point_batch_chunked(
     dtype: str | jnp.dtype | None = None,
     pad_to: int | None = None,
     pad_value: float | complex = 0.0,
+    **kwargs,
 ) -> jax.Array:
-    batched = _point_batch_fn(name)
     target = _resolve_dtype_for_args(args, dtype)
     batch_args, n = pad_batch_args(
         tuple(_cast_arg_to_dtype(arg, target) for arg in args),
         pad_to=pad_to,
         pad_value=pad_value,
     )
-    out = _chunked_apply(batched, batch_args, chunk_size)
+    out = _chunked_apply(
+        lambda *aa: eval_point_batch(name, *aa, dtype=target, pad_to=None, pad_value=pad_value, **kwargs),
+        batch_args,
+        chunk_size,
+    )
     return trim_batch_out(_cast_out_to_dtype(out, target), n)
 
 
@@ -1685,25 +1695,35 @@ def eval_interval_batch_chunked(
     dtype: str | jnp.dtype | None = None,
     pad_to: int | None = None,
     pad_value: float | complex = 0.0,
+    **kwargs,
 ) -> jax.Array:
-    batched = _interval_batch_fn(name, mode, prec_bits, dps)
     target = _resolve_dtype_for_args(args, dtype)
     batch_args, n = pad_batch_args(
         tuple(_cast_arg_to_dtype(arg, target) for arg in args),
         pad_to=pad_to,
         pad_value=pad_value,
     )
-    out = _chunked_apply(batched, batch_args, chunk_size)
+    out = _chunked_apply(
+        lambda *aa: eval_interval_batch(
+            name,
+            *aa,
+            mode=mode,
+            prec_bits=prec_bits,
+            dps=dps,
+            dtype=target,
+            pad_to=None,
+            pad_value=pad_value,
+            **kwargs,
+        ),
+        batch_args,
+        chunk_size,
+    )
     return trim_batch_out(_cast_out_to_dtype(out, target), n)
 
 
-def bind_point(name: str, dtype: str | jnp.dtype | None = None) -> Callable:
-    fn = _resolve_point_fn(name)
-
+def bind_point(name: str, dtype: str | jnp.dtype | None = None, **bound_kwargs) -> Callable:
     def wrapped(*args):
-        target = _resolve_dtype_for_args(args, dtype)
-        out = fn(*tuple(_cast_arg_to_dtype(arg, target) for arg in args))
-        return _cast_out_to_dtype(out, target)
+        return eval_point(name, *args, dtype=dtype, **bound_kwargs)
 
     return wrapped
 
@@ -1714,24 +1734,17 @@ def bind_interval(
     prec_bits: int | None = None,
     dps: int | None = None,
     dtype: str | jnp.dtype | None = None,
+    **bound_kwargs,
 ) -> Callable:
-    fn = _bound_interval_fn(name, mode, prec_bits, dps)
-
     def wrapped(*args):
-        target = _resolve_dtype_for_args(args, dtype)
-        out = fn(*tuple(_cast_arg_to_dtype(arg, target) for arg in args))
-        return _cast_out_to_dtype(out, target)
+        return eval_interval(name, *args, mode=mode, prec_bits=prec_bits, dps=dps, dtype=dtype, **bound_kwargs)
 
     return wrapped
 
 
-def bind_point_jit(name: str, dtype: str | jnp.dtype | None = None) -> Callable:
-    fn = _point_jit_fn(name)
-
+def bind_point_jit(name: str, dtype: str | jnp.dtype | None = None, **bound_kwargs) -> Callable:
     def wrapped(*args):
-        target = _resolve_dtype_for_args(args, dtype)
-        out = fn(*tuple(_cast_arg_to_dtype(arg, target) for arg in args))
-        return _cast_out_to_dtype(out, target)
+        return eval_point(name, *args, jit=True, dtype=dtype, **bound_kwargs)
 
     return wrapped
 
@@ -1742,13 +1755,19 @@ def bind_interval_jit(
     prec_bits: int | None = None,
     dps: int | None = None,
     dtype: str | jnp.dtype | None = None,
+    **bound_kwargs,
 ) -> Callable:
-    fn = _interval_jit_fn(name, mode, prec_bits, dps)
-
     def wrapped(*args):
-        target = _resolve_dtype_for_args(args, dtype)
-        out = fn(*tuple(_cast_arg_to_dtype(arg, target) for arg in args))
-        return _cast_out_to_dtype(out, target)
+        return eval_interval(
+            name,
+            *args,
+            mode=mode,
+            prec_bits=prec_bits,
+            dps=dps,
+            jit=True,
+            dtype=dtype,
+            **bound_kwargs,
+        )
 
     return wrapped
 
@@ -1774,18 +1793,28 @@ def bind_point_batch(
     dtype: str | jnp.dtype | None = None,
     pad_to: int | None = None,
     pad_value: float | complex = 0.0,
+    chunk_size: int | None = None,
+    **bound_kwargs,
 ) -> Callable:
-    fn = _point_batch_fn(name)
-
     def wrapped(*args):
-        target = _resolve_dtype_for_args(args, dtype)
-        batch_args, n = pad_batch_args(
-            tuple(_cast_arg_to_dtype(arg, target) for arg in args),
+        if chunk_size is not None:
+            return eval_point_batch_chunked(
+                name,
+                *args,
+                chunk_size=chunk_size,
+                dtype=dtype,
+                pad_to=pad_to,
+                pad_value=pad_value,
+                **bound_kwargs,
+            )
+        return eval_point_batch(
+            name,
+            *args,
+            dtype=dtype,
             pad_to=pad_to,
             pad_value=pad_value,
+            **bound_kwargs,
         )
-        out = fn(*batch_args)
-        return trim_batch_out(_cast_out_to_dtype(out, target), n)
 
     return wrapped
 
@@ -1798,18 +1827,34 @@ def bind_interval_batch(
     dtype: str | jnp.dtype | None = None,
     pad_to: int | None = None,
     pad_value: float | complex = 0.0,
+    chunk_size: int | None = None,
+    **bound_kwargs,
 ) -> Callable:
-    fn = _interval_batch_fn(name, mode, prec_bits, dps)
-
     def wrapped(*args):
-        target = _resolve_dtype_for_args(args, dtype)
-        batch_args, n = pad_batch_args(
-            tuple(_cast_arg_to_dtype(arg, target) for arg in args),
+        if chunk_size is not None:
+            return eval_interval_batch_chunked(
+                name,
+                *args,
+                mode=mode,
+                prec_bits=prec_bits,
+                dps=dps,
+                chunk_size=chunk_size,
+                dtype=dtype,
+                pad_to=pad_to,
+                pad_value=pad_value,
+                **bound_kwargs,
+            )
+        return eval_interval_batch(
+            name,
+            *args,
+            mode=mode,
+            prec_bits=prec_bits,
+            dps=dps,
+            dtype=dtype,
             pad_to=pad_to,
             pad_value=pad_value,
+            **bound_kwargs,
         )
-        out = fn(*batch_args)
-        return trim_batch_out(_cast_out_to_dtype(out, target), n)
 
     return wrapped
 

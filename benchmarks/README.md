@@ -15,7 +15,7 @@ This directory is intentionally separate from `tests/`.
 
 Benchmark governance and pytest marker policy:
 
-- [benchmark_validation_policy.md](/home/phili/projects/arbplusJAX/docs/standards/benchmark_validation_policy.md)
+- [benchmark_validation_policy_standard.md](/home/phili/projects/arbplusJAX/docs/standards/benchmark_validation_policy_standard.md)
 - [benchmark_grouping_standard.md](/home/phili/projects/arbplusJAX/docs/standards/benchmark_grouping_standard.md)
 - [environment_portability_standard.md](/home/phili/projects/arbplusJAX/docs/standards/environment_portability_standard.md)
 - taxonomy and marker derivation: [taxonomy.py](/home/phili/projects/arbplusJAX/benchmarks/taxonomy.py)

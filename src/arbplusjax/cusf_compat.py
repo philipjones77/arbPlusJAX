@@ -8,7 +8,7 @@ be surfaced through provenance-prefixed names such as `cusf_besselk`.
 Provenance:
 - classification: alternative
 - module lineage: CuSF/CUDA-style implementation family
-- naming policy: see docs/standards/function_naming.md
+- naming policy: see docs/standards/function_naming_standard.md
 - registry report: see docs/status/reports/function_implementation_index.md
 """
 
@@ -26,7 +26,7 @@ PROVENANCE = {
     "classification": "alternative",
     "module_lineage": "CuSF/CUDA-style implementation family",
     "preferred_prefix": "cusf",
-    "naming_policy": "docs/standards/function_naming.md",
+    "naming_policy": "docs/standards/function_naming_standard.md",
     "registry_report": "docs/status/reports/function_implementation_index.md",
 }
 

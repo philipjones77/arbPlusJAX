@@ -4,8 +4,8 @@ Last updated: 2026-03-17T00:00:00Z
 
 Use the docs tree by intent.
 
-- repo architecture: [architecture.md](/home/phili/projects/arbplusJAX/docs/architecture.md)
-- governance and placement rules: [documentation_governance.md](/home/phili/projects/arbplusJAX/docs/documentation_governance.md)
+- repo architecture: [governance/architecture.md](/home/phili/projects/arbplusJAX/docs/governance/architecture.md)
+- governance and placement rules: [governance/documentation_governance.md](/home/phili/projects/arbplusJAX/docs/governance/documentation_governance.md)
 - repo overview: [project_overview.md](/home/phili/projects/arbplusJAX/docs/project_overview.md)
 - current repo inventories: [reports/README.md](/home/phili/projects/arbplusJAX/docs/reports/README.md)
 - implementation notes: [implementation/README.md](/home/phili/projects/arbplusJAX/docs/implementation/README.md)

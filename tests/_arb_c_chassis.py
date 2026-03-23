@@ -14,5 +14,15 @@ def get_c_ref_build_dir() -> Path:
     env = os.environ.get("ARB_C_REF_DIR")
     if env:
         return Path(env)
-    # Default to archived migration build output in this repo.
-    return Path(__file__).resolve().parents[1] / "stuff" / "migration" / "c_chassis" / "build"
+    repo_root = Path(__file__).resolve().parents[1]
+    candidates = (
+        repo_root / "stuff" / "migration" / "c_chassis" / "build_linux_wsl",
+        repo_root / "stuff" / "migration" / "c_chassis" / "build",
+        repo_root / "migration" / "c_chassis" / "build_linux_wsl",
+        repo_root / "migration" / "c_chassis" / "build",
+    )
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    # Fall back to the historical archived path even if it does not exist yet.
+    return candidates[1]

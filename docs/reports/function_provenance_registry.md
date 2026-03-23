@@ -12,4 +12,4 @@ See the split reports for the actual registry tables:
 - `docs/status/reports/new_functions.md`
 - `docs/status/reports/function_implementation_index.md`
 
-See `docs/standards/function_naming.md` for the naming and provenance policy.
+See `docs/standards/function_naming_standard.md` for the naming and provenance policy.

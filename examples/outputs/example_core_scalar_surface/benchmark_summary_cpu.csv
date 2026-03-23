@@ -1,0 +1,6 @@
+accuracy_abs,accuracy_rel,ad_backward_time_s,ad_forward_time_s,ad_residual,benchmark_name,category,cold_time_s,concern,device,dtype,implementation,measurements,memory_bytes,notes,operation,python_overhead_s,recompile_time_s,residual,tags,warm_time_s
+,,,,,benchmark_acf.py,scalar,0.06334736600001634,scalar_speed,cpu,complex128,repo_native,[],,,acf_mul,,0.030466919999980746,,[],0.00010779633324394429
+,,,,,benchmark_arb_fpwrap.py,scalar,0.04209478700022373,scalar_speed,cpu,float64,repo_native,[],,,arb_fpwrap_double_exp,,0.032324597999831894,,[],1.5595666506366495e-05
+,,,,,benchmark_arf.py,scalar,0.04318104100002529,scalar_speed,cpu,float64,repo_native,[],,,arf_add,,0.02552119199981462,,[],0.00010266500006158215
+,,,,,benchmark_fmpr.py,scalar,0.06852027700006147,scalar_speed,cpu,float64,repo_native,[],,,fmpr_mul,,0.027079863999915688,,[],0.00032576000012340955
+,,,,,benchmark_fmpzi.py,scalar,0.0891438459998426,scalar_speed,cpu,int64,repo_native,[],,,fmpzi_add,,0.05311426200023561,,[],0.0001252706668613731

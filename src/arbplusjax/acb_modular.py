@@ -10,7 +10,7 @@ Provenance:
 - classification: new
 - base_names: modular_j
 - module lineage: repo-original modular function family
-- naming policy: see docs/standards/function_naming.md
+- naming policy: see docs/standards/function_naming_standard.md
 - registry report: see docs/status/reports/function_implementation_index.md
 """
 
@@ -29,7 +29,7 @@ PROVENANCE = {
     "classification": "new",
     "base_names": ("modular_j",),
     "module_lineage": "repo-original modular function family",
-    "naming_policy": "docs/standards/function_naming.md",
+    "naming_policy": "docs/standards/function_naming_standard.md",
     "registry_report": "docs/status/reports/function_implementation_index.md",
 }
 

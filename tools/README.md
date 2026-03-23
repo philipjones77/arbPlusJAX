@@ -65,6 +65,10 @@ scripts. Those belong under `benchmarks/`.
   - Regenerates the managed example notebooks in `examples/`.
   - Use after changing notebook standards, benchmark-profile wiring, or default example content.
 
+- `run_example_notebooks.py`
+  - Executes the canonical example notebooks and retains executed notebooks plus runtime/summary artifacts under the owning `examples/outputs/` folders.
+  - Use for CPU/GPU notebook validation runs without opening Jupyter manually.
+
 - `audit_coverage.py`
   - Audits implementation/test coverage against external/reference surfaces.
   - Use for coverage gap analysis rather than normal runtime execution.

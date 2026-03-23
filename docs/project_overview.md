@@ -20,16 +20,16 @@ arbPlusJAX is the active JAX implementation workspace. The repository separates 
 ## Docs map
 
 - root entry docs:
-  - [architecture.md](/home/phili/projects/arbplusJAX/docs/architecture.md)
-  - [documentation_governance.md](/home/phili/projects/arbplusJAX/docs/documentation_governance.md)
+  - [governance/architecture.md](/home/phili/projects/arbplusJAX/docs/governance/architecture.md)
+  - [governance/documentation_governance.md](/home/phili/projects/arbplusJAX/docs/governance/documentation_governance.md)
   - [project_overview.md](/home/phili/projects/arbplusJAX/docs/project_overview.md)
-- process and policy:
-  - [governance/engineering_policy.md](/home/phili/projects/arbplusJAX/docs/governance/engineering_policy.md)
+- governance:
+  - [governance/README.md](/home/phili/projects/arbplusJAX/docs/governance/README.md)
 - standards:
-  - [standards/documentation.md](/home/phili/projects/arbplusJAX/docs/standards/documentation.md)
-  - [standards/function_naming.md](/home/phili/projects/arbplusJAX/docs/standards/function_naming.md)
-  - [standards/jax_surface_policy.md](/home/phili/projects/arbplusJAX/docs/standards/jax_surface_policy.md)
-  - [standards/precision.md](/home/phili/projects/arbplusJAX/docs/standards/precision.md)
+  - [standards/engineering_standard.md](/home/phili/projects/arbplusJAX/docs/standards/engineering_standard.md)
+  - [standards/function_naming_standard.md](/home/phili/projects/arbplusJAX/docs/standards/function_naming_standard.md)
+  - [standards/jax_surface_policy_standard.md](/home/phili/projects/arbplusJAX/docs/standards/jax_surface_policy_standard.md)
+  - [standards/precision_standard.md](/home/phili/projects/arbplusJAX/docs/standards/precision_standard.md)
 - implementation docs:
   - [implementation/README.md](/home/phili/projects/arbplusJAX/docs/implementation/README.md)
   - [implementation/modules](/home/phili/projects/arbplusJAX/docs/implementation/modules)

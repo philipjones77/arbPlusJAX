@@ -28,7 +28,7 @@ Those belong to:
 - [example_notebook_standard.md](/home/phili/projects/arbplusJAX/docs/standards/example_notebook_standard.md)
 - [experiment_layout_standard.md](/home/phili/projects/arbplusJAX/docs/standards/experiment_layout_standard.md)
 - [benchmark_grouping_standard.md](/home/phili/projects/arbplusJAX/docs/standards/benchmark_grouping_standard.md)
-- [benchmark_validation_policy.md](/home/phili/projects/arbplusJAX/docs/standards/benchmark_validation_policy.md)
+- [benchmark_validation_policy_standard.md](/home/phili/projects/arbplusJAX/docs/standards/benchmark_validation_policy_standard.md)
 
 ## Supported Portability Targets
 

@@ -41,6 +41,5 @@ This contract covers the repo-wide dtype and precision policy implemented by `ar
 
 - `src/arbplusjax/__init__.py`
 - `src/arbplusjax/precision.py`
-- `docs/standards/precision.md`
+- `docs/standards/precision_standard.md`
 - `tests/conftest.py`
-

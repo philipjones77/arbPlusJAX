@@ -8,12 +8,30 @@ This document breaks the repo into the main functionality categories that need
 testing, the helper/infrastructure categories that also need testing, the main
 current test families, and the remaining gaps.
 
+This matrix is not just a test-planning artifact. It is the default
+organization lens for the repo.
+
+Use these top-level categories as the primary way to interpret:
+
+- implementation status
+- report structure
+- example notebook ownership
+- benchmark grouping
+- active TODO planning
+- tranche-by-tranche production-readiness work
+
+When a report, status page, benchmark summary, notebook inventory, or roadmap
+needs a top-level grouping, it should default back to the categories defined in
+this document unless there is a strong reason to use a narrower local view.
+
 The repo testing model is:
 
 - `tests/` verifies implementation correctness, contracts, AD behavior, and integration
 - `benchmarks/` measures speed, compile cost, recompile behavior, backend comparison, and bottlenecks
 
 ## Top-Level Test Categories
+
+These categories are also the default repo functionality categories.
 
 ### 1. Core Numeric Scalars
 

@@ -10,7 +10,7 @@ Provenance:
 - classification: new
 - base_names: dirichlet_zeta, dirichlet_eta
 - module lineage: repo-original Dirichlet helper family
-- naming policy: see docs/standards/function_naming.md
+- naming policy: see docs/standards/function_naming_standard.md
 - registry report: see docs/status/reports/function_implementation_index.md
 """
 
@@ -27,7 +27,7 @@ PROVENANCE = {
     "classification": "new",
     "base_names": ("dirichlet_zeta", "dirichlet_eta"),
     "module_lineage": "repo-original Dirichlet helper family",
-    "naming_policy": "docs/standards/function_naming.md",
+    "naming_policy": "docs/standards/function_naming_standard.md",
     "registry_report": "docs/status/reports/function_implementation_index.md",
 }
 

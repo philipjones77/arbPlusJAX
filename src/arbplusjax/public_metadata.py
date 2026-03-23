@@ -270,7 +270,12 @@ def _infer_execution_strategies(name: str, family: str) -> tuple[str, ...]:
     lowered = name.lower()
     strategies: list[str] = []
     if family == "matrix":
-        strategies.append("dense")
+        if "operator_plan" in lowered:
+            strategies.append("operator_plan")
+        elif "sparse" in lowered or lowered.startswith(("srb_", "scb_")):
+            strategies.append("sparse")
+        else:
+            strategies.append("dense")
         if "cached" in lowered:
             strategies.append("cached")
         if "matvec" in lowered or "rmatvec" in lowered:

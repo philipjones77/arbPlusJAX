@@ -1,0 +1,22 @@
+[
+  {
+    "samples": 64,
+    "seed": 0,
+    "path": "/home/phili/projects/arbplusJAX/examples/outputs/example_core_scalar_surface/cpu_profile/samples_64_seed_0"
+  },
+  {
+    "samples": 64,
+    "seed": 1,
+    "path": "/home/phili/projects/arbplusJAX/examples/outputs/example_core_scalar_surface/cpu_profile/samples_64_seed_1"
+  },
+  {
+    "samples": 128,
+    "seed": 0,
+    "path": "/home/phili/projects/arbplusJAX/examples/outputs/example_core_scalar_surface/cpu_profile/samples_128_seed_0"
+  },
+  {
+    "samples": 128,
+    "seed": 1,
+    "path": "/home/phili/projects/arbplusJAX/examples/outputs/example_core_scalar_surface/cpu_profile/samples_128_seed_1"
+  }
+]

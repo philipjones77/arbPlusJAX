@@ -24,7 +24,7 @@ Provenance:
 - classification: new
 - base_names: jrb_mat
 - module lineage: Jones matrix-function subsystem for real interval matrices
-- naming policy: see docs/standards/function_naming.md
+- naming policy: see docs/standards/function_naming_standard.md
 - registry report: see docs/status/reports/function_implementation_index.md
 """
 
@@ -51,7 +51,7 @@ PROVENANCE = {
     "classification": "new",
     "base_names": ("jrb_mat",),
     "module_lineage": "Jones matrix-function subsystem for real interval matrices",
-    "naming_policy": "docs/standards/function_naming.md",
+    "naming_policy": "docs/standards/function_naming_standard.md",
     "registry_report": "docs/status/reports/function_implementation_index.md",
 }
 

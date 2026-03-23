@@ -53,6 +53,5 @@ The semantic meaning of the modes is stable. The exact internal algorithm used f
 
 - `src/arbplusjax/api.py`
 - `src/arbplusjax/public_metadata.py`
-- `docs/standards/precision.md`
+- `docs/standards/precision_standard.md`
 - `tests/test_stable_kernels.py`
-

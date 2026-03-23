@@ -1,17 +1,17 @@
 Last updated: 2026-03-17T00:00:00Z
 
-# Engineering Policy
+# Engineering Standard
 
 ## Scope
 
-This policy applies to canonical Arb-like functions, alternative implementations, and repo-defined mathematical families.
+This standard applies to canonical Arb-like functions, alternative implementations, and repo-defined mathematical families.
 
 ## Engineering contract
 
 - Public functions should expose the expected mode surface for their family (`point`, `basic`, and where appropriate `adaptive` / `rigorous`).
 - Functions should obey the repo dtype rules. Family-specific algorithms do not get a separate dtype policy.
 - Families should share batching/padding/dispatch infrastructure while keeping separate numerical kernels for `point`, `basic`, and tighter interval modes. Point paths should not be forced through interval/box kernels just to reuse plumbing.
-- Runtime implementations should stay on the public JAX surface defined in [jax_surface_policy.md](/home/phili/projects/arbplusJAX/docs/standards/jax_surface_policy.md); SciPy-derived implementation paths are for benchmark/reference use only.
+- Runtime implementations should stay on the public JAX surface defined in [jax_surface_policy_standard.md](/home/phili/projects/arbplusJAX/docs/standards/jax_surface_policy_standard.md); SciPy-derived implementation paths are for benchmark/reference use only.
 - Batch execution should stay shape-stable where possible, and padding-friendly where practical.
 - Unnecessary Python-side value extraction and control flow should be removed from performance-sensitive paths.
 - Automatic differentiation compatibility is a target, but current status must be reported honestly per implementation family.

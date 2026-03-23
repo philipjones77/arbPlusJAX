@@ -14,7 +14,7 @@ Current implementation note:
 Provenance:
 - classification: alternative
 - module lineage: Alexanian--Kuznetsov paper-derived implementation family
-- naming policy: see docs/standards/function_naming.md
+- naming policy: see docs/standards/function_naming_standard.md
 - registry report: see docs/status/reports/function_implementation_index.md
 """
 
@@ -25,7 +25,7 @@ PROVENANCE = {
     "base_names": ("barnesdoublegamma", "barnesgamma2", "normalizeddoublegamma", "double_sine"),
     "preferred_prefix": "shahen",
     "module_lineage": "Alexanian--Kuznetsov paper-derived implementation family; current implementation delegates to bdg_* because the mathematical construction is the same in intent",
-    "naming_policy": "docs/standards/function_naming.md",
+    "naming_policy": "docs/standards/function_naming_standard.md",
     "registry_report": "docs/status/reports/function_implementation_index.md",
 }
 

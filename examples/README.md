@@ -125,3 +125,34 @@ The scripted suite now writes under:
 - `examples/outputs/example_run_suite/<run_name>/api_surface_warm_time.svg`
 
 It also runs the existing official API benchmark and matrix diagnostics entrypoints when enabled in the config.
+
+## Canonical Notebook Execution
+
+Execute the canonical CPU notebooks with the JAX environment:
+
+```bash
+/home/phili/miniforge3/envs/jax/bin/python tools/run_example_notebooks.py --jax-mode cpu --jax-dtype float64
+```
+
+Execute the canonical GPU notebooks with the JAX environment:
+
+```bash
+/home/phili/miniforge3/envs/jax/bin/python tools/run_example_notebooks.py --jax-mode gpu --jax-dtype float64
+```
+
+This runs:
+
+- `example_core_scalar_surface.ipynb`
+- `example_api_surface.ipynb`
+
+and writes:
+
+- executed notebooks under each example-owned output root
+- `runtime_manifest_<cpu|gpu>.json`
+- `execution_summary_<cpu|gpu>.json`
+- notebook-owned summaries, CSV tables, JSON artifacts, and plots
+
+Aggregated notebook execution output is written under:
+
+- `examples/outputs/example_run_suite/notebooks_cpu/`
+- `examples/outputs/example_run_suite/notebooks_gpu/`

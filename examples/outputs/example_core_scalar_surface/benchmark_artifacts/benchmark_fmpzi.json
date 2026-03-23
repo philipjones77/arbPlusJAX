@@ -1,0 +1,67 @@
+{
+  "benchmark_name": "benchmark_fmpzi.py",
+  "category": "scalar",
+  "concern": "scalar_speed",
+  "environment": {
+    "env": {
+      "ARB_C_REF_DIR": "",
+      "JAX_PLATFORMS": "cpu",
+      "PYTHONPATH": "/home/phili/projects/arbplusJAX/src:",
+      "XLA_PYTHON_CLIENT_MEM_FRACTION": "",
+      "XLA_PYTHON_CLIENT_PREALLOCATE": ""
+    },
+    "environment_kind": "wsl",
+    "git": {
+      "commit": "0e77df8709cb9b787bf456257d5b7fe1d8468ed2"
+    },
+    "jax": {
+      "available": true,
+      "backend": "cpu",
+      "devices": [
+        "TFRT_CPU_0"
+      ],
+      "jax_enable_x64": true,
+      "requested_mode": "auto"
+    },
+    "os": {
+      "machine": "x86_64",
+      "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+      "release": "6.6.87.2-microsoft-standard-WSL2",
+      "system": "Linux",
+      "version": "#1 SMP PREEMPT_DYNAMIC Thu Jun  5 18:30:46 UTC 2025"
+    },
+    "python": {
+      "executable": "/home/phili/miniforge3/envs/jax/bin/python",
+      "version": "3.12.12"
+    },
+    "repo_root": "/home/phili/projects/arbplusJAX",
+    "timestamp_utc": "2026-03-22T19:04:17Z"
+  },
+  "notes": "",
+  "records": [
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_fmpzi.py",
+      "category": "scalar",
+      "cold_time_s": 0.0891438459998426,
+      "concern": "scalar_speed",
+      "device": "cpu",
+      "dtype": "int64",
+      "implementation": "repo_native",
+      "measurements": [],
+      "memory_bytes": null,
+      "notes": "",
+      "operation": "fmpzi_add",
+      "python_overhead_s": null,
+      "recompile_time_s": 0.05311426200023561,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.0001252706668613731
+    }
+  ],
+  "schema_version": "v1"
+}
