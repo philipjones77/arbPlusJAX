@@ -8,10 +8,12 @@ Theory notes explain algorithmic meaning and mathematical interpretation. Standa
 
 Current methodology notes:
 - [ball_arithmetic_and_modes.md](/docs/theory/ball_arithmetic_and_modes.md)
+- [barnes_double_gamma_methodology.md](/docs/theory/barnes_double_gamma_methodology.md)
 - [bessel_family_methodology.md](/docs/theory/bessel_family_methodology.md)
 - [core_functions_methodology.md](/docs/theory/core_functions_methodology.md)
 - [elementary_functions_methodology.md](/docs/theory/elementary_functions_methodology.md)
 - [gamma_family_methodology.md](/docs/theory/gamma_family_methodology.md)
+- [hypergeometric_family_methodology.md](/docs/theory/hypergeometric_family_methodology.md)
 - [matrix_free_operator_methods.md](/docs/theory/matrix_free_operator_methods.md)
 - [matrix_interval_and_modes.md](/docs/theory/matrix_interval_and_modes.md)
 - [sparse_selected_inversion_domain_decomposition.md](/docs/theory/sparse_selected_inversion_domain_decomposition.md)

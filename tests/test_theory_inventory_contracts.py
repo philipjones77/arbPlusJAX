@@ -15,6 +15,8 @@ def test_theory_index_references_current_methodology_notes() -> None:
         "core_functions_methodology.md",
         "bessel_family_methodology.md",
         "gamma_family_methodology.md",
+        "hypergeometric_family_methodology.md",
+        "barnes_double_gamma_methodology.md",
         "transform_fft_nufft_methodology.md",
     ):
         assert name in readme

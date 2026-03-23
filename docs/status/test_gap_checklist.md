@@ -117,13 +117,13 @@ clearer if each eventually had a more explicit owner.
 - `double_interval_wrappers`
   Directly covered by `tests/test_double_interval_wrappers_contracts.py`.
 - `hypgeom_wrappers`
-  Covered indirectly through hypergeometric chassis and mode tests.
+  Directly covered by `tests/test_hypgeom_wrappers_contracts.py`.
 - `mat_wrappers`
   Directly covered by `tests/test_mat_wrappers_contracts.py`.
 - `modular_elliptic_wrappers`
   Covered indirectly through elliptic/modular chassis tests.
 - `poly_wrappers`
-  Covered indirectly through polynomial chassis tests.
+  Directly covered by `tests/test_poly_wrappers_contracts.py`.
 - `wrappers_common`
   Directly covered by `tests/test_wrappers_common_contracts.py`.
 
@@ -167,6 +167,8 @@ The latest concrete additions are:
 - `tests/test_ball_wrappers_contracts.py`
 - `tests/test_baseline_wrappers_contracts.py`
 - `tests/test_mat_wrappers_contracts.py`
+- `tests/test_hypgeom_wrappers_contracts.py`
+- `tests/test_poly_wrappers_contracts.py`
 - `tests/test_wrappers_common_contracts.py`
 - `tests/test_double_interval_wrappers_contracts.py`
 - `tests/test_core_wrappers_contracts.py`

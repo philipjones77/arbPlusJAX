@@ -72,7 +72,8 @@ Status: `in_progress`
   - add a dedicated sparse-matrix harness profile on top of the now-landed
     sparse point layer
   - normalize more legacy benchmark scripts onto the shared benchmark-report
-    schema instead of stdout-only summaries
+    schema instead of stdout-only summaries; direct normalized coverage now
+    includes `benchmark_arb_poly.py` and `benchmark_acb_poly.py`
   - keep normalized benchmark CLIs explicitly parameterized for CPU/GPU
     portability and `float32`/`float64` execution, even when the current
     validation slice only runs on CPU
@@ -164,12 +165,13 @@ Status: `in_progress`
     midpoint conversion, and low-level shape guards in the existing runtime/API
     test surface
 - `in_progress`
-  - continue tightening wrapper ownership for:
-    `hypgeom_wrappers` and `poly_wrappers`
+  - continue tightening wrapper ownership for the remaining indirect wrapper
+    modules beyond the now-landed `hypgeom_wrappers` and `poly_wrappers`
   - direct owner tests now exist for `ball_wrappers`,
     `baseline_wrappers`, and `mat_wrappers`
   - direct owner tests now exist for `wrappers_common`, `core_wrappers`,
     `calc_wrappers`, and `double_interval_wrappers`
+  - direct owner tests now exist for `hypgeom_wrappers` and `poly_wrappers`
   - direct owner tests now exist for `checks`, `coeffs`, and `precision`
   - keep precision-routing and dtype policy explicit instead of letting wrapper
     behavior drift by family
@@ -411,6 +413,8 @@ Status: `in_progress`
     Barnes/double-gamma production surfaces, with explicit production-calling
     guidance and benchmark-extension notes
   - dedicated theory notes now exist for the gamma-family production stack
+  - dedicated theory notes now exist for hypergeometric and Barnes/double-gamma
+    production methodology
 - `in_progress`
   - normalize special-function service benchmarks and diagnostics reporting more
     fully across hypergeometric, Bessel, gamma, and Barnes families
@@ -427,8 +431,6 @@ Status: `in_progress`
   - dedicated methodology notes now exist for gamma-family and transform/NUFFT
     surfaces
 - `in_progress`
-  - add dedicated hypergeometric methodology
-  - add dedicated Barnes / double-gamma methodology
   - add sparse/block/vblock production methodology
   - add matrix-free production methodology beyond the current logdet-specific
     note
