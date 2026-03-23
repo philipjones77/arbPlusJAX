@@ -56,3 +56,4 @@ The generated README should:
 - list current status files
 - point to key status entrypoints
 - avoid stale hand-maintained indexes
+- be refreshed by `python tools/check_generated_reports.py`

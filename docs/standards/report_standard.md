@@ -50,10 +50,13 @@ Reports should not:
 
 ## Automation Rule
 
-`docs/reports/README.md` should be generated and refreshed automatically.
+`docs/reports/README.md` and repo-mapping reports such as
+`docs/reports/current_repo_mapping.md` should be generated and refreshed
+automatically.
 
 The generated README should:
 
 - list current report files
 - point to the relevant standards when needed
 - avoid hand-maintained drift
+- be refreshed by `python tools/check_generated_reports.py`

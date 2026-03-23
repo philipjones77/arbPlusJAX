@@ -66,6 +66,9 @@ Status: `in_progress`
     environment manifest and execution policy
   - keep benchmark ownership distinct from correctness ownership, but make the
     pass/fail boundaries clearer in status docs
+  - keep docs landing pages, report indexes, status indexes, and current repo
+    mapping generated automatically so push/commit does not rely on hand-edited
+    tree summaries
   - add a dedicated sparse-matrix harness profile on top of the now-landed
     sparse point layer
   - normalize more legacy benchmark scripts onto the shared benchmark-report

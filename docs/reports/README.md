@@ -1,25 +1,26 @@
-Last updated: 2026-03-23T09:37:30Z
+Last updated: 2026-03-23T00:00:00Z
 
 # Reports
 
 This section holds current repo inventories and report-style summaries.
 
 Standards:
-- [report_standard.md](../standards/report_standard.md)
-- [documentation.md](../standards/documentation.md)
+- [report_standard.md](/home/phili/projects/arbplusJAX/docs/standards/report_standard.md)
+- [documentation_governance.md](/home/phili/projects/arbplusJAX/docs/governance/documentation_governance.md)
 
 Current reports:
-- [alternative_functions.md](alternative_functions.md)
-- [arb_like_functions.md](arb_like_functions.md)
-- [benchmark_group_inventory.md](benchmark_group_inventory.md)
-- [core_numeric_scalars_status.md](core_numeric_scalars_status.md)
-- [environment_portability_inventory.md](environment_portability_inventory.md)
-- [example_notebook_inventory.md](example_notebook_inventory.md)
-- [function_engineering_status.md](function_engineering_status.md)
-- [function_implementation_index.md](function_implementation_index.md)
-- [function_provenance_registry.md](function_provenance_registry.md)
-- [hypgeom_status.md](hypgeom_status.md)
-- [matrix_free_krylov_benchmark.md](matrix_free_krylov_benchmark.md)
-- [matrix_surface_workbook.md](matrix_surface_workbook.md)
-- [new_functions.md](new_functions.md)
-- [repo_organization_by_coverage_categories.md](repo_organization_by_coverage_categories.md)
+- [alternative_functions.md](/home/phili/projects/arbplusJAX/docs/reports/alternative_functions.md)
+- [arb_like_functions.md](/home/phili/projects/arbplusJAX/docs/reports/arb_like_functions.md)
+- [benchmark_group_inventory.md](/home/phili/projects/arbplusJAX/docs/reports/benchmark_group_inventory.md)
+- [core_numeric_scalars_status.md](/home/phili/projects/arbplusJAX/docs/reports/core_numeric_scalars_status.md)
+- [current_repo_mapping.md](/home/phili/projects/arbplusJAX/docs/reports/current_repo_mapping.md)
+- [environment_portability_inventory.md](/home/phili/projects/arbplusJAX/docs/reports/environment_portability_inventory.md)
+- [example_notebook_inventory.md](/home/phili/projects/arbplusJAX/docs/reports/example_notebook_inventory.md)
+- [function_engineering_status.md](/home/phili/projects/arbplusJAX/docs/reports/function_engineering_status.md)
+- [function_implementation_index.md](/home/phili/projects/arbplusJAX/docs/reports/function_implementation_index.md)
+- [function_provenance_registry.md](/home/phili/projects/arbplusJAX/docs/reports/function_provenance_registry.md)
+- [hypgeom_status.md](/home/phili/projects/arbplusJAX/docs/reports/hypgeom_status.md)
+- [matrix_free_krylov_benchmark.md](/home/phili/projects/arbplusJAX/docs/reports/matrix_free_krylov_benchmark.md)
+- [matrix_surface_workbook.md](/home/phili/projects/arbplusJAX/docs/reports/matrix_surface_workbook.md)
+- [new_functions.md](/home/phili/projects/arbplusJAX/docs/reports/new_functions.md)
+- [repo_organization_by_coverage_categories.md](/home/phili/projects/arbplusJAX/docs/reports/repo_organization_by_coverage_categories.md)

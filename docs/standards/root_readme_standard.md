@@ -41,3 +41,6 @@ The root `README.md` should be generated and refreshed automatically.
 Its content should be derived from stable repo structure and the generated
 `docs/standards/README.md`, `docs/reports/README.md`, and `docs/status/README.md`
 surfaces rather than hand-maintained prose.
+
+The same automation rule applies to the docs landing pages and section readmes
+under `docs/`.

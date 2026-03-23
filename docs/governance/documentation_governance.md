@@ -13,7 +13,7 @@ Date: 2026-03-21
 
 ## Scope
 
-This repository adopts the smplJAX documentation placement standard as the governing structure for IntegralFunctionsJAX.
+This repository adopts the smplJAX documentation placement standard as the governing structure for arbPlusJAX.
 
 The repository should keep the `specs/objects/contracts/implementation` structure as a stable backbone:
 
@@ -39,6 +39,17 @@ evaluation belong under `docs/standards/`. The current canonical document for th
 It does not define mathematical semantics. Those belong in `docs/specs/`.
 
 The current repo mapping should be maintained as a separate report under `docs/reports/`, not embedded in this governance file.
+
+Landing pages and section indexes should also be generated rather than hand-maintained:
+
+- `docs/index.md`
+- `docs/project_overview.md`
+- `docs/governance/README.md`
+- `docs/standards/README.md`
+- `docs/reports/README.md`
+- `docs/status/README.md`
+- `docs/theory/README.md`
+- `docs/reports/current_repo_mapping.md`
 
 ## Repository Layout
 
@@ -143,3 +154,13 @@ That report may list:
 - current standards, theory, implementation, practical, and status documents
 - current repo-root mapping notes
 - transitional notes about legacy paths
+
+## Commit And Push Rule
+
+Before commit/push, refresh generated docs, reports, notebook inventories, and
+status/report indexes through:
+
+- `python tools/check_generated_reports.py`
+
+That command is the canonical repo-side refresh path for generated docs/report
+surfaces and the pytest contracts that enforce them.
