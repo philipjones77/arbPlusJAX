@@ -206,8 +206,10 @@ Status: `in_progress`
     [example_dense_matrix_surface.ipynb](/examples/example_dense_matrix_surface.ipynb)
 - `in_progress`
   - strengthen large-`n` determinant enclosures beyond midpoint fallback
-  - add parity/reference checks for `inv`, `qr`, banded matvec, cached matvec,
-    determinant, trace, and matrix norms
+  - exact-reference dense chassis checks now cover `inv`, `qr`, cached matvec,
+    determinant, trace, and matrix norms for real and complex dense matrices
+  - add parity/reference checks for banded matvec and keep expanding larger-`n`
+    determinant enclosure quality beyond midpoint fallback
   - separate midpoint-first solve-family implementations from true interval/box
     linear-algebra kernels in status and engineering reports
   - deepen rigorous treatment for solve/inverse/factorization paths instead of

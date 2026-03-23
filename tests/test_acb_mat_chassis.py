@@ -440,3 +440,73 @@ def test_batch_solve_inv_triangular_lu_qr_helpers_and_api():
     _check(bool(jnp.allclose(acb_core.acb_midpoint(lu_api[2]), acb_core.acb_midpoint(u))))
     _check(bool(jnp.allclose(acb_core.acb_midpoint(qr_api[0]), acb_core.acb_midpoint(q))))
     _check(bool(jnp.allclose(acb_core.acb_midpoint(qr_api[1]), acb_core.acb_midpoint(r))))
+
+
+def test_dense_exact_reference_paths_cover_cached_qr_inv_det_trace_and_norms():
+    a_mid = jnp.array(
+        [
+            [3.0 + 0.5j, -1.0 + 0.0j, 0.5 - 0.25j, 2.0 + 1.0j],
+            [1.0 - 1.0j, 4.0 + 0.0j, -2.0 + 0.5j, 0.0 + 0.0j],
+            [0.0 + 0.0j, 2.0 + 0.5j, 5.0 + 0.0j, 1.0 - 1.0j],
+            [2.0 + 0.0j, 0.0 + 0.0j, 1.0 + 0.25j, 3.0 + 0.0j],
+        ],
+        dtype=jnp.complex128,
+    )
+    x_mid = jnp.array([1.0 + 0.0j, -2.0 + 1.0j, 0.5 - 0.5j, 3.0 + 0.25j], dtype=jnp.complex128)
+    a = acb_core.acb_box(di.interval(jnp.real(a_mid), jnp.real(a_mid)), di.interval(jnp.imag(a_mid), jnp.imag(a_mid)))
+    x = acb_core.acb_box(di.interval(jnp.real(x_mid), jnp.real(x_mid)), di.interval(jnp.imag(x_mid), jnp.imag(x_mid)))
+
+    cache = acb_mat.acb_mat_matvec_cached_prepare(a)
+    cached = acb_mat.acb_mat_matvec_cached_apply_jit(cache, x)
+    inv = acb_mat.acb_mat_inv_jit(a)
+    q, r = acb_mat.acb_mat_qr_jit(a)
+    det = acb_mat.acb_mat_det_jit(a)
+    tr = acb_mat.acb_mat_trace_jit(a)
+    fro = acb_mat.acb_mat_norm_fro_jit(a)
+    one = acb_mat.acb_mat_norm_1_jit(a)
+    infn = acb_mat.acb_mat_norm_inf_jit(a)
+
+    inv_mid = jnp.linalg.inv(a_mid)
+    q_mid, r_mid = jnp.linalg.qr(a_mid)
+
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(cached), a_mid @ x_mid)))
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(inv), inv_mid)))
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(q), q_mid)))
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(r), r_mid)))
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(det), jnp.linalg.det(a_mid))))
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(tr), jnp.trace(a_mid))))
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(fro), jnp.linalg.norm(a_mid, ord="fro"))))
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(one), jnp.linalg.norm(a_mid, ord=1))))
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(infn), jnp.linalg.norm(a_mid, ord=jnp.inf))))
+
+
+def test_large_n_det_enclosure_contains_midpoint_reference_and_precision_nesting():
+    a_mid = jnp.array(
+        [
+            [4.0 + 0.0j, 1.0 - 0.5j, 0.0 + 0.0j, -1.0 + 0.25j, 2.0 + 0.0j],
+            [0.5 + 0.5j, 3.5 + 0.0j, 1.5 - 0.25j, 0.0 + 0.0j, -0.5 + 0.75j],
+            [0.0 + 0.0j, 1.0 + 0.0j, 5.0 + 0.0j, 1.0 - 1.0j, 0.25 + 0.0j],
+            [1.0 - 0.25j, 0.0 + 0.0j, 0.5 + 1.0j, 2.5 + 0.0j, 1.0 + 0.0j],
+            [2.0 + 0.0j, -0.5 - 0.75j, 0.0 + 0.0j, 1.0 + 0.5j, 4.5 + 0.0j],
+        ],
+        dtype=jnp.complex128,
+    )
+    radius = jnp.full(a_mid.shape, 1e-6, dtype=jnp.float64)
+    a = acb_core.acb_box(
+        di.interval(jnp.real(a_mid) - radius, jnp.real(a_mid) + radius),
+        di.interval(jnp.imag(a_mid) - radius, jnp.imag(a_mid) + radius),
+    )
+
+    det_basic = acb_mat.acb_mat_det_basic(a)
+    det_rigorous = acb_mat.acb_mat_det_rigorous(a)
+    det_hi = acb_mat.acb_mat_det_prec(a, prec_bits=53)
+    det_lo = acb_mat.acb_mat_det_prec(a, prec_bits=20)
+    ref = jnp.linalg.det(a_mid)
+    ref_box = acb_core.acb_box(di.interval(jnp.real(ref), jnp.real(ref)), di.interval(jnp.imag(ref), jnp.imag(ref)))
+
+    _check(bool(di.contains(acb_core.acb_real(det_basic), acb_core.acb_real(ref_box))))
+    _check(bool(di.contains(acb_core.acb_imag(det_basic), acb_core.acb_imag(ref_box))))
+    _check(bool(di.contains(acb_core.acb_real(det_rigorous), acb_core.acb_real(ref_box))))
+    _check(bool(di.contains(acb_core.acb_imag(det_rigorous), acb_core.acb_imag(ref_box))))
+    _check(bool(di.contains(acb_core.acb_real(det_lo), acb_core.acb_real(det_hi))))
+    _check(bool(di.contains(acb_core.acb_imag(det_lo), acb_core.acb_imag(det_hi))))

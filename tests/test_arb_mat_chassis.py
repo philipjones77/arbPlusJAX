@@ -412,3 +412,66 @@ def test_batch_solve_inv_triangular_lu_qr_helpers_and_api():
     _check(bool(jnp.allclose(di.midpoint(lu_api[2]), di.midpoint(u))))
     _check(bool(jnp.allclose(di.midpoint(qr_api[0]), di.midpoint(q))))
     _check(bool(jnp.allclose(di.midpoint(qr_api[1]), di.midpoint(r))))
+
+
+def test_dense_exact_reference_paths_cover_cached_qr_inv_det_trace_and_norms():
+    a_mid = jnp.array(
+        [
+            [3.0, -1.0, 0.5, 2.0],
+            [1.0, 4.0, -2.0, 0.0],
+            [0.0, 2.0, 5.0, 1.0],
+            [2.0, 0.0, 1.0, 3.0],
+        ],
+        dtype=jnp.float64,
+    )
+    x_mid = jnp.array([1.0, -2.0, 0.5, 3.0], dtype=jnp.float64)
+    a = di.interval(a_mid, a_mid)
+    x = di.interval(x_mid, x_mid)
+
+    cache = arb_mat.arb_mat_matvec_cached_prepare(a)
+    cached = arb_mat.arb_mat_matvec_cached_apply_jit(cache, x)
+    inv = arb_mat.arb_mat_inv_jit(a)
+    q, r = arb_mat.arb_mat_qr_jit(a)
+    det = arb_mat.arb_mat_det_jit(a)
+    tr = arb_mat.arb_mat_trace_jit(a)
+    fro = arb_mat.arb_mat_norm_fro_jit(a)
+    one = arb_mat.arb_mat_norm_1_jit(a)
+    infn = arb_mat.arb_mat_norm_inf_jit(a)
+
+    inv_mid = jnp.linalg.inv(a_mid)
+    q_mid, r_mid = jnp.linalg.qr(a_mid)
+
+    _check(bool(jnp.allclose(di.midpoint(cached), a_mid @ x_mid)))
+    _check(bool(jnp.allclose(di.midpoint(inv), inv_mid)))
+    _check(bool(jnp.allclose(di.midpoint(q), q_mid)))
+    _check(bool(jnp.allclose(di.midpoint(r), r_mid)))
+    _check(bool(jnp.allclose(di.midpoint(det), jnp.linalg.det(a_mid))))
+    _check(bool(jnp.allclose(di.midpoint(tr), jnp.trace(a_mid))))
+    _check(bool(jnp.allclose(di.midpoint(fro), jnp.linalg.norm(a_mid, ord="fro"))))
+    _check(bool(jnp.allclose(di.midpoint(one), jnp.linalg.norm(a_mid, ord=1))))
+    _check(bool(jnp.allclose(di.midpoint(infn), jnp.linalg.norm(a_mid, ord=jnp.inf))))
+
+
+def test_large_n_det_enclosure_contains_midpoint_reference_and_precision_nesting():
+    a_mid = jnp.array(
+        [
+            [4.0, 1.0, 0.0, -1.0, 2.0],
+            [0.5, 3.5, 1.5, 0.0, -0.5],
+            [0.0, 1.0, 5.0, 1.0, 0.25],
+            [1.0, 0.0, 0.5, 2.5, 1.0],
+            [2.0, -0.5, 0.0, 1.0, 4.5],
+        ],
+        dtype=jnp.float64,
+    )
+    radius = jnp.full_like(a_mid, 1e-6)
+    a = di.interval(a_mid - radius, a_mid + radius)
+
+    det_basic = arb_mat.arb_mat_det_basic(a)
+    det_rigorous = arb_mat.arb_mat_det_rigorous(a)
+    det_hi = arb_mat.arb_mat_det_prec(a, prec_bits=53)
+    det_lo = arb_mat.arb_mat_det_prec(a, prec_bits=20)
+    ref = jnp.linalg.det(a_mid)
+
+    _check(bool(di.contains(det_basic, di.interval(ref, ref))))
+    _check(bool(di.contains(det_rigorous, di.interval(ref, ref))))
+    _check(bool(di.contains(det_lo, det_hi)))
