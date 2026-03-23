@@ -12,6 +12,7 @@ Current reports:
 - [alternative_functions.md](/docs/reports/alternative_functions.md)
 - [arb_like_functions.md](/docs/reports/arb_like_functions.md)
 - [benchmark_group_inventory.md](/docs/reports/benchmark_group_inventory.md)
+- [comparison_backend_defaults.md](/docs/reports/comparison_backend_defaults.md)
 - [core_numeric_scalars_status.md](/docs/reports/core_numeric_scalars_status.md)
 - [cpu_validation_profiles.md](/docs/reports/cpu_validation_profiles.md)
 - [current_repo_mapping.md](/docs/reports/current_repo_mapping.md)
