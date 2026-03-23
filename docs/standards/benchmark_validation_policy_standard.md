@@ -194,6 +194,18 @@ These official mappings are implemented in [taxonomy.py](/home/phili/projects/ar
 Benchmarks may continue to print human-readable summaries, but artifact output
 should converge on the shared schema in [schema.py](/home/phili/projects/arbplusJAX/benchmarks/schema.py).
 
+Production-facing benchmark CLIs should also expose explicit runtime controls
+for:
+
+- execution mode selection that remains CPU/GPU portable
+- dtype selection for at least `float32` and `float64` where the benchmarked
+  surface supports both
+
+In the current repo tranche, pytest and local validation may execute only the
+CPU slice, but benchmark entrypoints should not hard-code themselves into a
+CPU-only or `float64`-only calling contract unless that limitation is an
+intentional property of the family and is documented.
+
 The shared record fields are:
 
 - `benchmark_name`
@@ -227,12 +239,31 @@ Expected split:
 - benchmark smoke in pytest:
   - CLI/help-path validation
   - taxonomy completeness
+  - canonical benchmark entrypoint coverage for production-facing service/API benchmarks
 - real benchmark sweeps:
   - run through benchmark tools or dedicated harness profiles
   - write artifacts under `experiments/benchmarks/`
 
 Benchmarks should fail in pytest only on explicit guardrails, not because a full
 performance report exists.
+
+## Recompile Minimization Rule
+
+Canonical benchmarks and benchmark-backed example notebooks should make
+recompile behavior visible and should prefer calling patterns that minimize
+avoidable recompiles.
+
+That means using stable:
+
+- dtype policy
+- mode/precision policy
+- static control parameters
+- cached prepare/apply plans where supported
+- padding or chunking where variable-size request traffic would otherwise cause
+  noisy shape-driven recompilation
+
+Benchmarks do not need to eliminate all recompiles, but they should separate
+intentional recompiles from accidental calling-pattern churn.
 
 ## Matrix-Specific Rule
 

@@ -14,9 +14,20 @@ def _run(cmd: list[str]) -> None:
 
 
 def main() -> None:
+    _run([PYTHON, "tools/generate_example_notebooks.py"])
     _run([PYTHON, "tools/function_provenance_report.py"])
     _run([PYTHON, "tools/hypgeom_status_report.py"])
-    _run([PYTHON, "-m", "pytest", "-q", "tests/test_function_provenance_reports.py"])
+    _run(
+        [
+            PYTHON,
+            "-m",
+            "pytest",
+            "-q",
+            "tests/test_function_provenance_reports.py",
+            "tests/test_example_notebook_inventory_contracts.py",
+            "tests/test_example_notebook_content_contracts.py",
+        ]
+    )
 
 
 if __name__ == "__main__":

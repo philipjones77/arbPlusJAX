@@ -69,10 +69,21 @@ Every example notebook should include these sections in some form:
    - interpreter
    - JAX backend/device
    - dtype mode
+   - explicit note that canonical execution in this repo state is CPU, while
+     the notebook calling pattern remains CPU/GPU portable
 3. object/input construction
    - instantiate a representative object, matrix, operator, or function input
 4. direct usage
    - run the core public operations on that object
+5. production pattern
+   - show the intended production calling style for the family
+   - demonstrate binder reuse, cached plan reuse, or both where relevant
+   - show stable dtype/mode usage and optional padding/chunking where repeated calls would otherwise trigger recompiles
+   - explain how to extend the owning benchmark surface for adjacent functions
+6. AD product pattern
+   - show how automatic differentiation is intended to be used on the production surface
+   - validate AD behavior on a representative scalarized objective
+   - graph primal and derivative behavior over a representative sweep
 5. parameter/value sweeps
    - show a complete or representative sweep of values/parameters relevant to the family
 6. validation summary
@@ -172,6 +183,61 @@ whichever of these are meaningful:
 - memory
 - accuracy/residual
 - AD cost
+
+The notebook should also show how that benchmark surface can be extended for
+additional functions in the same family without inventing a separate local
+workflow.
+
+### Production calling rule
+
+The notebook must teach the production-quality calling pattern for its surface.
+
+That means showing the appropriate combination of:
+
+- pre-bound service callables through `api.bind_point_batch()` or
+  `api.bind_interval_batch()` where the public API supports them
+- cached prepare/apply plan reuse for matrix, sparse, transform, or
+  operator-plan surfaces
+- fixed dtype, mode, and precision policy across repeated calls
+- optional `pad_to` and `chunk_size` controls when they are relevant for
+  reducing avoidable recompiles or handling variable request sizes
+
+If a family does not use one of these patterns, the notebook should say so
+explicitly instead of leaving the calling convention implicit.
+
+The environment and production sections should also make runtime portability
+concrete:
+
+- show explicit `JAX_MODE` handling for CPU/GPU selection
+- show explicit `JAX_DTYPE` handling for `float32`/`float64`
+- state which slice is exercised by the retained canonical outputs in the
+  current repo state
+
+### Diagnostics and metadata rule
+
+When a family exposes method selection, execution strategies, or diagnostics
+through public metadata or optional diagnostics objects, the notebook should
+show that surface directly.
+
+Examples:
+
+- method parameter names from public metadata
+- execution strategy names from public metadata
+- representative diagnostics objects from production-facing calls
+- compile/recompile diagnostics from benchmark or JAX diagnostics artifacts
+
+### AD rule
+
+Canonical notebooks must show AD on the real production entrypoint for the
+family, not only on a toy local helper.
+
+That means:
+
+- differentiate the public bound callable, routed API surface, cached plan
+  surface, or other real production entrypoint
+- validate AD behavior on a representative scalarized objective
+- include a plot that shows primal and derivative behavior over a meaningful
+  sweep
 
 ### Comparison rule
 

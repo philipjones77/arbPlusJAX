@@ -1,4 +1,4 @@
-Last updated: 2026-03-22T22:00:00Z
+Last updated: 2026-03-23T00:00:00Z
 
 # TODO
 
@@ -53,6 +53,9 @@ Status: `in_progress`
     executed notebooks plus runtime/summary artifacts in the owning
     [examples/outputs/](/home/phili/projects/arbplusJAX/examples/outputs/)
     folders
+  - canonical notebooks now also encode production calling patterns:
+    binder reuse, optional padding/chunking, cached plan reuse, and benchmark
+    extension guidance for the main top-level categories
   - the existing official API benchmark
     [benchmark_api_surface.py](/home/phili/projects/arbplusJAX/benchmarks/benchmark_api_surface.py)
     now emits the shared benchmark-report JSON schema instead of only printing
@@ -65,6 +68,13 @@ Status: `in_progress`
     pass/fail boundaries clearer in status docs
   - add a dedicated sparse-matrix harness profile on top of the now-landed
     sparse point layer
+  - normalize more legacy benchmark scripts onto the shared benchmark-report
+    schema instead of stdout-only summaries
+  - keep normalized benchmark CLIs explicitly parameterized for CPU/GPU
+    portability and `float32`/`float64` execution, even when the current
+    validation slice only runs on CPU
+  - continue turning theory coverage into first-class tranche status rather than
+    leaving methodology gaps implicit
 - `planned`
   - add a single repo-facing execution checklist that names the minimum CPU,
     parity, GPU, and benchmark slices required for a release-quality change
@@ -101,6 +111,8 @@ Status: `done`
     [example_core_scalar_surface](/home/phili/projects/arbplusJAX/examples/outputs/example_core_scalar_surface)
     and
     [example_api_surface](/home/phili/projects/arbplusJAX/examples/outputs/example_api_surface)
+  - scalar/API notebooks now explicitly show production service usage with
+    binder reuse, stable dtype policy, and optional padding/chunking
 
 ## 2. Interval / Box / Precision Modes
 
@@ -347,6 +359,33 @@ Status: `in_progress`
 ## 6. Special Functions
 
 Status: `in_progress`
+
+- `done`
+  - canonical example notebooks now exist for top-level gamma and
+    Barnes/double-gamma production surfaces, with explicit production-calling
+    guidance and benchmark-extension notes
+  - dedicated theory notes now exist for the gamma-family production stack
+- `in_progress`
+  - normalize special-function service benchmarks and diagnostics reporting more
+    fully across hypergeometric, Bessel, gamma, and Barnes families
+  - continue converting notebook and benchmark guidance into schema-backed
+    artifacts rather than stdout-only summaries
+
+## Theory And Methodology
+
+Status: `in_progress`
+
+- `done`
+  - theory index now reflects production-readiness interpretation rather than
+    only listing older notes
+  - dedicated methodology notes now exist for gamma-family and transform/NUFFT
+    surfaces
+- `in_progress`
+  - add dedicated hypergeometric methodology
+  - add dedicated Barnes / double-gamma methodology
+  - add sparse/block/vblock production methodology
+  - add matrix-free production methodology beyond the current logdet-specific
+    note
 
 - `done`
   - canonical public entry points exist for `tail_integral`,

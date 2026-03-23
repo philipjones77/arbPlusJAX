@@ -23,9 +23,14 @@ Current notebook root:
 - `example_core_scalar_surface.ipynb`
 - `example_dense_matrix_surface.ipynb`
 - `example_dense_structured_spectral.ipynb`
+- `example_fft_nufft_surface.ipynb`
+- `example_gamma_family_surface.ipynb`
 - `example_hypgeom_robust_modes_sweep.ipynb`
 - `example_large_sweeps_progress.ipynb`
+- `example_matrix_free_operator_surface.ipynb`
+- `example_sparse_matrix_surface.ipynb`
 - `example_special_modes_sweep.ipynb`
+- `example_barnes_double_gamma_surface.ipynb`
 
 ## Coverage By Functionality Group
 
@@ -47,15 +52,17 @@ Current notebook coverage:
 - `example_special_modes_sweep.ipynb`
 - `example_bessel_modes_sweep.ipynb`
 - `example_hypgeom_robust_modes_sweep.ipynb`
+- `example_gamma_family_surface.ipynb`
+- `example_barnes_double_gamma_surface.ipynb`
 
 Status:
 
-- partially covered
+- covered
 
 Notes:
 
-- Bessel and hypergeometric families have dedicated notebooks.
-- Gamma, Barnes/double-gamma, Hankel, incomplete gamma, incomplete Bessel, and tail-acceleration-specific notebooks are still missing as dedicated group notebooks.
+- Bessel, hypergeometric, gamma, and Barnes/double-gamma families now have dedicated notebooks.
+- Tail-acceleration-specific and narrower per-subfamily notebooks can still be added later without changing category coverage.
 
 ### Dense matrix
 
@@ -72,49 +79,32 @@ Status:
 
 Current notebook coverage:
 
-- none
+- `example_sparse_matrix_surface.ipynb`
 
 Status:
 
-- missing dedicated notebook
-
-Recommended additions:
-
-- `example_sparse_matrix_surface.ipynb`
-- `example_block_sparse_matrix_surface.ipynb`
+- covered
 
 ### Matrix-free / operator
 
 Current notebook coverage:
 
-- no dedicated `example_*.ipynb` notebook yet
-
-Related non-notebook example:
-
-- `example_matrix_free_adjoints.py`
+- `example_matrix_free_operator_surface.ipynb`
+- related non-notebook example: `example_matrix_free_adjoints.py`
 
 Status:
 
-- missing dedicated notebook
-
-Recommended additions:
-
-- `example_matrix_free_operator_surface.ipynb`
-- `example_matrix_free_logdet_eigsh.ipynb`
+- covered
 
 ### Transforms
 
 Current notebook coverage:
 
-- none
+- `example_fft_nufft_surface.ipynb`
 
 Status:
 
-- missing dedicated notebook
-
-Recommended additions:
-
-- `example_fft_nufft_surface.ipynb`
+- covered
 
 ### API / runtime routing
 
@@ -138,7 +128,7 @@ Status:
 
 Notes:
 
-- Dirichlet, modular, elliptic, Bernoulli, partitions, and related families do not yet have dedicated `example_` notebooks.
+- Dirichlet, modular, elliptic, Bernoulli, partitions, and related families still do not have dedicated family notebooks.
 
 ## Required Notebook Content Checklist
 
@@ -146,24 +136,29 @@ Each functionality-group notebook should include:
 
 - object or input instantiation
 - public operation usage
+- production-calling guidance:
+  - binder reuse, cached plan reuse, or both where relevant
+  - stable dtype/mode/precision choices
+  - optional padding/chunking or other anti-recompile controls where relevant
 - parameter/value sweeps
 - summarized test/validation results
 - summarized benchmark results
 - comparisons to available benchmark/reference software
 - graphs for relevant benchmark/value sweeps
 - optional full diagnostics section or artifact links
+- benchmark-extension guidance for adjacent functions in the same family
 
 ## Missing High-Priority Notebooks
 
 - `example_sparse_matrix_surface.ipynb`
 - `example_matrix_free_operator_surface.ipynb`
 - `example_fft_nufft_surface.ipynb`
-- `example_api_surface.ipynb`
 - `example_gamma_family_surface.ipynb`
 - `example_barnes_double_gamma_surface.ipynb`
 
 ## Notes
 
 - The current notebook set is strongest for modes, dense matrices, Bessel, and hypergeometric coverage.
-- The repo does not yet have full notebook parity across all major functionality groups.
+- The repo now has canonical notebooks for the main top-level functionality groups.
+- Some narrower subfamily-specific notebooks are still optional follow-on work rather than top-level gaps.
 - Benchmarks, comparisons, and plots should be summarized in notebooks, but full raw artifacts should remain under `experiments/benchmarks/`.

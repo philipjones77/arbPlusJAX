@@ -1,5 +1,12 @@
 from __future__ import annotations
 
+from pathlib import Path
+import sys
+
+_HERE = Path(__file__).resolve().parent
+if str(_HERE) not in sys.path:
+    sys.path.insert(0, str(_HERE))
+
 from _source_tree_bootstrap import ensure_src_on_path
 
 ensure_src_on_path(__file__)
@@ -7,8 +14,6 @@ ensure_src_on_path(__file__)
 
 import os
 import subprocess
-import sys
-from pathlib import Path
 
 import pytest
 

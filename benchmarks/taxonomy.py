@@ -17,6 +17,12 @@ class BenchmarkScriptMetadata:
 
 
 def _category_for_script(script_name: str) -> str:
+    if "core_scalar" in script_name:
+        return "scalar"
+    if "matrix_service_api" in script_name:
+        return "matrix"
+    if "special_function_service_api" in script_name:
+        return "special"
     if "matrix_backend" in script_name:
         return "backend_matrix"
     if "nufft_backends" in script_name:
@@ -129,6 +135,9 @@ def smoke_script_names() -> tuple[str, ...]:
     return (
         "bench_harness.py",
         "benchmark_api_surface.py",
+        "benchmark_core_scalar_service_api.py",
+        "benchmark_special_function_service_api.py",
+        "benchmark_matrix_service_api.py",
         "benchmark_matrix_backend_candidates.py",
         "benchmark_nufft_backends.py",
     )

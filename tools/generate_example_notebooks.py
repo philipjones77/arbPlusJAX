@@ -1,8 +1,47 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
-import nbformat as nbf
+try:
+    import nbformat as nbf
+except ModuleNotFoundError:  # pragma: no cover - environment fallback
+    class _FallbackV4:
+        @staticmethod
+        def new_notebook() -> dict:
+            return {
+                "cells": [],
+                "metadata": {},
+                "nbformat": 4,
+                "nbformat_minor": 5,
+            }
+
+        @staticmethod
+        def new_markdown_cell(source: str) -> dict:
+            return {
+                "cell_type": "markdown",
+                "metadata": {},
+                "source": source,
+            }
+
+        @staticmethod
+        def new_code_cell(source: str) -> dict:
+            return {
+                "cell_type": "code",
+                "execution_count": None,
+                "metadata": {},
+                "outputs": [],
+                "source": source,
+            }
+
+    class _FallbackNBF:
+        v4 = _FallbackV4()
+
+        @staticmethod
+        def write(nb: dict, path: Path) -> None:
+            path.write_text(json.dumps(nb, indent=2) + "\n", encoding="utf-8")
+
+    nbf = _FallbackNBF()
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -25,8 +64,10 @@ def _common_setup_cells(example_name: str):
             "summarizes validation and benchmark status, and includes visual summaries."
         ),
         nbf.v4.new_code_cell(
+            "import io\n"
             "import json\n"
             "import os\n"
+            "import re\n"
             "import subprocess\n"
             "import sys\n"
             "import textwrap\n"
@@ -67,17 +108,51 @@ def _common_setup_cells(example_name: str):
         ),
         nbf.v4.new_markdown_cell(
             "## Environment\n\n"
-            "The notebook reports interpreter, selected JAX mode, and the active backend/device view."
+            "The notebook reports interpreter, selected JAX mode, and the active backend/device view. "
+            "Canonical retained execution in this repo state is CPU-oriented, but the notebook calling pattern remains CPU/GPU portable and explicitly parameterized for `float32` and `float64`."
         ),
         nbf.v4.new_code_cell(
+            "SUPPORTED_JAX_MODES = ('cpu', 'gpu')\n"
+            "SUPPORTED_JAX_DTYPES = ('float32', 'float64')\n"
+            "if JAX_MODE not in SUPPORTED_JAX_MODES:\n"
+            "    raise ValueError(f'Unsupported JAX_MODE: {JAX_MODE}')\n"
+            "if JAX_DTYPE not in SUPPORTED_JAX_DTYPES:\n"
+            "    raise ValueError(f'Unsupported JAX_DTYPE: {JAX_DTYPE}')\n"
             "print('python:', PYTHON)\n"
             "print('jax_mode:', JAX_MODE)\n"
             "print('jax_dtype:', JAX_DTYPE)\n"
+            "print('supported_jax_modes:', SUPPORTED_JAX_MODES)\n"
+            "print('supported_jax_dtypes:', SUPPORTED_JAX_DTYPES)\n"
+            "print('validation_slice:', 'cpu_current__gpu_portable_contract')\n"
             "runtime = run([PYTHON, 'tools/check_jax_runtime.py'], capture=True)\n"
             "print(runtime.stdout)\n"
             "runtime_payload = json.loads(runtime.stdout)\n"
             "(EXAMPLE_OUTPUT_ROOT / f'runtime_{JAX_MODE}.json').write_text(json.dumps(runtime_payload, indent=2) + '\\n', encoding='utf-8')"
         ),
+    ]
+
+
+def _production_pattern_cells(title: str, guidance: str, code: str, benchmark_notes: str):
+    return [
+        nbf.v4.new_markdown_cell(
+            f"## {title}\n\n"
+            f"{guidance}"
+        ),
+        nbf.v4.new_code_cell(code),
+        nbf.v4.new_markdown_cell(
+            "## Extending Benchmarks\n\n"
+            f"{benchmark_notes}"
+        ),
+    ]
+
+
+def _ad_pattern_cells(guidance: str, code: str):
+    return [
+        nbf.v4.new_markdown_cell(
+            "## AD Product Pattern\n\n"
+            f"{guidance}"
+        ),
+        nbf.v4.new_code_cell(code),
     ]
 
 
@@ -126,6 +201,42 @@ def _core_scalar_notebook() -> list:
             "    'arb_fpwrap_double_exp': api.eval_point('arb_fpwrap_double_exp', fpwrap_real),\n"
             "}\n"
             "display(results)"
+        ),
+        *_production_pattern_cells(
+            "Production Pattern",
+            "Production use should bind once, keep dtype stable, and pad or chunk batches when repeated calls would otherwise trigger shape churn. "
+            "For helper scalar families, `bind_point_batch()` is the main service-style entrypoint.",
+            "service_real = jnp.linspace(0.1, 1.0, 7, dtype=jnp.float32)\n"
+            "service_complex = jnp.asarray([0.1 + 0.2j, 0.3 - 0.1j, 0.5 + 0.4j], dtype=jnp.complex64)\n"
+            "arf_bound = api.bind_point_batch('arf_add', dtype='float32', pad_to=16, chunk_size=4)\n"
+            "acf_bound = api.bind_point_batch('acf_mul', dtype='float32', pad_to=16, chunk_size=4)\n"
+            "fpwrap_bound = api.bind_point_batch('arb_fpwrap_double_exp', dtype='float32', pad_to=16)\n"
+            "service_results = {\n"
+            "    'arf_bound': arf_bound(service_real, service_real),\n"
+            "    'acf_bound': acf_bound(service_complex, service_complex),\n"
+            "    'fpwrap_bound': fpwrap_bound(service_real),\n"
+            "}\n"
+            "display(service_results)",
+            "To benchmark another scalar family, either add another existing benchmark entrypoint to the `bench_dir` loop below or extend the representative operations in "
+            "`benchmark_core_scalar_service_api.py` / `benchmark_core_scalar_batch_padding.py` and rerun this notebook."
+        ),
+        *_ad_pattern_cells(
+            "AD should be shown on the production-facing bound callables, not only on local toy functions. "
+            "This section validates a scalar helper surface and plots primal versus gradient values over a representative sweep.",
+            "import jax\n"
+            "sweep = jnp.linspace(0.1, 1.2, 32, dtype=jnp.float32)\n"
+            "exp_bound = api.bind_point_batch('arb_fpwrap_double_exp', dtype='float32', pad_to=32)\n"
+            "def scalar_loss(x):\n"
+            "    return jnp.sum(exp_bound(x))\n"
+            "grad_vals = jax.grad(scalar_loss)(sweep)\n"
+            "primal_vals = exp_bound(sweep)\n"
+            "ad_df = pd.DataFrame({'x': np.asarray(sweep), 'primal': np.asarray(primal_vals), 'grad': np.asarray(grad_vals)})\n"
+            "display(ad_df.head())\n"
+            "ax = ad_df.plot(x='x', y=['primal', 'grad'], figsize=(8, 4), title='Core Scalar AD Validation')\n"
+            "ax.set_ylabel('value')\n"
+            "plt.tight_layout()\n"
+            "plt.savefig(EXAMPLE_OUTPUT_ROOT / f'ad_validation_{JAX_MODE}.png', dpi=160, bbox_inches='tight')\n"
+            "plt.show()"
         ),
         nbf.v4.new_markdown_cell(
             "## Parameter/Value Sweeps\n\n"
@@ -329,6 +440,39 @@ def _api_surface_notebook() -> list:
             "}\n"
             "display(api_results)"
         ),
+        *_production_pattern_cells(
+            "Production Pattern",
+            "For routed library use, favor explicit `evaluate()` or pre-bound batch entrypoints with fixed `dtype`, `mode`, and `pad_to` so service calls do not constantly recompile on batch-length drift. "
+            "Keep matrix plans cached when an operation supports prepare/apply separation.",
+            "real_batch = jnp.asarray([0.5, 1.0, 1.5, 2.0, 2.5], dtype=jnp.float64)\n"
+            "gamma_bound = api.bind_point_batch('incomplete_gamma_upper', dtype='float64', pad_to=8, method='quadrature', regularized=True)\n"
+            "solve_bound = api.bind_interval_batch('arb_mat_solve', mode='basic', dtype='float64', pad_to=4, prec_bits=53)\n"
+            "cached_plan = api.eval_point('arb_mat_matvec_cached_prepare', a)\n"
+            "api_service_results = {\n"
+            "    'gamma_bound': gamma_bound(real_batch, jnp.asarray([1.0, 1.1, 1.2, 1.3, 1.4], dtype=jnp.float64)),\n"
+            "    'solve_bound': solve_bound(a, rhs),\n"
+            "    'cached_matvec': api.eval_point('arb_mat_matvec_cached_apply', cached_plan, rhs),\n"
+            "}\n"
+            "display(api_service_results)",
+            "To extend routed benchmarks, add the target operation or implementation branch in `benchmark_api_surface.py`, `benchmark_special_function_service_api.py`, or `benchmark_matrix_service_api.py`, depending on whether the concern is generic API routing, special-function services, or matrix services."
+        ),
+        *_ad_pattern_cells(
+            "The routed API should demonstrate AD through the same public metadata-aware entrypoints used in product code. "
+            "This section differentiates a routed special-function call and plots primal and gradient behavior together.",
+            "import jax\n"
+            "sweep = jnp.linspace(0.25, 1.5, 24, dtype=jnp.float64)\n"
+            "def routed_loss(zv):\n"
+            "    return jnp.sum(api.evaluate('incomplete_gamma_upper', jnp.asarray(2.5, dtype=jnp.float64), zv, method='quadrature', method_params={'samples_per_panel': 8, 'max_panels': 16}))\n"
+            "grad_vals = jax.grad(routed_loss)(sweep)\n"
+            "primal_vals = api.bind_point_batch('incomplete_gamma_upper', dtype='float64', pad_to=32, method='quadrature')(jnp.full_like(sweep, 2.5), sweep)\n"
+            "ad_df = pd.DataFrame({'z': np.asarray(sweep), 'primal': np.asarray(primal_vals), 'grad': np.asarray(grad_vals)})\n"
+            "display(ad_df.head())\n"
+            "ax = ad_df.plot(x='z', y=['primal', 'grad'], figsize=(8, 4), title='API Routed AD Validation')\n"
+            "ax.set_ylabel('value')\n"
+            "plt.tight_layout()\n"
+            "plt.savefig(EXAMPLE_OUTPUT_ROOT / f'ad_validation_{JAX_MODE}.png', dpi=160, bbox_inches='tight')\n"
+            "plt.show()"
+        ),
         nbf.v4.new_markdown_cell(
             "## Parameter/Value Sweeps\n\n"
             "Sweep the official API benchmark over representative routed cases."
@@ -426,10 +570,659 @@ def _api_surface_notebook() -> list:
     return cells
 
 
+def _sparse_matrix_surface_notebook() -> list:
+    cells = [
+        nbf.v4.new_markdown_cell(
+            "# Example Sparse Matrix Surface\n\n"
+            "Canonical sparse/block-sparse example notebook for the sparse matrix tranche."
+        ),
+        *_common_setup_cells("example_sparse_matrix_surface"),
+        nbf.v4.new_markdown_cell(
+            "## Direct Usage\n\n"
+            "Construct sparse real/complex operators and exercise the public sparse API surface."
+        ),
+        nbf.v4.new_code_cell(
+            "import jax.numpy as jnp\n"
+            "from arbplusjax import api, scb_mat, srb_mat\n"
+            "\n"
+            "dense_real = jnp.array([[4.0, 1.0, 0.0], [1.0, 5.0, 2.0], [0.0, 2.0, 6.0]], dtype=jnp.float64)\n"
+            "dense_complex = dense_real + 1j * jnp.array([[0.0, 0.2, 0.0], [-0.2, 0.0, 0.1], [0.0, -0.1, 0.0]], dtype=jnp.float64)\n"
+            "sparse_real = srb_mat.srb_mat_from_dense_bcoo(dense_real)\n"
+            "sparse_complex = scb_mat.scb_mat_from_dense_bcoo(dense_complex)\n"
+            "vec_real = jnp.stack([jnp.array([1.0, 0.5, -0.25], dtype=jnp.float64), jnp.array([0.25, -0.5, 1.0], dtype=jnp.float64)], axis=0)\n"
+            "vec_complex = jnp.stack([\n"
+            "    jnp.array([1.0 + 0.2j, 0.5 - 0.1j, -0.25 + 0.3j], dtype=jnp.complex128),\n"
+            "    jnp.array([0.25 - 0.1j, -0.5 + 0.2j, 1.0 + 0.0j], dtype=jnp.complex128),\n"
+            "], axis=0)\n"
+            "real_plan = api.eval_point('srb_mat_matvec_cached_prepare', sparse_real)\n"
+            "complex_plan = api.eval_point('scb_mat_matvec_cached_prepare', sparse_complex)\n"
+            "sparse_results = {\n"
+            "    'srb_matvec': api.eval_point_batch('srb_mat_matvec', sparse_real, vec_real),\n"
+            "    'srb_cached_matvec': api.eval_point_batch('srb_mat_matvec_cached_apply', real_plan, vec_real),\n"
+            "    'scb_matvec': api.eval_point_batch('scb_mat_matvec', sparse_complex, vec_complex),\n"
+            "    'scb_cached_matvec': api.eval_point_batch('scb_mat_matvec_cached_apply', complex_plan, vec_complex),\n"
+            "}\n"
+            "display(sparse_results)"
+        ),
+        *_production_pattern_cells(
+            "Production Pattern",
+            "Sparse production calls should prepare cached plans once and reuse them for repeated apply or solve traffic. "
+            "If an API-facing service loop feeds variable batch sizes, pad the RHS batch to a stable multiple before calling the padded batch kernels.",
+            "rhs_batch = vec_real\n"
+            "real_cached = api.eval_point('srb_mat_matvec_cached_prepare', sparse_real)\n"
+            "sparse_service_results = {\n"
+            "    'cached_apply': api.eval_point_batch('srb_mat_matvec_cached_apply', real_cached, rhs_batch),\n"
+            "    'padded_batch_apply': api.eval_point_batch('srb_mat_matvec', sparse_real, rhs_batch, pad_to=8),\n"
+            "}\n"
+            "display(sparse_service_results)",
+            "To extend sparse benchmarks, add the target sparse/storage/mode combination inside `benchmark_sparse_matrix_surface.py` and keep the printed metric keys stable so downstream notebook parsing still works."
+        ),
+        *_ad_pattern_cells(
+            "Sparse AD should be demonstrated through stable public operations that are realistically differentiated in downstream models. "
+            "This section differentiates a squared-output objective through sparse matvec and plots primal versus gradient norms.",
+            "import jax\n"
+            "dense_param = jnp.array([[4.0, 1.0, 0.0], [1.0, 5.0, 2.0], [0.0, 2.0, 6.0]], dtype=jnp.float64)\n"
+            "vec0 = jnp.array([1.0, 0.5, -0.25], dtype=jnp.float64)\n"
+            "def sparse_loss(scale):\n"
+            "    sparse_scaled = srb_mat.srb_mat_from_dense_bcoo(scale * dense_param)\n"
+            "    out = api.eval_point('srb_mat_matvec', sparse_scaled, vec0)\n"
+            "    return jnp.sum(out ** 2)\n"
+            "scale_sweep = jnp.linspace(0.5, 1.5, 24, dtype=jnp.float64)\n"
+            "primal_vals = jax.vmap(sparse_loss)(scale_sweep)\n"
+            "grad_vals = jax.vmap(jax.grad(sparse_loss))(scale_sweep)\n"
+            "ad_df = pd.DataFrame({'scale': np.asarray(scale_sweep), 'primal': np.asarray(primal_vals), 'grad': np.asarray(grad_vals)})\n"
+            "display(ad_df.head())\n"
+            "ax = ad_df.plot(x='scale', y=['primal', 'grad'], figsize=(8, 4), title='Sparse AD Validation')\n"
+            "plt.tight_layout()\n"
+            "plt.savefig(EXAMPLE_OUTPUT_ROOT / f'ad_validation_{JAX_MODE}.png', dpi=160, bbox_inches='tight')\n"
+            "plt.show()"
+        ),
+        nbf.v4.new_markdown_cell(
+            "## Validation Summary\n\n"
+            "Run the sparse API and chassis tests that own this surface."
+        ),
+        nbf.v4.new_code_cell(
+            "tests = run([\n"
+            "    PYTHON, '-m', 'pytest', '-q',\n"
+            "    'tests/test_sparse_point_api.py',\n"
+            "    'tests/test_sparse_basic_contracts.py',\n"
+            "    'tests/test_srb_mat_chassis.py',\n"
+            "    'tests/test_scb_mat_chassis.py',\n"
+            "    'tests/test_srb_block_mat_chassis.py',\n"
+            "    'tests/test_scb_block_mat_chassis.py',\n"
+            "    'tests/test_srb_vblock_mat_chassis.py',\n"
+            "    'tests/test_scb_vblock_mat_chassis.py',\n"
+            "], capture=True)\n"
+            "print(tests.stdout)\n"
+            "if tests.stderr:\n"
+            "    print(tests.stderr)\n"
+            "(EXAMPLE_OUTPUT_ROOT / f'pytest_{JAX_MODE}.txt').write_text(tests.stdout + ('\\n' + tests.stderr if tests.stderr else ''), encoding='utf-8')"
+        ),
+        nbf.v4.new_markdown_cell(
+            "## Benchmark Summary\n\n"
+            "Run the sparse surface benchmark and convert the printed metrics into a structured table."
+        ),
+        nbf.v4.new_code_cell(
+            "completed = run([PYTHON, 'benchmarks/benchmark_sparse_matrix_surface.py', '--n', '16', '--warmup', '1', '--runs', '2'], capture=True)\n"
+            "print(completed.stdout)\n"
+            "rows = []\n"
+            "for line in completed.stdout.splitlines():\n"
+            "    if ': ' not in line:\n"
+            "        continue\n"
+            "    key, value = line.split(': ', 1)\n"
+            "    if key in {'platform', 'jax'} or key.startswith('n'):\n"
+            "        continue\n"
+            "    try:\n"
+            "        rows.append({'metric': key, 'seconds': float(value)})\n"
+            "    except ValueError:\n"
+            "        pass\n"
+            "bench_df = pd.DataFrame(rows).sort_values('seconds')\n"
+            "bench_df.to_csv(EXAMPLE_OUTPUT_ROOT / f'sparse_benchmark_summary_{JAX_MODE}.csv', index=False)\n"
+            "display(bench_df.head(20))"
+        ),
+        nbf.v4.new_markdown_cell(
+            "## Plots\n\n"
+            "Plot the fastest sparse benchmark metrics as a compact diagnostic summary."
+        ),
+        nbf.v4.new_code_cell(
+            "top = bench_df.head(12).copy()\n"
+            "ax = top.plot(x='metric', y='seconds', kind='barh', figsize=(10, 5), color='#5b7c8d', legend=False, title='Sparse Benchmark Summary')\n"
+            "ax.set_xlabel('seconds')\n"
+            "plt.tight_layout()\n"
+            "plt.savefig(EXAMPLE_OUTPUT_ROOT / f'sparse_benchmark_summary_{JAX_MODE}.png', dpi=160, bbox_inches='tight')\n"
+            "plt.show()"
+        ),
+        nbf.v4.new_markdown_cell(
+            "## Optional Diagnostics\n\n"
+            "Detailed sparse solver/factor diagnostics remain owned by the sparse matrix modules and their dedicated benchmarks."
+        ),
+        nbf.v4.new_code_cell(
+            "summary_lines = [\n"
+            "    f'# Example Sparse Matrix Surface Summary ({JAX_MODE})',\n"
+            "    '',\n"
+            "    f'- backend: `{runtime_payload[\"platform\"]}`',\n"
+            "    f'- benchmark_rows: `{len(bench_df)}`',\n"
+            "    '',\n"
+            "    '## Fastest Metrics',\n"
+            "    '',\n"
+            "]\n"
+            "for row in top.to_dict(orient='records'):\n"
+            "    summary_lines.append(f\"- `{row['metric']}`: {row['seconds']:.6g}s\")\n"
+            "(EXAMPLE_OUTPUT_ROOT / f'summary_{JAX_MODE}.md').write_text('\\n'.join(summary_lines) + '\\n', encoding='utf-8')\n"
+            "display('\\n'.join(summary_lines[:12]))"
+        ),
+    ]
+    return cells
+
+
+def _matrix_free_operator_surface_notebook() -> list:
+    cells = [
+        nbf.v4.new_markdown_cell(
+            "# Example Matrix-Free Operator Surface\n\n"
+            "Canonical matrix-free/operator notebook for the Krylov and operator-plan tranche."
+        ),
+        *_common_setup_cells("example_matrix_free_operator_surface"),
+        nbf.v4.new_markdown_cell(
+            "## Direct Usage\n\n"
+            "Build a small dense operator plan and exercise matrix-free apply, solve, and logdet-facing paths."
+        ),
+        nbf.v4.new_code_cell(
+            "import jax.numpy as jnp\n"
+            "from arbplusjax import double_interval as di, jrb_mat\n"
+            "\n"
+            "diag = jnp.array([2.0, 3.0, 5.0, 7.0], dtype=jnp.float64)\n"
+            "a_mid = jnp.diag(diag)\n"
+            "a = di.interval(a_mid, a_mid)\n"
+            "x = di.interval(jnp.array([1.0, 0.5, -0.25, 0.75], dtype=jnp.float64), jnp.array([1.0, 0.5, -0.25, 0.75], dtype=jnp.float64))\n"
+            "plan = jrb_mat.jrb_mat_dense_operator_plan_prepare(a)\n"
+            "probes = jnp.stack([x, x], axis=0)\n"
+            "operator_results = {\n"
+            "    'apply': jrb_mat.jrb_mat_operator_plan_apply(plan, x),\n"
+            "    'solve': jrb_mat.jrb_mat_solve_action_point_jit(plan, x, symmetric=True),\n"
+            "    'logdet': jrb_mat.jrb_mat_logdet_slq_point(plan, probes, steps=6),\n"
+            "}\n"
+            "display(operator_results)"
+        ),
+        *_production_pattern_cells(
+            "Production Pattern",
+            "Matrix-free production use should prepare operator plans once, reuse preconditioners, and keep problem size and Krylov steps stable across service requests where possible. "
+            "This reduces recompiles and keeps diagnostics interpretable.",
+            "precond = jrb_mat.jrb_mat_jacobi_preconditioner_plan_prepare(plan)\n"
+            "solve_once = lambda rhs: jrb_mat.jrb_mat_solve_action_point_jit(plan, rhs, symmetric=True)\n"
+            "multi_shift_once = lambda rhs: jrb_mat.jrb_mat_multi_shift_solve_point_jit(plan, rhs, jnp.asarray([0.0, 0.5], dtype=jnp.float64), symmetric=True, preconditioner=precond)\n"
+            "matrix_free_service = {\n"
+            "    'solve_once': solve_once(x),\n"
+            "    'multi_shift_once': multi_shift_once(x),\n"
+            "}\n"
+            "display(matrix_free_service)",
+            "To benchmark another operator path, add a new metric block in `benchmark_matrix_free_krylov.py` with a stable metric name and then include that section in the notebook parsing."
+        ),
+        *_ad_pattern_cells(
+            "Matrix-free AD should be shown on operator-plan-first usage, since that is the production surface. "
+            "This section differentiates a solve-based scalar objective and plots primal and gradient behavior over a scale sweep.",
+            "import jax\n"
+            "base_diag = jnp.array([2.0, 3.0, 5.0, 7.0], dtype=jnp.float64)\n"
+            "def mf_loss(scale):\n"
+            "    a_mid = jnp.diag(scale * base_diag)\n"
+            "    a = di.interval(a_mid, a_mid)\n"
+            "    local_plan = jrb_mat.jrb_mat_dense_operator_plan_prepare(a)\n"
+            "    solved = jrb_mat.jrb_mat_solve_action_point_jit(local_plan, x, symmetric=True)\n"
+            "    return jnp.sum(di.midpoint(solved))\n"
+            "scale_sweep = jnp.linspace(0.75, 1.25, 24, dtype=jnp.float64)\n"
+            "primal_vals = jax.vmap(mf_loss)(scale_sweep)\n"
+            "grad_vals = jax.vmap(jax.grad(mf_loss))(scale_sweep)\n"
+            "ad_df = pd.DataFrame({'scale': np.asarray(scale_sweep), 'primal': np.asarray(primal_vals), 'grad': np.asarray(grad_vals)})\n"
+            "display(ad_df.head())\n"
+            "ax = ad_df.plot(x='scale', y=['primal', 'grad'], figsize=(8, 4), title='Matrix-Free AD Validation')\n"
+            "plt.tight_layout()\n"
+            "plt.savefig(EXAMPLE_OUTPUT_ROOT / f'ad_validation_{JAX_MODE}.png', dpi=160, bbox_inches='tight')\n"
+            "plt.show()"
+        ),
+        nbf.v4.new_markdown_cell(
+            "## Validation Summary\n\n"
+            "Run the matrix-free contract, chassis, and AD-facing tests."
+        ),
+        nbf.v4.new_code_cell(
+            "tests = run([\n"
+            "    PYTHON, '-m', 'pytest', '-q',\n"
+            "    'tests/test_jrb_mat_chassis.py',\n"
+            "    'tests/test_jcb_mat_chassis.py',\n"
+            "    'tests/test_jrb_mat_logdet_contracts.py',\n"
+            "    'tests/test_jrb_mat_selected_inverse.py',\n"
+            "    'tests/test_matrix_free_basic.py',\n"
+            "    'tests/test_matrix_stack_contracts.py',\n"
+            "    'tests/test_matfree_adjoints.py',\n"
+            "], capture=True)\n"
+            "print(tests.stdout)\n"
+            "if tests.stderr:\n"
+            "    print(tests.stderr)\n"
+            "(EXAMPLE_OUTPUT_ROOT / f'pytest_{JAX_MODE}.txt').write_text(tests.stdout + ('\\n' + tests.stderr if tests.stderr else ''), encoding='utf-8')"
+        ),
+        nbf.v4.new_markdown_cell(
+            "## Benchmark Summary\n\n"
+            "Run the matrix-free Krylov benchmark on a reduced section set and structure the emitted metrics."
+        ),
+        nbf.v4.new_code_cell(
+            "completed = run([\n"
+            "    PYTHON, 'benchmarks/benchmark_matrix_free_krylov.py',\n"
+            "    '--n-real', '12', '--n-complex', '8', '--steps-real', '6', '--steps-complex', '6', '--warmup', '1', '--runs', '2',\n"
+            "    '--sections', 'real,complex',\n"
+            "], capture=True)\n"
+            "print(completed.stdout)\n"
+            "rows = []\n"
+            "for line in completed.stdout.splitlines():\n"
+            "    if ': ' not in line:\n"
+            "        continue\n"
+            "    key, value = line.split(': ', 1)\n"
+            "    if key in {'warmup', 'runs', 'plan_precompile', 'sections'} or key.startswith('[matrix_free_krylov]'):\n"
+            "        continue\n"
+            "    try:\n"
+            "        rows.append({'metric': key, 'seconds': float(value)})\n"
+            "    except ValueError:\n"
+            "        pass\n"
+            "bench_df = pd.DataFrame(rows).sort_values('seconds')\n"
+            "bench_df.to_csv(EXAMPLE_OUTPUT_ROOT / f'matrix_free_benchmark_summary_{JAX_MODE}.csv', index=False)\n"
+            "display(bench_df.head(20))"
+        ),
+        nbf.v4.new_markdown_cell(
+            "## Diagnostics\n\n"
+            "Matrix-free diagnostics are part of the production surface, so keep a compact summary of compile and execution metrics."
+        ),
+        nbf.v4.new_code_cell(
+            "diag_rows = bench_df[bench_df['metric'].str.contains('compile|execute|cold|warm', regex=True, na=False)].head(20)\n"
+            "diag_rows.to_csv(EXAMPLE_OUTPUT_ROOT / f'matrix_free_diagnostics_{JAX_MODE}.csv', index=False)\n"
+            "display(diag_rows)"
+        ),
+        nbf.v4.new_code_cell(
+            "top = bench_df.head(12).copy()\n"
+            "ax = top.plot(x='metric', y='seconds', kind='barh', figsize=(10, 5), color='#8c5a3c', legend=False, title='Matrix-Free Benchmark Summary')\n"
+            "ax.set_xlabel('seconds')\n"
+            "plt.tight_layout()\n"
+            "plt.savefig(EXAMPLE_OUTPUT_ROOT / f'matrix_free_benchmark_summary_{JAX_MODE}.png', dpi=160, bbox_inches='tight')\n"
+            "plt.show()"
+        ),
+        nbf.v4.new_code_cell(
+            "summary_lines = [\n"
+            "    f'# Example Matrix-Free Operator Surface Summary ({JAX_MODE})',\n"
+            "    '',\n"
+            "    f'- backend: `{runtime_payload[\"platform\"]}`',\n"
+            "    f'- benchmark_rows: `{len(bench_df)}`',\n"
+            "    f'- diagnostics_rows: `{len(diag_rows)}`',\n"
+            "    '',\n"
+            "    '## Fastest Metrics',\n"
+            "    '',\n"
+            "]\n"
+            "for row in top.to_dict(orient='records'):\n"
+            "    summary_lines.append(f\"- `{row['metric']}`: {row['seconds']:.6g}s\")\n"
+            "(EXAMPLE_OUTPUT_ROOT / f'summary_{JAX_MODE}.md').write_text('\\n'.join(summary_lines) + '\\n', encoding='utf-8')\n"
+            "display('\\n'.join(summary_lines[:12]))"
+        ),
+    ]
+    return cells
+
+
+def _fft_nufft_surface_notebook() -> list:
+    cells = [
+        nbf.v4.new_markdown_cell(
+            "# Example FFT NUFFT Surface\n\n"
+            "Canonical transform notebook for DFT and NUFFT production surfaces."
+        ),
+        *_common_setup_cells("example_fft_nufft_surface"),
+        nbf.v4.new_markdown_cell(
+            "## Direct Usage\n\n"
+            "Exercise direct DFT and cached NUFFT paths on representative complex inputs."
+        ),
+        nbf.v4.new_code_cell(
+            "import jax.numpy as jnp\n"
+            "from arbplusjax import dft, nufft\n"
+            "\n"
+            "x = jnp.asarray([1.0 + 0.0j, 0.5 + 0.25j, -0.75 + 0.1j, 0.25 - 0.5j], dtype=jnp.complex128)\n"
+            "points = jnp.asarray([0.1, 0.25, 0.55, 0.8], dtype=jnp.float64)\n"
+            "values = jnp.asarray([1.0 + 0.1j, 0.5 - 0.2j, -0.25 + 0.4j, 0.75 + 0.0j], dtype=jnp.complex128)\n"
+            "plan = nufft.nufft_type1_cached_prepare(points, 8, method='lanczos')\n"
+            "transform_results = {\n"
+            "    'dft': dft.dft_jit(x),\n"
+            "    'nufft_type1': nufft.nufft_type1(points, values, 8, method='lanczos'),\n"
+            "    'nufft_type1_cached': nufft.nufft_type1_cached_apply_jit(plan, values),\n"
+            "}\n"
+            "display(transform_results)"
+        ),
+        *_production_pattern_cells(
+            "Production Pattern",
+            "Transform workloads should cache NUFFT plans and reuse them across repeated calls. "
+            "Keep method choice and output grid size fixed inside a service path; avoid switching between direct and Lanczos or changing mode counts request-to-request unless you expect recompiles.",
+            "cached_type1 = nufft.nufft_type1_cached_prepare(points, 8, method='lanczos')\n"
+            "transform_service = {\n"
+            "    'dft_repeat': dft.dft_jit(x),\n"
+            "    'nufft_cached_repeat': nufft.nufft_type1_cached_apply_jit(cached_type1, values),\n"
+            "}\n"
+            "display(transform_service)",
+            "To extend transform benchmarks, add the new DFT/NUFFT case in `benchmark_fft_nufft.py` with a stable `name` field so the CSV-style summary in this notebook remains compatible."
+        ),
+        *_ad_pattern_cells(
+            "Transform AD should be shown through a realistic loss on transform outputs rather than isolated scalar identities. "
+            "This section differentiates a NUFFT energy objective and plots primal versus gradient over a scale sweep.",
+            "import jax\n"
+            "base_values = values\n"
+            "def transform_loss(scale):\n"
+            "    scaled = scale * base_values\n"
+            "    out = nufft.nufft_type1_cached_apply_jit(plan, scaled)\n"
+            "    return jnp.real(jnp.vdot(out, out))\n"
+            "scale_sweep = jnp.linspace(0.5, 1.5, 24, dtype=jnp.float64)\n"
+            "primal_vals = jax.vmap(transform_loss)(scale_sweep)\n"
+            "grad_vals = jax.vmap(jax.grad(transform_loss))(scale_sweep)\n"
+            "ad_df = pd.DataFrame({'scale': np.asarray(scale_sweep), 'primal': np.asarray(primal_vals), 'grad': np.asarray(grad_vals)})\n"
+            "display(ad_df.head())\n"
+            "ax = ad_df.plot(x='scale', y=['primal', 'grad'], figsize=(8, 4), title='Transform AD Validation')\n"
+            "plt.tight_layout()\n"
+            "plt.savefig(EXAMPLE_OUTPUT_ROOT / f'ad_validation_{JAX_MODE}.png', dpi=160, bbox_inches='tight')\n"
+            "plt.show()"
+        ),
+        nbf.v4.new_markdown_cell(
+            "## Validation Summary\n\n"
+            "Run the DFT and NUFFT owner tests."
+        ),
+        nbf.v4.new_code_cell(
+            "tests = run([\n"
+            "    PYTHON, '-m', 'pytest', '-q',\n"
+            "    'tests/test_dft_chassis.py',\n"
+            "    'tests/test_nufft.py',\n"
+            "    'tests/test_dft_parity.py',\n"
+            "], capture=True)\n"
+            "print(tests.stdout)\n"
+            "if tests.stderr:\n"
+            "    print(tests.stderr)\n"
+            "(EXAMPLE_OUTPUT_ROOT / f'pytest_{JAX_MODE}.txt').write_text(tests.stdout + ('\\n' + tests.stderr if tests.stderr else ''), encoding='utf-8')"
+        ),
+        nbf.v4.new_markdown_cell(
+            "## Benchmark Summary\n\n"
+            "Run the transform benchmark and parse the emitted CSV."
+        ),
+        nbf.v4.new_code_cell(
+            "completed = run([PYTHON, 'benchmarks/benchmark_fft_nufft.py'], capture=True)\n"
+            "print(completed.stdout)\n"
+            "bench_df = pd.read_csv(io.StringIO(completed.stdout))\n"
+            "bench_df.to_csv(EXAMPLE_OUTPUT_ROOT / f'fft_nufft_benchmark_summary_{JAX_MODE}.csv', index=False)\n"
+            "display(bench_df.head(20))"
+        ),
+        nbf.v4.new_markdown_cell(
+            "## Plots\n\n"
+            "Plot the fastest transform cases."
+        ),
+        nbf.v4.new_code_cell(
+            "top = bench_df.sort_values('time_s').head(12)\n"
+            "ax = top.plot(x='name', y='time_s', kind='barh', figsize=(10, 5), color='#3f6b5b', legend=False, title='FFT/NUFFT Benchmark Summary')\n"
+            "ax.set_xlabel('time_s')\n"
+            "plt.tight_layout()\n"
+            "plt.savefig(EXAMPLE_OUTPUT_ROOT / f'fft_nufft_benchmark_summary_{JAX_MODE}.png', dpi=160, bbox_inches='tight')\n"
+            "plt.show()"
+        ),
+        nbf.v4.new_markdown_cell(
+            "## Optional Diagnostics\n\n"
+            "GPU-focused runs remain optional and depend on the installed JAX runtime."
+        ),
+        nbf.v4.new_code_cell(
+            "summary_lines = [\n"
+            "    f'# Example FFT NUFFT Surface Summary ({JAX_MODE})',\n"
+            "    '',\n"
+            "    f'- backend: `{runtime_payload[\"platform\"]}`',\n"
+            "    f'- benchmark_rows: `{len(bench_df)}`',\n"
+            "    '',\n"
+            "    '## Fastest Metrics',\n"
+            "    '',\n"
+            "]\n"
+            "for row in top.to_dict(orient='records'):\n"
+            "    summary_lines.append(f\"- `{row['name']}`: {row['time_s']:.6g}s\")\n"
+            "(EXAMPLE_OUTPUT_ROOT / f'summary_{JAX_MODE}.md').write_text('\\n'.join(summary_lines) + '\\n', encoding='utf-8')\n"
+            "display('\\n'.join(summary_lines[:12]))"
+        ),
+    ]
+    return cells
+
+
+def _gamma_family_surface_notebook() -> list:
+    cells = [
+        nbf.v4.new_markdown_cell(
+            "# Example Gamma Family Surface\n\n"
+            "Canonical gamma-family notebook covering incomplete gamma and related routed API metadata."
+        ),
+        *_common_setup_cells("example_gamma_family_surface"),
+        nbf.v4.new_markdown_cell(
+            "## Direct Usage\n\n"
+            "Exercise lower/upper incomplete gamma surfaces, complement identities, and diagnostics."
+        ),
+        nbf.v4.new_code_cell(
+            "import jax.numpy as jnp\n"
+            "from arbplusjax import api\n"
+            "\n"
+            "s = jnp.asarray([1.5, 2.5, 3.5], dtype=jnp.float64)\n"
+            "z = jnp.asarray([0.75, 1.25, 1.75], dtype=jnp.float64)\n"
+            "gamma_results = {\n"
+            "    'upper_point': api.eval_point_batch('incomplete_gamma_upper', s, z, method='quadrature', regularized=True),\n"
+            "    'lower_point': api.eval_point_batch('incomplete_gamma_lower', s, z, method='quadrature', regularized=True),\n"
+            "    'upper_basic': api.eval_interval_batch('incomplete_gamma_upper', s, z, mode='basic', method='quadrature', regularized=True, prec_bits=53),\n"
+            "    'metadata': api.get_public_function_metadata('incomplete_gamma_upper'),\n"
+            "}\n"
+            "value, diagnostics = api.incomplete_gamma_upper(jnp.float64(0.75), jnp.float64(0.05), mode='point', method='auto', return_diagnostics=True)\n"
+            "display(gamma_results)\n"
+            "display({'diagnostic_method': diagnostics.method, 'fallback_used': diagnostics.fallback_used, 'value': value})"
+        ),
+        *_production_pattern_cells(
+            "Production Pattern",
+            "Gamma-family service calls should bind the method and precision policy up front and then reuse the bound callable over stable batch shapes. "
+            "Diagnostics are optional but should be sampled in staging so fallback behavior is visible before deployment.",
+            "gamma_bound = api.bind_point_batch('incomplete_gamma_upper', dtype='float64', pad_to=8, method='quadrature', regularized=True)\n"
+            "gamma_interval_bound = api.bind_interval_batch('incomplete_gamma_upper', mode='basic', dtype='float64', pad_to=8, prec_bits=53, method='quadrature', regularized=True)\n"
+            "gamma_service = {\n"
+            "    'point_bound': gamma_bound(s, z),\n"
+            "    'interval_bound': gamma_interval_bound(s, z),\n"
+            "}\n"
+            "display(gamma_service)",
+            "To benchmark more gamma-family functions, extend the representative operation list in `benchmark_special_function_service_api.py` or add a dedicated comparison/benchmark entrypoint if the function has special reference needs."
+        ),
+        *_ad_pattern_cells(
+            "Special-function AD should be shown on the production-facing differentiated surface with explicit method policy. "
+            "This section validates incomplete-gamma derivatives over a sweep and plots primal versus gradient.",
+            "import jax\n"
+            "s_fixed = jnp.asarray(2.5, dtype=jnp.float64)\n"
+            "def gamma_loss(zv):\n"
+            "    return api.incomplete_gamma_upper(s_fixed, zv, mode='point', method='quadrature')\n"
+            "z_sweep = jnp.linspace(0.25, 2.0, 32, dtype=jnp.float64)\n"
+            "primal_vals = jax.vmap(gamma_loss)(z_sweep)\n"
+            "grad_vals = jax.vmap(jax.grad(gamma_loss))(z_sweep)\n"
+            "ad_df = pd.DataFrame({'z': np.asarray(z_sweep), 'primal': np.asarray(primal_vals), 'grad': np.asarray(grad_vals)})\n"
+            "display(ad_df.head())\n"
+            "ax = ad_df.plot(x='z', y=['primal', 'grad'], figsize=(8, 4), title='Gamma AD Validation')\n"
+            "plt.tight_layout()\n"
+            "plt.savefig(EXAMPLE_OUTPUT_ROOT / f'ad_validation_{JAX_MODE}.png', dpi=160, bbox_inches='tight')\n"
+            "plt.show()"
+        ),
+        nbf.v4.new_markdown_cell(
+            "## Validation Summary\n\n"
+            "Run the incomplete-gamma and hardening tests."
+        ),
+        nbf.v4.new_code_cell(
+            "tests = run([\n"
+            "    PYTHON, '-m', 'pytest', '-q',\n"
+            "    'tests/test_incomplete_gamma.py',\n"
+            "    'tests/test_gamma_hardening.py',\n"
+            "    'tests/test_api_metadata.py',\n"
+            "], capture=True)\n"
+            "print(tests.stdout)\n"
+            "if tests.stderr:\n"
+            "    print(tests.stderr)\n"
+            "(EXAMPLE_OUTPUT_ROOT / f'pytest_{JAX_MODE}.txt').write_text(tests.stdout + ('\\n' + tests.stderr if tests.stderr else ''), encoding='utf-8')"
+        ),
+        nbf.v4.new_markdown_cell(
+            "## Benchmark / Comparison Summary\n\n"
+            "Use the existing gamma comparison benchmarks when local reference libraries are available."
+        ),
+        nbf.v4.new_code_cell(
+            "compare_cmds = [\n"
+            "    [PYTHON, 'benchmarks/benchmark_gamma_compare.py', '--arb-repo', str(REPO_ROOT), '--iters', '128'],\n"
+            "    [PYTHON, 'benchmarks/benchmark_loggamma_compare.py', '--arb-repo', str(REPO_ROOT), '--iters', '128'],\n"
+            "]\n"
+            "rows = []\n"
+            "for cmd in compare_cmds:\n"
+            "    try:\n"
+            "        completed = run(cmd, capture=True)\n"
+            "        print(completed.stdout)\n"
+            "        rows.append({'script': Path(cmd[1]).name, 'status': 'ok', 'tail': completed.stdout[-2000:]})\n"
+            "    except subprocess.CalledProcessError as exc:\n"
+            "        print(exc.stdout)\n"
+            "        print(exc.stderr)\n"
+            "        rows.append({'script': Path(cmd[1]).name, 'status': 'failed_or_unavailable', 'tail': ((exc.stdout or '') + '\\n' + (exc.stderr or ''))[-2000:]})\n"
+            "bench_df = pd.DataFrame(rows)\n"
+            "bench_df.to_csv(EXAMPLE_OUTPUT_ROOT / f'gamma_compare_status_{JAX_MODE}.csv', index=False)\n"
+            "display(bench_df)"
+        ),
+        nbf.v4.new_markdown_cell(
+            "## Optional Diagnostics\n\n"
+            "This tranche relies on the function-returned diagnostics objects rather than a separate compile-diagnostics benchmark."
+        ),
+        nbf.v4.new_code_cell(
+            "summary_lines = [\n"
+            "    f'# Example Gamma Family Surface Summary ({JAX_MODE})',\n"
+            "    '',\n"
+            "    f'- backend: `{runtime_payload[\"platform\"]}`',\n"
+            "    f'- comparison_rows: `{len(bench_df)}`',\n"
+            "    f'- auto_method: `{diagnostics.method}`',\n"
+            "    '',\n"
+            "    '## Comparison Scripts',\n"
+            "    '',\n"
+            "]\n"
+            "for row in bench_df.to_dict(orient='records'):\n"
+            "    summary_lines.append(f\"- `{row['script']}`: `{row['status']}`\")\n"
+            "(EXAMPLE_OUTPUT_ROOT / f'summary_{JAX_MODE}.md').write_text('\\n'.join(summary_lines) + '\\n', encoding='utf-8')\n"
+            "display('\\n'.join(summary_lines[:12]))"
+        ),
+    ]
+    return cells
+
+
+def _barnes_double_gamma_surface_notebook() -> list:
+    cells = [
+        nbf.v4.new_markdown_cell(
+            "# Example Barnes Double Gamma Surface\n\n"
+            "Canonical Barnes and double-gamma notebook for the production special-function tranche."
+        ),
+        *_common_setup_cells("example_barnes_double_gamma_surface"),
+        nbf.v4.new_markdown_cell(
+            "## Direct Usage\n\n"
+            "Exercise Barnes G and double-gamma public surfaces, including diagnostics."
+        ),
+        nbf.v4.new_code_cell(
+            "import jax.numpy as jnp\n"
+            "from arbplusjax import api, double_gamma\n"
+            "\n"
+            "z = jnp.asarray(1.7 + 0.1j, dtype=jnp.complex128)\n"
+            "tau = jnp.float64(0.5)\n"
+            "barnes_results = {\n"
+            "    'barnesg': api.eval_point('acb_barnes_g', z),\n"
+            "    'double_gamma_legacy': double_gamma.bdg_barnesdoublegamma(z, tau, prec_bits=80),\n"
+            "    'double_gamma_ifj': double_gamma.ifj_barnesdoublegamma(z, tau, dps=60),\n"
+            "}\n"
+            "diagnostics = double_gamma.ifj_barnesdoublegamma_diagnostics(0.2 + 0.05j, 1.0, dps=60, max_m_cap=256)\n"
+            "display(barnes_results)\n"
+            "display({'m_base': diagnostics.m_base, 'm_used': diagnostics.m_used, 'n_shift': diagnostics.n_shift, 'm_capped': diagnostics.m_capped})"
+        ),
+        *_production_pattern_cells(
+            "Production Pattern",
+            "Barnes and double-gamma usage should keep the chosen implementation, precision, and diagnostics policy explicit. "
+            "These are not hot scalar helpers; production code should avoid switching precision knobs per call unless that is a deliberate fallback path.",
+            "barnes_service = {\n"
+            "    'legacy_fixed_prec': double_gamma.bdg_barnesdoublegamma(z, tau, prec_bits=80),\n"
+            "    'ifj_fixed_dps': double_gamma.ifj_barnesdoublegamma(z, tau, dps=60),\n"
+            "}\n"
+            "display(barnes_service)",
+            "To extend Barnes/double-gamma benchmarks, add new printed metrics in `benchmark_barnes_double_gamma.py` or split out a schema-backed service benchmark if repeated-call API usage becomes a primary concern."
+        ),
+        *_ad_pattern_cells(
+            "Barnes-family AD should be shown explicitly because these surfaces are more specialized and their derivative expectations are less obvious to users. "
+            "This section differentiates the IFJ log-form path over a real sweep and plots primal versus gradient.",
+            "import jax\n"
+            "def barnes_loss(xv):\n"
+            "    val = double_gamma.ifj_barnesdoublegamma(jnp.asarray(xv + 0.05j, dtype=jnp.complex128), 1.0, dps=60)\n"
+            "    return jnp.real(val)\n"
+            "x_sweep = jnp.linspace(0.8, 2.0, 24, dtype=jnp.float64)\n"
+            "primal_vals = jax.vmap(barnes_loss)(x_sweep)\n"
+            "grad_vals = jax.vmap(jax.grad(barnes_loss))(x_sweep)\n"
+            "ad_df = pd.DataFrame({'x': np.asarray(x_sweep), 'primal': np.asarray(primal_vals), 'grad': np.asarray(grad_vals)})\n"
+            "display(ad_df.head())\n"
+            "ax = ad_df.plot(x='x', y=['primal', 'grad'], figsize=(8, 4), title='Barnes AD Validation')\n"
+            "plt.tight_layout()\n"
+            "plt.savefig(EXAMPLE_OUTPUT_ROOT / f'ad_validation_{JAX_MODE}.png', dpi=160, bbox_inches='tight')\n"
+            "plt.show()"
+        ),
+        nbf.v4.new_markdown_cell(
+            "## Validation Summary\n\n"
+            "Run the Barnes/double-gamma contract tests."
+        ),
+        nbf.v4.new_code_cell(
+            "tests = run([\n"
+            "    PYTHON, '-m', 'pytest', '-q',\n"
+            "    'tests/test_barnes_tier1.py',\n"
+            "    'tests/test_double_gamma_contracts.py',\n"
+            "    'tests/test_shahen_double_gamma.py',\n"
+            "], capture=True)\n"
+            "print(tests.stdout)\n"
+            "if tests.stderr:\n"
+            "    print(tests.stderr)\n"
+            "(EXAMPLE_OUTPUT_ROOT / f'pytest_{JAX_MODE}.txt').write_text(tests.stdout + ('\\n' + tests.stderr if tests.stderr else ''), encoding='utf-8')"
+        ),
+        nbf.v4.new_markdown_cell(
+            "## Benchmark Summary\n\n"
+            "Run the Barnes/double-gamma benchmark and parse the key-value output."
+        ),
+        nbf.v4.new_code_cell(
+            "completed = run([PYTHON, 'benchmarks/benchmark_barnes_double_gamma.py'], capture=True)\n"
+            "print(completed.stdout)\n"
+            "rows = []\n"
+            "for line in completed.stdout.splitlines():\n"
+            "    if ': ' not in line:\n"
+            "        continue\n"
+            "    key, value = line.split(': ', 1)\n"
+            "    try:\n"
+            "        rows.append({'metric': key, 'value': float(value)})\n"
+            "    except ValueError:\n"
+            "        rows.append({'metric': key, 'value': value})\n"
+            "bench_df = pd.DataFrame(rows)\n"
+            "bench_df.to_csv(EXAMPLE_OUTPUT_ROOT / f'barnes_double_gamma_summary_{JAX_MODE}.csv', index=False)\n"
+            "display(bench_df)"
+        ),
+        nbf.v4.new_markdown_cell(
+            "## Optional Diagnostics\n\n"
+            "The IFJ diagnostics object is the primary hardening signal for this notebook."
+        ),
+        nbf.v4.new_code_cell(
+            "summary_lines = [\n"
+            "    f'# Example Barnes Double Gamma Surface Summary ({JAX_MODE})',\n"
+            "    '',\n"
+            "    f'- backend: `{runtime_payload[\"platform\"]}`',\n"
+            "    f'- benchmark_rows: `{len(bench_df)}`',\n"
+            "    f'- diagnostics_m_used: `{diagnostics.m_used}`',\n"
+            "    '',\n"
+            "    '## Key Metrics',\n"
+            "    '',\n"
+            "]\n"
+            "for row in bench_df.to_dict(orient='records')[:12]:\n"
+            "    summary_lines.append(f\"- `{row['metric']}`: `{row['value']}`\")\n"
+            "(EXAMPLE_OUTPUT_ROOT / f'summary_{JAX_MODE}.md').write_text('\\n'.join(summary_lines) + '\\n', encoding='utf-8')\n"
+            "display('\\n'.join(summary_lines[:14]))"
+        ),
+    ]
+    return cells
+
+
 def main() -> None:
     notebooks = {
         "example_core_scalar_surface.ipynb": _core_scalar_notebook(),
         "example_api_surface.ipynb": _api_surface_notebook(),
+        "example_sparse_matrix_surface.ipynb": _sparse_matrix_surface_notebook(),
+        "example_matrix_free_operator_surface.ipynb": _matrix_free_operator_surface_notebook(),
+        "example_fft_nufft_surface.ipynb": _fft_nufft_surface_notebook(),
+        "example_gamma_family_surface.ipynb": _gamma_family_surface_notebook(),
+        "example_barnes_double_gamma_surface.ipynb": _barnes_double_gamma_surface_notebook(),
     }
     for name, cells in notebooks.items():
         _write_notebook(EXAMPLES_DIR / name, cells)

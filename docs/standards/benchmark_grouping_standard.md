@@ -140,6 +140,7 @@ when possible:
 
 - `benchmark_<family>.py`
 - `benchmark_<family>_surface.py`
+- `benchmark_<family>_service_api.py`
 - `benchmark_<family>_diagnostics.py`
 - `benchmark_<family>_backends.py`
 - `compare_<family>.py`

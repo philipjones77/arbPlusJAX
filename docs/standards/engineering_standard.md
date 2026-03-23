@@ -11,11 +11,23 @@ This standard applies to canonical Arb-like functions, alternative implementatio
 - Public functions should expose the expected mode surface for their family (`point`, `basic`, and where appropriate `adaptive` / `rigorous`).
 - Functions should obey the repo dtype rules. Family-specific algorithms do not get a separate dtype policy.
 - Families should share batching/padding/dispatch infrastructure while keeping separate numerical kernels for `point`, `basic`, and tighter interval modes. Point paths should not be forced through interval/box kernels just to reuse plumbing.
+- CPU is the current required execution and validation tranche in this repo state.
+- Public surfaces, examples, tests, and benchmarks should still be written so they remain GPU-compatible unless a limitation is documented explicitly in metadata, diagnostics, or status reports.
+- Validation ownership should be explicit about the current execution slice: CPU is required here, while GPU portability is a contract that should be preserved and surfaced through runtime parameterization rather than assumed.
 - Runtime implementations should stay on the public JAX surface defined in [jax_surface_policy_standard.md](/home/phili/projects/arbplusJAX/docs/standards/jax_surface_policy_standard.md); SciPy-derived implementation paths are for benchmark/reference use only.
 - Batch execution should stay shape-stable where possible, and padding-friendly where practical.
 - Unnecessary Python-side value extraction and control flow should be removed from performance-sensitive paths.
 - Automatic differentiation compatibility is a target, but current status must be reported honestly per implementation family.
 - Tightening and hardening status should be tracked separately from provenance and naming.
+- Production-facing families should expose metadata and diagnostics that make method selection, execution strategy, parameterization, and current hardening level inspectable from the public surface.
+
+## Production calling contract
+
+- Canonical example notebooks should teach the intended production calling style for their family.
+- Repeated-call surfaces should prefer binder reuse, cached prepare/apply flows, or both where relevant.
+- Variable-size service traffic should use stable dtype/mode controls and optional padding or chunking when that materially reduces recompiles.
+- Benchmarks should separate cold, warm, and recompile behavior when JAX compilation cost is part of the practical calling contract.
+- Canonical tests, benchmarks, and examples should expose runtime selection through explicit `float32`/`float64` and CPU/GPU parameterization even when only one execution slice is exercised in the current environment.
 
 ## Status interpretation
 

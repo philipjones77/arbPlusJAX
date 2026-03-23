@@ -115,6 +115,30 @@ def test_incomplete_gamma_metadata_exposes_method_parameters_and_execution_strat
     assert metadata.execution_strategies == ("direct",)
 
 
+def test_matrix_and_sparse_metadata_expose_execution_strategies_for_production_routing():
+    dense = api.get_public_function_metadata("arb_mat_matvec_cached_apply")
+    sparse = api.get_public_function_metadata("srb_mat_matvec")
+    operator = api.get_public_function_metadata("jrb_mat_operator_plan_apply")
+
+    assert "dense" in dense.execution_strategies
+    assert "cached" in dense.execution_strategies
+    assert "matvec" in dense.execution_strategies
+    assert "sparse" in sparse.execution_strategies
+    assert "matvec" in sparse.execution_strategies
+    assert "operator_plan" in operator.execution_strategies
+
+
+def test_special_metadata_exposes_parameterized_production_surface():
+    bessel = api.get_public_function_metadata("incomplete_bessel_k")
+    gamma = api.get_public_function_metadata("incomplete_gamma_upper")
+
+    assert bessel.default_method == "quadrature"
+    assert "samples_per_panel" in gamma.method_parameter_names
+    assert "max_panels" in gamma.method_parameter_names
+    assert "regularized" in gamma.method_parameter_names
+    assert "high_precision_refine" in bessel.method_tags
+
+
 def test_evaluate_routes_to_alternative_implementation_by_name():
     x = 0.5
     y = 2.0

@@ -49,6 +49,8 @@ The executable source of truth is:
 - `benchmark_arb_mat.py`
 - `benchmark_arb_poly.py`
 - `benchmark_arf.py`
+- `benchmark_core_scalar_batch_padding.py`
+- `benchmark_core_scalar_service_api.py`
 - `benchmark_barnes_double_gamma.py`
 - `benchmark_bernoulli.py`
 - `benchmark_block_sparse_matrix_surface.py`
@@ -64,8 +66,10 @@ The executable source of truth is:
 - `benchmark_hypgeom_extra.py`
 - `benchmark_mag.py`
 - `benchmark_matrix_suite.py`
+- `benchmark_matrix_service_api.py`
 - `benchmark_partitions.py`
 - `benchmark_sparse_matrix_surface.py`
+- `benchmark_special_function_service_api.py`
 - `benchmark_vblock_sparse_matrix_surface.py`
 
 ### Compile
@@ -127,6 +131,8 @@ The executable source of truth is:
 - `benchmark_arb_fpwrap.py`
 - `benchmark_arb_poly.py`
 - `benchmark_arf.py`
+- `benchmark_core_scalar_batch_padding.py`
+- `benchmark_core_scalar_service_api.py`
 - `benchmark_fmpr.py`
 - `benchmark_fmpz_extras.py`
 - `benchmark_fmpzi.py`
@@ -161,6 +167,7 @@ The executable source of truth is:
 - `benchmark_hypgeom.py`
 - `benchmark_hypgeom_extra.py`
 - `benchmark_loggamma_compare.py`
+- `benchmark_special_function_service_api.py`
 - `compare_acb_dirichlet.py`
 - `compare_acb_elliptic.py`
 - `compare_acb_modular.py`
@@ -194,6 +201,7 @@ The executable source of truth is:
 - `benchmark_arb_mat.py`
 - `benchmark_bool_mat.py`
 - `benchmark_matrix_stack_diagnostics.py`
+- `benchmark_matrix_service_api.py`
 - `benchmark_matrix_suite.py`
 - `compare_acb_mat.py`
 - `compare_arb_mat.py`
