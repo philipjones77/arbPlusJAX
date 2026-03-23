@@ -87,6 +87,7 @@ Consolidation note:
 ## Detailed Standards
 - [benchmark_grouping_standard.md](/docs/standards/benchmark_grouping_standard.md)
 - [benchmark_validation_policy_standard.md](/docs/standards/benchmark_validation_policy_standard.md)
+- [configuration_standard.md](/docs/standards/configuration_standard.md)
 - [contract_and_provider_boundary_standard.md](/docs/standards/contract_and_provider_boundary_standard.md)
 - [core_scalar_service_calling_standard.md](/docs/standards/core_scalar_service_calling_standard.md)
 - [engineering_standard.md](/docs/standards/engineering_standard.md)

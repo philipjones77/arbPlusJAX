@@ -20,6 +20,8 @@ arbPlusJAX is a JAX-first implementation of key Arb functionality with four exec
 ## Core Layout
 
 - `src/arbplusjax/`: primary implementation modules and wrappers.
+- `configs/`: canonical checked-in repo-level configuration and profile
+  templates.
 - `src/arbplusjax/hypgeom.py`: special functions, series helpers, and interval logic.
 - `src/arbplusjax/*_wrappers.py`: mode dispatch (`basic|adaptive|rigorous`) for kernels.
 - `src/arbplusjax/ball_wrappers.py`: rigorous ball semantics using Arb-style outward rounding.
@@ -69,6 +71,8 @@ Mode dispatch is centralized in `wrappers_common.py` and used by `*_wrappers.py`
 
 - `experiments/benchmarks/outputs/`: benchmark-side generated artifact root.
 - `benchmarks/results/`: benchmark logs and sweep run root.
+- `configs/`: reviewed benchmark, harness, and runtime configuration profiles
+  when the repo uses checked-in config definitions.
 - `tools/`: scripts for comparisons and audits.
 - `benchmarks/bench_harness.py`: uses `arbplusjax.api` to resolve interval/point modes for consistency.
 

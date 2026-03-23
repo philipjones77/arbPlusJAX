@@ -17,6 +17,7 @@ It owns:
 - the role and placement of
   `docs/governance/documentation_governance.md`
 - what is allowed at the repo root as stable top-level governance material
+- the role and placement of repo-level checked-in configuration under `configs/`
 - the intended purpose of `AGENTS.md` when present
 
 This is the canonical repo-level communication and placement standard.
@@ -99,6 +100,7 @@ Allowed stable repo-root structural directories include:
 - `src/`
 - `tests/`
 - `benchmarks/`
+- `configs/`
 - `examples/`
 - `experiments/`
 - `tools/`
@@ -109,6 +111,23 @@ Allowed stable repo-root structural directories include:
 
 Do not casually add new repo-root prose files when the content actually belongs
 under `docs/`.
+
+## `configs/` Rule
+
+If the repository uses checked-in repo-level configuration, the canonical home
+is:
+
+- `configs/`
+
+`configs/` should contain reviewed configuration definitions and templates, not
+user-local scratch settings.
+
+Each committed config should make its purpose and owning execution surface
+clear.
+
+See
+[configuration_standard.md](/docs/standards/configuration_standard.md)
+for the detailed configuration policy.
 
 ## License And Notice Rule
 

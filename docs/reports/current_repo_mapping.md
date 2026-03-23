@@ -8,6 +8,7 @@ This report records the current high-level repository and documentation-tree map
 
 - `_bundles/`
 - `benchmarks/`
+- `configs/`
 - `contracts/`
 - `docs/`
 - `examples/`

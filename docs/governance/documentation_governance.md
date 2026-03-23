@@ -74,11 +74,14 @@ Preferred top-level structure:
 - `experiments/`: exploratory work, with each subfolder representing a separate experiment
 - `tools/`: repository tooling and maintenance scripts
 - `benchmarks/`: benchmark scripts and harness integration
+- `configs/`: checked-in repo-level configuration definitions and profile
+  templates
 - `benchmarks/results/`: canonical benchmark run artifact directory
 - `outputs/`: canonical top-level root whose named subfolders contain retained generated artifacts and other permanent run outputs
 - `data/`: local or shared datasets, including large generated inputs that do not belong under source or docs trees
 - `experiments/benchmarks/outputs/`: experiment-local benchmark diagnostics and scratch artifact directory
-- additional standard folders such as `configs/`, `stuff/`, and `papers/` may be added when the repository starts using them directly
+- additional standard folders such as `stuff/` and `papers/` may be added when
+  the repository starts using them directly
 
 Artifact storage rule:
 

@@ -9,6 +9,7 @@ arbPlusJAX is the active hardened JAX numerical-kernel workspace. The repository
 - `src/`
 - `tests/`
 - `benchmarks/`
+- `configs/`
 - `tools/`
 - `docs/`
 - `contracts/`

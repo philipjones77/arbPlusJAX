@@ -8,6 +8,7 @@ It is not the official Arb project.
 - `src/arbplusjax/`: primary runtime source tree
 - `tests/`: correctness and contract test surface
 - `benchmarks/`: benchmark and comparison surface
+- `configs/`: checked-in repo-level configuration and profile definitions
 - `examples/`: canonical demonstration notebooks
 - `experiments/`: larger exploratory work and retained experiment outputs
 - `tools/`: harnesses, generators, and repo utilities

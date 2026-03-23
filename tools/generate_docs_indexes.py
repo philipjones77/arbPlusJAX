@@ -64,6 +64,7 @@ def render_project_overview() -> str:
         "src",
         "tests",
         "benchmarks",
+        "configs",
         "tools",
         "docs",
         "contracts",
