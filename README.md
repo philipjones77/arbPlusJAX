@@ -26,12 +26,6 @@ Tests, benchmarks, and notebooks are expected to run against the source tree in 
 ## Documentation Entry Points
 
 - standards: [README.md](docs/standards/README.md)
-  The standards set is now organized around six concept buckets:
-  runtime/numerics, validation/benchmarks/examples, portability/layout,
-  contracts/provider boundaries, generated documentation outputs, and
-  theory/notation/naming semantics. API calling policy, binder reuse,
-  diagnostics, and “keep diagnostics out of the required numeric hot path”
-  live under the runtime/contracts side of that model.
 - reports: [README.md](docs/reports/README.md)
 - status: [README.md](docs/status/README.md)
 - practical run guidance: [README.md](docs/practical/README.md)
