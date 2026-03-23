@@ -61,6 +61,10 @@ Status: `in_progress`
     now emits the shared benchmark-report JSON schema instead of only printing
     timings
   - Windows, Linux, and Colab run instructions are documented
+  - bounded CPU validation profiles were re-run through
+    [run_test_harness.py](/tools/run_test_harness.py) for `matrix`,
+    `special`, and `bench-smoke`; see
+    [cpu_validation_profiles.md](/docs/reports/cpu_validation_profiles.md)
 - `in_progress`
   - unify long-run benchmark scheduling and report collection behind a single
     environment manifest and execution policy
