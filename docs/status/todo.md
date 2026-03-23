@@ -224,12 +224,12 @@ Status: `in_progress`
     coverage
   - strengthen symbolic and numeric sparse direct-factorization quality beyond
     the current point-mode LU/QR layer
-  - add a direct-owner test for `sparse_common`
   - remove hidden assumptions in variable-block direct factorizations that
     require square row/column partitions
   - continue normalizing the block-sparse and variable-block benchmark/report
     layer so every retained matrix sparse surface follows the shared schema
     and pytest-owned runtime-report contract
+  - direct owner tests now exist for `sparse_common`
 - `planned`
   - add interval/box block-sparse and variable-block sparse modes
   - add more benchmark coverage that separates storage-format overhead from
@@ -261,7 +261,7 @@ Status: `in_progress`
 ### Core Operator Infrastructure
 
 - `in_progress`
-  - add a direct owner test for `iterative_solvers`
+  - direct owner tests now exist for `iterative_solvers`
   - deepen the new `basic` semantics for operator-first surfaces
   - harden flexible-preconditioner policy beyond the current shared
     preconditioned `minres` path
@@ -516,7 +516,7 @@ Status: `in_progress`
   - direct owner tests now exist for `public_metadata` and
     `capability_registry`
 - `in_progress`
-  - add direct owner tests for `validation` and `soft_types`
+  - direct owner tests now exist for `validation` and `soft_types`
   - keep stable versus experimental API status explicit in metadata and status
     reports
   - keep naming cleanup moving toward canonical mathematical names with
@@ -534,27 +534,29 @@ Status: `in_progress`
 Status: `in_progress`
 
 Highest priority:
-- add
+- landed
   [test_sparse_common_contracts.py](/tests/test_sparse_common_contracts.py)
-- add
+- landed
   [test_iterative_solvers_contracts.py](/tests/test_iterative_solvers_contracts.py)
-- add
+- landed
   [test_soft_types_contracts.py](/tests/test_soft_types_contracts.py)
-- add
+- landed
   [test_validation_contracts.py](/tests/test_validation_contracts.py)
 
 Next priority:
-- add
+- landed
   [test_krylov_solvers_contracts.py](/tests/test_krylov_solvers_contracts.py)
-- add
+- landed
   [test_transform_common_contracts.py](/tests/test_transform_common_contracts.py)
 
 Execution order:
-1. Add the four highest-priority direct-owner tests above.
-2. Re-run the CPU chassis and profile suite.
-3. Expand AD and compile-behavior assertions where those tests expose weak
+1. Re-run the CPU chassis and profile suite after the newly landed direct-owner
+   tests.
+2. Expand AD and compile-behavior assertions where those tests expose weak
    spots.
-4. Add the second-priority shared-infrastructure tests.
+3. Identify the next shared-infrastructure tranche that still lacks a direct
+   owner.
+4. Add that next tranche of focused tests.
 5. Re-run the full CPU harness, then opt-in parity and benchmark slices.
 
 ## Missing C implementation snapshot

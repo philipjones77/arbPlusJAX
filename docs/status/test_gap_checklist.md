@@ -126,6 +126,7 @@ clearer if each eventually had a more explicit owner.
 - `block_sparse_core`
 - `sparse_core`
 - `iterative_solvers`
+  Directly covered by `tests/test_iterative_solvers_contracts.py`.
 - `krylov_solvers`
 - `transform_common`
 - `kernel_helpers`
@@ -135,7 +136,7 @@ clearer if each eventually had a more explicit owner.
 - `sampling_helpers`
   Covered indirectly through stochastic/logdet paths.
 - `sparse_common`
-  Covered indirectly through sparse matrix chassis tests.
+  Directly covered by `tests/test_sparse_common_contracts.py`.
 
 ### Metadata, support, and validation
 
@@ -146,9 +147,9 @@ clearer if each eventually had a more explicit owner.
 - `precision`
   Covered indirectly through `jax_precision` tests and package import behavior.
 - `soft_types`
-  Covered indirectly through `soft_ops`.
+  Directly covered by `tests/test_soft_types_contracts.py`.
 - `validation`
-  Covered indirectly through runtime/API correctness checks.
+  Directly covered by `tests/test_validation_contracts.py`.
 
 ## 3. Modules That Still Need Explicit Test Owners
 
@@ -157,44 +158,32 @@ focused test file instead of relying on incidental coverage.
 
 ### Highest priority
 
-- `sparse_common`
-  Add a direct sparse-common contract file for shared sparse dataclasses,
-  batching, and canonicalization helpers.
-- `iterative_solvers`
-  Add a direct iterative-solver contract file for the non-Krylov wrapper layer
-  used by sparse and matrix-free surfaces.
-- `soft_types`
-  Add a direct test owner for the lightweight dtype/container typing helpers.
-- `validation`
-  Add a direct test owner for shared validation helpers rather than relying only
-  on runtime/API call sites.
+- no remaining highest-priority direct-owner gaps in this tranche
 
 ### Next priority
 
-- `sparse_common`
-- `iterative_solvers`
-- `soft_types`
-- `validation`
+- identify the next uncovered shared-infrastructure modules after the current
+  CPU owner sweep
 
 ## 4. Test Files To Add
 
-The first concrete additions should be:
+The latest concrete additions are:
 
 - `tests/test_sparse_common_contracts.py`
 - `tests/test_iterative_solvers_contracts.py`
 - `tests/test_soft_types_contracts.py`
 - `tests/test_validation_contracts.py`
 
-Then, if that is green:
-- `tests/test_sparse_common_contracts.py`
-- `tests/test_iterative_solvers_contracts.py`
-- `tests/test_soft_types_contracts.py`
-- `tests/test_validation_contracts.py`
+Next, identify the next shared helper tranche that still lacks direct-owner
+coverage.
 
 ## 5. Execution Order
 
-1. Add direct-owner tests for the four highest-priority modules above.
-2. Re-run the CPU chassis/profile suite.
-3. Expand AD and compile-behavior assertions where those new tests expose weak spots.
-4. Add the second-priority shared-infra test files.
+1. Re-run the CPU chassis/profile suite with the new direct-owner coverage in
+   place.
+2. Expand AD and compile-behavior assertions where these tests expose weak
+   spots.
+3. Identify the next shared-infrastructure modules that still lack a direct
+   owner.
+4. Add that next tranche of focused tests.
 5. Re-run the full CPU harness, then opt-in parity and benchmark slices.
