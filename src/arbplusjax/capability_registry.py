@@ -39,6 +39,16 @@ DOWNSTREAM_KERNELS: dict[str, dict[str, object]] = {
         "family": "bessel",
         "notes": "Supported downstream incomplete-Bessel-K kernel.",
     },
+    "barnesdoublegamma": {
+        "public_name": "ifj_barnesdoublegamma",
+        "family": "barnes",
+        "notes": "Supported downstream Barnes double-gamma kernel through the IFJ-compatible public provider surface.",
+    },
+    "log_barnesdoublegamma": {
+        "public_name": "ifj_log_barnesdoublegamma",
+        "family": "barnes",
+        "notes": "Supported downstream log Barnes double-gamma kernel through the IFJ-compatible public provider surface.",
+    },
 }
 
 

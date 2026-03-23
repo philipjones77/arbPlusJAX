@@ -40,6 +40,7 @@ def test_capability_registry_downstream_aliases_resolve_to_public_capabilities()
 def test_capability_lookup_supports_function_and_alias_queries():
     function_row = cr.lookup_capability("arb_mat_matvec_cached_apply")
     alias_row = cr.lookup_capability("loggamma")
+    barnes_row = cr.lookup_capability("barnesdoublegamma")
 
     assert function_row["name"] == "arb_mat_matvec_cached_apply"
     assert function_row["family"] == "matrix"
@@ -51,6 +52,11 @@ def test_capability_lookup_supports_function_and_alias_queries():
     assert alias_row["capability"]["family"] == "gamma"
     assert alias_row["complex_capability"]["family"] == "gamma"
 
+    assert barnes_row["alias"] == "barnesdoublegamma"
+    assert barnes_row["public_name"] == "ifj_barnesdoublegamma"
+    assert barnes_row["capability"]["family"] == "barnes"
+    assert barnes_row["capability"]["stability"] == "stable"
+
 
 def test_capability_lookup_prefers_downstream_alias_rows_when_names_overlap():
     row = cr.lookup_capability("incomplete_bessel_k")
@@ -58,6 +64,16 @@ def test_capability_lookup_prefers_downstream_alias_rows_when_names_overlap():
     assert row["alias"] == "incomplete_bessel_k"
     assert row["public_name"] == "incomplete_bessel_k"
     assert row["capability"]["name"] == "incomplete_bessel_k"
+
+
+def test_capability_registry_includes_barnes_provider_grade_aliases():
+    registry = cr.build_capability_registry()
+    downstream = registry["downstream_kernels"]
+
+    assert downstream["barnesdoublegamma"]["public_name"] == "ifj_barnesdoublegamma"
+    assert downstream["log_barnesdoublegamma"]["public_name"] == "ifj_log_barnesdoublegamma"
+    assert downstream["barnesdoublegamma"]["capability"]["derivative_status"]
+    assert "barnesdoublegamma" in downstream["barnesdoublegamma"]["capability"]["downstream_aliases"]
 
 
 def test_capability_registry_json_render_round_trips_to_current_schema():

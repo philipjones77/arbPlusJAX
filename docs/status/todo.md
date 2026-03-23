@@ -112,7 +112,9 @@ Status: `in_progress`
   - keep cross-repo integration thin: downstream libraries should integrate
     through adapter/provider layers on their side rather than by restructuring
     arbPlusJAX around a specific consumer
-  - make Barnes/double-gamma provider-grade first
+  - Barnes/double-gamma now has explicit downstream capability aliases through
+    the IFJ-compatible public surface; continue tightening diagnostics and
+    narrower provider wording around that capability
   - make fragile-regime promotion hooks provider-grade
   - make incomplete-Bessel provider-grade next
 - `planned`
