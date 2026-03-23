@@ -8,6 +8,7 @@ ensure_src_on_path(__file__)
 import argparse
 import platform
 import time
+from pathlib import Path
 
 import jax
 import jax.numpy as jnp
@@ -16,6 +17,11 @@ from arbplusjax import acb_core
 from arbplusjax import acb_mat
 from arbplusjax import arb_mat
 from arbplusjax import double_interval as di
+from benchmarks.schema import BenchmarkMeasurement
+from benchmarks.schema import BenchmarkRecord
+from benchmarks.schema import BenchmarkReport
+from benchmarks.schema import write_benchmark_report
+from tools.runtime_manifest import collect_runtime_manifest
 
 
 def _interval_matrix_from_point(a: jax.Array) -> jax.Array:
@@ -40,41 +46,41 @@ def _box_vector_from_point(x: jax.Array) -> jax.Array:
     )
 
 
-def _arb_dense_case(n: int) -> tuple[jax.Array, jax.Array, jax.Array]:
-    a_mid = jnp.eye(n, dtype=jnp.float64) * 3.0 + jnp.triu(jnp.ones((n, n), dtype=jnp.float64), k=1) * 0.1
-    x_mid = jnp.reshape(jnp.linspace(0.5, 1.5, n * 2, dtype=jnp.float64), (n, 2))
-    v_mid = jnp.linspace(-0.25, 0.75, n, dtype=jnp.float64)
+def _arb_dense_case(n: int, real_dtype) -> tuple[jax.Array, jax.Array, jax.Array]:
+    a_mid = jnp.eye(n, dtype=real_dtype) * 3.0 + jnp.triu(jnp.ones((n, n), dtype=real_dtype), k=1) * 0.1
+    x_mid = jnp.reshape(jnp.linspace(0.5, 1.5, n * 2, dtype=real_dtype), (n, 2))
+    v_mid = jnp.linspace(-0.25, 0.75, n, dtype=real_dtype)
     return _interval_matrix_from_point(a_mid), _interval_matrix_from_point(x_mid), _interval_vector_from_point(v_mid)
 
 
-def _arb_spd_case(n: int) -> tuple[jax.Array, jax.Array]:
-    base = jnp.reshape(jnp.linspace(0.2, 1.2, n * n, dtype=jnp.float64), (n, n))
-    mid = base.T @ base + jnp.eye(n, dtype=jnp.float64) * (n + 1.0)
-    rhs = jnp.reshape(jnp.linspace(-0.5, 0.75, n * 2, dtype=jnp.float64), (n, 2))
+def _arb_spd_case(n: int, real_dtype) -> tuple[jax.Array, jax.Array]:
+    base = jnp.reshape(jnp.linspace(0.2, 1.2, n * n, dtype=real_dtype), (n, n))
+    mid = base.T @ base + jnp.eye(n, dtype=real_dtype) * (n + 1.0)
+    rhs = jnp.reshape(jnp.linspace(-0.5, 0.75, n * 2, dtype=real_dtype), (n, 2))
     return _interval_matrix_from_point(mid), _interval_matrix_from_point(rhs)
 
 
-def _acb_dense_case(n: int) -> tuple[jax.Array, jax.Array, jax.Array]:
-    real = jnp.eye(n, dtype=jnp.float64) * 2.5 + jnp.triu(jnp.ones((n, n), dtype=jnp.float64), k=1) * 0.1
-    imag = jnp.tril(jnp.ones((n, n), dtype=jnp.float64), k=-1) * 0.05
+def _acb_dense_case(n: int, real_dtype, complex_dtype) -> tuple[jax.Array, jax.Array, jax.Array]:
+    real = jnp.eye(n, dtype=real_dtype) * 2.5 + jnp.triu(jnp.ones((n, n), dtype=real_dtype), k=1) * 0.1
+    imag = jnp.tril(jnp.ones((n, n), dtype=real_dtype), k=-1) * 0.05
     a_mid = real + 1j * imag
     x_mid = jnp.reshape(
-        jnp.linspace(0.5, 1.5, n * 2, dtype=jnp.float64) + 1j * jnp.linspace(-0.2, 0.2, n * 2, dtype=jnp.float64),
+        jnp.linspace(0.5, 1.5, n * 2, dtype=real_dtype) + 1j * jnp.linspace(-0.2, 0.2, n * 2, dtype=real_dtype),
         (n, 2),
-    )
-    v_mid = jnp.linspace(-0.25, 0.75, n, dtype=jnp.float64) + 1j * jnp.linspace(0.1, 0.3, n, dtype=jnp.float64)
+    ).astype(complex_dtype)
+    v_mid = (jnp.linspace(-0.25, 0.75, n, dtype=real_dtype) + 1j * jnp.linspace(0.1, 0.3, n, dtype=real_dtype)).astype(complex_dtype)
     return _box_matrix_from_point(a_mid), _box_matrix_from_point(x_mid), _box_vector_from_point(v_mid)
 
 
-def _acb_hpd_case(n: int) -> tuple[jax.Array, jax.Array]:
-    real = jnp.reshape(jnp.linspace(0.2, 1.1, n * n, dtype=jnp.float64), (n, n))
-    imag = jnp.reshape(jnp.linspace(-0.3, 0.3, n * n, dtype=jnp.float64), (n, n))
+def _acb_hpd_case(n: int, real_dtype, complex_dtype) -> tuple[jax.Array, jax.Array]:
+    real = jnp.reshape(jnp.linspace(0.2, 1.1, n * n, dtype=real_dtype), (n, n))
+    imag = jnp.reshape(jnp.linspace(-0.3, 0.3, n * n, dtype=real_dtype), (n, n))
     base = real + 1j * imag
-    mid = jnp.conj(base.T) @ base + jnp.eye(n, dtype=jnp.complex128) * (n + 1.0)
+    mid = (jnp.conj(base.T) @ base + jnp.eye(n, dtype=complex_dtype) * (n + 1.0)).astype(complex_dtype)
     rhs = jnp.reshape(
-        jnp.linspace(-0.5, 0.75, n * 2, dtype=jnp.float64) + 1j * jnp.linspace(0.1, 0.4, n * 2, dtype=jnp.float64),
+        jnp.linspace(-0.5, 0.75, n * 2, dtype=real_dtype) + 1j * jnp.linspace(0.1, 0.4, n * 2, dtype=real_dtype),
         (n, 2),
-    )
+    ).astype(complex_dtype)
     return _box_matrix_from_point(mid), _box_matrix_from_point(rhs)
 
 
@@ -91,9 +97,9 @@ def _time_call(fn, *args, warmup: int, runs: int) -> float:
     return (ended - started) / float(runs)
 
 
-def run_arb_case(n: int, warmup: int, runs: int) -> dict[str, float]:
-    a, x, vec = _arb_dense_case(n)
-    spd_a, spd_rhs = _arb_spd_case(n)
+def run_arb_case(n: int, warmup: int, runs: int, real_dtype, *, smoke: bool) -> dict[str, float]:
+    a, x, vec = _arb_dense_case(n, real_dtype)
+    spd_a, spd_rhs = _arb_spd_case(n, real_dtype)
     rhs = _interval_matrix_from_point(di.midpoint(a) @ di.midpoint(x))
     lu_plan = arb_mat.arb_mat_dense_lu_solve_plan_prepare(a)
     cache = arb_mat.arb_mat_dense_matvec_plan_prepare(a)
@@ -127,34 +133,40 @@ def run_arb_case(n: int, warmup: int, runs: int) -> dict[str, float]:
     block_assemble = lambda blocks: arb_mat.arb_mat_block_assemble(blocks)
     block_diag = lambda blocks: arb_mat.arb_mat_block_diag((blocks[0][0], blocks[1][1]))
 
-    return {
+    stats = {
         "arb_direct_solve_s": _time_call(direct_solve, a, rhs, warmup=warmup, runs=runs),
         "arb_lu_reuse_s": _time_call(lu_solve, lu_plan, rhs, warmup=warmup, runs=runs),
-        "arb_lu_reuse_transpose_s": _time_call(lu_solve_transpose, lu_plan, rhs, warmup=warmup, runs=runs),
-        "arb_lu_reuse_add_s": _time_call(lu_solve_add, lu_plan, rhs, rhs, warmup=warmup, runs=runs),
         "arb_dense_plan_prepare_s": _time_call(prepare_plan, a, warmup=warmup, runs=runs),
         "arb_cached_matvec_s": _time_call(cached_matvec, cache, vec, warmup=warmup, runs=runs),
         "arb_cached_matvec_padded_s": _time_call(cached_matvec_padded, cache, vec_batch, warmup=warmup, runs=runs),
-        "arb_add_s": _time_call(add, a, a, warmup=warmup, runs=runs),
-        "arb_mul_entrywise_s": _time_call(entrywise, a, a, warmup=warmup, runs=runs),
-        "arb_charpoly_s": _time_call(charpoly, a, warmup=warmup, runs=runs),
-        "arb_pow_ui_s": _time_call(power2, a, warmup=warmup, runs=runs),
-        "arb_exp_s": _time_call(expm, spd_a, warmup=warmup, runs=runs),
-        "arb_spd_solve_s": _time_call(spd_solve, spd_a, spd_rhs, warmup=warmup, runs=runs),
-        "arb_spd_plan_solve_s": _time_call(spd_plan_solve, spd_plan, spd_rhs, warmup=warmup, runs=runs),
-        "arb_spd_eigh_s": _time_call(spd_eigh, spd_a, warmup=warmup, runs=runs),
-        "arb_solve_tril_s": _time_call(solve_tril, arb_mat.arb_mat_cho(spd_a), spd_rhs, warmup=warmup, runs=runs),
-        "arb_solve_lu_s": _time_call(solve_lu, a, rhs, warmup=warmup, runs=runs),
         "arb_transpose_s": _time_call(transpose, a, warmup=warmup, runs=runs),
         "arb_diag_s": _time_call(diag, a, warmup=warmup, runs=runs),
-        "arb_block_assemble_s": _time_call(block_assemble, arb_blocks, warmup=warmup, runs=runs),
-        "arb_block_diag_s": _time_call(block_diag, arb_blocks, warmup=warmup, runs=runs),
     }
+    if not smoke:
+        stats.update(
+            {
+                "arb_lu_reuse_transpose_s": _time_call(lu_solve_transpose, lu_plan, rhs, warmup=warmup, runs=runs),
+                "arb_lu_reuse_add_s": _time_call(lu_solve_add, lu_plan, rhs, rhs, warmup=warmup, runs=runs),
+                "arb_add_s": _time_call(add, a, a, warmup=warmup, runs=runs),
+                "arb_mul_entrywise_s": _time_call(entrywise, a, a, warmup=warmup, runs=runs),
+                "arb_charpoly_s": _time_call(charpoly, a, warmup=warmup, runs=runs),
+                "arb_pow_ui_s": _time_call(power2, a, warmup=warmup, runs=runs),
+                "arb_exp_s": _time_call(expm, spd_a, warmup=warmup, runs=runs),
+                "arb_spd_solve_s": _time_call(spd_solve, spd_a, spd_rhs, warmup=warmup, runs=runs),
+                "arb_spd_plan_solve_s": _time_call(spd_plan_solve, spd_plan, spd_rhs, warmup=warmup, runs=runs),
+                "arb_spd_eigh_s": _time_call(spd_eigh, spd_a, warmup=warmup, runs=runs),
+                "arb_solve_tril_s": _time_call(solve_tril, arb_mat.arb_mat_cho(spd_a), spd_rhs, warmup=warmup, runs=runs),
+                "arb_solve_lu_s": _time_call(solve_lu, a, rhs, warmup=warmup, runs=runs),
+                "arb_block_assemble_s": _time_call(block_assemble, arb_blocks, warmup=warmup, runs=runs),
+                "arb_block_diag_s": _time_call(block_diag, arb_blocks, warmup=warmup, runs=runs),
+            }
+        )
+    return stats
 
 
-def run_acb_case(n: int, warmup: int, runs: int) -> dict[str, float]:
-    a, x, vec = _acb_dense_case(n)
-    hpd_a, hpd_rhs = _acb_hpd_case(n)
+def run_acb_case(n: int, warmup: int, runs: int, real_dtype, complex_dtype, *, smoke: bool) -> dict[str, float]:
+    a, x, vec = _acb_dense_case(n, real_dtype, complex_dtype)
+    hpd_a, hpd_rhs = _acb_hpd_case(n, real_dtype, complex_dtype)
     rhs = _box_matrix_from_point(acb_core.acb_midpoint(a) @ acb_core.acb_midpoint(x))
     lu_plan = acb_mat.acb_mat_dense_lu_solve_plan_prepare(a)
     cache = acb_mat.acb_mat_dense_matvec_plan_prepare(a)
@@ -189,30 +201,36 @@ def run_acb_case(n: int, warmup: int, runs: int) -> dict[str, float]:
     block_assemble = lambda blocks: acb_mat.acb_mat_block_assemble(blocks)
     block_diag = lambda blocks: acb_mat.acb_mat_block_diag((blocks[0][0], blocks[1][1]))
 
-    return {
+    stats = {
         "acb_direct_solve_s": _time_call(direct_solve, a, rhs, warmup=warmup, runs=runs),
         "acb_lu_reuse_s": _time_call(lu_solve, lu_plan, rhs, warmup=warmup, runs=runs),
-        "acb_lu_reuse_transpose_s": _time_call(lu_solve_transpose, lu_plan, rhs, warmup=warmup, runs=runs),
-        "acb_lu_reuse_add_s": _time_call(lu_solve_add, lu_plan, rhs, rhs, warmup=warmup, runs=runs),
         "acb_dense_plan_prepare_s": _time_call(prepare_plan, a, warmup=warmup, runs=runs),
         "acb_cached_matvec_s": _time_call(cached_matvec, cache, vec, warmup=warmup, runs=runs),
         "acb_cached_matvec_padded_s": _time_call(cached_matvec_padded, cache, vec_batch, warmup=warmup, runs=runs),
-        "acb_add_s": _time_call(add, a, a, warmup=warmup, runs=runs),
-        "acb_mul_entrywise_s": _time_call(entrywise, a, a, warmup=warmup, runs=runs),
-        "acb_charpoly_s": _time_call(charpoly, a, warmup=warmup, runs=runs),
-        "acb_pow_ui_s": _time_call(power2, a, warmup=warmup, runs=runs),
-        "acb_exp_s": _time_call(expm, hpd_a, warmup=warmup, runs=runs),
-        "acb_hpd_solve_s": _time_call(hpd_solve, hpd_a, hpd_rhs, warmup=warmup, runs=runs),
-        "acb_hpd_plan_solve_s": _time_call(hpd_plan_solve, hpd_plan, hpd_rhs, warmup=warmup, runs=runs),
-        "acb_hpd_eigh_s": _time_call(hpd_eigh, hpd_a, warmup=warmup, runs=runs),
-        "acb_solve_tril_s": _time_call(solve_tril, acb_mat.acb_mat_cho(hpd_a), hpd_rhs, warmup=warmup, runs=runs),
-        "acb_solve_lu_s": _time_call(solve_lu, a, rhs, warmup=warmup, runs=runs),
         "acb_transpose_s": _time_call(transpose, a, warmup=warmup, runs=runs),
         "acb_conjugate_transpose_s": _time_call(ctranspose, a, warmup=warmup, runs=runs),
         "acb_diag_s": _time_call(diag, a, warmup=warmup, runs=runs),
-        "acb_block_assemble_s": _time_call(block_assemble, acb_blocks, warmup=warmup, runs=runs),
-        "acb_block_diag_s": _time_call(block_diag, acb_blocks, warmup=warmup, runs=runs),
     }
+    if not smoke:
+        stats.update(
+            {
+                "acb_lu_reuse_transpose_s": _time_call(lu_solve_transpose, lu_plan, rhs, warmup=warmup, runs=runs),
+                "acb_lu_reuse_add_s": _time_call(lu_solve_add, lu_plan, rhs, rhs, warmup=warmup, runs=runs),
+                "acb_add_s": _time_call(add, a, a, warmup=warmup, runs=runs),
+                "acb_mul_entrywise_s": _time_call(entrywise, a, a, warmup=warmup, runs=runs),
+                "acb_charpoly_s": _time_call(charpoly, a, warmup=warmup, runs=runs),
+                "acb_pow_ui_s": _time_call(power2, a, warmup=warmup, runs=runs),
+                "acb_exp_s": _time_call(expm, hpd_a, warmup=warmup, runs=runs),
+                "acb_hpd_solve_s": _time_call(hpd_solve, hpd_a, hpd_rhs, warmup=warmup, runs=runs),
+                "acb_hpd_plan_solve_s": _time_call(hpd_plan_solve, hpd_plan, hpd_rhs, warmup=warmup, runs=runs),
+                "acb_hpd_eigh_s": _time_call(hpd_eigh, hpd_a, warmup=warmup, runs=runs),
+                "acb_solve_tril_s": _time_call(solve_tril, acb_mat.acb_mat_cho(hpd_a), hpd_rhs, warmup=warmup, runs=runs),
+                "acb_solve_lu_s": _time_call(solve_lu, a, rhs, warmup=warmup, runs=runs),
+                "acb_block_assemble_s": _time_call(block_assemble, acb_blocks, warmup=warmup, runs=runs),
+                "acb_block_diag_s": _time_call(block_diag, acb_blocks, warmup=warmup, runs=runs),
+            }
+        )
+    return stats
 
 
 def main() -> None:
@@ -220,19 +238,68 @@ def main() -> None:
     parser.add_argument("--n", type=int, default=32)
     parser.add_argument("--warmup", type=int, default=1)
     parser.add_argument("--runs", type=int, default=5)
+    parser.add_argument("--dtype", choices=("float32", "float64"), default="float64")
+    parser.add_argument("--smoke", action="store_true", help="Run only the fast dense plan/matvec/solve subset for pytest-owned schema checks.")
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=Path("experiments/benchmarks/outputs/matrix/benchmark_dense_matrix_surface.json"),
+    )
     args = parser.parse_args()
+    real_dtype = jnp.float64 if args.dtype == "float64" else jnp.float32
+    complex_dtype = jnp.complex128 if args.dtype == "float64" else jnp.complex64
 
     print(f"platform: {platform.platform()}")
     print(f"jax_backend: {jax.default_backend()}")
     print(f"n: {args.n}")
     print(f"warmup: {args.warmup}")
     print(f"runs: {args.runs}")
+    print(f"dtype: {args.dtype}")
+    print(f"smoke: {args.smoke}")
 
     stats = {}
-    stats.update(run_arb_case(args.n, args.warmup, args.runs))
-    stats.update(run_acb_case(args.n, args.warmup, args.runs))
+    stats.update(run_arb_case(args.n, args.warmup, args.runs, real_dtype, smoke=args.smoke))
+    stats.update(run_acb_case(args.n, args.warmup, args.runs, real_dtype, complex_dtype, smoke=args.smoke))
     for key, value in stats.items():
         print(f"{key}: {value:.6f}")
+    records: list[BenchmarkRecord] = []
+    for key, value in sorted(stats.items()):
+        parts = key.split("_")
+        implementation = parts[0]
+        operation = "_".join(parts[1:-1])
+        is_complex = implementation == "acb"
+        records.append(
+            BenchmarkRecord(
+                benchmark_name="benchmark_dense_matrix_surface.py",
+                concern="matrix_speed",
+                category="matrix_dense",
+                implementation=implementation,
+                operation=operation,
+                device=jax.default_backend(),
+                dtype=("complex128" if args.dtype == "float64" else "complex64") if is_complex else args.dtype,
+                warm_time_s=float(value),
+                measurements=(
+                    BenchmarkMeasurement(name="n", value=args.n, unit="rows"),
+                    BenchmarkMeasurement(name="warmup", value=args.warmup, unit="calls"),
+                    BenchmarkMeasurement(name="runs", value=args.runs, unit="calls"),
+                    BenchmarkMeasurement(name="requested_dtype", value=args.dtype),
+                    BenchmarkMeasurement(name="smoke", value=args.smoke),
+                ),
+                notes="Dense matrix surface benchmark normalized onto the shared benchmark schema; stdout remains metric-style for notebook compatibility.",
+            )
+        )
+    report = BenchmarkReport(
+        benchmark_name="benchmark_dense_matrix_surface.py",
+        concern="matrix_speed",
+        category="matrix_dense",
+        records=tuple(records),
+        environment=collect_runtime_manifest(
+            Path(__file__).resolve().parents[1],
+            jax_mode="gpu" if jax.default_backend() in {"gpu", "cuda"} else "cpu",
+        ),
+        notes="Dense matrix benchmark. Stdout preserves metric-style lines for notebook/report compatibility.",
+    )
+    write_benchmark_report(args.output, report)
 
 
 if __name__ == "__main__":

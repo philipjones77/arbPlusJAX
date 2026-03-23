@@ -41,6 +41,20 @@ def test_sparse_matrix_benchmark_writes_shared_schema_report() -> None:
     assert payload["environment"]["jax"]["requested_mode"] == "cpu"
 
 
+def test_dense_matrix_benchmark_writes_shared_schema_report() -> None:
+    payload = _run_and_load(
+        ["benchmarks/benchmark_dense_matrix_surface.py", "--n", "4", "--warmup", "0", "--runs", "1", "--dtype", "float32", "--smoke"],
+        "benchmark_dense_matrix_surface.json",
+    )
+    assert payload["benchmark_name"] == "benchmark_dense_matrix_surface.py"
+    assert payload["category"] == "matrix_dense"
+    assert payload["records"]
+    assert any(row["operation"] == "cached_matvec" for row in payload["records"])
+    assert any(row["operation"] == "direct_solve" for row in payload["records"])
+    assert {"float32", "complex64"} == {row["dtype"] for row in payload["records"]}
+    assert payload["environment"]["jax"]["requested_mode"] == "cpu"
+
+
 def test_barnes_double_gamma_benchmark_writes_shared_schema_report() -> None:
     result = subprocess.run(
         [sys.executable, "benchmarks/benchmark_barnes_double_gamma.py", "--help"],
@@ -109,6 +123,7 @@ def test_normalized_benchmark_help_shows_dtype_portability_controls() -> None:
         "benchmarks/benchmark_fft_nufft.py",
         "benchmarks/benchmark_sparse_matrix_surface.py",
         "benchmarks/benchmark_block_sparse_matrix_surface.py",
+        "benchmarks/benchmark_dense_matrix_surface.py",
         "benchmarks/benchmark_vblock_sparse_matrix_surface.py",
     ):
         result = subprocess.run(

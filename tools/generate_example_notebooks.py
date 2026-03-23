@@ -570,6 +570,158 @@ def _api_surface_notebook() -> list:
     return cells
 
 
+def _dense_matrix_surface_notebook() -> list:
+    cells = [
+        nbf.v4.new_markdown_cell(
+            "# Example Dense Matrix Surface\n\n"
+            "Canonical dense matrix notebook for direct solve, cached matvec/rmatvec reuse, and dense operator-plan usage."
+        ),
+        *_common_setup_cells("example_dense_matrix_surface"),
+        nbf.v4.new_markdown_cell(
+            "## Direct Usage\n\n"
+            "Construct representative real and complex dense matrices and exercise solve, matvec, cached matvec, and cached rmatvec surfaces."
+        ),
+        nbf.v4.new_code_cell(
+            "import jax.numpy as jnp\n"
+            "from arbplusjax import acb_core, acb_mat, arb_mat, double_interval as di, jcb_mat, jrb_mat\n"
+            "\n"
+            "a_mid = jnp.array([[4.0, 1.0, 0.0], [2.0, 3.0, 1.0], [0.0, 1.0, 2.0]], dtype=jnp.float64)\n"
+            "x_mid = jnp.array([[1.0, 0.0], [2.0, 1.0], [-1.0, 3.0]], dtype=jnp.float64)\n"
+            "vec_mid = jnp.array([1.0, -0.5, 0.25], dtype=jnp.float64)\n"
+            "a = di.interval(a_mid, a_mid)\n"
+            "x = di.interval(x_mid, x_mid)\n"
+            "vec = di.interval(vec_mid, vec_mid)\n"
+            "rhs = arb_mat.arb_mat_matmul(a, x)\n"
+            "cache = arb_mat.arb_mat_dense_matvec_plan_prepare(a)\n"
+            "rcache = arb_mat.arb_mat_rmatvec_cached_prepare(a)\n"
+            "dense_plan = jrb_mat.jrb_mat_dense_operator_plan_prepare(a)\n"
+            "\n"
+            "a_c_mid = a_mid + 1j * jnp.array([[0.0, 1.0, 0.0], [-1.0, 0.0, 0.5], [0.0, -0.5, 0.0]], dtype=jnp.float64)\n"
+            "vec_c_mid = vec_mid + 1j * jnp.array([0.25, -0.1, 0.3], dtype=jnp.float64)\n"
+            "a_c = acb_core.acb_box(di.interval(jnp.real(a_c_mid), jnp.real(a_c_mid)), di.interval(jnp.imag(a_c_mid), jnp.imag(a_c_mid)))\n"
+            "vec_c = acb_core.acb_box(di.interval(jnp.real(vec_c_mid), jnp.real(vec_c_mid)), di.interval(jnp.imag(vec_c_mid), jnp.imag(vec_c_mid)))\n"
+            "cache_c = acb_mat.acb_mat_dense_matvec_plan_prepare(a_c)\n"
+            "rcache_c = acb_mat.acb_mat_rmatvec_cached_prepare(a_c)\n"
+            "dense_plan_c = jcb_mat.jcb_mat_dense_operator_plan_prepare(a_c)\n"
+            "\n"
+            "dense_results = {\n"
+            "    'solve_basic': arb_mat.arb_mat_solve(a, rhs),\n"
+            "    'cached_matvec': arb_mat.arb_mat_dense_matvec_plan_apply(cache, vec),\n"
+            "    'cached_rmatvec': arb_mat.arb_mat_rmatvec_cached_apply(rcache, vec),\n"
+            "    'operator_apply': jrb_mat.jrb_mat_operator_plan_apply(dense_plan, vec),\n"
+            "    'complex_cached_matvec': acb_mat.acb_mat_dense_matvec_plan_apply(cache_c, vec_c),\n"
+            "    'complex_cached_rmatvec': acb_mat.acb_mat_rmatvec_cached_apply(rcache_c, vec_c),\n"
+            "    'complex_operator_apply': jcb_mat.jcb_mat_operator_plan_apply(dense_plan_c, vec_c),\n"
+            "}\n"
+            "display(dense_results)"
+        ),
+        *_production_pattern_cells(
+            "Production Pattern",
+            "Dense production use should prepare solve and matvec/rmatvec plans once, reuse them across repeated calls, and keep dtype and batch shape stable. "
+            "Dense operator plans should be the bridge into matrix-free workflows when callers later want Krylov-style execution without rewriting the model surface.",
+            "rhs_batch = jnp.stack([vec, vec], axis=0)\n"
+            "dense_service = {\n"
+            "    'solve_reuse': arb_mat.arb_mat_dense_lu_solve_plan_apply(arb_mat.arb_mat_dense_lu_solve_plan_prepare(a), rhs),\n"
+            "    'cached_matvec': arb_mat.arb_mat_dense_matvec_plan_apply(cache, vec),\n"
+            "    'cached_rmatvec': arb_mat.arb_mat_rmatvec_cached_apply(rcache, vec),\n"
+            "    'cached_matvec_padded': arb_mat.arb_mat_dense_matvec_plan_apply_batch_padded(cache, rhs_batch, pad_to=8),\n"
+            "    'operator_apply': jrb_mat.jrb_mat_operator_plan_apply(dense_plan, vec),\n"
+            "}\n"
+            "display(dense_service)",
+            "To extend dense benchmarks, add a stable metric in `benchmark_dense_matrix_surface.py`; use that same metric key in the matrix workbook so dense, sparse, and matrix-free surfaces remain comparable."
+        ),
+        *_ad_pattern_cells(
+            "Dense AD should be demonstrated on the production-facing plan-based or operator-plan surface rather than only on a raw midpoint helper. "
+            "This section differentiates a dense operator-plan objective and plots primal and gradient behavior over a scale sweep.",
+            "import jax\n"
+            "base = a_mid\n"
+            "def dense_loss(scale):\n"
+            "    scaled = di.interval(scale * base, scale * base)\n"
+            "    plan = jrb_mat.jrb_mat_dense_operator_plan_prepare(scaled)\n"
+            "    out = jrb_mat.jrb_mat_operator_plan_apply(plan, vec)\n"
+            "    return jnp.sum(di.midpoint(out))\n"
+            "scale_sweep = jnp.linspace(0.75, 1.25, 24, dtype=jnp.float64)\n"
+            "primal_vals = jax.vmap(dense_loss)(scale_sweep)\n"
+            "grad_vals = jax.vmap(jax.grad(dense_loss))(scale_sweep)\n"
+            "ad_df = pd.DataFrame({'scale': np.asarray(scale_sweep), 'primal': np.asarray(primal_vals), 'grad': np.asarray(grad_vals)})\n"
+            "display(ad_df.head())\n"
+            "ax = ad_df.plot(x='scale', y=['primal', 'grad'], figsize=(8, 4), title='Dense Matrix AD Validation')\n"
+            "plt.tight_layout()\n"
+            "plt.savefig(EXAMPLE_OUTPUT_ROOT / f'ad_validation_{JAX_MODE}.png', dpi=160, bbox_inches='tight')\n"
+            "plt.show()"
+        ),
+        nbf.v4.new_markdown_cell(
+            "## Validation Summary\n\n"
+            "Run the dense matrix chassis and matrix-stack contract tests that own cached matvec/rmatvec and operator-plan adaptation."
+        ),
+        nbf.v4.new_code_cell(
+            "tests = run([\n"
+            "    PYTHON, '-m', 'pytest', '-q',\n"
+            "    'tests/test_arb_mat_chassis.py',\n"
+            "    'tests/test_acb_mat_chassis.py',\n"
+            "    'tests/test_dense_broad_surface.py',\n"
+            "    'tests/test_matrix_stack_contracts.py',\n"
+            "], capture=True)\n"
+            "print(tests.stdout)\n"
+            "if tests.stderr:\n"
+            "    print(tests.stderr)\n"
+            "(EXAMPLE_OUTPUT_ROOT / f'pytest_{JAX_MODE}.txt').write_text(tests.stdout + ('\\n' + tests.stderr if tests.stderr else ''), encoding='utf-8')"
+        ),
+        nbf.v4.new_markdown_cell(
+            "## Benchmark Summary\n\n"
+            "Run the dense matrix benchmark in schema-backed form and compare cached/direct/operator-friendly paths."
+        ),
+        nbf.v4.new_code_cell(
+            "dense_report = EXAMPLE_OUTPUT_ROOT / f'dense_matrix_surface_{JAX_MODE}.json'\n"
+            "run([PYTHON, 'benchmarks/benchmark_dense_matrix_surface.py', '--n', '8', '--warmup', '1', '--runs', '2', '--output', str(dense_report)])\n"
+            "bench_payload = json.loads(dense_report.read_text())\n"
+            "bench_df = pd.DataFrame(bench_payload['records']).sort_values('warm_time_s')\n"
+            "bench_df.to_csv(EXAMPLE_OUTPUT_ROOT / f'dense_benchmark_summary_{JAX_MODE}.csv', index=False)\n"
+            "display(bench_df[['implementation', 'operation', 'dtype', 'warm_time_s']].head(20))"
+        ),
+        nbf.v4.new_markdown_cell(
+            "## Comparison / Contrast\n\n"
+            "Summarize direct solve, cached matvec/rmatvec, and operator-plan usage so dense callers can compare production calling styles."
+        ),
+        nbf.v4.new_code_cell(
+            "compare_df = bench_df[bench_df['operation'].isin(['direct_solve', 'cached_matvec', 'cached_rmatvec', 'dense_plan_prepare'])].copy()\n"
+            "display(compare_df[['implementation', 'operation', 'warm_time_s']])"
+        ),
+        nbf.v4.new_markdown_cell(
+            "## Plots\n\n"
+            "Plot dense matrix timing by operation to make direct, cached, and operator-plan-friendly paths easy to compare visually."
+        ),
+        nbf.v4.new_code_cell(
+            "pivot = bench_df.pivot(index='operation', columns='implementation', values='warm_time_s')\n"
+            "ax = pivot.plot(kind='bar', figsize=(11, 4), title='Dense Matrix Warm Time by Operation')\n"
+            "ax.set_ylabel('warm_time_s')\n"
+            "plt.tight_layout()\n"
+            "plt.savefig(EXAMPLE_OUTPUT_ROOT / f'dense_benchmark_summary_{JAX_MODE}.png', dpi=160, bbox_inches='tight')\n"
+            "plt.show()"
+        ),
+        nbf.v4.new_markdown_cell(
+            "## Optional Diagnostics\n\n"
+            "Use the matrix stack diagnostics benchmark when compile, recompile, and operator-plan adaptation behavior needs deeper inspection."
+        ),
+        nbf.v4.new_code_cell(
+            "summary_lines = [\n"
+            "    f'# Example Dense Matrix Surface Summary ({JAX_MODE})',\n"
+            "    '',\n"
+            "    f'- backend: `{runtime_payload[\"platform\"]}`',\n"
+            "    f'- benchmark_rows: `{len(bench_df)}`',\n"
+            "    '',\n"
+            "    '## Comparison Slice',\n"
+            "    '',\n"
+            "]\n"
+            "for row in compare_df.to_dict(orient='records'):\n"
+            "    summary_lines.append(f\"- `{row['implementation']}` / `{row['operation']}`: warm={row['warm_time_s']:.6g}s\")\n"
+            "(EXAMPLE_OUTPUT_ROOT / f'summary_{JAX_MODE}.md').write_text('\\n'.join(summary_lines) + '\\n', encoding='utf-8')\n"
+            "display('\\n'.join(summary_lines[:14]))"
+        ),
+    ]
+    return cells
+
+
 def _sparse_matrix_surface_notebook() -> list:
     cells = [
         nbf.v4.new_markdown_cell(
@@ -589,6 +741,8 @@ def _sparse_matrix_surface_notebook() -> list:
             "dense_complex = dense_real + 1j * jnp.array([[0.0, 0.2, 0.0], [-0.2, 0.0, 0.1], [0.0, -0.1, 0.0]], dtype=jnp.float64)\n"
             "sparse_real = srb_mat.srb_mat_from_dense_bcoo(dense_real)\n"
             "sparse_complex = scb_mat.scb_mat_from_dense_bcoo(dense_complex)\n"
+            "block_real = api.eval_point('srb_block_mat_from_dense_csr', dense_real, block_shape=(1, 1))\n"
+            "vblock_real = api.eval_point('srb_vblock_mat_from_dense_csr', dense_real, row_block_sizes=jnp.asarray([1, 2], dtype=jnp.int32), col_block_sizes=jnp.asarray([1, 2], dtype=jnp.int32))\n"
             "vec_real = jnp.stack([jnp.array([1.0, 0.5, -0.25], dtype=jnp.float64), jnp.array([0.25, -0.5, 1.0], dtype=jnp.float64)], axis=0)\n"
             "vec_complex = jnp.stack([\n"
             "    jnp.array([1.0 + 0.2j, 0.5 - 0.1j, -0.25 + 0.3j], dtype=jnp.complex128),\n"
@@ -596,9 +750,13 @@ def _sparse_matrix_surface_notebook() -> list:
             "], axis=0)\n"
             "real_plan = api.eval_point('srb_mat_matvec_cached_prepare', sparse_real)\n"
             "complex_plan = api.eval_point('scb_mat_matvec_cached_prepare', sparse_complex)\n"
+            "real_rplan = api.eval_point('srb_mat_rmatvec_cached_prepare', sparse_real)\n"
             "sparse_results = {\n"
             "    'srb_matvec': api.eval_point_batch('srb_mat_matvec', sparse_real, vec_real),\n"
             "    'srb_cached_matvec': api.eval_point_batch('srb_mat_matvec_cached_apply', real_plan, vec_real),\n"
+            "    'srb_cached_rmatvec': api.eval_point_batch('srb_mat_rmatvec_cached_apply', real_rplan, vec_real),\n"
+            "    'srb_block_matvec': api.eval_point_batch('srb_block_mat_matvec', block_real, vec_real),\n"
+            "    'srb_vblock_matvec': api.eval_point_batch('srb_vblock_mat_matvec', vblock_real, vec_real),\n"
             "    'scb_matvec': api.eval_point_batch('scb_mat_matvec', sparse_complex, vec_complex),\n"
             "    'scb_cached_matvec': api.eval_point_batch('scb_mat_matvec_cached_apply', complex_plan, vec_complex),\n"
             "}\n"
@@ -610,9 +768,13 @@ def _sparse_matrix_surface_notebook() -> list:
             "If an API-facing service loop feeds variable batch sizes, pad the RHS batch to a stable multiple before calling the padded batch kernels.",
             "rhs_batch = vec_real\n"
             "real_cached = api.eval_point('srb_mat_matvec_cached_prepare', sparse_real)\n"
+            "real_rcached = api.eval_point('srb_mat_rmatvec_cached_prepare', sparse_real)\n"
             "sparse_service_results = {\n"
             "    'cached_apply': api.eval_point_batch('srb_mat_matvec_cached_apply', real_cached, rhs_batch),\n"
+            "    'cached_rmatvec': api.eval_point_batch('srb_mat_rmatvec_cached_apply', real_rcached, rhs_batch),\n"
             "    'padded_batch_apply': api.eval_point_batch('srb_mat_matvec', sparse_real, rhs_batch, pad_to=8),\n"
+            "    'block_sparse_apply': api.eval_point_batch('srb_block_mat_matvec', block_real, rhs_batch),\n"
+            "    'vblock_sparse_apply': api.eval_point_batch('srb_vblock_mat_matvec', vblock_real, rhs_batch),\n"
             "}\n"
             "display(sparse_service_results)",
             "To extend sparse benchmarks, add the target sparse/storage/mode combination inside `benchmark_sparse_matrix_surface.py` and keep the printed metric keys stable so downstream notebook parsing still works."
@@ -681,6 +843,14 @@ def _sparse_matrix_surface_notebook() -> list:
             "display(bench_df.head(20))"
         ),
         nbf.v4.new_markdown_cell(
+            "## Comparison / Contrast\n\n"
+            "Compare sparse, block-sparse, and variable-block matvec/cached-rmatvec surfaces in one place so users can see when storage structure changes the calling pattern."
+        ),
+        nbf.v4.new_code_cell(
+            "compare_metrics = bench_df[bench_df['metric'].str.contains('matvec|rmatvec', regex=True, na=False)].copy()\n"
+            "display(compare_metrics.head(20))"
+        ),
+        nbf.v4.new_markdown_cell(
             "## Plots\n\n"
             "Plot the fastest sparse benchmark metrics as a compact diagnostic summary."
         ),
@@ -735,9 +905,11 @@ def _matrix_free_operator_surface_notebook() -> list:
             "a = di.interval(a_mid, a_mid)\n"
             "x = di.interval(jnp.array([1.0, 0.5, -0.25, 0.75], dtype=jnp.float64), jnp.array([1.0, 0.5, -0.25, 0.75], dtype=jnp.float64))\n"
             "plan = jrb_mat.jrb_mat_dense_operator_plan_prepare(a)\n"
+            "sparse_plan = jrb_mat.jrb_mat_sparse_operator_plan_prepare(jrb_mat.sparse_common.dense_to_sparse_bcoo(a_mid, algebra='jrb'))\n"
             "probes = jnp.stack([x, x], axis=0)\n"
             "operator_results = {\n"
             "    'apply': jrb_mat.jrb_mat_operator_plan_apply(plan, x),\n"
+            "    'sparse_apply': jrb_mat.jrb_mat_operator_plan_apply(sparse_plan, x),\n"
             "    'solve': jrb_mat.jrb_mat_solve_action_point_jit(plan, x, symmetric=True),\n"
             "    'logdet': jrb_mat.jrb_mat_logdet_slq_point(plan, probes, steps=6),\n"
             "}\n"
@@ -751,6 +923,8 @@ def _matrix_free_operator_surface_notebook() -> list:
             "solve_once = lambda rhs: jrb_mat.jrb_mat_solve_action_point_jit(plan, rhs, symmetric=True)\n"
             "multi_shift_once = lambda rhs: jrb_mat.jrb_mat_multi_shift_solve_point_jit(plan, rhs, jnp.asarray([0.0, 0.5], dtype=jnp.float64), symmetric=True, preconditioner=precond)\n"
             "matrix_free_service = {\n"
+            "    'operator_plan': jrb_mat.jrb_mat_operator_plan_apply(plan, x),\n"
+            "    'sparse_operator_plan': jrb_mat.jrb_mat_operator_plan_apply(sparse_plan, x),\n"
             "    'solve_once': solve_once(x),\n"
             "    'multi_shift_once': multi_shift_once(x),\n"
             "}\n"
@@ -823,6 +997,14 @@ def _matrix_free_operator_surface_notebook() -> list:
             "bench_df = pd.DataFrame(rows).sort_values('seconds')\n"
             "bench_df.to_csv(EXAMPLE_OUTPUT_ROOT / f'matrix_free_benchmark_summary_{JAX_MODE}.csv', index=False)\n"
             "display(bench_df.head(20))"
+        ),
+        nbf.v4.new_markdown_cell(
+            "## Comparison / Contrast\n\n"
+            "Compare dense-operator, sparse-operator, and solve/logdet-facing matrix-free usage so callers can decide when to stay dense, when to adapt sparse structure, and when to move fully into operator-free execution."
+        ),
+        nbf.v4.new_code_cell(
+            "compare_df = bench_df[bench_df['metric'].str.contains('solve|matvec|logdet', regex=True, na=False)].copy()\n"
+            "display(compare_df.head(20))"
         ),
         nbf.v4.new_markdown_cell(
             "## Diagnostics\n\n"
@@ -1218,6 +1400,7 @@ def main() -> None:
     notebooks = {
         "example_core_scalar_surface.ipynb": _core_scalar_notebook(),
         "example_api_surface.ipynb": _api_surface_notebook(),
+        "example_dense_matrix_surface.ipynb": _dense_matrix_surface_notebook(),
         "example_sparse_matrix_surface.ipynb": _sparse_matrix_surface_notebook(),
         "example_matrix_free_operator_surface.ipynb": _matrix_free_operator_surface_notebook(),
         "example_fft_nufft_surface.ipynb": _fft_nufft_surface_notebook(),
