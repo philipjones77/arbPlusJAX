@@ -7,41 +7,18 @@ ensure_src_on_path(__file__)
 
 import argparse
 import time
-from datetime import datetime, timezone
 from pathlib import Path
-import platform
-import subprocess
 
 import jax
 import jax.numpy as jnp
 import numpy as np
 
 from arbplusjax import arb_calc
-
-
-def _git_commit(repo_root: Path) -> str:
-    try:
-        return (
-            subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=repo_root, text=True).strip()
-        )
-    except Exception:
-        return "unknown"
-
-
-def _log_run(tool: str, command: str, notes: str = "") -> None:
-    repo_root = Path(__file__).resolve().parents[2]
-    results_dir = repo_root / "migration" / "results"
-    results_dir.mkdir(parents=True, exist_ok=True)
-    log_path = results_dir / "runs.csv"
-    if not log_path.exists():
-        log_path.write_text("run_id,timestamp_utc,tool,command,commit,platform,notes\n", encoding="ascii")
-    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-    run_id = f"{tool}-{timestamp}"
-    commit = _git_commit(repo_root)
-    plat = platform.platform()
-    line = f"{run_id},{timestamp},{tool},\"{command}\",{commit},\"{plat}\",\"{notes}\"\n"
-    with log_path.open("a", encoding="ascii") as f:
-        f.write(line)
+from benchmarks.schema import BenchmarkMeasurement
+from benchmarks.schema import BenchmarkRecord
+from benchmarks.schema import BenchmarkReport
+from benchmarks.schema import write_benchmark_report
+from tools.runtime_manifest import collect_runtime_manifest
 
 
 def _random_intervals(rng: np.random.Generator, n: int, lo: float, hi: float) -> np.ndarray:
@@ -57,26 +34,61 @@ def main() -> int:
     parser.add_argument("--samples", type=int, default=20000)
     parser.add_argument("--steps", type=int, default=64)
     parser.add_argument("--integrand", type=str, default="exp", choices=["exp", "sin", "cos"])
+    parser.add_argument("--dtype", choices=("float32", "float64"), default="float64")
+    parser.add_argument("--jax-mode", choices=("auto", "cpu", "gpu"), default="auto")
+    parser.add_argument("--smoke", action="store_true", help="Run a reduced benchmark size for pytest-owned schema checks.")
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=Path("experiments/benchmarks/outputs/calc/benchmark_arb_calc.json"),
+    )
     args = parser.parse_args()
 
     rng = np.random.default_rng(2193)
-    a = jnp.asarray(_random_intervals(rng, args.samples, -0.5, 0.5))
-    b = jnp.asarray(_random_intervals(rng, args.samples, 0.2, 1.0))
+    sample_count = min(args.samples, 512) if args.smoke else args.samples
+    steps = min(args.steps, 16) if args.smoke else args.steps
+    real_dtype = jnp.float64 if args.dtype == "float64" else jnp.float32
+    a = jnp.asarray(_random_intervals(rng, sample_count, -0.5, 0.5), dtype=real_dtype)
+    b = jnp.asarray(_random_intervals(rng, sample_count, 0.2, 1.0), dtype=real_dtype)
 
     fn = jax.jit(arb_calc.arb_calc_integrate_line_batch, static_argnames=("integrand", "n_steps"))
-    fn(a, b, integrand=args.integrand, n_steps=args.steps).block_until_ready()
-    t0 = time.perf_counter()
-    out = fn(a, b, integrand=args.integrand, n_steps=args.steps)
-    out.block_until_ready()
-    t1 = time.perf_counter()
-    ms = (t1 - t0) * 1000.0
+    fn(a, b, integrand=args.integrand, n_steps=steps).block_until_ready()
 
-    print(f"arb_calc ({args.integrand}) | samples={args.samples} steps={args.steps} | time_ms={ms:.2f}")
-    _log_run(
-        "benchmark_arb_calc",
-        f"benchmark_arb_calc.py --samples {args.samples} --steps {args.steps} --integrand {args.integrand}",
-        f"time_ms={ms:.2f}",
+    start = time.perf_counter()
+    out = fn(a, b, integrand=args.integrand, n_steps=steps)
+    out.block_until_ready()
+    warm_s = time.perf_counter() - start
+
+    print(f"arb_calc ({args.integrand}) | samples={sample_count} steps={steps} | time_ms={warm_s * 1000.0:.2f}")
+
+    report = BenchmarkReport(
+        benchmark_name="benchmark_arb_calc.py",
+        concern="scalar_speed",
+        category="integration",
+        records=(
+            BenchmarkRecord(
+                benchmark_name="benchmark_arb_calc.py",
+                concern="scalar_speed",
+                category="integration",
+                implementation="arb_calc",
+                operation=f"integrate_line_{args.integrand}",
+                device=jax.default_backend(),
+                dtype=args.dtype,
+                warm_time_s=float(warm_s),
+                measurements=(
+                    BenchmarkMeasurement(name="samples", value=sample_count, unit="rows"),
+                    BenchmarkMeasurement(name="steps", value=steps, unit="panels"),
+                    BenchmarkMeasurement(name="requested_dtype", value=args.dtype),
+                    BenchmarkMeasurement(name="integrand", value=args.integrand),
+                    BenchmarkMeasurement(name="smoke", value=args.smoke),
+                ),
+                notes="Legacy arb_calc benchmark normalized onto the shared benchmark schema; stdout remains summary-style for notebook compatibility.",
+            ),
+        ),
+        environment=collect_runtime_manifest(Path(__file__).resolve().parents[1], jax_mode=args.jax_mode),
+        notes="arb_calc benchmark with explicit dtype and requested runtime mode controls.",
     )
+    write_benchmark_report(args.output, report)
     return 0
 
 

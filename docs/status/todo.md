@@ -77,7 +77,9 @@ Status: `in_progress`
     sparse point layer
   - normalize more legacy benchmark scripts onto the shared benchmark-report
     schema instead of stdout-only summaries; direct normalized coverage now
-    includes `benchmark_arb_poly.py` and `benchmark_acb_poly.py`
+    includes `benchmark_arb_poly.py`, `benchmark_acb_poly.py`,
+    `benchmark_arb_calc.py`, `benchmark_acb_calc.py`,
+    `benchmark_dirichlet.py`, and `benchmark_acb_dirichlet.py`
   - keep normalized benchmark CLIs explicitly parameterized for CPU/GPU
     portability and `float32`/`float64` execution, even when the current
     validation slice only runs on CPU

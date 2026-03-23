@@ -144,6 +144,58 @@ def test_acb_poly_benchmark_writes_shared_schema_report() -> None:
     assert payload["environment"]["jax"]["requested_mode"] == "cpu"
 
 
+def test_arb_calc_benchmark_writes_shared_schema_report() -> None:
+    payload = _run_and_load(
+        ["benchmarks/benchmark_arb_calc.py", "--samples", "128", "--steps", "8", "--dtype", "float32", "--jax-mode", "cpu", "--smoke"],
+        "benchmark_arb_calc.json",
+    )
+    assert payload["benchmark_name"] == "benchmark_arb_calc.py"
+    assert payload["category"] == "integration"
+    assert payload["records"]
+    assert payload["records"][0]["operation"] == "integrate_line_exp"
+    assert payload["records"][0]["dtype"] == "float32"
+    assert payload["environment"]["jax"]["requested_mode"] == "cpu"
+
+
+def test_acb_calc_benchmark_writes_shared_schema_report() -> None:
+    payload = _run_and_load(
+        ["benchmarks/benchmark_acb_calc.py", "--samples", "128", "--steps", "8", "--dtype", "float32", "--jax-mode", "cpu", "--smoke"],
+        "benchmark_acb_calc.json",
+    )
+    assert payload["benchmark_name"] == "benchmark_acb_calc.py"
+    assert payload["category"] == "integration"
+    assert payload["records"]
+    assert payload["records"][0]["operation"] == "integrate_line_exp"
+    assert payload["records"][0]["dtype"] == "complex64"
+    assert payload["environment"]["jax"]["requested_mode"] == "cpu"
+
+
+def test_dirichlet_benchmark_writes_shared_schema_report() -> None:
+    payload = _run_and_load(
+        ["benchmarks/benchmark_dirichlet.py", "--samples", "128", "--terms", "8", "--dtype", "float32", "--jax-mode", "cpu", "--smoke"],
+        "benchmark_dirichlet.json",
+    )
+    assert payload["benchmark_name"] == "benchmark_dirichlet.py"
+    assert payload["category"] == "special"
+    assert payload["records"]
+    assert payload["records"][0]["operation"] == "zeta_batch"
+    assert payload["records"][0]["dtype"] == "float32"
+    assert payload["environment"]["jax"]["requested_mode"] == "cpu"
+
+
+def test_acb_dirichlet_benchmark_writes_shared_schema_report() -> None:
+    payload = _run_and_load(
+        ["benchmarks/benchmark_acb_dirichlet.py", "--samples", "128", "--terms", "8", "--dtype", "float32", "--jax-mode", "cpu", "--smoke"],
+        "benchmark_acb_dirichlet.json",
+    )
+    assert payload["benchmark_name"] == "benchmark_acb_dirichlet.py"
+    assert payload["category"] == "special"
+    assert payload["records"]
+    assert payload["records"][0]["operation"] == "zeta_batch"
+    assert payload["records"][0]["dtype"] == "complex64"
+    assert payload["environment"]["jax"]["requested_mode"] == "cpu"
+
+
 def test_normalized_benchmark_help_shows_dtype_portability_controls() -> None:
     for script in (
         "benchmarks/benchmark_fft_nufft.py",
@@ -153,6 +205,10 @@ def test_normalized_benchmark_help_shows_dtype_portability_controls() -> None:
         "benchmarks/benchmark_vblock_sparse_matrix_surface.py",
         "benchmarks/benchmark_arb_poly.py",
         "benchmarks/benchmark_acb_poly.py",
+        "benchmarks/benchmark_arb_calc.py",
+        "benchmarks/benchmark_acb_calc.py",
+        "benchmarks/benchmark_dirichlet.py",
+        "benchmarks/benchmark_acb_dirichlet.py",
     ):
         result = subprocess.run(
             [sys.executable, script, "--help"],

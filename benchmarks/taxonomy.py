@@ -41,6 +41,8 @@ def _category_for_script(script_name: str) -> str:
         return "matrix"
     if "fft" in script_name or "nufft" in script_name:
         return "transform"
+    if "calc" in script_name:
+        return "integration"
     if "api_surface" in script_name:
         return "api"
     if "_mat" in script_name:
