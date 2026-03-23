@@ -1,26 +1,12 @@
-Last updated: 2026-03-22T15:36:00Z
+Last updated: 2026-03-23T06:24:52Z
 
 # Reports
 
 This section holds current repo inventories and report-style summaries.
 
-Default organization rule:
-- reports should use the top-level categories in
-  [test_coverage_matrix.md](/home/phili/projects/arbplusJAX/docs/status/test_coverage_matrix.md)
-  as the primary repo-wide grouping unless a narrower report-specific structure
-  is required
-- this means the default lens for the repo is:
-  - Core Numeric Scalars
-  - Interval / Box / Precision Modes
-  - Dense Matrix Functionality
-  - Sparse / Block-Sparse / VBlock Functionality
-  - Matrix-Free / Operator Functionality
-  - Special Functions
-  - helper / infrastructure categories defined in the same matrix
-
 Standards:
 - [report_standard.md](../standards/report_standard.md)
-- [documentation_governance.md](../governance/documentation_governance.md)
+- [documentation.md](../standards/documentation.md)
 
 Current reports:
 - [alternative_functions.md](alternative_functions.md)
