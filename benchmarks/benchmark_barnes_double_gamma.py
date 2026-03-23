@@ -46,14 +46,17 @@ def main() -> int:
     parser.add_argument("--dps", type=int, default=60)
     parser.add_argument("--prec-bits", type=int, default=80)
     parser.add_argument("--max-m-cap", type=int, default=256)
+    parser.add_argument("--dtype", choices=("float32", "float64"), default="float64")
     parser.add_argument(
         "--output",
         type=Path,
         default=Path("experiments/benchmarks/outputs/special/benchmark_barnes_double_gamma.json"),
     )
     args = parser.parse_args()
+    real_dtype = jnp.float64 if args.dtype == "float64" else jnp.float32
+    complex_dtype = jnp.complex128 if args.dtype == "float64" else jnp.complex64
 
-    z_scalar = jnp.asarray(1.7 + 0.1j, dtype=jnp.complex128)
+    z_scalar = jnp.asarray(1.7 + 0.1j, dtype=complex_dtype)
     tau = 0.5
     zs = jnp.asarray(
         [
@@ -61,10 +64,10 @@ def main() -> int:
             1.5 + 0.15j,
             1.8 + 0.2j,
         ],
-        dtype=jnp.complex128,
+        dtype=complex_dtype,
     )
-    anchors = jnp.asarray([1.0, 2.0, 3.0, 4.0], dtype=jnp.float64)
-    expected = jnp.asarray([1.0, 1.0, 1.0, 2.0], dtype=jnp.complex128)
+    anchors = jnp.asarray([1.0, 2.0, 3.0, 4.0], dtype=real_dtype)
+    expected = jnp.asarray([1.0, 1.0, 1.0, 2.0], dtype=complex_dtype)
 
     legacy_scalar_s = _time_call(lambda z: double_gamma.bdg_barnesdoublegamma(z, tau, prec_bits=args.prec_bits), z_scalar, iters=args.iters)
     ifj_scalar_s = _time_call(lambda z: double_gamma.ifj_barnesdoublegamma(z, tau, dps=args.dps), z_scalar, iters=args.iters)
@@ -77,8 +80,8 @@ def main() -> int:
     legacy_shift_err = jnp.abs(legacy_shift - shift_target)
     ifj_shift_err = jnp.abs(ifj_shift - shift_target)
 
-    legacy_anchor = jnp.asarray([double_gamma.bdg_barnesdoublegamma(x, 1.0, prec_bits=args.prec_bits) for x in anchors], dtype=jnp.complex128)
-    ifj_anchor = jnp.asarray([double_gamma.ifj_barnesdoublegamma(x, 1.0, dps=args.dps) for x in anchors], dtype=jnp.complex128)
+    legacy_anchor = jnp.asarray([double_gamma.bdg_barnesdoublegamma(x, 1.0, prec_bits=args.prec_bits) for x in anchors], dtype=complex_dtype)
+    ifj_anchor = jnp.asarray([double_gamma.ifj_barnesdoublegamma(x, 1.0, dps=args.dps) for x in anchors], dtype=complex_dtype)
     legacy_anchor_err = jnp.max(jnp.abs(legacy_anchor - expected))
     ifj_anchor_err = jnp.max(jnp.abs(ifj_anchor - expected))
 
@@ -113,11 +116,12 @@ def main() -> int:
             implementation="legacy_bdg",
             operation="barnes_double_gamma_scalar",
             device=jax.default_backend(),
-            dtype="complex128",
+            dtype="complex128" if args.dtype == "float64" else "complex64",
             warm_time_s=float(legacy_scalar_s),
             accuracy_abs=float(legacy_shift_err),
             measurements=(
                 BenchmarkMeasurement(name="iters", value=args.iters, unit="calls"),
+                BenchmarkMeasurement(name="requested_dtype", value=args.dtype),
                 BenchmarkMeasurement(name="tau1_anchor_max_abs_err", value=float(legacy_anchor_err)),
             ),
             notes="Legacy Barnes/double-gamma scalar path.",
@@ -129,11 +133,12 @@ def main() -> int:
             implementation="ifj",
             operation="barnes_double_gamma_scalar",
             device=jax.default_backend(),
-            dtype="complex128",
+            dtype="complex128" if args.dtype == "float64" else "complex64",
             warm_time_s=float(ifj_scalar_s),
             accuracy_abs=float(ifj_shift_err),
             measurements=(
                 BenchmarkMeasurement(name="iters", value=args.iters, unit="calls"),
+                BenchmarkMeasurement(name="requested_dtype", value=args.dtype),
                 BenchmarkMeasurement(name="tau1_anchor_max_abs_err", value=float(ifj_anchor_err)),
                 BenchmarkMeasurement(name="m_used", value=float(diagnostics.m_used)),
                 BenchmarkMeasurement(name="n_shift", value=float(diagnostics.n_shift)),
@@ -147,8 +152,9 @@ def main() -> int:
             implementation="legacy_bdg",
             operation="barnes_double_gamma_vector",
             device=jax.default_backend(),
-            dtype="complex128",
+            dtype="complex128" if args.dtype == "float64" else "complex64",
             warm_time_s=float(legacy_vector_s),
+            measurements=(BenchmarkMeasurement(name="requested_dtype", value=args.dtype),),
             notes="Legacy vectorized Barnes/double-gamma path.",
         ),
         BenchmarkRecord(
@@ -158,8 +164,9 @@ def main() -> int:
             implementation="ifj",
             operation="barnes_double_gamma_vector",
             device=jax.default_backend(),
-            dtype="complex128",
+            dtype="complex128" if args.dtype == "float64" else "complex64",
             warm_time_s=float(ifj_vector_s),
+            measurements=(BenchmarkMeasurement(name="requested_dtype", value=args.dtype),),
             notes="IFJ vectorized Barnes/double-gamma path.",
         ),
     )
@@ -168,7 +175,10 @@ def main() -> int:
         concern="special_speed",
         category="special",
         records=records,
-        environment=collect_runtime_manifest(Path(__file__).resolve().parents[1], jax_mode="auto"),
+        environment=collect_runtime_manifest(
+            Path(__file__).resolve().parents[1],
+            jax_mode="gpu" if jax.default_backend() in {"gpu", "cuda"} else "cpu",
+        ),
         notes="Barnes G and double-gamma benchmark. Stdout preserves metric-style lines for notebook compatibility.",
     )
     write_benchmark_report(args.output, report)

@@ -1,4 +1,4 @@
-Last updated: 2026-03-22T00:00:00Z
+Last updated: 2026-03-23T00:00:00Z
 
 # Benchmark Group Inventory
 
@@ -238,3 +238,5 @@ All current benchmark scripts default to CPU except the transform GPU-optional g
 - The current compile group has one official matrix compile benchmark and no scalar/special compile-specific benchmark yet.
 - The current AD benchmark group is matrix-free focused today.
 - PETSc/SLEPc remain comparison-only through `benchmark_matrix_backend_candidates.py`.
+- Legacy matrix sparse surface benchmarks are now being normalized onto the shared benchmark-report schema while preserving their existing stdout summaries for notebook/report compatibility.
+- The current matrix sparse tranche now includes shared-schema coverage for sparse, block-sparse, and variable-block sparse surface benchmarks.

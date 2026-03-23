@@ -51,10 +51,66 @@ def test_barnes_double_gamma_benchmark_writes_shared_schema_report() -> None:
     assert result.returncode == 0, result.stderr
     assert "--dps" in result.stdout
     assert "--prec-bits" in result.stdout
+    assert "--dtype" in result.stdout
+
+
+def test_block_sparse_benchmark_writes_shared_schema_report() -> None:
+    payload = _run_and_load(
+        [
+            "benchmarks/benchmark_block_sparse_matrix_surface.py",
+            "--n-blocks",
+            "2",
+            "--block-size",
+            "2",
+            "--warmup",
+            "0",
+            "--runs",
+            "1",
+            "--dtype",
+            "float32",
+            "--smoke",
+        ],
+        "benchmark_block_sparse_matrix_surface.json",
+    )
+    assert payload["benchmark_name"] == "benchmark_block_sparse_matrix_surface.py"
+    assert payload["category"] == "matrix_block_sparse"
+    assert payload["records"]
+    assert any(row["operation"] == "matvec" for row in payload["records"])
+    assert {"float32", "complex64"} == {row["dtype"] for row in payload["records"]}
+    assert payload["environment"]["jax"]["requested_mode"] == "cpu"
+
+
+def test_vblock_sparse_benchmark_writes_shared_schema_report() -> None:
+    payload = _run_and_load(
+        [
+            "benchmarks/benchmark_vblock_sparse_matrix_surface.py",
+            "--n",
+            "4",
+            "--warmup",
+            "0",
+            "--runs",
+            "1",
+            "--dtype",
+            "float32",
+            "--smoke",
+        ],
+        "benchmark_vblock_sparse_matrix_surface.json",
+    )
+    assert payload["benchmark_name"] == "benchmark_vblock_sparse_matrix_surface.py"
+    assert payload["category"] == "matrix_vblock_sparse"
+    assert payload["records"]
+    assert any(row["operation"] == "matvec" for row in payload["records"])
+    assert {"float32", "complex64"} == {row["dtype"] for row in payload["records"]}
+    assert payload["environment"]["jax"]["requested_mode"] == "cpu"
 
 
 def test_normalized_benchmark_help_shows_dtype_portability_controls() -> None:
-    for script in ("benchmarks/benchmark_fft_nufft.py", "benchmarks/benchmark_sparse_matrix_surface.py"):
+    for script in (
+        "benchmarks/benchmark_fft_nufft.py",
+        "benchmarks/benchmark_sparse_matrix_surface.py",
+        "benchmarks/benchmark_block_sparse_matrix_surface.py",
+        "benchmarks/benchmark_vblock_sparse_matrix_surface.py",
+    ):
         result = subprocess.run(
             [sys.executable, script, "--help"],
             cwd=REPO_ROOT,

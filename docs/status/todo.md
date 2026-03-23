@@ -190,6 +190,9 @@ Status: `in_progress`
     `sparse_common`
   - remove hidden assumptions in variable-block direct factorizations that
     require square row/column partitions
+  - continue normalizing the block-sparse and variable-block benchmark/report
+    layer so every retained matrix sparse surface follows the shared schema
+    and pytest-owned runtime-report contract
 - `planned`
   - add interval/box block-sparse and variable-block sparse modes
   - add more benchmark coverage that separates storage-format overhead from

@@ -155,7 +155,10 @@ def main() -> int:
         concern="service_api_speed",
         category="matrix",
         records=tuple(records),
-        environment=collect_runtime_manifest(Path(__file__).resolve().parents[1], jax_mode="auto"),
+        environment=collect_runtime_manifest(
+            Path(__file__).resolve().parents[1],
+            jax_mode="gpu" if jax.default_backend() in {"gpu", "cuda"} else "cpu",
+        ),
         notes="Repeated-call public API benchmark for representative matrix families, including padded vs unpadded service use.",
     )
     path = write_benchmark_report(args.output, report)
