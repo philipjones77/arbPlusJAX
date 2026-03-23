@@ -218,13 +218,13 @@ Status: `in_progress`
   - variable-block `srb_vblock_mat` / `scb_vblock_mat` surfaces exist for
     partitioned COO/CSR, dense conversion, apply, cached apply, matmul, and
     direct solve/factorization helpers
+  - direct-owner tests now exist for `block_sparse_core` and `sparse_core`
 - `in_progress`
   - extend sparse interval/box storage and wrappers into fuller four-mode
     coverage
   - strengthen symbolic and numeric sparse direct-factorization quality beyond
     the current point-mode LU/QR layer
-  - add direct-owner tests for `block_sparse_core`, `sparse_core`, and
-    `sparse_common`
+  - add a direct-owner test for `sparse_common`
   - remove hidden assumptions in variable-block direct factorizations that
     require square row/column partitions
   - continue normalizing the block-sparse and variable-block benchmark/report
@@ -534,16 +534,18 @@ Status: `in_progress`
 
 Highest priority:
 - add
-  [test_block_sparse_core_contracts.py](/tests/test_block_sparse_core_contracts.py)
-- add
-  [test_sparse_core_contracts.py](/tests/test_sparse_core_contracts.py)
-- add
   [test_krylov_solvers_contracts.py](/tests/test_krylov_solvers_contracts.py)
 - add
   [test_transform_common_contracts.py](/tests/test_transform_common_contracts.py)
 
+Next priority:
+- add
+  [test_sparse_common_contracts.py](/tests/test_sparse_common_contracts.py)
+- add
+  [test_iterative_solvers_contracts.py](/tests/test_iterative_solvers_contracts.py)
+
 Execution order:
-1. Add the four highest-priority direct-owner tests above.
+1. Add the two highest-priority direct-owner tests above.
 2. Re-run the CPU chassis and profile suite.
 3. Expand AD and compile-behavior assertions where those tests expose weak
    spots.

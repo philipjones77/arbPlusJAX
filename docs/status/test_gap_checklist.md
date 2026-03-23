@@ -124,7 +124,7 @@ clearer if each eventually had a more explicit owner.
 
 - `matrix_free_core`
 - `block_sparse_core`
-  Covered indirectly through block/vblock sparse chassis tests.
+- `sparse_core`
 - `iterative_solvers`
   Covered indirectly through matrix-free public surfaces.
 - `kernel_helpers`
@@ -136,8 +136,6 @@ clearer if each eventually had a more explicit owner.
 - `sampling_helpers`
   Covered indirectly through stochastic/logdet paths.
 - `sparse_common`
-  Covered indirectly through sparse matrix chassis tests.
-- `sparse_core`
   Covered indirectly through sparse matrix chassis tests.
 - `transform_common`
   Covered indirectly through DFT/NUFFT surfaces.
@@ -162,12 +160,6 @@ focused test file instead of relying on incidental coverage.
 
 ### Highest priority
 
-- `block_sparse_core`
-  Add a focused shared-infrastructure contract test file for fixed-block sparse
-  formats, cached plans, and solve helpers.
-- `sparse_core`
-  Add a focused shared sparse-core contract test file for common sparse
-  canonicalization and shared matvec helpers.
 - `krylov_solvers`
   Add a direct solver-layer contract test instead of relying only on matrix-free
   public surfaces.
@@ -177,8 +169,6 @@ focused test file instead of relying on incidental coverage.
 
 ### Next priority
 
-- `block_sparse_core`
-- `sparse_core`
 - `sparse_common`
 - `krylov_solvers`
 - `iterative_solvers`
@@ -190,20 +180,16 @@ focused test file instead of relying on incidental coverage.
 
 The first concrete additions should be:
 
-- `tests/test_block_sparse_core_contracts.py`
-- `tests/test_sparse_core_contracts.py`
 - `tests/test_krylov_solvers_contracts.py`
 - `tests/test_transform_common_contracts.py`
 
 Then, if that is green:
-- `tests/test_block_sparse_core_contracts.py`
-- `tests/test_sparse_core_contracts.py`
 - `tests/test_krylov_solvers_contracts.py`
 - `tests/test_transform_common_contracts.py`
 
 ## 5. Execution Order
 
-1. Add direct-owner tests for the four highest-priority modules above.
+1. Add direct-owner tests for the two highest-priority modules above.
 2. Re-run the CPU chassis/profile suite.
 3. Expand AD and compile-behavior assertions where those new tests expose weak spots.
 4. Add the second-priority shared-infra test files.
