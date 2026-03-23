@@ -196,6 +196,18 @@ def test_acb_dirichlet_benchmark_writes_shared_schema_report() -> None:
     assert payload["environment"]["jax"]["requested_mode"] == "cpu"
 
 
+def test_hypgeom_extra_benchmark_writes_shared_schema_report() -> None:
+    payload = _run_and_load(
+        ["benchmarks/benchmark_hypgeom_extra.py", "--iters", "2", "--dtype", "float32", "--jax-mode", "cpu", "--smoke"],
+        "benchmark_hypgeom_extra.json",
+    )
+    assert payload["benchmark_name"] == "benchmark_hypgeom_extra.py"
+    assert payload["category"] == "special"
+    assert payload["records"]
+    assert payload["records"][0]["dtype"] == "float32"
+    assert payload["environment"]["jax"]["requested_mode"] == "cpu"
+
+
 def test_normalized_benchmark_help_shows_dtype_portability_controls() -> None:
     for script in (
         "benchmarks/benchmark_fft_nufft.py",
@@ -209,6 +221,7 @@ def test_normalized_benchmark_help_shows_dtype_portability_controls() -> None:
         "benchmarks/benchmark_acb_calc.py",
         "benchmarks/benchmark_dirichlet.py",
         "benchmarks/benchmark_acb_dirichlet.py",
+        "benchmarks/benchmark_hypgeom_extra.py",
     ):
         result = subprocess.run(
             [sys.executable, script, "--help"],

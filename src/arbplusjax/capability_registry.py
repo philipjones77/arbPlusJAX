@@ -49,6 +49,21 @@ DOWNSTREAM_KERNELS: dict[str, dict[str, object]] = {
         "family": "barnes",
         "notes": "Supported downstream log Barnes double-gamma kernel through the IFJ-compatible public provider surface.",
     },
+    "fragile_regime_promotion_gamma_upper": {
+        "public_name": "incomplete_gamma_upper",
+        "family": "gamma",
+        "notes": "Downstream promotion hook for fragile upper incomplete-gamma regimes; callers should use method='high_precision_refine' or method='auto' and inspect diagnostics.",
+    },
+    "fragile_regime_promotion_bessel_k": {
+        "public_name": "incomplete_bessel_k",
+        "family": "bessel",
+        "notes": "Downstream promotion hook for fragile incomplete-Bessel-K regimes; callers should use method='high_precision_refine' or method='auto' and inspect diagnostics.",
+    },
+    "fragile_regime_promotion_bessel_i": {
+        "public_name": "incomplete_bessel_i",
+        "family": "bessel",
+        "notes": "Downstream promotion hook for fragile incomplete-Bessel-I regimes; callers should use method='high_precision_refine' or method='auto' and inspect diagnostics.",
+    },
 }
 
 

@@ -115,7 +115,10 @@ Status: `in_progress`
   - Barnes/double-gamma now has explicit downstream capability aliases through
     the IFJ-compatible public surface; continue tightening diagnostics and
     narrower provider wording around that capability
-  - make fragile-regime promotion hooks provider-grade
+  - fragile-regime promotion hooks now have explicit downstream capability
+    aliases for incomplete gamma upper and incomplete Bessel `I`/`K`;
+    continue narrowing terminology and diagnostics expectations around those
+    hooks
   - make incomplete-Bessel provider-grade next
 - `planned`
   - document a narrower capability-contract surface specifically for
@@ -430,6 +433,8 @@ Status: `in_progress`
 - `in_progress`
   - normalize special-function service benchmarks and diagnostics reporting more
     fully across hypergeometric, Bessel, gamma, and Barnes families
+  - direct normalized special benchmark coverage now also includes
+    `benchmark_hypgeom_extra.py`
   - continue converting notebook and benchmark guidance into schema-backed
     artifacts rather than stdout-only summaries
 

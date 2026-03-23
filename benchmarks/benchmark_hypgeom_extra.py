@@ -7,33 +7,53 @@ ensure_src_on_path(__file__)
 
 import argparse
 import time
+from pathlib import Path
 
 import jax
 import jax.numpy as jnp
 
 from arbplusjax import hypgeom
+from benchmarks.schema import BenchmarkMeasurement
+from benchmarks.schema import BenchmarkRecord
+from benchmarks.schema import BenchmarkReport
+from benchmarks.schema import write_benchmark_report
+from tools.runtime_manifest import collect_runtime_manifest
 
 
-def _timer(fn, *args, iters: int = 50) -> float:
-    fn(*args)
-    jax.block_until_ready(fn(*args))
+def _timer(fn, *, iters: int = 50) -> tuple[float, float]:
+    out = fn()
+    jax.block_until_ready(out)
+    start = time.perf_counter()
+    cold = fn()
+    jax.block_until_ready(cold)
+    cold_s = time.perf_counter() - start
     start = time.perf_counter()
     for _ in range(iters):
-        jax.block_until_ready(fn(*args))
-    end = time.perf_counter()
-    return (end - start) / iters
+        out = fn()
+        jax.block_until_ready(out)
+    warm_s = (time.perf_counter() - start) / iters
+    return cold_s, warm_s
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser()
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Benchmark extra hypergeometric JAX kernels.")
     parser.add_argument("--iters", type=int, default=50)
     parser.add_argument("--n", type=int, default=3)
+    parser.add_argument("--dtype", choices=("float32", "float64"), default="float64")
+    parser.add_argument("--jax-mode", choices=("auto", "cpu", "gpu"), default="auto")
+    parser.add_argument("--smoke", action="store_true", help="Run a reduced subset for pytest-owned schema checks.")
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=Path("experiments/benchmarks/outputs/hypgeom/benchmark_hypgeom_extra.json"),
+    )
     args = parser.parse_args()
 
-    x = jnp.array([0.2, 0.3], dtype=jnp.float64)
-    s = jnp.array([1.0, 1.0], dtype=jnp.float64)
-    a = jnp.array([0.5, 0.5], dtype=jnp.float64)
-    b = jnp.array([1.5, 1.5], dtype=jnp.float64)
+    real_dtype = jnp.float64 if args.dtype == "float64" else jnp.float32
+    x = jnp.array([0.2, 0.3], dtype=real_dtype)
+    s = jnp.array([1.0, 1.0], dtype=real_dtype)
+    a = jnp.array([0.5, 0.5], dtype=real_dtype)
+    b = jnp.array([1.5, 1.5], dtype=real_dtype)
 
     bench = [
         ("fresnel", lambda: hypgeom.arb_hypgeom_fresnel_batch_jit(jnp.stack([x, x]))),
@@ -59,11 +79,46 @@ def main() -> None:
         ("gegenbauer", lambda: hypgeom.arb_hypgeom_gegenbauer_c_batch_jit(args.n, jnp.stack([a, a]), jnp.stack([x, x]))),
         ("central_bin", lambda: hypgeom.arb_hypgeom_central_bin_ui_batch_jit(jnp.array([args.n, args.n + 1]))),
     ]
+    if args.smoke:
+        bench = bench[:6]
 
+    effective_iters = min(args.iters, 5) if args.smoke else args.iters
+    records = []
     for name, fn in bench:
-        dt = _timer(fn, iters=args.iters)
-        print(f"{name:14s} {dt*1e6:8.2f} us")
+        cold_s, warm_s = _timer(fn, iters=effective_iters)
+        print(f"{name:14s} {warm_s*1e6:8.2f} us")
+        records.append(
+            BenchmarkRecord(
+                benchmark_name="benchmark_hypgeom_extra.py",
+                concern="scalar_speed",
+                category="special",
+                implementation="hypgeom",
+                operation=name,
+                device=jax.default_backend(),
+                dtype=args.dtype,
+                cold_time_s=float(cold_s),
+                warm_time_s=float(warm_s),
+                measurements=(
+                    BenchmarkMeasurement(name="iters", value=effective_iters),
+                    BenchmarkMeasurement(name="n", value=args.n),
+                    BenchmarkMeasurement(name="requested_dtype", value=args.dtype),
+                    BenchmarkMeasurement(name="smoke", value=args.smoke),
+                ),
+                notes="Legacy hypergeometric extra benchmark normalized onto the shared benchmark schema; stdout remains summary-style for notebook compatibility.",
+            )
+        )
+
+    report = BenchmarkReport(
+        benchmark_name="benchmark_hypgeom_extra.py",
+        concern="scalar_speed",
+        category="special",
+        records=tuple(records),
+        environment=collect_runtime_manifest(Path(__file__).resolve().parents[1], jax_mode=args.jax_mode),
+        notes="Hypergeometric extras benchmark with explicit dtype and requested runtime mode controls.",
+    )
+    write_benchmark_report(args.output, report)
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
