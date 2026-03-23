@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+import json
+from dataclasses import asdict, dataclass
 from inspect import Parameter, signature
-from typing import Callable, Container, Mapping
+from typing import Any, Callable, Container, Mapping
 
 
 _ALT_PREFIXES = ("boost_", "cuda_", "cusf_", "mpmath_", "scipy_", "shahen_")
@@ -44,6 +45,88 @@ class PublicFunctionMetadata:
     regime_tags: tuple[str, ...]
     derivative_status: str
     notes: str
+
+
+def metadata_to_record(entry: PublicFunctionMetadata) -> dict[str, Any]:
+    return asdict(entry)
+
+
+def metadata_matches(
+    entry: PublicFunctionMetadata,
+    *,
+    family: str | None = None,
+    stability: str | None = None,
+    module: str | None = None,
+    name_prefix: str | None = None,
+    derivative_status: str | None = None,
+) -> bool:
+    if family is not None and entry.family != family:
+        return False
+    if stability is not None and entry.stability != stability:
+        return False
+    if module is not None and entry.module != module:
+        return False
+    if name_prefix is not None and not entry.name.startswith(name_prefix):
+        return False
+    if derivative_status is not None and entry.derivative_status != derivative_status:
+        return False
+    return True
+
+
+def filter_metadata_entries(
+    entries: list[PublicFunctionMetadata],
+    *,
+    family: str | None = None,
+    stability: str | None = None,
+    module: str | None = None,
+    name_prefix: str | None = None,
+    derivative_status: str | None = None,
+) -> list[PublicFunctionMetadata]:
+    filtered = [
+        entry
+        for entry in entries
+        if metadata_matches(
+            entry,
+            family=family,
+            stability=stability,
+            module=module,
+            name_prefix=name_prefix,
+            derivative_status=derivative_status,
+        )
+    ]
+    return sorted(filtered, key=lambda entry: entry.name)
+
+
+def render_metadata_json(
+    entries: list[PublicFunctionMetadata],
+    *,
+    family: str | None = None,
+    stability: str | None = None,
+    module: str | None = None,
+    name_prefix: str | None = None,
+    derivative_status: str | None = None,
+) -> str:
+    filtered = filter_metadata_entries(
+        entries,
+        family=family,
+        stability=stability,
+        module=module,
+        name_prefix=name_prefix,
+        derivative_status=derivative_status,
+    )
+    payload = {
+        "generated_at": "2026-03-23T00:00:00Z",
+        "source": "arbplusjax.public_metadata",
+        "filters": {
+            "family": family,
+            "stability": stability,
+            "module": module,
+            "name_prefix": name_prefix,
+            "derivative_status": derivative_status,
+        },
+        "functions": [metadata_to_record(entry) for entry in filtered],
+    }
+    return json.dumps(payload, indent=2, sort_keys=True)
 
 
 def build_public_metadata_registry(

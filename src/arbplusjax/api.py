@@ -29,7 +29,12 @@ from .kernel_helpers import (
     trim_batch_out,
 )
 from . import point_wrappers
-from .public_metadata import PublicFunctionMetadata, build_public_metadata_registry
+from .public_metadata import (
+    PublicFunctionMetadata,
+    build_public_metadata_registry,
+    filter_metadata_entries,
+    render_metadata_json,
+)
 from . import scb_block_mat
 from . import scb_mat
 from . import scb_vblock_mat
@@ -1966,6 +1971,7 @@ __all__ = [
     "list_interval_functions",
     "get_public_function_metadata",
     "list_public_function_metadata",
+    "render_public_function_metadata_json",
     "PublicFunctionMetadata",
     "TailDerivativeMetadata",
     "TailEvaluationDiagnostics",
@@ -2592,13 +2598,36 @@ def list_public_function_metadata(
     *,
     family: str | None = None,
     stability: str | None = None,
+    module: str | None = None,
+    name_prefix: str | None = None,
+    derivative_status: str | None = None,
 ) -> list[PublicFunctionMetadata]:
-    entries = list(_PUBLIC_METADATA_REGISTRY().values())
-    if family is not None:
-        entries = [entry for entry in entries if entry.family == family]
-    if stability is not None:
-        entries = [entry for entry in entries if entry.stability == stability]
-    return sorted(entries, key=lambda entry: entry.name)
+    return filter_metadata_entries(
+        list(_PUBLIC_METADATA_REGISTRY().values()),
+        family=family,
+        stability=stability,
+        module=module,
+        name_prefix=name_prefix,
+        derivative_status=derivative_status,
+    )
+
+
+def render_public_function_metadata_json(
+    *,
+    family: str | None = None,
+    stability: str | None = None,
+    module: str | None = None,
+    name_prefix: str | None = None,
+    derivative_status: str | None = None,
+) -> str:
+    return render_metadata_json(
+        list(_PUBLIC_METADATA_REGISTRY().values()),
+        family=family,
+        stability=stability,
+        module=module,
+        name_prefix=name_prefix,
+        derivative_status=derivative_status,
+    )
 
 
 _POINT_FUNC_NAMES = tuple(sorted(_POINT_FUNCS.keys()))

@@ -49,6 +49,7 @@ Examples:
 - public API obligations
 - stable payload schema guarantees
 - public metadata structure guarantees
+- public metadata filtering and serialization guarantees
 - capability contracts needed by downstream users
 
 Do not put the following in `contracts/`:
@@ -101,6 +102,10 @@ Provider-grade surfaces should make the following inspectable when relevant:
 - AD status
 - hardening level
 - regime or method tags
+
+Provider-grade metadata should also support deterministic report-facing
+serialization and explicit filtering so downstream adapters do not have to
+inspect private module layout.
 
 ## Thin Adapter Rule
 

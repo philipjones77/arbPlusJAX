@@ -1,3 +1,4 @@
+import json
 from dataclasses import asdict, fields
 
 from arbplusjax import api
@@ -84,3 +85,43 @@ def test_public_metadata_helper_only_rows_are_explicitly_non_callable_surfaces()
     assert meta.interval_support is False
     assert meta.value_kinds == ()
     assert meta.notes
+
+
+def test_public_metadata_filtering_supports_report_facing_queries():
+    matrix_rows = api.list_public_function_metadata(family="matrix", module="arb_mat")
+    stable_gamma_rows = api.list_public_function_metadata(family="gamma", stability="stable")
+    derivative_rows = api.list_public_function_metadata(derivative_status="explicit_custom_jvp_and_explicit_argument_lower")
+    prefixed_rows = api.list_public_function_metadata(name_prefix="incomplete_bessel_")
+
+    assert matrix_rows
+    assert all(entry.family == "matrix" and entry.module == "arb_mat" for entry in matrix_rows)
+    assert stable_gamma_rows
+    assert all(entry.family == "gamma" and entry.stability == "stable" for entry in stable_gamma_rows)
+    assert derivative_rows
+    assert "incomplete_bessel_k" in {entry.name for entry in derivative_rows}
+    assert all(entry.derivative_status == "explicit_custom_jvp_and_explicit_argument_lower" for entry in derivative_rows)
+    assert {entry.name for entry in prefixed_rows} >= {"incomplete_bessel_i", "incomplete_bessel_k"}
+
+
+def test_public_metadata_json_render_has_stable_top_level_shape():
+    payload = json.loads(
+        api.render_public_function_metadata_json(
+            family="matrix",
+            module="arb_mat",
+            stability="stable",
+        )
+    )
+
+    assert payload["generated_at"] == "2026-03-23T00:00:00Z"
+    assert payload["source"] == "arbplusjax.public_metadata"
+    assert payload["filters"] == {
+        "family": "matrix",
+        "stability": "stable",
+        "module": "arb_mat",
+        "name_prefix": None,
+        "derivative_status": None,
+    }
+    assert payload["functions"]
+    assert payload["functions"] == sorted(payload["functions"], key=lambda row: row["name"])
+    assert all(row["family"] == "matrix" for row in payload["functions"])
+    assert all(row["module"] == "arb_mat" for row in payload["functions"])

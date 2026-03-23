@@ -526,6 +526,8 @@ Status: `in_progress`
     `capability_registry`
   - direct owner tests now exist for `checks`, `coeffs`, `precision`,
     `validation`, and `soft_types`
+  - public metadata now supports explicit filtering and deterministic JSON
+    serialization for report-facing and downstream-adapter usage
 - `in_progress`
   - keep stable versus experimental API status explicit in metadata and status
     reports
@@ -535,9 +537,6 @@ Status: `in_progress`
     `docs/implementation/modules/acb_mat.md`,
     `docs/implementation/modules/jrb_mat.md`, and
     `docs/implementation/modules/jcb_mat.md` aligned with source
-- `planned`
-  - add a tighter contract for metadata serialization, filtering, and
-    report-facing structure guarantees
 
 ## Priority test-owner additions
 

@@ -172,6 +172,33 @@ Recommended diagnostics capabilities:
 - optional HLO capture
 - optional JAX profiler traces
 
+## Public Metadata Standard
+
+### Metadata contract
+
+- Public metadata should be exposed as a structured API surface, not inferred by downstream callers from module layout.
+- Metadata should be stable enough for downstream routing, report generation, and capability inspection.
+- Metadata should describe public surfaces rather than private helper topology.
+
+Recommended fields include:
+
+- family
+- stability
+- mode support
+- value kinds
+- execution strategies
+- method and regime tags
+- derivative status
+- notes that summarize hardening or usage status
+
+### Metadata filtering and serialization
+
+- Public metadata should support explicit filtering rather than requiring downstream consumers to reimplement selection logic.
+- Filtering should use stable named fields such as family, stability, module, public-name prefix, or derivative status.
+- Public metadata should support deterministic serialization for report-facing and adapter-facing consumers.
+- Serialized payloads should include source and filter context so generated reports remain auditable.
+- Metadata serialization belongs in the API/report layer, not in hot numerical kernels.
+
 ## Logging Standard
 
 - Logging is opt-in.
