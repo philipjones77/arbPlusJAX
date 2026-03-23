@@ -75,12 +75,14 @@ These modules already have clearly named test owners in `tests/`.
 ### API / runtime / metadata layers
 
 - `api`
+- `capability_registry`
 - `cusf_compat`
 - `elementary`
 - `function_provenance`
 - `jax_diagnostics`
 - `jax_precision`
 - `point_wrappers`
+- `public_metadata`
 - `runtime`
 - `soft_ops`
 
@@ -141,16 +143,12 @@ clearer if each eventually had a more explicit owner.
 
 ### Metadata, support, and validation
 
-- `capability_registry`
-  Covered indirectly through API metadata and provenance tests.
 - `checks`
   Covered indirectly through status and implementation tests.
 - `coeffs`
   Covered indirectly through polynomial and analytic families.
 - `precision`
   Covered indirectly through `jax_precision` tests and package import behavior.
-- `public_metadata`
-  Covered indirectly through API metadata and function-provenance tests.
 - `soft_types`
   Covered indirectly through `soft_ops`.
 - `validation`
@@ -173,12 +171,6 @@ focused test file instead of relying on incidental coverage.
 - `matrix_free_core`
   Add a focused shared-substrate contract test file for operator plans,
   restart helpers, generalized operator plans, and shape/static-arg behavior.
-- `public_metadata`
-  Add a direct test file for registry serialization, metadata structure, and
-  package-root metadata queries.
-- `capability_registry`
-  Add a direct test file for capability entries, filtering, and report-facing
-  structure guarantees.
 - `bessel_kernels`
   Add a direct low-level kernel contract file so cylindrical kernels are tested
   independently from higher-level spherical/Hankel wrappers.
@@ -202,8 +194,6 @@ focused test file instead of relying on incidental coverage.
 The first concrete additions should be:
 
 - `tests/test_matrix_free_core_contracts.py`
-- `tests/test_public_metadata_contracts.py`
-- `tests/test_capability_registry_contracts.py`
 - `tests/test_bessel_kernels_contracts.py`
 - `tests/test_barnesg_contracts.py`
 

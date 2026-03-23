@@ -512,8 +512,9 @@ Status: `in_progress`
   - direct test owners already exist for `api`, `runtime`, `elementary`,
     `function_provenance`, `jax_diagnostics`, `jax_precision`, `cusf_compat`,
     and `soft_ops`
+  - direct owner tests now exist for `public_metadata` and
+    `capability_registry`
 - `in_progress`
-  - add direct owner tests for `public_metadata` and `capability_registry`
   - add direct owner tests for `validation` and `soft_types`
   - keep stable versus experimental API status explicit in metadata and status
     reports
@@ -534,10 +535,6 @@ Status: `in_progress`
 Highest priority:
 - add
   [test_matrix_free_core_contracts.py](/tests/test_matrix_free_core_contracts.py)
-- add
-  [test_public_metadata_contracts.py](/tests/test_public_metadata_contracts.py)
-- add
-  [test_capability_registry_contracts.py](/tests/test_capability_registry_contracts.py)
 - add
   [test_bessel_kernels_contracts.py](/tests/test_bessel_kernels_contracts.py)
 - add
