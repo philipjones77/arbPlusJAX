@@ -1,8 +1,10 @@
+import jax
 import jax.numpy as jnp
 
 from arbplusjax import acb_core
 from arbplusjax import api
 from arbplusjax import double_interval as di
+from arbplusjax import point_wrappers
 
 
 def _real_interval_batch(values: jax.Array) -> jax.Array:
@@ -47,7 +49,8 @@ def test_matrix_service_binders_cover_point_and_interval_paths():
 
     assert det_point.shape == (dense.shape[0],)
     assert solve_basic.shape == vec.shape + (2,)
-    assert complex_matvec.shape == complex_vec.shape
+    assert complex_matvec.shape == vec.shape
+    assert jnp.allclose(complex_matvec, point_wrappers.acb_mat_matvec_batch_fixed_point(complex_dense, complex_vec))
 
 
 def test_matrix_service_chunked_binders_match_nonchunked_api_results():

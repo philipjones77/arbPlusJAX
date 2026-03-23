@@ -590,7 +590,8 @@ def _maybe_hypgeom_basic_batch_fastpath(
             del kwargs["prec_bits"]
         if extra_kwargs:
             kwargs.update(extra_kwargs)
-        return fn(*args, **kwargs)
+        out = fn(*args, **kwargs)
+        return trim_batch_out(out, batch_n if batch_n is not None else 0)
     fn = getattr(mod, fixed_name, None)
     if fn is None:
         return None
@@ -645,7 +646,8 @@ def _maybe_direct_interval_batch_fastpath(
     if pad_to is not None and name in _DIRECT_INTERVAL_BASIC_BATCH_FASTPATHS | _DIRECT_INTERVAL_MODE_BATCH_FASTPATHS:
         if batch_n is not None and int(pad_to) == batch_n:
             return fixed_fn(*args, **kwargs)
-        return padded_fn(*args, pad_to=pad_to, **kwargs)
+        out = padded_fn(*args, pad_to=pad_to, **kwargs)
+        return trim_batch_out(out, batch_n if batch_n is not None else 0)
     call_args, trim_n = pad_mixed_batch_args_repeat_last(args, pad_to=pad_to)
     out = fixed_fn(*call_args, **kwargs)
     return trim_batch_out(out, trim_n)
@@ -720,7 +722,8 @@ def _maybe_hypgeom_mode_batch_fastpath(
             kwargs["prec_bits"] = prec_bits
         if extra_kwargs:
             kwargs.update(extra_kwargs)
-        return fn(*args, **kwargs)
+        out = fn(*args, **kwargs)
+        return trim_batch_out(out, batch_n if batch_n is not None else 0)
     fn = getattr(mod, fixed_name, None)
     if fn is None:
         return None
@@ -1672,13 +1675,13 @@ def eval_point_batch_chunked(
     **kwargs,
 ) -> jax.Array:
     target = _resolve_dtype_for_args(args, dtype)
-    batch_args, n = pad_batch_args(
+    del pad_value
+    batch_args, n = pad_mixed_batch_args_repeat_last(
         tuple(_cast_arg_to_dtype(arg, target) for arg in args),
         pad_to=pad_to,
-        pad_value=pad_value,
     )
     out = _chunked_apply(
-        lambda *aa: eval_point_batch(name, *aa, dtype=target, pad_to=None, pad_value=pad_value, **kwargs),
+        lambda *aa: eval_point_batch(name, *aa, dtype=target, pad_to=None, **kwargs),
         batch_args,
         chunk_size,
     )
@@ -1698,10 +1701,10 @@ def eval_interval_batch_chunked(
     **kwargs,
 ) -> jax.Array:
     target = _resolve_dtype_for_args(args, dtype)
-    batch_args, n = pad_batch_args(
+    del pad_value
+    batch_args, n = pad_mixed_batch_args_repeat_last(
         tuple(_cast_arg_to_dtype(arg, target) for arg in args),
         pad_to=pad_to,
-        pad_value=pad_value,
     )
     out = _chunked_apply(
         lambda *aa: eval_interval_batch(
@@ -1712,7 +1715,6 @@ def eval_interval_batch_chunked(
             dps=dps,
             dtype=target,
             pad_to=None,
-            pad_value=pad_value,
             **kwargs,
         ),
         batch_args,

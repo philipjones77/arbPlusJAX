@@ -10,6 +10,7 @@ from . import acb_core
 from . import acb_dirichlet
 from . import acb_elliptic
 from . import acb_modular
+from . import barnesg
 from . import checks
 from . import double_interval as di
 from . import hypgeom
@@ -435,9 +436,9 @@ def arb_mat_rmatvec_point(a: jax.Array, x: jax.Array) -> jax.Array:
 
 def arb_mat_lu_solve_point(plan: mat_common.DenseLUSolvePlan | tuple[jax.Array, jax.Array, jax.Array], b: jax.Array) -> jax.Array:
     plan = mat_common.as_dense_lu_solve_plan(plan, algebra="arb", label="point_wrappers.arb_mat_lu_solve_point")
-    p_mid = _arb_mat_point_matrix(plan.p)
-    l_mid = _arb_mat_point_matrix(plan.l)
-    u_mid = _arb_mat_point_matrix(plan.u)
+    p_mid = jnp.asarray(plan.p)
+    l_mid = jnp.asarray(plan.l)
+    u_mid = jnp.asarray(plan.u)
     b_mid = _arb_mat_point_rhs(b)
     vector_rhs = b_mid.ndim == p_mid.ndim - 1
     pb = jnp.einsum("...ij,...j->...i", p_mid, b_mid) if vector_rhs else jnp.matmul(p_mid, b_mid)
@@ -462,9 +463,9 @@ def arb_mat_solve_transpose_point(a_or_plan, b: jax.Array) -> jax.Array:
         return mat_common.lower_cholesky_solve_transpose(factor, _arb_mat_point_rhs(b))
     if isinstance(a_or_plan, mat_common.DenseLUSolvePlan) or isinstance(a_or_plan, tuple):
         plan = mat_common.as_dense_lu_solve_plan(a_or_plan, algebra="arb", label="point_wrappers.arb_mat_solve_transpose_point")
-        p_mid = _arb_mat_point_matrix(plan.p)
-        l_mid = _arb_mat_point_matrix(plan.l)
-        u_mid = _arb_mat_point_matrix(plan.u)
+        p_mid = jnp.asarray(plan.p)
+        l_mid = jnp.asarray(plan.l)
+        u_mid = jnp.asarray(plan.u)
         b_mid = _arb_mat_point_rhs(b)
         vector_rhs = b_mid.ndim == p_mid.ndim - 1
         y = lax.linalg.triangular_solve(u_mid, b_mid[..., None] if vector_rhs else b_mid, left_side=True, lower=False, transpose_a=True, conjugate_a=False)
@@ -1059,9 +1060,9 @@ def acb_mat_rmatvec_point(a: jax.Array, x: jax.Array) -> jax.Array:
 
 def acb_mat_lu_solve_point(plan: mat_common.DenseLUSolvePlan | tuple[jax.Array, jax.Array, jax.Array], b: jax.Array) -> jax.Array:
     plan = mat_common.as_dense_lu_solve_plan(plan, algebra="acb", label="point_wrappers.acb_mat_lu_solve_point")
-    p_mid = _acb_mat_point_matrix(plan.p)
-    l_mid = _acb_mat_point_matrix(plan.l)
-    u_mid = _acb_mat_point_matrix(plan.u)
+    p_mid = jnp.asarray(plan.p)
+    l_mid = jnp.asarray(plan.l)
+    u_mid = jnp.asarray(plan.u)
     b_mid = _acb_mat_point_rhs(b)
     vector_rhs = b_mid.ndim == p_mid.ndim - 1
     pb = jnp.einsum("...ij,...j->...i", p_mid, b_mid) if vector_rhs else jnp.matmul(p_mid, b_mid)
@@ -1086,9 +1087,9 @@ def acb_mat_solve_transpose_point(a_or_plan, b: jax.Array) -> jax.Array:
         return mat_common.lower_cholesky_solve_transpose(factor, _acb_mat_point_rhs(b))
     if isinstance(a_or_plan, mat_common.DenseLUSolvePlan) or isinstance(a_or_plan, tuple):
         plan = mat_common.as_dense_lu_solve_plan(a_or_plan, algebra="acb", label="point_wrappers.acb_mat_solve_transpose_point")
-        p_mid = _acb_mat_point_matrix(plan.p)
-        l_mid = _acb_mat_point_matrix(plan.l)
-        u_mid = _acb_mat_point_matrix(plan.u)
+        p_mid = jnp.asarray(plan.p)
+        l_mid = jnp.asarray(plan.l)
+        u_mid = jnp.asarray(plan.u)
         b_mid = _acb_mat_point_rhs(b)
         vector_rhs = b_mid.ndim == p_mid.ndim - 1
         y = lax.linalg.triangular_solve(u_mid, b_mid[..., None] if vector_rhs else b_mid, left_side=True, lower=False, transpose_a=True, conjugate_a=False)
@@ -3206,6 +3207,8 @@ def acb_log_sin_pi_point(x: jax.Array) -> jax.Array:
 
 
 acb_digamma_point = scalarize_unary_complex(_complex_digamma_scalar)
+acb_barnes_g_point = scalarize_unary_complex(barnesg.barnesg_complex)
+acb_log_barnes_g_point = scalarize_unary_complex(barnesg.log_barnesg)
 acb_zeta_point = scalarize_unary_complex(_complex_zeta_scalar)
 
 
@@ -3560,6 +3563,8 @@ __all__.extend(
         "acb_lgamma_point",
         "acb_log_sin_pi_point",
         "acb_digamma_point",
+        "acb_barnes_g_point",
+        "acb_log_barnes_g_point",
         "acb_zeta_point",
         "acb_hurwitz_zeta_point",
         "acb_polygamma_point",
