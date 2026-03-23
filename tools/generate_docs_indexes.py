@@ -15,7 +15,13 @@ def _title_from_name(path: Path) -> str:
 
 
 def _doc_link(path: Path) -> str:
-    return f"[{path.name}]({path.resolve()})"
+    repo_path = path.relative_to(REPO_ROOT).as_posix()
+    return f"[{path.name}](/{repo_path})"
+
+
+def _repo_link(path: Path) -> str:
+    repo_path = path.relative_to(REPO_ROOT).as_posix()
+    return f"[{repo_path}](/{repo_path})"
 
 
 def _sorted_markdown_files(folder: Path) -> list[Path]:
@@ -37,15 +43,18 @@ def render_docs_index() -> str:
         "",
         "Use the docs tree by intent.",
         "",
-        f"- repo architecture: [{'governance/architecture.md'}]({(DOCS_ROOT / 'governance' / 'architecture.md').resolve()})",
-        f"- governance and placement rules: [{'governance/documentation_governance.md'}]({(DOCS_ROOT / 'governance' / 'documentation_governance.md').resolve()})",
-        f"- repo overview: [{'project_overview.md'}]({(DOCS_ROOT / 'project_overview.md').resolve()})",
-        f"- standards and contracts map: [{'standards/README.md'}]({(DOCS_ROOT / 'standards' / 'README.md').resolve()})",
-        f"- current repo inventories and generated reports: [{'reports/README.md'}]({(DOCS_ROOT / 'reports' / 'README.md').resolve()})",
-        f"- implementation notes: [{'implementation/README.md'}]({(DOCS_ROOT / 'implementation' / 'README.md').resolve()})",
-        f"- theory and methodology notes: [{'theory/README.md'}]({(DOCS_ROOT / 'theory' / 'README.md').resolve()})",
-        f"- practical runbooks and numerical guidance: [{'practical/README.md'}]({(DOCS_ROOT / 'practical' / 'README.md').resolve()})",
-        f"- current implementation state and TODOs: [{'status/README.md'}]({(DOCS_ROOT / 'status' / 'README.md').resolve()})",
+        f"- repo architecture: [governance/architecture.md](/{(DOCS_ROOT / 'governance' / 'architecture.md').relative_to(REPO_ROOT).as_posix()})",
+        f"- governance and placement rules: [governance/documentation_governance.md](/{(DOCS_ROOT / 'governance' / 'documentation_governance.md').relative_to(REPO_ROOT).as_posix()})",
+        f"- repo overview: [project_overview.md](/{(DOCS_ROOT / 'project_overview.md').relative_to(REPO_ROOT).as_posix()})",
+        f"- notation and symbol conventions: [notation/README.md](/{(DOCS_ROOT / 'notation' / 'README.md').relative_to(REPO_ROOT).as_posix()})",
+        f"- semantic definitions and invariants: [specs/README.md](/{(DOCS_ROOT / 'specs' / 'README.md').relative_to(REPO_ROOT).as_posix()})",
+        f"- named runtime catalogs and object registries: [objects/README.md](/{(DOCS_ROOT / 'objects' / 'README.md').relative_to(REPO_ROOT).as_posix()})",
+        f"- standards and contracts map: [standards/README.md](/{(DOCS_ROOT / 'standards' / 'README.md').relative_to(REPO_ROOT).as_posix()})",
+        f"- current repo inventories and generated reports: [reports/README.md](/{(DOCS_ROOT / 'reports' / 'README.md').relative_to(REPO_ROOT).as_posix()})",
+        f"- implementation notes: [implementation/README.md](/{(DOCS_ROOT / 'implementation' / 'README.md').relative_to(REPO_ROOT).as_posix()})",
+        f"- theory and methodology notes: [theory/README.md](/{(DOCS_ROOT / 'theory' / 'README.md').relative_to(REPO_ROOT).as_posix()})",
+        f"- practical runbooks and numerical guidance: [practical/README.md](/{(DOCS_ROOT / 'practical' / 'README.md').relative_to(REPO_ROOT).as_posix()})",
+        f"- current implementation state and TODOs: [status/README.md](/{(DOCS_ROOT / 'status' / 'README.md').relative_to(REPO_ROOT).as_posix()})",
     ]
     return "\n".join(lines) + "\n"
 
@@ -82,13 +91,16 @@ def render_project_overview() -> str:
             "",
             "## Docs Map",
             "",
-            f"- governance: [{DOCS_ROOT / 'governance' / 'README.md'}]({(DOCS_ROOT / 'governance' / 'README.md').resolve()})",
-            f"- standards: [{DOCS_ROOT / 'standards' / 'README.md'}]({(DOCS_ROOT / 'standards' / 'README.md').resolve()})",
-            f"- reports: [{DOCS_ROOT / 'reports' / 'README.md'}]({(DOCS_ROOT / 'reports' / 'README.md').resolve()})",
-            f"- status: [{DOCS_ROOT / 'status' / 'README.md'}]({(DOCS_ROOT / 'status' / 'README.md').resolve()})",
-            f"- theory: [{DOCS_ROOT / 'theory' / 'README.md'}]({(DOCS_ROOT / 'theory' / 'README.md').resolve()})",
-            f"- implementation: [{DOCS_ROOT / 'implementation' / 'README.md'}]({(DOCS_ROOT / 'implementation' / 'README.md').resolve()})",
-            f"- practical: [{DOCS_ROOT / 'practical' / 'README.md'}]({(DOCS_ROOT / 'practical' / 'README.md').resolve()})",
+            f"- governance: {_repo_link(DOCS_ROOT / 'governance' / 'README.md')}",
+            f"- standards: {_repo_link(DOCS_ROOT / 'standards' / 'README.md')}",
+            f"- notation: {_repo_link(DOCS_ROOT / 'notation' / 'README.md')}",
+            f"- specs: {_repo_link(DOCS_ROOT / 'specs' / 'README.md')}",
+            f"- objects: {_repo_link(DOCS_ROOT / 'objects' / 'README.md')}",
+            f"- reports: {_repo_link(DOCS_ROOT / 'reports' / 'README.md')}",
+            f"- status: {_repo_link(DOCS_ROOT / 'status' / 'README.md')}",
+            f"- theory: {_repo_link(DOCS_ROOT / 'theory' / 'README.md')}",
+            f"- implementation: {_repo_link(DOCS_ROOT / 'implementation' / 'README.md')}",
+            f"- practical: {_repo_link(DOCS_ROOT / 'practical' / 'README.md')}",
             "",
             "## Generation Rule",
             "",
@@ -132,6 +144,21 @@ def render_standards_readme() -> str:
             "Current implementation progress and active TODOs belong in `docs/status/`.",
         ]
     )
+    return "\n".join(lines) + "\n"
+
+
+def render_notation_readme() -> str:
+    files = _sorted_markdown_files(DOCS_ROOT / "notation")
+    lines = [
+        "Last updated: 2026-03-23T00:00:00Z",
+        "",
+        "# Notation",
+        "",
+        "This section holds authoritative notation conventions, symbol tables, and naming bridges between code and mathematics.",
+        "",
+        "Current notation documents:",
+    ]
+    lines.extend(f"- {_doc_link(path)}" for path in files)
     return "\n".join(lines) + "\n"
 
 
@@ -258,6 +285,7 @@ def generated_docs() -> dict[Path, str]:
         DOCS_ROOT / "project_overview.md": render_project_overview(),
         DOCS_ROOT / "governance" / "README.md": render_governance_readme(),
         DOCS_ROOT / "standards" / "README.md": render_standards_readme(),
+        DOCS_ROOT / "notation" / "README.md": render_notation_readme(),
         DOCS_ROOT / "status" / "README.md": render_status_readme(),
         DOCS_ROOT / "theory" / "README.md": render_theory_readme(),
         DOCS_ROOT / "reports" / "current_repo_mapping.md": render_current_repo_mapping(),

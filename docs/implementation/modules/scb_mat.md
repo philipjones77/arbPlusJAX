@@ -8,8 +8,8 @@ Last updated: 2026-03-15T00:00:00Z
 
 It is separate from:
 
-- [acb_mat](/home/phili/projects/arbplusJAX/src/arbplusjax/acb_mat.py): dense complex box matrix layer
-- [jcb_mat](/home/phili/projects/arbplusJAX/src/arbplusjax/jcb_mat.py): matrix-free complex operator layer
+- [acb_mat](/src/arbplusjax/acb_mat.py): dense complex box matrix layer
+- [jcb_mat](/src/arbplusjax/jcb_mat.py): matrix-free complex operator layer
 
 ## Current Scope
 
@@ -62,6 +62,6 @@ That means:
 
 ## Coverage
 
-- tests: [test_scb_mat_chassis.py](/home/phili/projects/arbplusJAX/tests/test_scb_mat_chassis.py)
-- API tests: [test_sparse_point_api.py](/home/phili/projects/arbplusJAX/tests/test_sparse_point_api.py)
-- benchmark: [benchmark_sparse_matrix_surface.py](/home/phili/projects/arbplusJAX/benchmarks/benchmark_sparse_matrix_surface.py)
+- tests: [test_scb_mat_chassis.py](/tests/test_scb_mat_chassis.py)
+- API tests: [test_sparse_point_api.py](/tests/test_sparse_point_api.py)
+- benchmark: [benchmark_sparse_matrix_surface.py](/benchmarks/benchmark_sparse_matrix_surface.py)

@@ -6,7 +6,7 @@ Last updated: 2026-03-22T00:00:00Z
 
 `jcb_mat` is the Jones-labeled subsystem for complex matrix-free JAX algorithms.
 
-It is separate from [acb_mat](/home/phili/projects/arbplusJAX/src/arbplusjax/acb_mat.py):
+It is separate from [acb_mat](/src/arbplusjax/acb_mat.py):
 - `acb_mat`: canonical Arb/FLINT-style JAX extension surface for complex box matrices
 - `jcb_mat`: operator-style matrix-free subsystem for Arnoldi actions, trace estimators, and AD-aware large-scale complex workflows
 
@@ -165,12 +165,12 @@ Matrix-free layer:
 ## Diagnostics And Benchmarks
 
 Current correctness coverage:
-- [test_jcb_mat_chassis.py](/home/phili/projects/arbplusJAX/tests/test_jcb_mat_chassis.py)
+- [test_jcb_mat_chassis.py](/tests/test_jcb_mat_chassis.py)
 - includes operator apply, polynomial action, `expm` action, Arnoldi exact diagonal cases, trace/logdet estimators, and backward probe-gradient checks
 
 Current benchmark coverage:
-- [benchmark_matrix_free_krylov.py](/home/phili/projects/arbplusJAX/benchmarks/benchmark_matrix_free_krylov.py)
-- current report: [matrix_free_krylov_benchmark.md](/home/phili/projects/arbplusJAX/docs/status/reports/matrix_free_krylov_benchmark.md)
+- [benchmark_matrix_free_krylov.py](/benchmarks/benchmark_matrix_free_krylov.py)
+- current report: [matrix_free_krylov_benchmark.md](/docs/status/reports/matrix_free_krylov_benchmark.md)
 
 Current diagnostic contract:
 - structured diagnostics now exist via `JcbMatKrylovDiagnostics`

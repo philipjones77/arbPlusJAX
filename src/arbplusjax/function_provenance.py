@@ -121,6 +121,10 @@ This standard applies to canonical Arb-like functions, alternative implementatio
 """
 
 
+def _repo_link(path: str) -> str:
+    return f"[{path}](/{path})"
+
+
 SPECIAL_BASE_NAMES = {
     "cusf_besselj": "besselj",
     "cusf_bessely": "bessely",
@@ -1019,12 +1023,12 @@ def render_registry_summary() -> str:
         f"Summary: `entries={total}`, `arb_like={arb_like}`, `alternative={alternative}`, `new={new}`.",
         "",
         "See the split reports for the actual registry tables:",
-        "- `docs/status/reports/arb_like_functions.md`",
-        "- `docs/status/reports/alternative_functions.md`",
-        "- `docs/status/reports/new_functions.md`",
-        "- `docs/status/reports/function_implementation_index.md`",
+        f"- {_repo_link('docs/reports/arb_like_functions.md')}",
+        f"- {_repo_link('docs/reports/alternative_functions.md')}",
+        f"- {_repo_link('docs/reports/new_functions.md')}",
+        f"- {_repo_link('docs/reports/function_implementation_index.md')}",
         "",
-        "See `docs/standards/function_naming_standard.md` for the naming and provenance policy.",
+        f"See {_repo_link('docs/standards/function_naming_standard.md')} for the naming and provenance policy.",
         "",
     ]
     return "\n".join(lines)

@@ -4,7 +4,7 @@ Last updated: 2026-03-20T06:25:37Z
 
 ## Scope
 
-This page is the practical companion to [matrix_free_operator_methods.md](/home/phili/projects/arbplusJAX/docs/theory/matrix_free_operator_methods.md). It explains how to use the current point-mode matrix-free surface effectively, where JAX bottlenecks show up, and how to avoid unnecessary recompilation.
+This page is the practical companion to [matrix_free_operator_methods.md](/docs/theory/matrix_free_operator_methods.md). It explains how to use the current point-mode matrix-free surface effectively, where JAX bottlenecks show up, and how to avoid unnecessary recompilation.
 
 ## 1. Choose The Right Operator Surface
 

@@ -14,9 +14,9 @@ tranche.
 
 Use it together with:
 
-- [jax_api_runtime_standard.md](/home/phili/projects/arbplusJAX/docs/standards/jax_api_runtime_standard.md)
-- [environment_portability_standard.md](/home/phili/projects/arbplusJAX/docs/standards/environment_portability_standard.md)
-- [test_coverage_matrix.md](/home/phili/projects/arbplusJAX/docs/status/test_coverage_matrix.md)
+- [jax_api_runtime_standard.md](/docs/standards/jax_api_runtime_standard.md)
+- [environment_portability_standard.md](/docs/standards/environment_portability_standard.md)
+- [test_coverage_matrix.md](/docs/status/test_coverage_matrix.md)
 
 ## Scope
 

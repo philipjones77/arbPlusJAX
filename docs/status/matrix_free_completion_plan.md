@@ -6,10 +6,10 @@ Last updated: 2026-03-22T00:00:00Z
 
 This plan covers the matrix-free/operator stack implemented in:
 
-- [matrix_free_core.py](/home/phili/projects/arbplusJAX/src/arbplusjax/matrix_free_core.py)
-- [matrix_free_basic.py](/home/phili/projects/arbplusJAX/src/arbplusjax/matrix_free_basic.py)
-- [jrb_mat.py](/home/phili/projects/arbplusJAX/src/arbplusjax/jrb_mat.py)
-- [jcb_mat.py](/home/phili/projects/arbplusJAX/src/arbplusjax/jcb_mat.py)
+- [matrix_free_core.py](/src/arbplusjax/matrix_free_core.py)
+- [matrix_free_basic.py](/src/arbplusjax/matrix_free_basic.py)
+- [jrb_mat.py](/src/arbplusjax/jrb_mat.py)
+- [jcb_mat.py](/src/arbplusjax/jcb_mat.py)
 
 The goal is dense-style functional parity where matrix-free semantics make sense, while keeping point mode as the optimized execution engine and `basic` as a separate semantic layer.
 
@@ -17,9 +17,9 @@ The goal is dense-style functional parity where matrix-free semantics make sense
 
 ### Implemented
 
-- shared operator-plan substrate in [matrix_free_core.py](/home/phili/projects/arbplusJAX/src/arbplusjax/matrix_free_core.py)
+- shared operator-plan substrate in [matrix_free_core.py](/src/arbplusjax/matrix_free_core.py)
   - includes reusable shell-orientation and parametric sparse-plan helpers used by the Jones wrappers
-- shared `basic` semantic wrapper layer in [matrix_free_basic.py](/home/phili/projects/arbplusJAX/src/arbplusjax/matrix_free_basic.py)
+- shared `basic` semantic wrapper layer in [matrix_free_basic.py](/src/arbplusjax/matrix_free_basic.py)
 - dense operator plans
 - shell operator plans
 - finite-difference operator plans with reusable base-point updates
@@ -66,11 +66,11 @@ The goal is dense-style functional parity where matrix-free semantics make sense
 - parameter-differentiable sparse `BCOO` and dense operator-plan constructors now exist in `jrb_mat` / `jcb_mat`
 - diagnostics-aware `basic` wrappers now exist for the main matrix-free solve/inverse/logdet families and the public log-action Krylov wrappers
 - sparse interval/box storage wrappers now exist in `srb_mat` / `scb_mat`
-- dedicated `basic` matrix-free tests in [test_matrix_free_basic.py](/home/phili/projects/arbplusJAX/tests/test_matrix_free_basic.py)
+- dedicated `basic` matrix-free tests in [test_matrix_free_basic.py](/tests/test_matrix_free_basic.py)
 - point chassis coverage in:
-  - [test_jrb_mat_chassis.py](/home/phili/projects/arbplusJAX/tests/test_jrb_mat_chassis.py)
-  - [test_jcb_mat_chassis.py](/home/phili/projects/arbplusJAX/tests/test_jcb_mat_chassis.py)
-- benchmark coverage in [benchmark_matrix_free_krylov.py](/home/phili/projects/arbplusJAX/benchmarks/benchmark_matrix_free_krylov.py)
+  - [test_jrb_mat_chassis.py](/tests/test_jrb_mat_chassis.py)
+  - [test_jcb_mat_chassis.py](/tests/test_jcb_mat_chassis.py)
+- benchmark coverage in [benchmark_matrix_free_krylov.py](/benchmarks/benchmark_matrix_free_krylov.py)
   - includes compile-vs-execute slices for plan-backed solve, inverse, `minres`, multi-shift, restarted `eigsh`, and selected gradient paths
 
 ### Partial
@@ -79,7 +79,7 @@ The goal is dense-style functional parity where matrix-free semantics make sense
 - sparse operator-plan support exists for `COO`, `CSR`, and `BCOO` at the API edge, but internal plan canonicalization is still centered on the common sparse substrate rather than fully distinct format-specialized plans
 - structured complex Hermitian/HPD paths now route the main projected action/integrand families through Hermitian Lanczos-backed kernels, but broader Hermitian-specialized coverage is still incomplete
 - point-mode Jones public chassis is now complete enough to pass the dedicated `jrb_mat` and `jcb_mat` chassis suites from source-tree execution, including solve/inverse, `minres`, action/logdet SLQ, operator-plan `eigsh`, and plan-native JIT coverage for the main repeated-use paths
-- shared midpoint Krylov solve scaffolding now lives in [matrix_free_core.py](/home/phili/projects/arbplusJAX/src/arbplusjax/matrix_free_core.py), reducing duplication between [jrb_mat.py](/home/phili/projects/arbplusJAX/src/arbplusjax/jrb_mat.py) and [jcb_mat.py](/home/phili/projects/arbplusJAX/src/arbplusjax/jcb_mat.py)
+- shared midpoint Krylov solve scaffolding now lives in [matrix_free_core.py](/src/arbplusjax/matrix_free_core.py), reducing duplication between [jrb_mat.py](/src/arbplusjax/jrb_mat.py) and [jcb_mat.py](/src/arbplusjax/jcb_mat.py)
 - SLQ estimator handling now includes exact orthogonal-probe scaling for complete probe families while keeping probe gradients stable
 - `minres` now exists on both the unpreconditioned and current shared preconditioned point-mode path for symmetric / Hermitian indefinite operator solves, including Jones plan/JIT entry points and `basic` wrappers
 - benchmark coverage now includes compile-vs-execute and selected gradient-cost slices, but it is not yet exhaustive across sparse formats and all structured variants
@@ -109,7 +109,7 @@ Priority:
 
 ## 2. Dense-Function Parity
 
-- audit dense matrix functions in [arb_mat.py](/home/phili/projects/arbplusJAX/src/arbplusjax/arb_mat.py) and [acb_mat.py](/home/phili/projects/arbplusJAX/src/arbplusjax/acb_mat.py)
+- audit dense matrix functions in [arb_mat.py](/src/arbplusjax/arb_mat.py) and [acb_mat.py](/src/arbplusjax/acb_mat.py)
 - add matrix-free action analogues where they are numerically appropriate
 - explicitly mark dense-only or tiny-matrix-only functions where matrix-free parity is not the right target
 
@@ -167,7 +167,7 @@ Required matrix-free policy categories:
 
 ## 7. Benchmarks
 
-- expand [benchmark_matrix_free_krylov.py](/home/phili/projects/arbplusJAX/benchmarks/benchmark_matrix_free_krylov.py) with explicit slices for:
+- expand [benchmark_matrix_free_krylov.py](/benchmarks/benchmark_matrix_free_krylov.py) with explicit slices for:
   - complex structured Hermitian / HPD
   - sparse `COO` vs `CSR` vs `BCOO`
   - callable vs plan reuse under repeated loops
@@ -179,7 +179,7 @@ Required matrix-free policy categories:
 
 ## 8. Preconditioners, Multi-Shift, And Recycling
 
-- harden and broaden the current reusable preconditioner-plan abstraction in [matrix_free_core.py](/home/phili/projects/arbplusJAX/src/arbplusjax/matrix_free_core.py)
+- harden and broaden the current reusable preconditioner-plan abstraction in [matrix_free_core.py](/src/arbplusjax/matrix_free_core.py)
 - extend the current shared multi-shift solve substrate toward rational matrix functions and shifted trace/logdet estimators
 - add recycled Krylov basis support for closely related solves and hypergradient-style repeated adjoints
 - add block multi-RHS Krylov support as a standard path, not only as a special-case wrapper
@@ -225,37 +225,37 @@ Current external-boundary rule:
 
 - `petsc4py` / `slepc4py` remain optional benchmark-oracle tooling only
 - no governed runtime path in `src/arbplusjax` should depend on PETSc or SLEPc object models
-- benchmark probing for PETSc/SLEPc remains isolated in [benchmark_matrix_backend_candidates.py](/home/phili/projects/arbplusJAX/benchmarks/benchmark_matrix_backend_candidates.py)
+- benchmark probing for PETSc/SLEPc remains isolated in [benchmark_matrix_backend_candidates.py](/benchmarks/benchmark_matrix_backend_candidates.py)
 
 Implemented or now clearly owned in JAX:
 
 - shell/operator abstraction
-  - owner: [matrix_free_core.py](/home/phili/projects/arbplusJAX/src/arbplusjax/matrix_free_core.py)
+  - owner: [matrix_free_core.py](/src/arbplusjax/matrix_free_core.py)
   - status: landed via `OperatorPlan`, shell plans, sparse plans, and preconditioner plans
 - spectral-transformation substrate
-  - owner: [matrix_free_core.py](/home/phili/projects/arbplusJAX/src/arbplusjax/matrix_free_core.py)
+  - owner: [matrix_free_core.py](/src/arbplusjax/matrix_free_core.py)
   - status: landed for shift-invert, contour quadrature/filtering, restarted subspace utilities, and shared shifted solves
 - public partial-spectrum eigensolver families
-  - owner: [jrb_mat.py](/home/phili/projects/arbplusJAX/src/arbplusjax/jrb_mat.py), [jcb_mat.py](/home/phili/projects/arbplusJAX/src/arbplusjax/jcb_mat.py)
+  - owner: [jrb_mat.py](/src/arbplusjax/jrb_mat.py), [jcb_mat.py](/src/arbplusjax/jcb_mat.py)
   - status: landed for Lanczos/Arnoldi, restarted, block, Krylov-Schur-style, Davidson, Jacobi-Davidson, generalized Hermitian-definite problems, standard and generalized shift-invert, contour front doors, and first Hermitian polynomial/nonlinear point fronts
 - convergence diagnostics
-  - owner: [matrix_free_core.py](/home/phili/projects/arbplusJAX/src/arbplusjax/matrix_free_core.py), [jrb_mat.py](/home/phili/projects/arbplusJAX/src/arbplusjax/jrb_mat.py), [jcb_mat.py](/home/phili/projects/arbplusJAX/src/arbplusjax/jcb_mat.py)
+  - owner: [matrix_free_core.py](/src/arbplusjax/matrix_free_core.py), [jrb_mat.py](/src/arbplusjax/jrb_mat.py), [jcb_mat.py](/src/arbplusjax/jcb_mat.py)
   - status: landed for residual-history, convergence flags, locked count, and deflation count
 - restart and locking policy
-  - owner: [matrix_free_core.py](/home/phili/projects/arbplusJAX/src/arbplusjax/matrix_free_core.py) for shared policy, [jrb_mat.py](/home/phili/projects/arbplusJAX/src/arbplusjax/jrb_mat.py) and [jcb_mat.py](/home/phili/projects/arbplusJAX/src/arbplusjax/jcb_mat.py) for public eigensolver use
+  - owner: [matrix_free_core.py](/src/arbplusjax/matrix_free_core.py) for shared policy, [jrb_mat.py](/src/arbplusjax/jrb_mat.py) and [jcb_mat.py](/src/arbplusjax/jcb_mat.py) for public eigensolver use
   - status: landed broader native tranche with locked-first restart selection, retained restart windows larger than `k`, refill from the current subspace rather than fresh random seeds, and shared correction-column prioritization for Davidson/Jacobi-Davidson expansion
 
 Still to deepen:
 
 - richer restart-window truncation and wanted/unwanted partition policy
-  - owner: [matrix_free_core.py](/home/phili/projects/arbplusJAX/src/arbplusjax/matrix_free_core.py)
+  - owner: [matrix_free_core.py](/src/arbplusjax/matrix_free_core.py)
 - stronger Davidson/Jacobi-Davidson correction-equation policy and preconditioned outer-loop strategy
-  - owner: [jrb_mat.py](/home/phili/projects/arbplusJAX/src/arbplusjax/jrb_mat.py), [jcb_mat.py](/home/phili/projects/arbplusJAX/src/arbplusjax/jcb_mat.py) with reusable helpers promoted into [matrix_free_core.py](/home/phili/projects/arbplusJAX/src/arbplusjax/matrix_free_core.py) when stable
+  - owner: [jrb_mat.py](/src/arbplusjax/jrb_mat.py), [jcb_mat.py](/src/arbplusjax/jcb_mat.py) with reusable helpers promoted into [matrix_free_core.py](/src/arbplusjax/matrix_free_core.py) when stable
 - generalized, polynomial, and nonlinear eigensolver abstractions
-  - owner: [matrix_free_core.py](/home/phili/projects/arbplusJAX/src/arbplusjax/matrix_free_core.py) for substrate, [jrb_mat.py](/home/phili/projects/arbplusJAX/src/arbplusjax/jrb_mat.py) / [jcb_mat.py](/home/phili/projects/arbplusJAX/src/arbplusjax/jcb_mat.py) for public surfaces
+  - owner: [matrix_free_core.py](/src/arbplusjax/matrix_free_core.py) for substrate, [jrb_mat.py](/src/arbplusjax/jrb_mat.py) / [jcb_mat.py](/src/arbplusjax/jcb_mat.py) for public surfaces
   - status: generalized Hermitian-definite, generalized shift-invert, and first native Hermitian polynomial/nonlinear point surfaces are landed; broader nonlinear solver-product depth remains open beyond the current Newton-on-shift-invert tranche
 - mature solver-product behavior
-  - owner: [jrb_mat.py](/home/phili/projects/arbplusJAX/src/arbplusjax/jrb_mat.py), [jcb_mat.py](/home/phili/projects/arbplusJAX/src/arbplusjax/jcb_mat.py)
+  - owner: [jrb_mat.py](/src/arbplusjax/jrb_mat.py), [jcb_mat.py](/src/arbplusjax/jcb_mat.py)
   - status: still open for more sophisticated restart selection, convergence safeguards, and stronger preconditioned correction solves
 
 ## 9. Documentation

@@ -265,7 +265,7 @@ That is consistent with the current implementation in `benchmarks/bench_harness.
 
 ## Local implementation pointers
 
-- [bench_harness.py](/home/phili/projects/arbplusJAX/benchmarks/bench_harness.py)
-- [bench_registry.py](/home/phili/projects/arbplusJAX/benchmarks/bench_registry.py)
-- [benchmarks.md](/home/phili/projects/arbplusJAX/docs/implementation/benchmarks.md)
-- [benchmark_process.md](/home/phili/projects/arbplusJAX/docs/implementation/benchmark_process.md)
+- [bench_harness.py](/benchmarks/bench_harness.py)
+- [bench_registry.py](/benchmarks/bench_registry.py)
+- [benchmarks.md](/docs/implementation/benchmarks.md)
+- [benchmark_process.md](/docs/implementation/benchmark_process.md)

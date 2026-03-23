@@ -8,8 +8,8 @@ Last updated: 2026-03-15T00:00:00Z
 
 It is separate from:
 
-- [arb_mat](/home/phili/projects/arbplusJAX/src/arbplusjax/arb_mat.py): dense interval matrix layer
-- [jrb_mat](/home/phili/projects/arbplusJAX/src/arbplusjax/jrb_mat.py): matrix-free operator layer
+- [arb_mat](/src/arbplusjax/arb_mat.py): dense interval matrix layer
+- [jrb_mat](/src/arbplusjax/jrb_mat.py): matrix-free operator layer
 
 ## Current Scope
 
@@ -63,6 +63,6 @@ That means:
 
 ## Coverage
 
-- tests: [test_srb_mat_chassis.py](/home/phili/projects/arbplusJAX/tests/test_srb_mat_chassis.py)
-- API tests: [test_sparse_point_api.py](/home/phili/projects/arbplusJAX/tests/test_sparse_point_api.py)
-- benchmark: [benchmark_sparse_matrix_surface.py](/home/phili/projects/arbplusJAX/benchmarks/benchmark_sparse_matrix_surface.py)
+- tests: [test_srb_mat_chassis.py](/tests/test_srb_mat_chassis.py)
+- API tests: [test_sparse_point_api.py](/tests/test_sparse_point_api.py)
+- benchmark: [benchmark_sparse_matrix_surface.py](/benchmarks/benchmark_sparse_matrix_surface.py)

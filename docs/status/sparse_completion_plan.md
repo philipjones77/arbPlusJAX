@@ -127,8 +127,8 @@ The next sparse-native tranche should be:
 
 ## Validation Entry Points
 
-- [test_srb_mat_chassis.py](/home/phili/projects/arbplusJAX/tests/test_srb_mat_chassis.py)
-- [test_scb_mat_chassis.py](/home/phili/projects/arbplusJAX/tests/test_scb_mat_chassis.py)
-- [test_sparse_structured_surface.py](/home/phili/projects/arbplusJAX/tests/test_sparse_structured_surface.py)
-- [test_sparse_mode_surface.py](/home/phili/projects/arbplusJAX/tests/test_sparse_mode_surface.py)
-- [benchmark_sparse_matrix_surface.py](/home/phili/projects/arbplusJAX/benchmarks/benchmark_sparse_matrix_surface.py)
+- [test_srb_mat_chassis.py](/tests/test_srb_mat_chassis.py)
+- [test_scb_mat_chassis.py](/tests/test_scb_mat_chassis.py)
+- [test_sparse_structured_surface.py](/tests/test_sparse_structured_surface.py)
+- [test_sparse_mode_surface.py](/tests/test_sparse_mode_surface.py)
+- [benchmark_sparse_matrix_surface.py](/benchmarks/benchmark_sparse_matrix_surface.py)

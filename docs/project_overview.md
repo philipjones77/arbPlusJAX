@@ -18,13 +18,16 @@ arbPlusJAX is the active hardened JAX numerical-kernel workspace. The repository
 
 ## Docs Map
 
-- governance: [/home/phili/projects/arbplusJAX/docs/governance/README.md](/home/phili/projects/arbplusJAX/docs/governance/README.md)
-- standards: [/home/phili/projects/arbplusJAX/docs/standards/README.md](/home/phili/projects/arbplusJAX/docs/standards/README.md)
-- reports: [/home/phili/projects/arbplusJAX/docs/reports/README.md](/home/phili/projects/arbplusJAX/docs/reports/README.md)
-- status: [/home/phili/projects/arbplusJAX/docs/status/README.md](/home/phili/projects/arbplusJAX/docs/status/README.md)
-- theory: [/home/phili/projects/arbplusJAX/docs/theory/README.md](/home/phili/projects/arbplusJAX/docs/theory/README.md)
-- implementation: [/home/phili/projects/arbplusJAX/docs/implementation/README.md](/home/phili/projects/arbplusJAX/docs/implementation/README.md)
-- practical: [/home/phili/projects/arbplusJAX/docs/practical/README.md](/home/phili/projects/arbplusJAX/docs/practical/README.md)
+- governance: [docs/governance/README.md](/docs/governance/README.md)
+- standards: [docs/standards/README.md](/docs/standards/README.md)
+- notation: [docs/notation/README.md](/docs/notation/README.md)
+- specs: [docs/specs/README.md](/docs/specs/README.md)
+- objects: [docs/objects/README.md](/docs/objects/README.md)
+- reports: [docs/reports/README.md](/docs/reports/README.md)
+- status: [docs/status/README.md](/docs/status/README.md)
+- theory: [docs/theory/README.md](/docs/theory/README.md)
+- implementation: [docs/implementation/README.md](/docs/implementation/README.md)
+- practical: [docs/practical/README.md](/docs/practical/README.md)
 
 ## Generation Rule
 

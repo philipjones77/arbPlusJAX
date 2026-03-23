@@ -74,7 +74,7 @@ Mode dispatch is centralized in `wrappers_common.py` and used by `*_wrappers.py`
 
 ## Function Registry
 
-See [function_catalog.md](/home/phili/projects/arbplusJAX/docs/objects/function_catalog.md) and the generated reports in [reports/README.md](/home/phili/projects/arbplusJAX/docs/reports/README.md) for the current public and implementation registries.
+See [function_catalog.md](/docs/objects/function_catalog.md) and the generated reports in [reports/README.md](/docs/reports/README.md) for the current public and implementation registries.
 
 ## Archived Migration
 

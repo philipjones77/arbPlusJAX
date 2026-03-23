@@ -8,7 +8,7 @@ This report defines the default way to view and organize the repo at the
 top level.
 
 The canonical top-level organization for this repo is the category structure in
-[test_coverage_matrix.md](/home/phili/projects/arbplusJAX/docs/status/test_coverage_matrix.md).
+[test_coverage_matrix.md](/docs/status/test_coverage_matrix.md).
 
 That matrix is not only a testing breakdown. It is the default repo
 functionality map.
@@ -74,4 +74,4 @@ status tracking.
 
 Canonical source:
 
-- [test_coverage_matrix.md](/home/phili/projects/arbplusJAX/docs/status/test_coverage_matrix.md)
+- [test_coverage_matrix.md](/docs/status/test_coverage_matrix.md)

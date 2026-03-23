@@ -28,6 +28,6 @@ Last updated: 2026-03-17T00:00:00Z
   - `parsinv_review.md`
   - `strumpack_butterflypack_review.md`
 
-For practical runbooks, benchmarking guidance, and numerically informed operating notes, start from [docs/practical/README.md](/home/phili/projects/arbplusJAX/docs/practical/README.md).
+For practical runbooks, benchmarking guidance, and numerically informed operating notes, start from [docs/practical/README.md](/docs/practical/README.md).
 
 The practical layer is additive. Most current documentation material remains in `docs/implementation/`, and `docs/practical/` exists to provide separate run/use guidance rather than to rename this tree.

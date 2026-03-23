@@ -79,6 +79,12 @@ Recommended shared config types:
 - `QuadratureConfig`
 - any additional config types only when they represent a genuinely distinct control family
 
+### Interpreter selection policy
+
+- Harnesses and validation entrypoints should make interpreter selection explicit and shared rather than ad hoc per script.
+- On Linux workstations, the default interpreter policy should prefer the shared `jax` environment when present.
+- Explicit caller overrides such as `--python` or environment-variable overrides remain higher priority than the default policy.
+
 ### Recommended config builders
 
 - Provide recommended config builders for common settings.

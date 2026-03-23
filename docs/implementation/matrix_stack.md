@@ -198,8 +198,8 @@ Within `operator_plan`, the repeated-use substrate now includes:
 
 SLEPc-style placement rule:
 
-- spectral-transformation substrate such as shift-invert, Cayley-like, polynomial/rational transforms, correction equations, and contour quadrature belongs in [matrix_free_core.py](/home/phili/projects/arbplusJAX/src/arbplusjax/matrix_free_core.py)
-- public JAX-native operator eigensolver families belong in [jrb_mat.py](/home/phili/projects/arbplusJAX/src/arbplusjax/jrb_mat.py) and [jcb_mat.py](/home/phili/projects/arbplusJAX/src/arbplusjax/jcb_mat.py)
+- spectral-transformation substrate such as shift-invert, Cayley-like, polynomial/rational transforms, correction equations, and contour quadrature belongs in [matrix_free_core.py](/src/arbplusjax/matrix_free_core.py)
+- public JAX-native operator eigensolver families belong in [jrb_mat.py](/src/arbplusjax/jrb_mat.py) and [jcb_mat.py](/src/arbplusjax/jcb_mat.py)
 - Krylov-Schur, Davidson, Jacobi-Davidson, contour eigensolvers, and spectral-transform eigensolver families should be treated as Jones/operator-stack work, not dense/sparse-storage work and not external-backend substitutions
 - PETSc/SLEPc remain optional benchmark-oracle layers only; they are not part of the governed runtime path
 For JAX-first usage, repeated calls should prefer cached or prepared-plan entry points when they exist, and repeated batches should prefer padded or fixed-shape helpers so recompiles stay under control.
@@ -217,30 +217,30 @@ For sparse real and complex matrices in particular:
 ## Current Shared Infrastructure
 
 - shared dense/sparse helpers:
-  - [mat_common.py](/home/phili/projects/arbplusJAX/src/arbplusjax/mat_common.py)
-  - [sparse_common.py](/home/phili/projects/arbplusJAX/src/arbplusjax/sparse_common.py)
-  - [sparse_core.py](/home/phili/projects/arbplusJAX/src/arbplusjax/sparse_core.py)
+  - [mat_common.py](/src/arbplusjax/mat_common.py)
+  - [sparse_common.py](/src/arbplusjax/sparse_common.py)
+  - [sparse_core.py](/src/arbplusjax/sparse_core.py)
 
 - shared matrix-free helpers:
-  - [matrix_free_core.py](/home/phili/projects/arbplusJAX/src/arbplusjax/matrix_free_core.py)
-  - [matrix_free_basic.py](/home/phili/projects/arbplusJAX/src/arbplusjax/matrix_free_basic.py)
-  - [matfree_adjoints.py](/home/phili/projects/arbplusJAX/src/arbplusjax/matfree_adjoints.py)
+  - [matrix_free_core.py](/src/arbplusjax/matrix_free_core.py)
+  - [matrix_free_basic.py](/src/arbplusjax/matrix_free_basic.py)
+  - [matfree_adjoints.py](/src/arbplusjax/matfree_adjoints.py)
 
 - optional diagnostics:
-  - [jax_diagnostics.py](/home/phili/projects/arbplusJAX/src/arbplusjax/jax_diagnostics.py)
+  - [jax_diagnostics.py](/src/arbplusjax/jax_diagnostics.py)
 
 ## Audit Scope
 
 The repo-level consistency harness for this stack currently lives in:
-- [test_matrix_stack_contracts.py](/home/phili/projects/arbplusJAX/tests/test_matrix_stack_contracts.py)
-- [test_matrix_free_basic.py](/home/phili/projects/arbplusJAX/tests/test_matrix_free_basic.py)
-- [test_jax_diagnostics.py](/home/phili/projects/arbplusJAX/tests/test_jax_diagnostics.py)
+- [test_matrix_stack_contracts.py](/tests/test_matrix_stack_contracts.py)
+- [test_matrix_free_basic.py](/tests/test_matrix_free_basic.py)
+- [test_jax_diagnostics.py](/tests/test_jax_diagnostics.py)
 
 The matrix-oriented benchmark and diagnostics runners currently live in:
-- [benchmark_dense_matrix_surface.py](/home/phili/projects/arbplusJAX/benchmarks/benchmark_dense_matrix_surface.py)
-- [benchmark_sparse_matrix_surface.py](/home/phili/projects/arbplusJAX/benchmarks/benchmark_sparse_matrix_surface.py)
-- [benchmark_matrix_free_krylov.py](/home/phili/projects/arbplusJAX/benchmarks/benchmark_matrix_free_krylov.py)
-- [benchmark_matrix_stack_diagnostics.py](/home/phili/projects/arbplusJAX/benchmarks/benchmark_matrix_stack_diagnostics.py)
+- [benchmark_dense_matrix_surface.py](/benchmarks/benchmark_dense_matrix_surface.py)
+- [benchmark_sparse_matrix_surface.py](/benchmarks/benchmark_sparse_matrix_surface.py)
+- [benchmark_matrix_free_krylov.py](/benchmarks/benchmark_matrix_free_krylov.py)
+- [benchmark_matrix_stack_diagnostics.py](/benchmarks/benchmark_matrix_stack_diagnostics.py)
 
 The report/workbook view for this stack currently lives in:
-- [matrix_surface_workbook.md](/home/phili/projects/arbplusJAX/docs/reports/matrix_surface_workbook.md)
+- [matrix_surface_workbook.md](/docs/reports/matrix_surface_workbook.md)

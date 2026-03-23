@@ -6,9 +6,9 @@ Last updated: 2026-03-20T06:25:37Z
 
 This note describes the current matrix-free layer implemented in:
 
-- [matrix_free_core.py](/home/phili/projects/arbplusJAX/src/arbplusjax/matrix_free_core.py)
-- [jrb_mat.py](/home/phili/projects/arbplusJAX/src/arbplusjax/jrb_mat.py)
-- [jcb_mat.py](/home/phili/projects/arbplusJAX/src/arbplusjax/jcb_mat.py)
+- [matrix_free_core.py](/src/arbplusjax/matrix_free_core.py)
+- [jrb_mat.py](/src/arbplusjax/jrb_mat.py)
+- [jcb_mat.py](/src/arbplusjax/jcb_mat.py)
 
 The design target is a reusable operator-first surface for:
 
@@ -17,7 +17,7 @@ The design target is a reusable operator-first surface for:
 - sparse operators
 - sparse symmetric / Hermitian operators
 
-The point implementation remains the optimized execution substrate. `basic` matrix-free now exists as a separate shared semantic layer in [matrix_free_basic.py](/home/phili/projects/arbplusJAX/src/arbplusjax/matrix_free_basic.py), but its enclosure and validation semantics are still only partially completed.
+The point implementation remains the optimized execution substrate. `basic` matrix-free now exists as a separate shared semantic layer in [matrix_free_basic.py](/src/arbplusjax/matrix_free_basic.py), but its enclosure and validation semantics are still only partially completed.
 
 ## 1. Operator-First Model
 
@@ -130,7 +130,7 @@ $$
 \det(A) = \exp(\log \det(A)).
 $$
 
-Sparse SPD log-determinant also has a Leja plus Hutch++ path documented separately in [sparse_symmetric_leja_hutchpp_logdet.md](/home/phili/projects/arbplusJAX/docs/theory/sparse_symmetric_leja_hutchpp_logdet.md).
+Sparse SPD log-determinant also has a Leja plus Hutch++ path documented separately in [sparse_symmetric_leja_hutchpp_logdet.md](/docs/theory/sparse_symmetric_leja_hutchpp_logdet.md).
 
 ## 5. Solve And Inverse Actions
 

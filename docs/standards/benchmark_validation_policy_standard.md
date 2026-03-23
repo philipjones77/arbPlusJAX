@@ -16,8 +16,8 @@ This document owns:
 - how official benchmarks are chosen
 
 It does not own the allowed grouping categories or filename-to-group mapping.
-Those belong to [benchmark_grouping_standard.md](/home/phili/projects/arbplusJAX/docs/standards/benchmark_grouping_standard.md)
-and [taxonomy.py](/home/phili/projects/arbplusJAX/benchmarks/taxonomy.py).
+Those belong to [benchmark_grouping_standard.md](/docs/standards/benchmark_grouping_standard.md)
+and [taxonomy.py](/benchmarks/taxonomy.py).
 
 The goal is to keep benchmark concerns separate:
 
@@ -128,7 +128,7 @@ Pytest marker:
 
 ## Repo Implementation Rule
 
-The repo benchmark taxonomy is defined in [taxonomy.py](/home/phili/projects/arbplusJAX/benchmarks/taxonomy.py).
+The repo benchmark taxonomy is defined in [taxonomy.py](/benchmarks/taxonomy.py).
 
 That taxonomy:
 
@@ -137,7 +137,7 @@ That taxonomy:
 - derives pytest markers for benchmark smoke coverage
 
 The allowed grouping axes and benchmark category families are defined in
-[benchmark_grouping_standard.md](/home/phili/projects/arbplusJAX/docs/standards/benchmark_grouping_standard.md).
+[benchmark_grouping_standard.md](/docs/standards/benchmark_grouping_standard.md).
 
 New benchmark entrypoints should not be added without classification in the
 taxonomy.
@@ -187,12 +187,12 @@ Current official benchmark concerns:
 - `transform_backend_compare` -> `benchmark_nufft_backends.py`
 - `transform_gpu` -> `benchmark_fft_nufft.py`
 
-These official mappings are implemented in [taxonomy.py](/home/phili/projects/arbplusJAX/benchmarks/taxonomy.py).
+These official mappings are implemented in [taxonomy.py](/benchmarks/taxonomy.py).
 
 ## Shared Benchmark Output Schema
 
 Benchmarks may continue to print human-readable summaries, but artifact output
-should converge on the shared schema in [schema.py](/home/phili/projects/arbplusJAX/benchmarks/schema.py).
+should converge on the shared schema in [schema.py](/benchmarks/schema.py).
 
 Production-facing benchmark CLIs should also expose explicit runtime controls
 for:

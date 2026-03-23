@@ -6,14 +6,14 @@ Last updated: 2026-03-14T00:00:00Z
 
 Naming policy:
 
-- [pytest_test_naming_standard.md](/home/phili/projects/arbplusJAX/docs/standards/pytest_test_naming_standard.md)
-- [environment_portability_standard.md](/home/phili/projects/arbplusJAX/docs/standards/environment_portability_standard.md)
+- [pytest_test_naming_standard.md](/docs/standards/pytest_test_naming_standard.md)
+- [environment_portability_standard.md](/docs/standards/environment_portability_standard.md)
 
 Repo-wide functionality and helper coverage map:
 
-- [test_coverage_matrix.md](/home/phili/projects/arbplusJAX/docs/status/test_coverage_matrix.md)
+- [test_coverage_matrix.md](/docs/status/test_coverage_matrix.md)
   - includes the phased testing work plan used to burn down remaining gaps
-- [test_gap_checklist.md](/home/phili/projects/arbplusJAX/docs/status/test_gap_checklist.md)
+- [test_gap_checklist.md](/docs/status/test_gap_checklist.md)
   - module-by-module direct-owner vs indirect-coverage checklist
 
 ## Test families

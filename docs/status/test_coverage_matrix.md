@@ -49,12 +49,12 @@ Main modules:
 
 Main tests:
 
-- [test_arb_core_chassis.py](/home/phili/projects/arbplusJAX/tests/test_arb_core_chassis.py)
-- [test_acb_core_chassis.py](/home/phili/projects/arbplusJAX/tests/test_acb_core_chassis.py)
-- [test_arf_chassis.py](/home/phili/projects/arbplusJAX/tests/test_arf_chassis.py)
-- [test_acf_chassis.py](/home/phili/projects/arbplusJAX/tests/test_acf_chassis.py)
-- [test_fmpr_chassis.py](/home/phili/projects/arbplusJAX/tests/test_fmpr_chassis.py)
-- [test_fmpzi_chassis.py](/home/phili/projects/arbplusJAX/tests/test_fmpzi_chassis.py)
+- [test_arb_core_chassis.py](/tests/test_arb_core_chassis.py)
+- [test_acb_core_chassis.py](/tests/test_acb_core_chassis.py)
+- [test_arf_chassis.py](/tests/test_arf_chassis.py)
+- [test_acf_chassis.py](/tests/test_acf_chassis.py)
+- [test_fmpr_chassis.py](/tests/test_fmpr_chassis.py)
+- [test_fmpzi_chassis.py](/tests/test_fmpzi_chassis.py)
 - parity companions in `test_*_parity.py`
 
 ### 2. Interval / Box / Precision Modes
@@ -75,11 +75,12 @@ Main modules:
 
 Main tests:
 
-- [test_double_interval_chassis.py](/home/phili/projects/arbplusJAX/tests/test_double_interval_chassis.py)
-- [test_mat_modes.py](/home/phili/projects/arbplusJAX/tests/test_mat_modes.py)
-- [test_basic_wrappers.py](/home/phili/projects/arbplusJAX/tests/test_basic_wrappers.py)
-- [test_mp_mode.py](/home/phili/projects/arbplusJAX/tests/test_mp_mode.py)
-- [test_jax_precision.py](/home/phili/projects/arbplusJAX/tests/test_jax_precision.py)
+- [test_double_interval_chassis.py](/tests/test_double_interval_chassis.py)
+- [test_point_wrappers_contracts.py](/tests/test_point_wrappers_contracts.py)
+- [test_mat_modes.py](/tests/test_mat_modes.py)
+- [test_basic_wrappers.py](/tests/test_basic_wrappers.py)
+- [test_mp_mode.py](/tests/test_mp_mode.py)
+- [test_jax_precision.py](/tests/test_jax_precision.py)
 
 ### 3. Dense Matrix Functionality
 
@@ -97,12 +98,12 @@ Main modules:
 
 Main tests:
 
-- [test_arb_mat_chassis.py](/home/phili/projects/arbplusJAX/tests/test_arb_mat_chassis.py)
-- [test_acb_mat_chassis.py](/home/phili/projects/arbplusJAX/tests/test_acb_mat_chassis.py)
-- [test_dense_broad_surface.py](/home/phili/projects/arbplusJAX/tests/test_dense_broad_surface.py)
-- [test_dense_plan_modes.py](/home/phili/projects/arbplusJAX/tests/test_dense_plan_modes.py)
-- [test_dense_structured_modes.py](/home/phili/projects/arbplusJAX/tests/test_dense_structured_modes.py)
-- [test_dense_eigh_and_aliases.py](/home/phili/projects/arbplusJAX/tests/test_dense_eigh_and_aliases.py)
+- [test_arb_mat_chassis.py](/tests/test_arb_mat_chassis.py)
+- [test_acb_mat_chassis.py](/tests/test_acb_mat_chassis.py)
+- [test_dense_broad_surface.py](/tests/test_dense_broad_surface.py)
+- [test_dense_plan_modes.py](/tests/test_dense_plan_modes.py)
+- [test_dense_structured_modes.py](/tests/test_dense_structured_modes.py)
+- [test_dense_eigh_and_aliases.py](/tests/test_dense_eigh_and_aliases.py)
 
 ### 4. Sparse / Block-Sparse / VBlock Functionality
 
@@ -121,16 +122,16 @@ Main modules:
 
 Main tests:
 
-- [test_srb_mat_chassis.py](/home/phili/projects/arbplusJAX/tests/test_srb_mat_chassis.py)
-- [test_scb_mat_chassis.py](/home/phili/projects/arbplusJAX/tests/test_scb_mat_chassis.py)
-- [test_srb_block_mat_chassis.py](/home/phili/projects/arbplusJAX/tests/test_srb_block_mat_chassis.py)
-- [test_scb_block_mat_chassis.py](/home/phili/projects/arbplusJAX/tests/test_scb_block_mat_chassis.py)
-- [test_srb_vblock_mat_chassis.py](/home/phili/projects/arbplusJAX/tests/test_srb_vblock_mat_chassis.py)
-- [test_scb_vblock_mat_chassis.py](/home/phili/projects/arbplusJAX/tests/test_scb_vblock_mat_chassis.py)
-- [test_sparse_point_api.py](/home/phili/projects/arbplusJAX/tests/test_sparse_point_api.py)
-- [test_sparse_format_modes.py](/home/phili/projects/arbplusJAX/tests/test_sparse_format_modes.py)
-- [test_sparse_structured_surface.py](/home/phili/projects/arbplusJAX/tests/test_sparse_structured_surface.py)
-- [test_sparse_basic_contracts.py](/home/phili/projects/arbplusJAX/tests/test_sparse_basic_contracts.py)
+- [test_srb_mat_chassis.py](/tests/test_srb_mat_chassis.py)
+- [test_scb_mat_chassis.py](/tests/test_scb_mat_chassis.py)
+- [test_srb_block_mat_chassis.py](/tests/test_srb_block_mat_chassis.py)
+- [test_scb_block_mat_chassis.py](/tests/test_scb_block_mat_chassis.py)
+- [test_srb_vblock_mat_chassis.py](/tests/test_srb_vblock_mat_chassis.py)
+- [test_scb_vblock_mat_chassis.py](/tests/test_scb_vblock_mat_chassis.py)
+- [test_sparse_point_api.py](/tests/test_sparse_point_api.py)
+- [test_sparse_format_modes.py](/tests/test_sparse_format_modes.py)
+- [test_sparse_structured_surface.py](/tests/test_sparse_structured_surface.py)
+- [test_sparse_basic_contracts.py](/tests/test_sparse_basic_contracts.py)
 
 ### 5. Matrix-Free / Operator Functionality
 
@@ -153,13 +154,13 @@ Main modules:
 
 Main tests:
 
-- [test_jrb_mat_chassis.py](/home/phili/projects/arbplusJAX/tests/test_jrb_mat_chassis.py)
-- [test_jcb_mat_chassis.py](/home/phili/projects/arbplusJAX/tests/test_jcb_mat_chassis.py)
-- [test_jrb_mat_logdet_contracts.py](/home/phili/projects/arbplusJAX/tests/test_jrb_mat_logdet_contracts.py)
-- [test_jrb_mat_selected_inverse.py](/home/phili/projects/arbplusJAX/tests/test_jrb_mat_selected_inverse.py)
-- [test_matrix_free_basic.py](/home/phili/projects/arbplusJAX/tests/test_matrix_free_basic.py)
-- [test_matrix_stack_contracts.py](/home/phili/projects/arbplusJAX/tests/test_matrix_stack_contracts.py)
-- [test_matfree_adjoints.py](/home/phili/projects/arbplusJAX/tests/test_matfree_adjoints.py)
+- [test_jrb_mat_chassis.py](/tests/test_jrb_mat_chassis.py)
+- [test_jcb_mat_chassis.py](/tests/test_jcb_mat_chassis.py)
+- [test_jrb_mat_logdet_contracts.py](/tests/test_jrb_mat_logdet_contracts.py)
+- [test_jrb_mat_selected_inverse.py](/tests/test_jrb_mat_selected_inverse.py)
+- [test_matrix_free_basic.py](/tests/test_matrix_free_basic.py)
+- [test_matrix_stack_contracts.py](/tests/test_matrix_stack_contracts.py)
+- [test_matfree_adjoints.py](/tests/test_matfree_adjoints.py)
 
 ### 6. Special Functions
 
@@ -180,17 +181,17 @@ Main modules:
 
 Main tests:
 
-- [test_hypgeom_chassis.py](/home/phili/projects/arbplusJAX/tests/test_hypgeom_chassis.py)
-- [test_hypgeom_modes_complete.py](/home/phili/projects/arbplusJAX/tests/test_hypgeom_modes_complete.py)
-- [test_incomplete_gamma.py](/home/phili/projects/arbplusJAX/tests/test_incomplete_gamma.py)
-- [test_incomplete_bessel_i.py](/home/phili/projects/arbplusJAX/tests/test_incomplete_bessel_i.py)
-- [test_incomplete_bessel_k.py](/home/phili/projects/arbplusJAX/tests/test_incomplete_bessel_k.py)
-- [test_gamma_hardening.py](/home/phili/projects/arbplusJAX/tests/test_gamma_hardening.py)
-- [test_hankel_special.py](/home/phili/projects/arbplusJAX/tests/test_hankel_special.py)
-- [test_spherical_bessel_special.py](/home/phili/projects/arbplusJAX/tests/test_spherical_bessel_special.py)
-- [test_tail_acceleration_scaffold.py](/home/phili/projects/arbplusJAX/tests/test_tail_acceleration_scaffold.py)
-- [test_boost_hypgeom.py](/home/phili/projects/arbplusJAX/tests/test_boost_hypgeom.py)
-- [test_boost_ref_adapter.py](/home/phili/projects/arbplusJAX/tests/test_boost_ref_adapter.py)
+- [test_hypgeom_chassis.py](/tests/test_hypgeom_chassis.py)
+- [test_hypgeom_modes_complete.py](/tests/test_hypgeom_modes_complete.py)
+- [test_incomplete_gamma.py](/tests/test_incomplete_gamma.py)
+- [test_incomplete_bessel_i.py](/tests/test_incomplete_bessel_i.py)
+- [test_incomplete_bessel_k.py](/tests/test_incomplete_bessel_k.py)
+- [test_gamma_hardening.py](/tests/test_gamma_hardening.py)
+- [test_hankel_special.py](/tests/test_hankel_special.py)
+- [test_spherical_bessel_special.py](/tests/test_spherical_bessel_special.py)
+- [test_tail_acceleration_scaffold.py](/tests/test_tail_acceleration_scaffold.py)
+- [test_boost_hypgeom.py](/tests/test_boost_hypgeom.py)
+- [test_boost_ref_adapter.py](/tests/test_boost_ref_adapter.py)
 
 Hypergeometric detail that needs explicit testing:
 
@@ -305,8 +306,8 @@ Main modules:
 
 Main tests:
 
-- [test_dft_chassis.py](/home/phili/projects/arbplusJAX/tests/test_dft_chassis.py)
-- [test_nufft.py](/home/phili/projects/arbplusJAX/tests/test_nufft.py)
+- [test_dft_chassis.py](/tests/test_dft_chassis.py)
+- [test_nufft.py](/tests/test_nufft.py)
 
 ### 8. API / Facade / Metadata
 
@@ -325,11 +326,11 @@ Main modules:
 
 Main tests:
 
-- [test_api_metadata.py](/home/phili/projects/arbplusJAX/tests/test_api_metadata.py)
-- [test_api_selection_contracts.py](/home/phili/projects/arbplusJAX/tests/test_api_selection_contracts.py)
-- [test_function_provenance_reports.py](/home/phili/projects/arbplusJAX/tests/test_function_provenance_reports.py)
-- [test_package_repo_naming.py](/home/phili/projects/arbplusJAX/tests/test_package_repo_naming.py)
-- [test_all_functions_smoke.py](/home/phili/projects/arbplusJAX/tests/test_all_functions_smoke.py)
+- [test_api_metadata.py](/tests/test_api_metadata.py)
+- [test_api_selection_contracts.py](/tests/test_api_selection_contracts.py)
+- [test_function_provenance_reports.py](/tests/test_function_provenance_reports.py)
+- [test_package_repo_naming.py](/tests/test_package_repo_naming.py)
+- [test_all_functions_smoke.py](/tests/test_all_functions_smoke.py)
 
 ### 9. Analytic / Algebraic / Number-Theoretic Families
 
@@ -350,20 +351,20 @@ Main modules:
 
 Main tests:
 
-- [test_arb_calc_chassis.py](/home/phili/projects/arbplusJAX/tests/test_arb_calc_chassis.py)
-- [test_acb_calc_chassis.py](/home/phili/projects/arbplusJAX/tests/test_acb_calc_chassis.py)
-- [test_dirichlet_chassis.py](/home/phili/projects/arbplusJAX/tests/test_dirichlet_chassis.py)
-- [test_acb_dirichlet_chassis.py](/home/phili/projects/arbplusJAX/tests/test_acb_dirichlet_chassis.py)
-- [test_acb_elliptic_chassis.py](/home/phili/projects/arbplusJAX/tests/test_acb_elliptic_chassis.py)
-- [test_acb_modular_chassis.py](/home/phili/projects/arbplusJAX/tests/test_acb_modular_chassis.py)
-- [test_arb_poly_chassis.py](/home/phili/projects/arbplusJAX/tests/test_arb_poly_chassis.py)
-- [test_acb_poly_chassis.py](/home/phili/projects/arbplusJAX/tests/test_acb_poly_chassis.py)
-- [test_arb_fmpz_poly_chassis.py](/home/phili/projects/arbplusJAX/tests/test_arb_fmpz_poly_chassis.py)
-- [test_bernoulli_chassis.py](/home/phili/projects/arbplusJAX/tests/test_bernoulli_chassis.py)
-- [test_partitions_chassis.py](/home/phili/projects/arbplusJAX/tests/test_partitions_chassis.py)
-- [test_dlog_chassis.py](/home/phili/projects/arbplusJAX/tests/test_dlog_chassis.py)
-- [test_cubesselk_api.py](/home/phili/projects/arbplusJAX/tests/test_cubesselk_api.py)
-- [test_stable_kernels.py](/home/phili/projects/arbplusJAX/tests/test_stable_kernels.py)
+- [test_arb_calc_chassis.py](/tests/test_arb_calc_chassis.py)
+- [test_acb_calc_chassis.py](/tests/test_acb_calc_chassis.py)
+- [test_dirichlet_chassis.py](/tests/test_dirichlet_chassis.py)
+- [test_acb_dirichlet_chassis.py](/tests/test_acb_dirichlet_chassis.py)
+- [test_acb_elliptic_chassis.py](/tests/test_acb_elliptic_chassis.py)
+- [test_acb_modular_chassis.py](/tests/test_acb_modular_chassis.py)
+- [test_arb_poly_chassis.py](/tests/test_arb_poly_chassis.py)
+- [test_acb_poly_chassis.py](/tests/test_acb_poly_chassis.py)
+- [test_arb_fmpz_poly_chassis.py](/tests/test_arb_fmpz_poly_chassis.py)
+- [test_bernoulli_chassis.py](/tests/test_bernoulli_chassis.py)
+- [test_partitions_chassis.py](/tests/test_partitions_chassis.py)
+- [test_dlog_chassis.py](/tests/test_dlog_chassis.py)
+- [test_cubesselk_api.py](/tests/test_cubesselk_api.py)
+- [test_stable_kernels.py](/tests/test_stable_kernels.py)
 - parity companions in `test_*_parity.py`
 
 ### 10. Compatibility / Soft Ops / Support Kernels
@@ -385,13 +386,13 @@ Main modules:
 
 Main tests:
 
-- [test_cusf_compat.py](/home/phili/projects/arbplusJAX/tests/test_cusf_compat.py)
-- [test_soft_ops.py](/home/phili/projects/arbplusJAX/tests/test_soft_ops.py)
-- [test_bool_mat_chassis.py](/home/phili/projects/arbplusJAX/tests/test_bool_mat_chassis.py)
-- [test_mag_chassis.py](/home/phili/projects/arbplusJAX/tests/test_mag_chassis.py)
-- [test_custom_core_status.py](/home/phili/projects/arbplusJAX/tests/test_custom_core_status.py)
-- [test_point_core_status.py](/home/phili/projects/arbplusJAX/tests/test_point_core_status.py)
-- [test_elementary_layer.py](/home/phili/projects/arbplusJAX/tests/test_elementary_layer.py)
+- [test_cusf_compat.py](/tests/test_cusf_compat.py)
+- [test_soft_ops.py](/tests/test_soft_ops.py)
+- [test_bool_mat_chassis.py](/tests/test_bool_mat_chassis.py)
+- [test_mag_chassis.py](/tests/test_mag_chassis.py)
+- [test_custom_core_status.py](/tests/test_custom_core_status.py)
+- [test_point_core_status.py](/tests/test_point_core_status.py)
+- [test_elementary_layer.py](/tests/test_elementary_layer.py)
 
 ### 11. Runtime / Diagnostics / Harness
 
@@ -409,10 +410,10 @@ Main modules:
 
 Main tests:
 
-- [test_jax_diagnostics.py](/home/phili/projects/arbplusJAX/tests/test_jax_diagnostics.py)
-- [test_runtime_manifest.py](/home/phili/projects/arbplusJAX/tests/test_runtime_manifest.py)
-- [test_benchmark_taxonomy.py](/home/phili/projects/arbplusJAX/benchmarks/test_benchmark_taxonomy.py)
-- [test_benchmark_smoke.py](/home/phili/projects/arbplusJAX/benchmarks/test_benchmark_smoke.py)
+- [test_jax_diagnostics.py](/tests/test_jax_diagnostics.py)
+- [test_runtime_manifest.py](/tests/test_runtime_manifest.py)
+- [test_benchmark_taxonomy.py](/benchmarks/test_benchmark_taxonomy.py)
+- [test_benchmark_smoke.py](/benchmarks/test_benchmark_smoke.py)
 
 ### 12. Parity / External Reference Validation
 
@@ -424,8 +425,8 @@ Scope:
 Main tests:
 
 - all `test_*_parity.py`
-- [test_boost_hypgeom.py](/home/phili/projects/arbplusJAX/tests/test_boost_hypgeom.py)
-- [test_boost_ref_adapter.py](/home/phili/projects/arbplusJAX/tests/test_boost_ref_adapter.py)
+- [test_boost_hypgeom.py](/tests/test_boost_hypgeom.py)
+- [test_boost_ref_adapter.py](/tests/test_boost_ref_adapter.py)
 
 ## Helper / Infrastructure Categories That Also Need Tests
 
@@ -446,12 +447,12 @@ These are easy to under-test but should remain explicit:
 
 Current concentrated coverage:
 
-- [test_matrix_stack_contracts.py](/home/phili/projects/arbplusJAX/tests/test_matrix_stack_contracts.py)
-- [test_dense_plan_modes.py](/home/phili/projects/arbplusJAX/tests/test_dense_plan_modes.py)
-- [test_sparse_basic_contracts.py](/home/phili/projects/arbplusJAX/tests/test_sparse_basic_contracts.py)
-- [test_jax_precision.py](/home/phili/projects/arbplusJAX/tests/test_jax_precision.py)
-- [test_api_selection_contracts.py](/home/phili/projects/arbplusJAX/tests/test_api_selection_contracts.py)
-- [test_benchmark_taxonomy.py](/home/phili/projects/arbplusJAX/benchmarks/test_benchmark_taxonomy.py)
+- [test_matrix_stack_contracts.py](/tests/test_matrix_stack_contracts.py)
+- [test_dense_plan_modes.py](/tests/test_dense_plan_modes.py)
+- [test_sparse_basic_contracts.py](/tests/test_sparse_basic_contracts.py)
+- [test_jax_precision.py](/tests/test_jax_precision.py)
+- [test_api_selection_contracts.py](/tests/test_api_selection_contracts.py)
+- [test_benchmark_taxonomy.py](/benchmarks/test_benchmark_taxonomy.py)
 
 ## Coverage Dimensions Every Category Should Hit
 

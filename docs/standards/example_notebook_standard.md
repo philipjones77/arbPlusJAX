@@ -18,8 +18,8 @@ It does not define:
 
 Those belong to:
 
-- [experiment_layout_standard.md](/home/phili/projects/arbplusJAX/docs/standards/experiment_layout_standard.md)
-- [environment_portability_standard.md](/home/phili/projects/arbplusJAX/docs/standards/environment_portability_standard.md)
+- [experiment_layout_standard.md](/docs/standards/experiment_layout_standard.md)
+- [environment_portability_standard.md](/docs/standards/environment_portability_standard.md)
 
 Example notebooks are not optional decoration. They are the canonical
 demonstration layer for a functionality group.

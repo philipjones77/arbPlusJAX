@@ -3,7 +3,7 @@ Last updated: 2026-03-22T00:00:00Z
 # Whole-Repo Test Gap Checklist
 
 This is the execution checklist that sits underneath
-[test_coverage_matrix.md](/home/phili/projects/arbplusJAX/docs/status/test_coverage_matrix.md).
+[test_coverage_matrix.md](/docs/status/test_coverage_matrix.md).
 It answers a narrower question:
 
 - which runtime modules already have direct test owners
@@ -80,6 +80,7 @@ These modules already have clearly named test owners in `tests/`.
 - `function_provenance`
 - `jax_diagnostics`
 - `jax_precision`
+- `point_wrappers`
 - `runtime`
 - `soft_ops`
 
@@ -110,8 +111,6 @@ clearer if each eventually had a more explicit owner.
   Covered indirectly through `test_mat_modes.py` and matrix chassis tests.
 - `modular_elliptic_wrappers`
   Covered indirectly through elliptic/modular chassis tests.
-- `point_wrappers`
-  Covered indirectly through many point-mode chassis tests, but not owned as a module.
 - `poly_wrappers`
   Covered indirectly through polynomial chassis tests.
 - `wrappers_common`
@@ -174,9 +173,6 @@ focused test file instead of relying on incidental coverage.
 - `matrix_free_core`
   Add a focused shared-substrate contract test file for operator plans,
   restart helpers, generalized operator plans, and shape/static-arg behavior.
-- `point_wrappers`
-  Add a focused point-wrapper contract file for representative exported point
-  surfaces, batching, padding, and dtype/shape normalization.
 - `public_metadata`
   Add a direct test file for registry serialization, metadata structure, and
   package-root metadata queries.
@@ -206,7 +202,6 @@ focused test file instead of relying on incidental coverage.
 The first concrete additions should be:
 
 - `tests/test_matrix_free_core_contracts.py`
-- `tests/test_point_wrappers_contracts.py`
 - `tests/test_public_metadata_contracts.py`
 - `tests/test_capability_registry_contracts.py`
 - `tests/test_bessel_kernels_contracts.py`

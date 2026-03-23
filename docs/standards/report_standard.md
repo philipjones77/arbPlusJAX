@@ -41,12 +41,14 @@ Reports should:
 - describe the current repo state
 - prefer factual inventory language over roadmap language
 - point to the governing standards when policy is relevant
+- use repository-root links such as `/docs/...` or `/src/...` for repo cross-references
 
 Reports should not:
 
 - own policy
 - duplicate standards text
 - act as TODO lists
+- embed host-specific filesystem paths such as `/home/...`
 
 ## Automation Rule
 

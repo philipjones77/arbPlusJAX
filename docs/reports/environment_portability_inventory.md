@@ -7,13 +7,13 @@ environments.
 
 Policy lives in:
 
-- [environment_portability_standard.md](/home/phili/projects/arbplusJAX/docs/standards/environment_portability_standard.md)
+- [environment_portability_standard.md](/docs/standards/environment_portability_standard.md)
 
 ## Current Portable Entry Points
 
 ### Test harness
 
-- [run_test_harness.py](/home/phili/projects/arbplusJAX/tools/run_test_harness.py)
+- [run_test_harness.py](/tools/run_test_harness.py)
 
 Current portability-relevant behavior:
 
@@ -23,8 +23,8 @@ Current portability-relevant behavior:
 
 ### Benchmark harness
 
-- [run_benchmarks.py](/home/phili/projects/arbplusJAX/benchmarks/run_benchmarks.py)
-- [bench_harness.py](/home/phili/projects/arbplusJAX/benchmarks/bench_harness.py)
+- [run_benchmarks.py](/benchmarks/run_benchmarks.py)
+- [bench_harness.py](/benchmarks/bench_harness.py)
 
 Current portability-relevant behavior:
 
@@ -34,7 +34,7 @@ Current portability-relevant behavior:
 
 ### Colab bootstrap
 
-- [colab_bootstrap.sh](/home/phili/projects/arbplusJAX/tools/colab_bootstrap.sh)
+- [colab_bootstrap.sh](/tools/colab_bootstrap.sh)
 
 Status:
 
@@ -42,7 +42,7 @@ Status:
 
 ### Example notebooks
 
-- [README.md](/home/phili/projects/arbplusJAX/examples/README.md)
+- [README.md](/examples/README.md)
 
 Current portability-relevant behavior:
 
@@ -52,8 +52,8 @@ Current portability-relevant behavior:
 
 ### Runtime manifest
 
-- [runtime_manifest.py](/home/phili/projects/arbplusJAX/tools/runtime_manifest.py)
-- [test_runtime_manifest.py](/home/phili/projects/arbplusJAX/tests/test_runtime_manifest.py)
+- [runtime_manifest.py](/tools/runtime_manifest.py)
+- [test_runtime_manifest.py](/tests/test_runtime_manifest.py)
 
 Status:
 
@@ -61,9 +61,9 @@ Status:
 
 ## Current WSL / Colab Docs
 
-- [run_platform.md](/home/phili/projects/arbplusJAX/docs/implementation/run_platform.md)
-- [linux_gpu_colab.md](/home/phili/projects/arbplusJAX/docs/implementation/linux_gpu_colab.md)
-- [running.md](/home/phili/projects/arbplusJAX/docs/practical/running.md)
+- [run_platform.md](/docs/implementation/run_platform.md)
+- [linux_gpu_colab.md](/docs/implementation/linux_gpu_colab.md)
+- [running.md](/docs/practical/running.md)
 
 ## Current Strengths
 

@@ -566,8 +566,8 @@ These then continue into the module’s precision and batched variants.
 
 ## 7. Local implementation pointers
 
-- [arb_core.py](/home/phili/projects/arbplusJAX/src/arbplusjax/arb_core.py)
-- [acb_core.py](/home/phili/projects/arbplusJAX/src/arbplusjax/acb_core.py)
-- [arb_core.md](/home/phili/projects/arbplusJAX/docs/implementation/modules/arb_core.md)
-- [acb_core.md](/home/phili/projects/arbplusJAX/docs/implementation/modules/acb_core.md)
-- [elementary_functions_methodology.md](/home/phili/projects/arbplusJAX/docs/theory/elementary_functions_methodology.md)
+- [arb_core.py](/src/arbplusjax/arb_core.py)
+- [acb_core.py](/src/arbplusjax/acb_core.py)
+- [arb_core.md](/docs/implementation/modules/arb_core.md)
+- [acb_core.md](/docs/implementation/modules/acb_core.md)
+- [elementary_functions_methodology.md](/docs/theory/elementary_functions_methodology.md)

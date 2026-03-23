@@ -7,9 +7,9 @@ This is the canonical consolidated TODO list for active implementation work in
 
 Organization rule:
 - Sections follow the top-level function and infrastructure categories defined in
-  [test_coverage_matrix.md](/home/phili/projects/arbplusJAX/docs/status/test_coverage_matrix.md).
+  [test_coverage_matrix.md](/docs/status/test_coverage_matrix.md).
 - Test-owner priorities follow
-  [test_gap_checklist.md](/home/phili/projects/arbplusJAX/docs/status/test_gap_checklist.md).
+  [test_gap_checklist.md](/docs/status/test_gap_checklist.md).
 - Generated inventories and detailed provenance stay in `docs/status/reports/`,
   not here.
 
@@ -31,33 +31,33 @@ Current phase snapshot:
 Status: `in_progress`
 
 - `done`
-  - root-level [tests](/home/phili/projects/arbplusJAX/tests) and
-    [benchmarks](/home/phili/projects/arbplusJAX/benchmarks) remain the
+  - root-level [tests](/tests) and
+    [benchmarks](/benchmarks) remain the
     canonical run surfaces
   - dedicated test orchestration exists in
-    [tools/run_test_harness.py](/home/phili/projects/arbplusJAX/tools/run_test_harness.py)
+    [tools/run_test_harness.py](/tools/run_test_harness.py)
   - dedicated benchmark orchestration exists in
-    [benchmarks/run_benchmarks.py](/home/phili/projects/arbplusJAX/benchmarks/run_benchmarks.py)
+    [benchmarks/run_benchmarks.py](/benchmarks/run_benchmarks.py)
     and
-    [benchmarks/run_harness_profile.py](/home/phili/projects/arbplusJAX/benchmarks/run_harness_profile.py)
+    [benchmarks/run_harness_profile.py](/benchmarks/run_harness_profile.py)
   - a shared `runtime_manifest.json` schema now exists across test and benchmark
     outputs
   - the existing
-    [example_run_suite.py](/home/phili/projects/arbplusJAX/examples/example_run_suite.py)
+    [example_run_suite.py](/examples/example_run_suite.py)
     flow now writes a suite-level runtime manifest, summary markdown, and SVG
     plots under
-    [examples/outputs/example_run_suite/](/home/phili/projects/arbplusJAX/examples/outputs/example_run_suite/)
+    [examples/outputs/example_run_suite/](/examples/outputs/example_run_suite/)
   - canonical notebook execution now exists through
-    [run_example_notebooks.py](/home/phili/projects/arbplusJAX/tools/run_example_notebooks.py),
+    [run_example_notebooks.py](/tools/run_example_notebooks.py),
     which executes the standards-aligned notebook surfaces and retains
     executed notebooks plus runtime/summary artifacts in the owning
-    [examples/outputs/](/home/phili/projects/arbplusJAX/examples/outputs/)
+    [examples/outputs/](/examples/outputs/)
     folders
   - canonical notebooks now also encode production calling patterns:
     binder reuse, optional padding/chunking, cached plan reuse, and benchmark
     extension guidance for the main top-level categories
   - the existing official API benchmark
-    [benchmark_api_surface.py](/home/phili/projects/arbplusJAX/benchmarks/benchmark_api_surface.py)
+    [benchmark_api_surface.py](/benchmarks/benchmark_api_surface.py)
     now emits the shared benchmark-report JSON schema instead of only printing
     timings
   - Windows, Linux, and Colab run instructions are documented
@@ -81,6 +81,37 @@ Status: `in_progress`
 - `planned`
   - add a single repo-facing execution checklist that names the minimum CPU,
     parity, GPU, and benchmark slices required for a release-quality change
+
+## Cross-repo provider boundary
+
+Status: `in_progress`
+
+- `done`
+  - arbPlusJAX remains the hardened numeric-kernel repo rather than being
+    repurposed as another library's orchestration layer
+  - matrix, sparse, block/vblock, and matrix-free/operator infrastructure are
+    being hardened as repo-owned numeric infrastructure inside arbPlusJAX
+- `in_progress`
+  - keep hardening public provider-worthy families instead of exposing more ad
+    hoc module-internal integration paths
+  - prefer stable capability entrypoints and metadata-bearing public surfaces
+    over downstream imports of internal module layout
+  - strengthen metadata and diagnostics so downstream orchestration can route
+    intelligently on method, hardening level, derivative support, and runtime
+    strategy
+  - keep notebooks, tests, and benchmarks written as downstream-consumer
+    documentation and validation surfaces, not only as internal development
+    checks
+  - keep cross-repo integration thin: downstream libraries should integrate
+    through adapter/provider layers on their side rather than by restructuring
+    arbPlusJAX around a specific consumer
+  - make Barnes/double-gamma provider-grade first
+  - make fragile-regime promotion hooks provider-grade
+  - make incomplete-Bessel provider-grade next
+- `planned`
+  - document a narrower capability-contract surface specifically for
+    downstream-provider use once the Barnes/promotion/incomplete-Bessel tranche
+    is hardened enough to freeze terminology
 
 ## 1. Core Numeric Scalars
 
@@ -106,14 +137,14 @@ Status: `done`
   - CPU direct-owner and parity slices now run against the repo-local WSL C
     reference builds through the shared parity-path helper
   - direct scalar status rollup now exists in
-    [core_numeric_scalars_status.md](/home/phili/projects/arbplusJAX/docs/reports/core_numeric_scalars_status.md),
+    [core_numeric_scalars_status.md](/docs/reports/core_numeric_scalars_status.md),
     including the distinction between true interval/box scalar kernels
     (`arb_core`, `acb_core`) and point-only helper scalar families
     (`arf`, `acf`, `fmpr`, `fmpzi`, `arb_fpwrap`)
   - canonical CPU notebook outputs now exist for the scalar/API tranche under
-    [example_core_scalar_surface](/home/phili/projects/arbplusJAX/examples/outputs/example_core_scalar_surface)
+    [example_core_scalar_surface](/examples/outputs/example_core_scalar_surface)
     and
-    [example_api_surface](/home/phili/projects/arbplusJAX/examples/outputs/example_api_surface)
+    [example_api_surface](/examples/outputs/example_api_surface)
   - scalar/API notebooks now explicitly show production service usage with
     binder reuse, stable dtype policy, and optional padding/chunking
 
@@ -124,12 +155,15 @@ Status: `in_progress`
 - `done`
   - direct test owners exist for `double_interval`, `mp_mode`, and
     `jax_precision`
+  - a direct owner test now exists for
+    [test_point_wrappers_contracts.py](/tests/test_point_wrappers_contracts.py),
+    covering representative point-wrapper exports, batching, padding, matrix
+    plan prepare/apply paths, and API fastpath parity
   - mode tests exist for point/basic interval behavior and matrix mode routing
   - targeted helper coverage now exists for shared batch padding, trimming,
     midpoint conversion, and low-level shape guards in the existing runtime/API
     test surface
 - `in_progress`
-  - add a direct owner test for `point_wrappers`
   - continue tightening wrapper ownership for:
     `ball_wrappers`, `baseline_wrappers`, `calc_wrappers`, `core_wrappers`,
     `double_interval_wrappers`, `hypgeom_wrappers`, `mat_wrappers`,
@@ -153,10 +187,10 @@ Status: `in_progress`
     `triangular_solve`, `lu`, and `qr`
   - point/basic/adaptive/rigorous API exposure exists for the main chassis
   - dense benchmark and example coverage exist in
-    [benchmark_dense_matrix_surface.py](/home/phili/projects/arbplusJAX/benchmarks/benchmark_dense_matrix_surface.py),
-    [dense_matrix_surface_benchmark.md](/home/phili/projects/arbplusJAX/docs/status/reports/dense_matrix_surface_benchmark.md),
+    [benchmark_dense_matrix_surface.py](/benchmarks/benchmark_dense_matrix_surface.py),
+    [dense_matrix_surface_benchmark.md](/docs/status/reports/dense_matrix_surface_benchmark.md),
     and
-    [example_dense_matrix_surface.ipynb](/home/phili/projects/arbplusJAX/examples/example_dense_matrix_surface.ipynb)
+    [example_dense_matrix_surface.ipynb](/examples/example_dense_matrix_surface.ipynb)
 - `in_progress`
   - strengthen large-`n` determinant enclosures beyond midpoint fallback
   - add parity/reference checks for `inv`, `qr`, banded matvec, cached matvec,
@@ -499,27 +533,25 @@ Status: `in_progress`
 
 Highest priority:
 - add
-  [test_matrix_free_core_contracts.py](/home/phili/projects/arbplusJAX/tests/test_matrix_free_core_contracts.py)
+  [test_matrix_free_core_contracts.py](/tests/test_matrix_free_core_contracts.py)
 - add
-  [test_point_wrappers_contracts.py](/home/phili/projects/arbplusJAX/tests/test_point_wrappers_contracts.py)
+  [test_public_metadata_contracts.py](/tests/test_public_metadata_contracts.py)
 - add
-  [test_public_metadata_contracts.py](/home/phili/projects/arbplusJAX/tests/test_public_metadata_contracts.py)
+  [test_capability_registry_contracts.py](/tests/test_capability_registry_contracts.py)
 - add
-  [test_capability_registry_contracts.py](/home/phili/projects/arbplusJAX/tests/test_capability_registry_contracts.py)
+  [test_bessel_kernels_contracts.py](/tests/test_bessel_kernels_contracts.py)
 - add
-  [test_bessel_kernels_contracts.py](/home/phili/projects/arbplusJAX/tests/test_bessel_kernels_contracts.py)
-- add
-  [test_barnesg_contracts.py](/home/phili/projects/arbplusJAX/tests/test_barnesg_contracts.py)
+  [test_barnesg_contracts.py](/tests/test_barnesg_contracts.py)
 
 Next priority:
 - add
-  [test_block_sparse_core_contracts.py](/home/phili/projects/arbplusJAX/tests/test_block_sparse_core_contracts.py)
+  [test_block_sparse_core_contracts.py](/tests/test_block_sparse_core_contracts.py)
 - add
-  [test_sparse_core_contracts.py](/home/phili/projects/arbplusJAX/tests/test_sparse_core_contracts.py)
+  [test_sparse_core_contracts.py](/tests/test_sparse_core_contracts.py)
 - add
-  [test_krylov_solvers_contracts.py](/home/phili/projects/arbplusJAX/tests/test_krylov_solvers_contracts.py)
+  [test_krylov_solvers_contracts.py](/tests/test_krylov_solvers_contracts.py)
 - add
-  [test_transform_common_contracts.py](/home/phili/projects/arbplusJAX/tests/test_transform_common_contracts.py)
+  [test_transform_common_contracts.py](/tests/test_transform_common_contracts.py)
 
 Execution order:
 1. Add the six highest-priority direct-owner tests above.
@@ -532,7 +564,7 @@ Execution order:
 ## Missing C implementation snapshot
 
 Source:
-[audit.md](/home/phili/projects/arbplusJAX/docs/status/audit.md)
+[audit.md](/docs/status/audit.md)
 snapshot `2026-02-25T03:51:38Z`.
 
 - Arb Core: 195

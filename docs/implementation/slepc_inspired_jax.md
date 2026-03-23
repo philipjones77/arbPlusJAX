@@ -14,7 +14,7 @@ The repo position is:
 
 ## Landed Native JAX Surface
 
-Shared substrate in [matrix_free_core.py](/home/phili/projects/arbplusJAX/src/arbplusjax/matrix_free_core.py):
+Shared substrate in [matrix_free_core.py](/src/arbplusjax/matrix_free_core.py):
 
 - operator-plan shell model
 - preconditioner-plan shell model
@@ -22,7 +22,7 @@ Shared substrate in [matrix_free_core.py](/home/phili/projects/arbplusJAX/src/ar
 - shared restart and locking helpers
 - correction-column prioritization for Davidson/Jacobi-Davidson expansion
 
-Public eigensolver families in [jrb_mat.py](/home/phili/projects/arbplusJAX/src/arbplusjax/jrb_mat.py) and [jcb_mat.py](/home/phili/projects/arbplusJAX/src/arbplusjax/jcb_mat.py):
+Public eigensolver families in [jrb_mat.py](/src/arbplusjax/jrb_mat.py) and [jcb_mat.py](/src/arbplusjax/jcb_mat.py):
 
 - Hermitian / symmetric `eigsh`
 - restarted and block eigensolvers
@@ -51,7 +51,7 @@ The following remain external-only and are not part of the governed runtime:
 - PETSc `KSP` as a library runtime dependency
 - SLEPc `EPS` as a library runtime dependency
 
-Current optional probing remains isolated to [benchmark_matrix_backend_candidates.py](/home/phili/projects/arbplusJAX/benchmarks/benchmark_matrix_backend_candidates.py).
+Current optional probing remains isolated to [benchmark_matrix_backend_candidates.py](/benchmarks/benchmark_matrix_backend_candidates.py).
 
 That benchmark currently:
 
@@ -72,7 +72,7 @@ What is still open is solver-product depth, not missing baseline surface:
 
 ## Cross References
 
-- status matrix: [matrix_free_completion_plan.md](/home/phili/projects/arbplusJAX/docs/status/matrix_free_completion_plan.md)
-- placement rules: [matrix_stack.md](/home/phili/projects/arbplusJAX/docs/implementation/matrix_stack.md)
-- real module surface: [jrb_mat.md](/home/phili/projects/arbplusJAX/docs/implementation/modules/jrb_mat.md)
-- complex module surface: [jcb_mat.md](/home/phili/projects/arbplusJAX/docs/implementation/modules/jcb_mat.md)
+- status matrix: [matrix_free_completion_plan.md](/docs/status/matrix_free_completion_plan.md)
+- placement rules: [matrix_stack.md](/docs/implementation/matrix_stack.md)
+- real module surface: [jrb_mat.md](/docs/implementation/modules/jrb_mat.md)
+- complex module surface: [jcb_mat.md](/docs/implementation/modules/jcb_mat.md)

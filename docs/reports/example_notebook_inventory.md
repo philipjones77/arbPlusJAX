@@ -7,7 +7,7 @@ remaining notebook gaps by functionality group.
 
 Policy lives in:
 
-- [example_notebook_standard.md](/home/phili/projects/arbplusJAX/docs/standards/example_notebook_standard.md)
+- [example_notebook_standard.md](/docs/standards/example_notebook_standard.md)
 
 Current notebook root:
 

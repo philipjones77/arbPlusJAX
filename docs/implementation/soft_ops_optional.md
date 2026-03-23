@@ -17,8 +17,8 @@ That means:
 
 ## Modules
 
-- [soft_ops.py](/home/phili/projects/arbplusJAX/src/arbplusjax/soft_ops.py)
-- [soft_types.py](/home/phili/projects/arbplusJAX/src/arbplusjax/soft_types.py)
+- [soft_ops.py](/src/arbplusjax/soft_ops.py)
+- [soft_types.py](/src/arbplusjax/soft_types.py)
 
 Current functions:
 

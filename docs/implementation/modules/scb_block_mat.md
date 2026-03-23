@@ -8,8 +8,8 @@ Last updated: 2026-03-15T00:00:00Z
 
 It is separate from:
 
-- [scb_mat](/home/phili/projects/arbplusJAX/src/arbplusjax/scb_mat.py): scalar sparse matrices
-- [acb_mat](/home/phili/projects/arbplusJAX/src/arbplusjax/acb_mat.py): dense complex box matrices
+- [scb_mat](/src/arbplusjax/scb_mat.py): scalar sparse matrices
+- [acb_mat](/src/arbplusjax/acb_mat.py): dense complex box matrices
 
 ## Current Scope
 

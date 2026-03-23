@@ -25,10 +25,10 @@ It does not define:
 
 Those belong to:
 
-- [example_notebook_standard.md](/home/phili/projects/arbplusJAX/docs/standards/example_notebook_standard.md)
-- [experiment_layout_standard.md](/home/phili/projects/arbplusJAX/docs/standards/experiment_layout_standard.md)
-- [benchmark_grouping_standard.md](/home/phili/projects/arbplusJAX/docs/standards/benchmark_grouping_standard.md)
-- [benchmark_validation_policy_standard.md](/home/phili/projects/arbplusJAX/docs/standards/benchmark_validation_policy_standard.md)
+- [example_notebook_standard.md](/docs/standards/example_notebook_standard.md)
+- [experiment_layout_standard.md](/docs/standards/experiment_layout_standard.md)
+- [benchmark_grouping_standard.md](/docs/standards/benchmark_grouping_standard.md)
+- [benchmark_validation_policy_standard.md](/docs/standards/benchmark_validation_policy_standard.md)
 
 ## Supported Portability Targets
 
@@ -91,7 +91,7 @@ available.
 
 For this repo, Colab support should prefer:
 
-- [colab_bootstrap.sh](/home/phili/projects/arbplusJAX/tools/colab_bootstrap.sh)
+- [colab_bootstrap.sh](/tools/colab_bootstrap.sh)
 
 ### 6. WSL must be treated as a first-class local platform
 
@@ -109,7 +109,20 @@ Portability-critical entrypoints should remain:
 
 These entrypoints should remain the preferred cross-environment launch surfaces.
 
-### 8. Optional integrations must degrade cleanly
+### 8. Linux default interpreter policy must prefer JAX
+
+On native Linux, the default interpreter for repo harnesses and validation
+scripts should be the shared `jax` environment when it is available.
+
+Use explicit overrides only when needed:
+
+- `--python ...`
+- `ARBPLUSJAX_PYTHON=...`
+
+This keeps local tests, examples, and benchmarks aligned to the same JAX
+runtime by default instead of drifting onto an arbitrary ambient interpreter.
+
+### 9. Optional integrations must degrade cleanly
 
 When an environment lacks optional software:
 

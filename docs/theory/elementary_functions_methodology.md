@@ -376,6 +376,6 @@ The public elementary functions covered by this methodology are:
 
 ## 9. Local implementation pointers
 
-- [elementary.py](/home/phili/projects/arbplusJAX/src/arbplusjax/elementary.py)
-- [ball_arithmetic_and_modes.md](/home/phili/projects/arbplusJAX/docs/theory/ball_arithmetic_and_modes.md)
-- [core_functions_methodology.md](/home/phili/projects/arbplusJAX/docs/theory/core_functions_methodology.md)
+- [elementary.py](/src/arbplusjax/elementary.py)
+- [ball_arithmetic_and_modes.md](/docs/theory/ball_arithmetic_and_modes.md)
+- [core_functions_methodology.md](/docs/theory/core_functions_methodology.md)

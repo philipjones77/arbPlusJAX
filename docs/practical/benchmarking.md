@@ -6,11 +6,11 @@ This page is for the practical question: how should benchmark runs be structured
 
 ## Recommended path
 
-- use [benchmarks.md](/home/phili/projects/arbplusJAX/docs/implementation/benchmarks.md) for the main benchmark workflow
-- use [benchmark_process.md](/home/phili/projects/arbplusJAX/docs/implementation/benchmark_process.md) for benchmark process and reporting expectations
-- use [testing_harness.md](/home/phili/projects/arbplusJAX/docs/implementation/testing_harness.md) for backend roles and comparison policy
-- use [matrix_stack.md](/home/phili/projects/arbplusJAX/docs/implementation/matrix_stack.md) for dense/sparse/matrix-free contract alignment
-- use [jax_diagnostics.md](/home/phili/projects/arbplusJAX/docs/practical/jax_diagnostics.md) for optional JAX compile, memory, and recompile profiling
+- use [benchmarks.md](/docs/implementation/benchmarks.md) for the main benchmark workflow
+- use [benchmark_process.md](/docs/implementation/benchmark_process.md) for benchmark process and reporting expectations
+- use [testing_harness.md](/docs/implementation/testing_harness.md) for backend roles and comparison policy
+- use [matrix_stack.md](/docs/implementation/matrix_stack.md) for dense/sparse/matrix-free contract alignment
+- use [jax_diagnostics.md](/docs/practical/jax_diagnostics.md) for optional JAX compile, memory, and recompile profiling
 
 ## Practical rules
 

@@ -4,7 +4,7 @@ Last updated: 2026-03-07T00:00:00Z
 
 Generated from `arbplusjax.function_provenance`.
 
-Summary: `implementations=5615`.
+Summary: `implementations=5617`.
 
 | base_name | category | public_name | preferred_public_name | four_modes | tightening | why | lineage | module |
 |---|---|---|---|---|---|---|---|---|
@@ -33,6 +33,7 @@ Summary: `implementations=5615`.
 | acb_asinh | arb_like | acb_asinh | acb_asinh | point | point-only canonical path | Synthetic canonical implementation row derived from the public point/interval inventory. | Arb/FLINT-style canonical mathematical family | `inventory-derived canonical surface` |
 | acb_atan | arb_like | acb_atan | acb_atan | point | point-only canonical path | Synthetic canonical implementation row derived from the public point/interval inventory. | Arb/FLINT-style canonical mathematical family | `inventory-derived canonical surface` |
 | acb_atanh | arb_like | acb_atanh | acb_atanh | point | point-only canonical path | Synthetic canonical implementation row derived from the public point/interval inventory. | Arb/FLINT-style canonical mathematical family | `inventory-derived canonical surface` |
+| acb_barnes_g | arb_like | acb_barnes_g | acb_barnes_g | point | point-only canonical path | Synthetic canonical implementation row derived from the public point/interval inventory. | Arb/FLINT-style canonical mathematical family | `inventory-derived canonical surface` |
 | acb_bernoulli_poly_ui | arb_like | acb_bernoulli_poly_ui | acb_bernoulli_poly_ui | point | point-only canonical path | Synthetic canonical implementation row derived from the public point/interval inventory. | Arb/FLINT-style canonical mathematical family | `inventory-derived canonical surface` |
 | acb_calc.acb_calc_integrate_line | arb_like | acb_calc.acb_calc_integrate_line | acb_calc.acb_calc_integrate_line | point | point-only canonical path | Synthetic canonical implementation row derived from the public point/interval inventory. | Arb/FLINT-style canonical mathematical family | `inventory-derived canonical surface` |
 | acb_calc_integrate_line | arb_like | acb_calc_integrate_line | acb_calc_integrate_line | point | point-only canonical path | Synthetic canonical implementation row derived from the public point/interval inventory. | Arb/FLINT-style canonical mathematical family | `inventory-derived canonical surface` |
@@ -152,6 +153,7 @@ Summary: `implementations=5615`.
 | acb_lgamma | arb_like | acb_lgamma | acb_lgamma | point | point-only canonical path | Synthetic canonical implementation row derived from the public point/interval inventory. | Arb/FLINT-style canonical mathematical family | `inventory-derived canonical surface` |
 | acb_log | arb_like | acb_log | acb_log | point | point-only canonical path | Synthetic canonical implementation row derived from the public point/interval inventory. | Arb/FLINT-style canonical mathematical family | `inventory-derived canonical surface` |
 | acb_log1p | arb_like | acb_log1p | acb_log1p | point | point-only canonical path | Synthetic canonical implementation row derived from the public point/interval inventory. | Arb/FLINT-style canonical mathematical family | `inventory-derived canonical surface` |
+| acb_log_barnes_g | arb_like | acb_log_barnes_g | acb_log_barnes_g | point | point-only canonical path | Synthetic canonical implementation row derived from the public point/interval inventory. | Arb/FLINT-style canonical mathematical family | `inventory-derived canonical surface` |
 | acb_log_sin_pi | arb_like | acb_log_sin_pi | acb_log_sin_pi | point | point-only canonical path | Synthetic canonical implementation row derived from the public point/interval inventory. | Arb/FLINT-style canonical mathematical family | `inventory-derived canonical surface` |
 | acb_mat_2x2_det | arb_like | acb_mat_2x2_det | acb_mat_2x2_det | point | point-only canonical path | Synthetic canonical implementation row derived from the public point/interval inventory. | Arb/FLINT-style canonical mathematical family | `inventory-derived canonical surface` |
 | acb_mat_2x2_det_batch | arb_like | acb_mat_2x2_det_batch | acb_mat_2x2_det_batch | point | point-only canonical path | Synthetic canonical implementation row derived from the public point/interval inventory. | Arb/FLINT-style canonical mathematical family | `inventory-derived canonical surface` |

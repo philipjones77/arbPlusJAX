@@ -7,7 +7,7 @@ implementations, usually grown out of `example_*.ipynb` notebooks.
 
 Policy:
 
-- [experiment_layout_standard.md](/home/phili/projects/arbplusJAX/docs/standards/experiment_layout_standard.md)
+- [experiment_layout_standard.md](/docs/standards/experiment_layout_standard.md)
 
 Rules:
 

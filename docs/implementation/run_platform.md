@@ -25,13 +25,13 @@ The rule is simple:
 
 ## VS Code root
 
-The VS Code explorer root should be the repository root, [arbplusJAX](/home/phili/projects/arbplusJAX), not [docs](/home/phili/projects/arbplusJAX/docs).
+The VS Code explorer root should be the repository root, [arbplusJAX](/), not [docs](/docs).
 
 Workspace files:
 
 - `arbPlusJAX.code-workspace`: not currently present in this repo
-- [arbPlusJAX-linux.code-workspace](/home/phili/projects/arbplusJAX/arbPlusJAX-linux.code-workspace): Linux-specific defaults
-- [arbPlusJAX-windows.code-workspace](/home/phili/projects/arbplusJAX/arbPlusJAX-windows.code-workspace): Windows-specific defaults
+- [arbPlusJAX-linux.code-workspace](/arbPlusJAX-linux.code-workspace): Linux-specific defaults
+- [arbPlusJAX-windows.code-workspace](/arbPlusJAX-windows.code-workspace): Windows-specific defaults
 
 Recommendation:
 

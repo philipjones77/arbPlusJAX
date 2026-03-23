@@ -6,12 +6,12 @@ This report records the current benchmark grouping in the repo.
 
 Policy and grouping rules live in:
 
-- [benchmark_grouping_standard.md](/home/phili/projects/arbplusJAX/docs/standards/benchmark_grouping_standard.md)
-- [benchmark_validation_policy_standard.md](/home/phili/projects/arbplusJAX/docs/standards/benchmark_validation_policy_standard.md)
+- [benchmark_grouping_standard.md](/docs/standards/benchmark_grouping_standard.md)
+- [benchmark_validation_policy_standard.md](/docs/standards/benchmark_validation_policy_standard.md)
 
 The executable source of truth is:
 
-- [taxonomy.py](/home/phili/projects/arbplusJAX/benchmarks/taxonomy.py)
+- [taxonomy.py](/benchmarks/taxonomy.py)
 
 ## Official Benchmarks
 

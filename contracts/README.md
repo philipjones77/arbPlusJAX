@@ -8,13 +8,13 @@ Operational obligations should go here rather than under `docs/`.
 
 ## Active contract set
 
-- [public_api_mode_contract.md](/home/phili/projects/arbplusJAX/contracts/public_api_mode_contract.md)
-- [public_api_selection_contract.md](/home/phili/projects/arbplusJAX/contracts/public_api_selection_contract.md)
-- [dtype_and_precision_contract.md](/home/phili/projects/arbplusJAX/contracts/dtype_and_precision_contract.md)
-- [stable_kernel_subset_contract.md](/home/phili/projects/arbplusJAX/contracts/stable_kernel_subset_contract.md)
-- [matrix_surface_contract.md](/home/phili/projects/arbplusJAX/contracts/matrix_surface_contract.md)
-- [sparse_layout_operator_contract.md](/home/phili/projects/arbplusJAX/contracts/sparse_layout_operator_contract.md)
-- [capability_registry_contract.md](/home/phili/projects/arbplusJAX/contracts/capability_registry_contract.md)
+- [public_api_mode_contract.md](/contracts/public_api_mode_contract.md)
+- [public_api_selection_contract.md](/contracts/public_api_selection_contract.md)
+- [dtype_and_precision_contract.md](/contracts/dtype_and_precision_contract.md)
+- [stable_kernel_subset_contract.md](/contracts/stable_kernel_subset_contract.md)
+- [matrix_surface_contract.md](/contracts/matrix_surface_contract.md)
+- [sparse_layout_operator_contract.md](/contracts/sparse_layout_operator_contract.md)
+- [capability_registry_contract.md](/contracts/capability_registry_contract.md)
 
 ## Scope
 

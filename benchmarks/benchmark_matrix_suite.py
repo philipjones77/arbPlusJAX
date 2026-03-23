@@ -32,9 +32,6 @@ from functools import partial
 # Set JAX to 64-bit mode
 jax.config.update("jax_enable_x64", True)
 
-import sys
-sys.path.insert(0, "/home/phili/projects/arbplusJAX/src")
-
 from arbplusjax import arb_mat, acb_mat
 from arbplusjax import srb_mat, scb_mat
 from arbplusjax import srb_block_mat, scb_block_mat

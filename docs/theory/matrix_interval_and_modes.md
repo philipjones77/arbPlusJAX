@@ -339,7 +339,7 @@ The local bibliography snapshot does not currently appear to contain the standar
 
 For the concrete matrix semantics described here, see:
 
-- [arb_mat.md](/home/phili/projects/arbplusJAX/docs/implementation/modules/arb_mat.md)
-- [acb_mat.md](/home/phili/projects/arbplusJAX/docs/implementation/modules/acb_mat.md)
-- [mat_wrappers.md](/home/phili/projects/arbplusJAX/docs/implementation/wrappers/mat_wrappers.md)
-- [ball_arithmetic_and_modes.md](/home/phili/projects/arbplusJAX/docs/theory/ball_arithmetic_and_modes.md)
+- [arb_mat.md](/docs/implementation/modules/arb_mat.md)
+- [acb_mat.md](/docs/implementation/modules/acb_mat.md)
+- [mat_wrappers.md](/docs/implementation/wrappers/mat_wrappers.md)
+- [ball_arithmetic_and_modes.md](/docs/theory/ball_arithmetic_and_modes.md)

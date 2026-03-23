@@ -100,7 +100,7 @@ That rectangular widening was needed so block dense algebra is valid without for
 
 Dense shared helpers live primarily in:
 
-- [mat_common.py](/home/phili/projects/arbplusJAX/src/arbplusjax/mat_common.py)
+- [mat_common.py](/src/arbplusjax/mat_common.py)
 
 This common layer owns:
 
@@ -191,13 +191,13 @@ These are runtime bottlenecks, not correctness blockers.
 
 Current dense tranche validation includes:
 
-- [test_dense_plan_modes.py](/home/phili/projects/arbplusJAX/tests/test_dense_plan_modes.py)
-- [test_dense_broad_surface.py](/home/phili/projects/arbplusJAX/tests/test_dense_broad_surface.py)
-- [test_dense_eigh_and_aliases.py](/home/phili/projects/arbplusJAX/tests/test_dense_eigh_and_aliases.py)
-- [test_dense_structured_modes.py](/home/phili/projects/arbplusJAX/tests/test_dense_structured_modes.py)
-- [test_mat_modes.py](/home/phili/projects/arbplusJAX/tests/test_mat_modes.py)
-- [test_arb_mat_chassis.py](/home/phili/projects/arbplusJAX/tests/test_arb_mat_chassis.py)
-- [test_acb_mat_chassis.py](/home/phili/projects/arbplusJAX/tests/test_acb_mat_chassis.py)
+- [test_dense_plan_modes.py](/tests/test_dense_plan_modes.py)
+- [test_dense_broad_surface.py](/tests/test_dense_broad_surface.py)
+- [test_dense_eigh_and_aliases.py](/tests/test_dense_eigh_and_aliases.py)
+- [test_dense_structured_modes.py](/tests/test_dense_structured_modes.py)
+- [test_mat_modes.py](/tests/test_mat_modes.py)
+- [test_arb_mat_chassis.py](/tests/test_arb_mat_chassis.py)
+- [test_acb_mat_chassis.py](/tests/test_acb_mat_chassis.py)
 
 Most recent dense tranche run:
 
@@ -212,16 +212,16 @@ The latest pass also fixed:
 
 Primary dense benchmark:
 
-- [benchmark_dense_matrix_surface.py](/home/phili/projects/arbplusJAX/benchmarks/benchmark_dense_matrix_surface.py)
+- [benchmark_dense_matrix_surface.py](/benchmarks/benchmark_dense_matrix_surface.py)
 
 Current benchmark report:
 
-- [dense_matrix_surface_benchmark.md](/home/phili/projects/arbplusJAX/docs/status/reports/dense_matrix_surface_benchmark.md)
+- [dense_matrix_surface_benchmark.md](/docs/status/reports/dense_matrix_surface_benchmark.md)
 
 ## Example Entry Points
 
-- [example_dense_matrix_surface.ipynb](/home/phili/projects/arbplusJAX/examples/example_dense_matrix_surface.ipynb)
-- [example_dense_structured_spectral.ipynb](/home/phili/projects/arbplusJAX/examples/example_dense_structured_spectral.ipynb)
+- [example_dense_matrix_surface.ipynb](/examples/example_dense_matrix_surface.ipynb)
+- [example_dense_structured_spectral.ipynb](/examples/example_dense_structured_spectral.ipynb)
 
 ## Remaining Boundaries
 

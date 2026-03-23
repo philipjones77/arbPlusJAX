@@ -18,9 +18,9 @@ It does not define:
 
 Those belong to:
 
-- [example_notebook_standard.md](/home/phili/projects/arbplusJAX/docs/standards/example_notebook_standard.md)
-- [benchmark_grouping_standard.md](/home/phili/projects/arbplusJAX/docs/standards/benchmark_grouping_standard.md)
-- [environment_portability_standard.md](/home/phili/projects/arbplusJAX/docs/standards/environment_portability_standard.md)
+- [example_notebook_standard.md](/docs/standards/example_notebook_standard.md)
+- [benchmark_grouping_standard.md](/docs/standards/benchmark_grouping_standard.md)
+- [environment_portability_standard.md](/docs/standards/environment_portability_standard.md)
 
 Experiments are for larger-scale implementations and exploratory work, usually
 grown out of `example_*.ipynb` notebooks.

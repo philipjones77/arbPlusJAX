@@ -10,8 +10,8 @@ This document defines how benchmark functionality is grouped in this repo.
 
 Use it together with:
 
-- [benchmark_validation_policy_standard.md](/home/phili/projects/arbplusJAX/docs/standards/benchmark_validation_policy_standard.md)
-- [jax_api_runtime_standard.md](/home/phili/projects/arbplusJAX/docs/standards/jax_api_runtime_standard.md)
+- [benchmark_validation_policy_standard.md](/docs/standards/benchmark_validation_policy_standard.md)
+- [jax_api_runtime_standard.md](/docs/standards/jax_api_runtime_standard.md)
 
 The goal is to keep benchmark organization consistent across:
 
@@ -29,7 +29,7 @@ This document owns:
 
 It does not define benchmark output schema details or benchmark measurement
 policy. Those belong to
-[benchmark_validation_policy_standard.md](/home/phili/projects/arbplusJAX/docs/standards/benchmark_validation_policy_standard.md).
+[benchmark_validation_policy_standard.md](/docs/standards/benchmark_validation_policy_standard.md).
 
 ## Grouping Axes
 
@@ -152,7 +152,7 @@ then confirmed in the taxonomy.
 
 The executable grouping source of truth is:
 
-- [taxonomy.py](/home/phili/projects/arbplusJAX/benchmarks/taxonomy.py)
+- [taxonomy.py](/benchmarks/taxonomy.py)
 
 This standard defines the allowed grouping model.
 The taxonomy defines the current repo mapping.

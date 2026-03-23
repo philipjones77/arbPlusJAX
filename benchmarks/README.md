@@ -15,14 +15,14 @@ This directory is intentionally separate from `tests/`.
 
 Benchmark governance and pytest marker policy:
 
-- [benchmark_validation_policy_standard.md](/home/phili/projects/arbplusJAX/docs/standards/benchmark_validation_policy_standard.md)
-- [benchmark_grouping_standard.md](/home/phili/projects/arbplusJAX/docs/standards/benchmark_grouping_standard.md)
-- [environment_portability_standard.md](/home/phili/projects/arbplusJAX/docs/standards/environment_portability_standard.md)
-- taxonomy and marker derivation: [taxonomy.py](/home/phili/projects/arbplusJAX/benchmarks/taxonomy.py)
+- [benchmark_validation_policy_standard.md](/docs/standards/benchmark_validation_policy_standard.md)
+- [benchmark_grouping_standard.md](/docs/standards/benchmark_grouping_standard.md)
+- [environment_portability_standard.md](/docs/standards/environment_portability_standard.md)
+- taxonomy and marker derivation: [taxonomy.py](/benchmarks/taxonomy.py)
   - this also defines the official benchmark mapping for major benchmark concerns
-- shared artifact schema: [schema.py](/home/phili/projects/arbplusJAX/benchmarks/schema.py)
-- current grouped inventory: [benchmark_group_inventory.md](/home/phili/projects/arbplusJAX/docs/reports/benchmark_group_inventory.md)
-- current portability inventory: [environment_portability_inventory.md](/home/phili/projects/arbplusJAX/docs/reports/environment_portability_inventory.md)
+- shared artifact schema: [schema.py](/benchmarks/schema.py)
+- current grouped inventory: [benchmark_group_inventory.md](/docs/reports/benchmark_group_inventory.md)
+- current portability inventory: [environment_portability_inventory.md](/docs/reports/environment_portability_inventory.md)
 
 - Use `tools/run_test_harness.py --profile bench-smoke` for lightweight benchmark smoke checks.
 - Use `python -m pytest benchmarks/test_benchmark_smoke.py` for the direct benchmark CLI smoke path.

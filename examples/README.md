@@ -2,9 +2,9 @@
 
 Notebook policy and coverage:
 
-- [example_notebook_standard.md](/home/phili/projects/arbplusJAX/docs/standards/example_notebook_standard.md)
-- [example_notebook_inventory.md](/home/phili/projects/arbplusJAX/docs/reports/example_notebook_inventory.md)
-- [environment_portability_standard.md](/home/phili/projects/arbplusJAX/docs/standards/environment_portability_standard.md)
+- [example_notebook_standard.md](/docs/standards/example_notebook_standard.md)
+- [example_notebook_inventory.md](/docs/reports/example_notebook_inventory.md)
+- [environment_portability_standard.md](/docs/standards/environment_portability_standard.md)
 
 All notebooks in this folder are named `example_*.ipynb` and are designed for both Linux and Windows.
 
@@ -100,8 +100,8 @@ For matrix-free adjoint examples:
 - `example_matrix_free_adjoints.py` demonstrates direct scripted use of the matrix-free custom-adjoint surfaces outside the notebook flow
 
 Dense matrix documentation:
-- implementation overview: [dense_matrix_tranche.md](/home/phili/projects/arbplusJAX/docs/implementation/dense_matrix_tranche.md)
-- practical runbook: [dense_matrices.md](/home/phili/projects/arbplusJAX/docs/practical/dense_matrices.md)
+- implementation overview: [dense_matrix_tranche.md](/docs/implementation/dense_matrix_tranche.md)
+- practical runbook: [dense_matrices.md](/docs/practical/dense_matrices.md)
 
 ## Scripted suite runs
 

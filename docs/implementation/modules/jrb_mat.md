@@ -6,7 +6,7 @@ Last updated: 2026-03-22T00:00:00Z
 
 `jrb_mat` is the Jones-labeled subsystem for real matrix-free JAX algorithms.
 
-It is separate from [arb_mat](/home/phili/projects/arbplusJAX/src/arbplusjax/arb_mat.py):
+It is separate from [arb_mat](/src/arbplusjax/arb_mat.py):
 - `arb_mat`: canonical Arb/FLINT-style JAX matrix extension surface
 - `jrb_mat`: operator-style matrix-free subsystem for Krylov actions, trace estimators, and large-scale AD-aware workflows
 
@@ -187,19 +187,19 @@ Matrix-free layer:
 ## Diagnostics And Benchmarks
 
 Current correctness coverage:
-- [test_jrb_mat_chassis.py](/home/phili/projects/arbplusJAX/tests/test_jrb_mat_chassis.py)
+- [test_jrb_mat_chassis.py](/tests/test_jrb_mat_chassis.py)
 - includes operator apply, polynomial action, `expm` action, Lanczos exact diagonal cases, trace/logdet estimators, and backward probe-gradient checks
-- [test_jrb_mat_logdet_contracts.py](/home/phili/projects/arbplusJAX/tests/test_jrb_mat_logdet_contracts.py)
+- [test_jrb_mat_logdet_contracts.py](/tests/test_jrb_mat_logdet_contracts.py)
 - adds SLQ/logdet sanity contracts for diagonal exactness, eigen-tail sensitivity, probe-budget variance, reproducibility/dtype stability, sparse Leja+Hutch++ diagonal exactness, and the new auto-bounds adaptive-degree sparse diagonal contract
-- [test_jrb_mat_selected_inverse.py](/home/phili/projects/arbplusJAX/tests/test_jrb_mat_selected_inverse.py)
+- [test_jrb_mat_selected_inverse.py](/tests/test_jrb_mat_selected_inverse.py)
 - adds selected-inverse contracts for sparse diagonal exactness, full-overlap inverse-diagonal exactness, and stochastic-correction improvement over the local-only estimate
 
 Current benchmark coverage:
-- [benchmark_matrix_free_krylov.py](/home/phili/projects/arbplusJAX/benchmarks/benchmark_matrix_free_krylov.py)
-- current report: [matrix_free_krylov_benchmark.md](/home/phili/projects/arbplusJAX/docs/status/reports/matrix_free_krylov_benchmark.md)
+- [benchmark_matrix_free_krylov.py](/benchmarks/benchmark_matrix_free_krylov.py)
+- current report: [matrix_free_krylov_benchmark.md](/docs/status/reports/matrix_free_krylov_benchmark.md)
 - optional JSON sanity snapshot: `python tools/slq_logdet_contract_report.py`
-- broader method comparison note: [matrix_logdet_landscape.md](/home/phili/projects/arbplusJAX/docs/implementation/matrix_logdet_landscape.md)
-- theory note for the sparse SPD Leja path: [sparse_symmetric_leja_hutchpp_logdet.md](/home/phili/projects/arbplusJAX/docs/theory/sparse_symmetric_leja_hutchpp_logdet.md)
+- broader method comparison note: [matrix_logdet_landscape.md](/docs/implementation/matrix_logdet_landscape.md)
+- theory note for the sparse SPD Leja path: [sparse_symmetric_leja_hutchpp_logdet.md](/docs/theory/sparse_symmetric_leja_hutchpp_logdet.md)
 
 Current diagnostic contract:
 - structured diagnostics now exist via `JrbMatKrylovDiagnostics`

@@ -8,8 +8,8 @@ Last updated: 2026-03-15T00:00:00Z
 
 It is separate from:
 
-- [srb_mat](/home/phili/projects/arbplusJAX/src/arbplusjax/srb_mat.py): scalar sparse matrices
-- [arb_mat](/home/phili/projects/arbplusJAX/src/arbplusjax/arb_mat.py): dense interval matrices
+- [srb_mat](/src/arbplusjax/srb_mat.py): scalar sparse matrices
+- [arb_mat](/src/arbplusjax/arb_mat.py): dense interval matrices
 
 ## Current Scope
 

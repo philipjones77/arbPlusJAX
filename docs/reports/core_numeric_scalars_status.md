@@ -6,7 +6,7 @@ Last updated: 2026-03-22T00:00:00Z
 
 This report is the canonical rollup for
 `1. Core Numeric Scalars` from
-[test_coverage_matrix.md](/home/phili/projects/arbplusJAX/docs/status/test_coverage_matrix.md).
+[test_coverage_matrix.md](/docs/status/test_coverage_matrix.md).
 
 It records which families are:
 
@@ -90,36 +90,36 @@ Why:
 
 Primary tests:
 
-- [test_arb_core_chassis.py](/home/phili/projects/arbplusJAX/tests/test_arb_core_chassis.py)
-- [test_acb_core_chassis.py](/home/phili/projects/arbplusJAX/tests/test_acb_core_chassis.py)
-- [test_arf_chassis.py](/home/phili/projects/arbplusJAX/tests/test_arf_chassis.py)
-- [test_acf_chassis.py](/home/phili/projects/arbplusJAX/tests/test_acf_chassis.py)
-- [test_fmpr_chassis.py](/home/phili/projects/arbplusJAX/tests/test_fmpr_chassis.py)
-- [test_fmpzi_chassis.py](/home/phili/projects/arbplusJAX/tests/test_fmpzi_chassis.py)
-- [test_arb_fpwrap_chassis.py](/home/phili/projects/arbplusJAX/tests/test_arb_fpwrap_chassis.py)
-- [test_core_scalar_api_contracts.py](/home/phili/projects/arbplusJAX/tests/test_core_scalar_api_contracts.py)
+- [test_arb_core_chassis.py](/tests/test_arb_core_chassis.py)
+- [test_acb_core_chassis.py](/tests/test_acb_core_chassis.py)
+- [test_arf_chassis.py](/tests/test_arf_chassis.py)
+- [test_acf_chassis.py](/tests/test_acf_chassis.py)
+- [test_fmpr_chassis.py](/tests/test_fmpr_chassis.py)
+- [test_fmpzi_chassis.py](/tests/test_fmpzi_chassis.py)
+- [test_arb_fpwrap_chassis.py](/tests/test_arb_fpwrap_chassis.py)
+- [test_core_scalar_api_contracts.py](/tests/test_core_scalar_api_contracts.py)
 
 Parity tests:
 
-- [test_arb_core_parity.py](/home/phili/projects/arbplusJAX/tests/test_arb_core_parity.py)
-- [test_acb_core_parity.py](/home/phili/projects/arbplusJAX/tests/test_acb_core_parity.py)
-- [test_arf_parity.py](/home/phili/projects/arbplusJAX/tests/test_arf_parity.py)
-- [test_acf_parity.py](/home/phili/projects/arbplusJAX/tests/test_acf_parity.py)
-- [test_fmpr_parity.py](/home/phili/projects/arbplusJAX/tests/test_fmpr_parity.py)
-- [test_fmpzi_parity.py](/home/phili/projects/arbplusJAX/tests/test_fmpzi_parity.py)
-- [test_arb_fpwrap_parity.py](/home/phili/projects/arbplusJAX/tests/test_arb_fpwrap_parity.py)
+- [test_arb_core_parity.py](/tests/test_arb_core_parity.py)
+- [test_acb_core_parity.py](/tests/test_acb_core_parity.py)
+- [test_arf_parity.py](/tests/test_arf_parity.py)
+- [test_acf_parity.py](/tests/test_acf_parity.py)
+- [test_fmpr_parity.py](/tests/test_fmpr_parity.py)
+- [test_fmpzi_parity.py](/tests/test_fmpzi_parity.py)
+- [test_arb_fpwrap_parity.py](/tests/test_arb_fpwrap_parity.py)
 
 Benchmarks and comparisons:
 
-- [benchmark_arf.py](/home/phili/projects/arbplusJAX/benchmarks/benchmark_arf.py)
-- [benchmark_acf.py](/home/phili/projects/arbplusJAX/benchmarks/benchmark_acf.py)
-- [benchmark_fmpr.py](/home/phili/projects/arbplusJAX/benchmarks/benchmark_fmpr.py)
-- [benchmark_fmpzi.py](/home/phili/projects/arbplusJAX/benchmarks/benchmark_fmpzi.py)
-- [benchmark_arb_fpwrap.py](/home/phili/projects/arbplusJAX/benchmarks/benchmark_arb_fpwrap.py)
-- [compare_arb_core.py](/home/phili/projects/arbplusJAX/benchmarks/compare_arb_core.py)
-- [compare_acb_core.py](/home/phili/projects/arbplusJAX/benchmarks/compare_acb_core.py)
+- [benchmark_arf.py](/benchmarks/benchmark_arf.py)
+- [benchmark_acf.py](/benchmarks/benchmark_acf.py)
+- [benchmark_fmpr.py](/benchmarks/benchmark_fmpr.py)
+- [benchmark_fmpzi.py](/benchmarks/benchmark_fmpzi.py)
+- [benchmark_arb_fpwrap.py](/benchmarks/benchmark_arb_fpwrap.py)
+- [compare_arb_core.py](/benchmarks/compare_arb_core.py)
+- [compare_acb_core.py](/benchmarks/compare_acb_core.py)
 
 Examples:
 
-- [example_core_scalar_surface.ipynb](/home/phili/projects/arbplusJAX/examples/example_core_scalar_surface.ipynb)
-- [example_api_surface.ipynb](/home/phili/projects/arbplusJAX/examples/example_api_surface.ipynb)
+- [example_core_scalar_surface.ipynb](/examples/example_core_scalar_surface.ipynb)
+- [example_api_surface.ipynb](/examples/example_api_surface.ipynb)

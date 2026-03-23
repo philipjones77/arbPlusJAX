@@ -2,7 +2,7 @@ Last updated: 2026-03-20T00:00:00Z
 
 # JAX Diagnostics
 
-This repo now has an optional JAX diagnostics path in [jax_diagnostics.py](/home/phili/projects/arbplusJAX/src/arbplusjax/jax_diagnostics.py).
+This repo now has an optional JAX diagnostics path in [jax_diagnostics.py](/src/arbplusjax/jax_diagnostics.py).
 
 ## Design Goal
 
@@ -47,11 +47,11 @@ Flags:
 
 1. Run correctness tests first.
 2. Run the normal benchmark for the subsystem:
-   - dense: [benchmark_dense_matrix_surface.py](/home/phili/projects/arbplusJAX/benchmarks/benchmark_dense_matrix_surface.py)
-   - sparse: [benchmark_sparse_matrix_surface.py](/home/phili/projects/arbplusJAX/benchmarks/benchmark_sparse_matrix_surface.py)
-   - matrix-free: [benchmark_matrix_free_krylov.py](/home/phili/projects/arbplusJAX/benchmarks/benchmark_matrix_free_krylov.py)
+   - dense: [benchmark_dense_matrix_surface.py](/benchmarks/benchmark_dense_matrix_surface.py)
+   - sparse: [benchmark_sparse_matrix_surface.py](/benchmarks/benchmark_sparse_matrix_surface.py)
+   - matrix-free: [benchmark_matrix_free_krylov.py](/benchmarks/benchmark_matrix_free_krylov.py)
 3. Run the diagnostics benchmark when you want compile/recompile or memory visibility:
-   - [benchmark_matrix_stack_diagnostics.py](/home/phili/projects/arbplusJAX/benchmarks/benchmark_matrix_stack_diagnostics.py)
+   - [benchmark_matrix_stack_diagnostics.py](/benchmarks/benchmark_matrix_stack_diagnostics.py)
 
 Example:
 
@@ -74,4 +74,4 @@ Default report path:
 ## Coverage
 
 Diagnostics coverage is validated in:
-- [test_jax_diagnostics.py](/home/phili/projects/arbplusJAX/tests/test_jax_diagnostics.py)
+- [test_jax_diagnostics.py](/tests/test_jax_diagnostics.py)

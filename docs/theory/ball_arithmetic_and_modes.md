@@ -231,8 +231,8 @@ The current bibliography snapshot does not appear to contain a separate entry fo
 
 For the concrete arbPlusJAX definitions referenced in this note, see:
 
-- [precision_standard.md](/home/phili/projects/arbplusJAX/docs/standards/precision_standard.md)
-- [governance/architecture.md](/home/phili/projects/arbplusJAX/docs/governance/architecture.md)
-- [ball_wrappers.md](/home/phili/projects/arbplusJAX/docs/implementation/wrappers/ball_wrappers.md)
-- [baseline_wrappers.md](/home/phili/projects/arbplusJAX/docs/implementation/wrappers/baseline_wrappers.md)
-- [hypgeom_wrappers.md](/home/phili/projects/arbplusJAX/docs/implementation/wrappers/hypgeom_wrappers.md)
+- [precision_standard.md](/docs/standards/precision_standard.md)
+- [governance/architecture.md](/docs/governance/architecture.md)
+- [ball_wrappers.md](/docs/implementation/wrappers/ball_wrappers.md)
+- [baseline_wrappers.md](/docs/implementation/wrappers/baseline_wrappers.md)
+- [hypgeom_wrappers.md](/docs/implementation/wrappers/hypgeom_wrappers.md)

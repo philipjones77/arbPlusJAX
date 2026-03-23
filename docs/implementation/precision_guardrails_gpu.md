@@ -78,7 +78,7 @@ If only one rule is remembered, it should be:
 
 To make that policy concrete, the repo now contains a small utility layer:
 
-- [jax_precision.py](/home/phili/projects/arbplusJAX/src/arbplusjax/jax_precision.py)
+- [jax_precision.py](/src/arbplusjax/jax_precision.py)
 
 Current helpers include:
 
@@ -97,9 +97,9 @@ These utilities promote reduction paths to `float64` or `complex128` even when t
 
 This policy is already used in a few immediate places:
 
-- [elementary.py](/home/phili/projects/arbplusJAX/src/arbplusjax/elementary.py) now routes `logsumexp` through `safe_logsumexp`.
-- [iterative_solvers.py](/home/phili/projects/arbplusJAX/src/arbplusjax/iterative_solvers.py) now uses safe high-precision norms and inner products in the CG path and related scalar checks.
-- [krylov_solvers.py](/home/phili/projects/arbplusJAX/src/arbplusjax/krylov_solvers.py) now uses safe reduction helpers for norms and CG scalar recurrences.
+- [elementary.py](/src/arbplusjax/elementary.py) now routes `logsumexp` through `safe_logsumexp`.
+- [iterative_solvers.py](/src/arbplusjax/iterative_solvers.py) now uses safe high-precision norms and inner products in the CG path and related scalar checks.
+- [krylov_solvers.py](/src/arbplusjax/krylov_solvers.py) now uses safe reduction helpers for norms and CG scalar recurrences.
 
 This is not a full mixed-precision runtime policy yet, but it establishes the core rule in the places where silent reduction error is most dangerous.
 

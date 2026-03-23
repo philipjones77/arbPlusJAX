@@ -1,9 +1,9 @@
 {
   "run_name": "example_suite_cpu",
-  "python": "/home/phili/miniforge3/envs/jax/bin/python",
+  "python": "python",
   "jax_mode": "cpu",
   "jax_dtype": "float64",
-  "c_ref_dir": "/home/phili/projects/arbplusJAX/stuff/migration/c_chassis/build_linux_wsl",
+  "c_ref_dir": "",
   "api_benchmark": {
     "enabled": true,
     "warmup": 1,

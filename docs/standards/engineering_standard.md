@@ -14,7 +14,7 @@ This standard applies to canonical Arb-like functions, alternative implementatio
 - CPU is the current required execution and validation tranche in this repo state.
 - Public surfaces, examples, tests, and benchmarks should still be written so they remain GPU-compatible unless a limitation is documented explicitly in metadata, diagnostics, or status reports.
 - Validation ownership should be explicit about the current execution slice: CPU is required here, while GPU portability is a contract that should be preserved and surfaced through runtime parameterization rather than assumed.
-- Runtime implementations should stay on the public JAX surface defined in [jax_surface_policy_standard.md](/home/phili/projects/arbplusJAX/docs/standards/jax_surface_policy_standard.md); SciPy-derived implementation paths are for benchmark/reference use only.
+- Runtime implementations should stay on the public JAX surface defined in [jax_surface_policy_standard.md](/docs/standards/jax_surface_policy_standard.md); SciPy-derived implementation paths are for benchmark/reference use only.
 - Batch execution should stay shape-stable where possible, and padding-friendly where practical.
 - Unnecessary Python-side value extraction and control flow should be removed from performance-sensitive paths.
 - Automatic differentiation compatibility is a target, but current status must be reported honestly per implementation family.

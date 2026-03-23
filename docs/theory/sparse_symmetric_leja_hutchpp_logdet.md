@@ -4,7 +4,7 @@ Last updated: 2026-03-16T21:00:00Z
 
 ## Scope
 
-This note describes the sparse symmetric positive-definite log-determinant path currently implemented in [jrb_mat.py](/home/phili/projects/arbplusJAX/src/arbplusjax/jrb_mat.py):
+This note describes the sparse symmetric positive-definite log-determinant path currently implemented in [jrb_mat.py](/src/arbplusjax/jrb_mat.py):
 
 - `jrb_mat_log_action_leja_point`
 - `jrb_mat_log_action_leja_with_diagnostics_point`

@@ -61,12 +61,12 @@ If you are tuning runtime:
 
 Implementation details:
 
-- [dense_matrix_tranche.md](/home/phili/projects/arbplusJAX/docs/implementation/dense_matrix_tranche.md)
-- [arb_mat.md](/home/phili/projects/arbplusJAX/docs/implementation/modules/arb_mat.md)
-- [acb_mat.md](/home/phili/projects/arbplusJAX/docs/implementation/modules/acb_mat.md)
+- [dense_matrix_tranche.md](/docs/implementation/dense_matrix_tranche.md)
+- [arb_mat.md](/docs/implementation/modules/arb_mat.md)
+- [acb_mat.md](/docs/implementation/modules/acb_mat.md)
 
 Validation and performance:
 
-- [dense_matrix_surface_benchmark.md](/home/phili/projects/arbplusJAX/docs/status/reports/dense_matrix_surface_benchmark.md)
-- [example_dense_matrix_surface.ipynb](/home/phili/projects/arbplusJAX/examples/example_dense_matrix_surface.ipynb)
-- [example_dense_structured_spectral.ipynb](/home/phili/projects/arbplusJAX/examples/example_dense_structured_spectral.ipynb)
+- [dense_matrix_surface_benchmark.md](/docs/status/reports/dense_matrix_surface_benchmark.md)
+- [example_dense_matrix_surface.ipynb](/examples/example_dense_matrix_surface.ipynb)
+- [example_dense_structured_spectral.ipynb](/examples/example_dense_structured_spectral.ipynb)

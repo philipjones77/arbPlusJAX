@@ -51,6 +51,17 @@ Landing pages and section indexes should also be generated rather than hand-main
 - `docs/theory/README.md`
 - `docs/reports/current_repo_mapping.md`
 
+## Link Policy
+
+Documentation must not use host-specific absolute filesystem paths such as
+`/home/...` or Windows drive roots for cross-references.
+
+Use repository-root links instead:
+
+- use `/docs/...`, `/src/...`, `/tests/...`, `/benchmarks/...`, `/examples/...`, `/contracts/...`, and similar repo-root paths for repository cross-references
+- generated docs and reports must emit the same repo-root link style
+- machine-local absolute paths are only acceptable in transient command output, not in committed docs, generated reports, or generators
+
 ## Repository Layout
 
 Preferred top-level structure:

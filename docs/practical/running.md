@@ -6,10 +6,10 @@ This page is for the practical question: how should someone actually run arbPlus
 
 ## Recommended path
 
-- use [run_platform.md](/home/phili/projects/arbplusJAX/docs/implementation/run_platform.md) as the main workflow reference
+- use [run_platform.md](/docs/implementation/run_platform.md) as the main workflow reference
 - use `tools/run_test_harness.py` for correctness-oriented validation
 - use `benchmarks/run_benchmarks.py` for benchmark sweeps and backend comparison
-- use [linux_gpu_colab.md](/home/phili/projects/arbplusJAX/docs/implementation/linux_gpu_colab.md) for Colab and Linux GPU runs
+- use [linux_gpu_colab.md](/docs/implementation/linux_gpu_colab.md) for Colab and Linux GPU runs
 
 ## Day-to-day workflow
 
@@ -20,7 +20,7 @@ This page is for the practical question: how should someone actually run arbPlus
 
 ## Supporting references
 
-- [README.md](/home/phili/projects/arbplusJAX/README.md)
-- [tests/README.md](/home/phili/projects/arbplusJAX/tests/README.md)
-- [benchmarks/README.md](/home/phili/projects/arbplusJAX/benchmarks/README.md)
-- [build.md](/home/phili/projects/arbplusJAX/docs/implementation/build.md)
+- [README.md](/README.md)
+- [tests/README.md](/tests/README.md)
+- [benchmarks/README.md](/benchmarks/README.md)
+- [build.md](/docs/implementation/build.md)

@@ -135,6 +135,6 @@ stack rather than replace it. The usual pattern is:
 
 ## Related Docs
 
-- [matrix_free.md](/home/phili/projects/arbplusJAX/docs/practical/matrix_free.md)
-- [matrix_stack.md](/home/phili/projects/arbplusJAX/docs/implementation/matrix_stack.md)
-- [slepc_inspired_jax.md](/home/phili/projects/arbplusJAX/docs/implementation/slepc_inspired_jax.md)
+- [matrix_free.md](/docs/practical/matrix_free.md)
+- [matrix_stack.md](/docs/implementation/matrix_stack.md)
+- [slepc_inspired_jax.md](/docs/implementation/slepc_inspired_jax.md)
