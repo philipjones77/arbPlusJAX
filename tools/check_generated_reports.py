@@ -17,6 +17,8 @@ def main() -> None:
     _run([PYTHON, "tools/generate_docs_indexes.py"])
     _run([PYTHON, "tools/generate_example_notebooks.py"])
     _run([PYTHON, "tools/comparison_backend_defaults_report.py"])
+    _run([PYTHON, "tools/point_fast_jax_category_report.py"])
+    _run([PYTHON, "tools/report_status_refresh_inventory.py"])
     _run([PYTHON, "tools/function_provenance_report.py"])
     _run([PYTHON, "tools/hypgeom_status_report.py"])
     _run([PYTHON, "benchmarks/matrix_surface_workbook.py", "--n", "4", "--warmup", "0", "--runs", "1", "--steps", "4"])
@@ -28,6 +30,8 @@ def main() -> None:
             "-q",
             "tests/test_function_provenance_reports.py",
             "tests/test_comparison_backend_defaults.py",
+            "tests/test_point_fast_jax_docs_contracts.py",
+            "tests/test_report_status_refresh_inventory.py",
             "tests/test_docs_indexes.py",
             "tests/test_example_notebook_inventory_contracts.py",
             "tests/test_example_notebook_content_contracts.py",

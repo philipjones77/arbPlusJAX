@@ -16,4 +16,5 @@ Primary entry points:
 
 Other status documents:
 - [matrix_free_completion_plan.md](/docs/status/matrix_free_completion_plan.md)
+- [point_fast_jax_plan.md](/docs/status/point_fast_jax_plan.md)
 - [sparse_completion_plan.md](/docs/status/sparse_completion_plan.md)

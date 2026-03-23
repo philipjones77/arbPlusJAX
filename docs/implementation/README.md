@@ -22,6 +22,7 @@ Implementation notes explain how the code is built and organized. Practical runb
 - [linux_gpu_colab_implementation.md](/docs/implementation/linux_gpu_colab_implementation.md)
 - [matrix_logdet_landscape_implementation.md](/docs/implementation/matrix_logdet_landscape_implementation.md)
 - [matrix_stack_implementation.md](/docs/implementation/matrix_stack_implementation.md)
+- [point_fast_jax_implementation.md](/docs/implementation/point_fast_jax_implementation.md)
 - [precision_guardrails_gpu_implementation.md](/docs/implementation/precision_guardrails_gpu_implementation.md)
 - [run_platform_implementation.md](/docs/implementation/run_platform_implementation.md)
 - [slepc_inspired_jax_implementation.md](/docs/implementation/slepc_inspired_jax_implementation.md)

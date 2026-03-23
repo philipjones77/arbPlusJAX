@@ -98,6 +98,7 @@ Consolidation note:
 - [generated_documentation_standard.md](/docs/standards/generated_documentation_standard.md)
 - [jax_api_runtime_standard.md](/docs/standards/jax_api_runtime_standard.md)
 - [jax_surface_policy_standard.md](/docs/standards/jax_surface_policy_standard.md)
+- [point_fast_jax_standard.md](/docs/standards/point_fast_jax_standard.md)
 - [precision_standard.md](/docs/standards/precision_standard.md)
 - [pytest_test_naming_standard.md](/docs/standards/pytest_test_naming_standard.md)
 - [repo_standards.md](/docs/standards/repo_standards.md)

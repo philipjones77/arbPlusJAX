@@ -9,6 +9,10 @@ Policy lives in:
 
 - [environment_portability_standard.md](/docs/standards/environment_portability_standard.md)
 
+Checked-in configuration now also lives in:
+
+- [cpu_validation_profiles.json](/configs/cpu_validation_profiles.json)
+
 ## Current Portable Entry Points
 
 ### Test harness
@@ -20,6 +24,13 @@ Current portability-relevant behavior:
 - explicit `--jax-mode`
 - repo-relative invocation
 - shared `runtime_manifest.json` output via `--outdir`
+- category-aligned bounded profiles now exist for:
+  - `core`
+  - `modes`
+  - `dense`
+  - `sparse`
+  - `matrix-free`
+  - `special`
 
 ### Benchmark harness
 
@@ -71,12 +82,13 @@ Status:
 - Google Colab is already mentioned in test/example run docs
 - runtime manifests already capture environment details
 - examples/tests/benchmarks already have explicit environment-aware harness entrypoints
+- the bounded CPU validation slice is now expressed as checked-in config under `configs/`
 
 ## Current Gaps
 
 - portability guidance is spread across multiple docs
 - not every notebook or experiment currently summarizes portability assumptions explicitly
-- WSL and Colab remain documented, but not yet summarized in one current-support report
+- the third-party comparison software install matrix is still documented in prose rather than a single machine-readable inventory
 
 ## Current Portability Conclusion
 

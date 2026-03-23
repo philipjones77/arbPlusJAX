@@ -31,9 +31,13 @@ Use `tools/run_test_harness.py` for environment-aware test runs.
 Common profiles:
 
 - `smoke`: fast import and surface smoke checks.
+- `core`: bounded core-numeric scalar chassis and service/API coverage.
+- `modes`: interval/box, wrapper, and precision-routing coverage.
+- `dense`: dense matrix chassis and structured dense surface coverage.
+- `sparse`: sparse, block-sparse, and variable-block sparse chassis coverage.
 - `matrix`: dense / matrix-mode focused checks, including `arb_mat`, `acb_mat`, `jrb_mat`, `jcb_mat`, and `mat_modes`.
-  - sparse chassis tests can be added to this profile or split into their own profile once the harness is updated
-- `special`: tail acceleration and incomplete special-function stack.
+- `matrix-free`: operator, logdet, selected-inverse, and adjoint coverage.
+- `special`: bounded special-function, incomplete-tail, hypergeometric, and gamma-family coverage.
 - `chassis`: all non-parity tests under `tests/`.
 - `parity`: parity-only tests under `tests/`.
 - `bench-smoke`: benchmark CLI smoke tests under `benchmarks/`.
@@ -53,6 +57,8 @@ Linux or macOS:
 
 ```bash
 python tools/run_test_harness.py --profile chassis --jax-mode cpu
+python tools/run_test_harness.py --profile core --jax-mode cpu
+python tools/run_test_harness.py --profile sparse --jax-mode cpu
 python tools/run_test_harness.py --profile matrix --jax-mode cpu
 ARB_C_REF_DIR="$PWD/stuff/migration/c_chassis/build" \
 LD_LIBRARY_PATH="$ARB_C_REF_DIR:$LD_LIBRARY_PATH" \
@@ -63,6 +69,8 @@ Windows PowerShell:
 
 ```powershell
 python .\tools\run_test_harness.py --profile chassis --jax-mode cpu
+python .\tools\run_test_harness.py --profile core --jax-mode cpu
+python .\tools\run_test_harness.py --profile sparse --jax-mode cpu
 python .\tools\run_test_harness.py --profile matrix --jax-mode cpu
 $env:ARB_C_REF_DIR = "$PWD\stuff\migration\c_chassis\build"
 python .\tools\run_test_harness.py --profile parity --jax-mode cpu

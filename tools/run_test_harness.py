@@ -42,6 +42,72 @@ def _build_tasks(args: argparse.Namespace, repo_root: Path) -> list[TestTask]:
 
     if args.profile == "smoke":
         tasks.append(TestTask("smoke", ["tests/test_all_functions_smoke.py"], common_env))
+    elif args.profile == "core":
+        tasks.append(
+            TestTask(
+                "core",
+                [
+                    "tests/test_arb_core_chassis.py",
+                    "tests/test_acb_core_chassis.py",
+                    "tests/test_arf_chassis.py",
+                    "tests/test_acf_chassis.py",
+                    "tests/test_fmpr_chassis.py",
+                    "tests/test_fmpzi_chassis.py",
+                    "tests/test_core_scalar_api_contracts.py",
+                    "tests/test_core_scalar_service_contracts.py",
+                ],
+                common_env,
+            )
+        )
+    elif args.profile == "modes":
+        tasks.append(
+            TestTask(
+                "modes",
+                [
+                    "tests/test_double_interval_chassis.py",
+                    "tests/test_point_wrappers_contracts.py",
+                    "tests/test_mat_modes.py",
+                    "tests/test_basic_wrappers.py",
+                    "tests/test_mp_mode.py",
+                    "tests/test_jax_precision.py",
+                ],
+                common_env,
+            )
+        )
+    elif args.profile == "dense":
+        tasks.append(
+            TestTask(
+                "dense",
+                [
+                    "tests/test_arb_mat_chassis.py",
+                    "tests/test_acb_mat_chassis.py",
+                    "tests/test_dense_broad_surface.py",
+                    "tests/test_dense_plan_modes.py",
+                    "tests/test_dense_structured_modes.py",
+                    "tests/test_dense_eigh_and_aliases.py",
+                ],
+                common_env,
+            )
+        )
+    elif args.profile == "sparse":
+        tasks.append(
+            TestTask(
+                "sparse",
+                [
+                    "tests/test_srb_mat_chassis.py",
+                    "tests/test_scb_mat_chassis.py",
+                    "tests/test_srb_block_mat_chassis.py",
+                    "tests/test_scb_block_mat_chassis.py",
+                    "tests/test_srb_vblock_mat_chassis.py",
+                    "tests/test_scb_vblock_mat_chassis.py",
+                    "tests/test_sparse_point_api.py",
+                    "tests/test_sparse_format_modes.py",
+                    "tests/test_sparse_structured_surface.py",
+                    "tests/test_sparse_basic_contracts.py",
+                ],
+                common_env,
+            )
+        )
     elif args.profile == "matrix":
         tasks.append(
             TestTask(
@@ -63,6 +129,12 @@ def _build_tasks(args: argparse.Namespace, repo_root: Path) -> list[TestTask]:
                 [
                     "tests/test_jrb_mat_chassis.py",
                     "tests/test_jcb_mat_chassis.py",
+                    "tests/test_jrb_mat_logdet_contracts.py",
+                    "tests/test_jrb_mat_selected_inverse.py",
+                    "tests/test_matrix_free_basic.py",
+                    "tests/test_matrix_free_core_contracts.py",
+                    "tests/test_matfree_adjoints.py",
+                    "tests/test_matrix_stack_contracts.py",
                 ],
                 common_env,
             )
@@ -78,6 +150,15 @@ def _build_tasks(args: argparse.Namespace, repo_root: Path) -> list[TestTask]:
                     "tests/test_incomplete_gamma.py",
                     "tests/test_laplace_bessel_k_tail.py",
                     "tests/test_api_metadata.py",
+                    "tests/test_hypgeom_chassis.py",
+                    "tests/test_hypgeom_modes_complete.py",
+                    "tests/test_gamma_hardening.py",
+                    "tests/test_hankel_special.py",
+                    "tests/test_spherical_bessel_special.py",
+                    "tests/test_boost_hypgeom.py",
+                    "tests/test_special_function_service_contracts.py",
+                    "tests/test_double_gamma_contracts.py",
+                    "tests/test_shahen_double_gamma.py",
                 ],
                 common_env,
             )
@@ -131,7 +212,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Run arbPlusJAX tests with explicit environment-aware profiles.")
     parser.add_argument(
         "--profile",
-        choices=("smoke", "matrix", "matrix-free", "special", "chassis", "parity", "bench-smoke", "full"),
+        choices=("smoke", "core", "modes", "dense", "sparse", "matrix", "matrix-free", "special", "chassis", "parity", "bench-smoke", "full"),
         default="chassis",
         help="Named test profile to run.",
     )

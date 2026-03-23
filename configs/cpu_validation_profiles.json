@@ -1,0 +1,46 @@
+{
+  "name": "cpu_validation_profiles",
+  "status": "active",
+  "owner": "tools/run_test_harness.py",
+  "surface": "tests and benchmark smoke",
+  "backend_scope": "CPU current, GPU portable",
+  "python_env": "jax",
+  "jax_mode": "cpu",
+  "profiles": [
+    {
+      "category": "core_numeric_scalars",
+      "profile": "core",
+      "outdir": "tests/_runs/core_cpu_latest"
+    },
+    {
+      "category": "interval_box_precision_modes",
+      "profile": "modes",
+      "outdir": "tests/_runs/modes_cpu_latest"
+    },
+    {
+      "category": "dense_matrix_functionality",
+      "profile": "dense",
+      "outdir": "tests/_runs/dense_cpu_latest"
+    },
+    {
+      "category": "sparse_block_vblock_functionality",
+      "profile": "sparse",
+      "outdir": "tests/_runs/sparse_cpu_latest"
+    },
+    {
+      "category": "matrix_free_operator_functionality",
+      "profile": "matrix-free",
+      "outdir": "tests/_runs/matrix_free_cpu_latest"
+    },
+    {
+      "category": "special_functions",
+      "profile": "special",
+      "outdir": "tests/_runs/special_cpu_latest"
+    },
+    {
+      "category": "benchmark_smoke",
+      "profile": "bench-smoke",
+      "outdir": "tests/_runs/bench_smoke_cpu_latest"
+    }
+  ]
+}

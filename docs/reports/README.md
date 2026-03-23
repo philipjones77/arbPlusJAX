@@ -25,4 +25,6 @@ Current reports:
 - [matrix_free_krylov_benchmark.md](/docs/reports/matrix_free_krylov_benchmark.md)
 - [matrix_surface_workbook.md](/docs/reports/matrix_surface_workbook.md)
 - [new_functions.md](/docs/reports/new_functions.md)
+- [point_fast_jax_category_matrix.md](/docs/reports/point_fast_jax_category_matrix.md)
 - [repo_organization_by_coverage_categories.md](/docs/reports/repo_organization_by_coverage_categories.md)
+- [report_status_refresh_inventory.md](/docs/reports/report_status_refresh_inventory.md)

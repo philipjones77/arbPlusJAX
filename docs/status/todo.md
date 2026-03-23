@@ -20,6 +20,7 @@ Status legend:
 
 Current phase snapshot:
 - Tier 0 architecture/API: `in_progress`
+- point-fast JAX conversion of public point mode across all six categories: `in_progress`
 - Tier 1 core special-function hardening: `in_progress`
 - Tier 2 general incomplete-tail engine: `in_progress`
 - Tier 3 incomplete Bessel specialization: `in_progress`
@@ -88,6 +89,31 @@ Status: `in_progress`
 - `planned`
   - add a single repo-facing execution checklist that names the minimum CPU,
     parity, GPU, and benchmark slices required for a release-quality change
+
+## Cross-cutting point-fast JAX conversion
+
+Status: `in_progress`
+
+- `done`
+  - the repo now has an explicit definition of `fast JAX` for point mode in
+    [point_fast_jax_standard.md](/docs/standards/point_fast_jax_standard.md)
+  - the six-category implementation program now exists in
+    [point_fast_jax_implementation.md](/docs/implementation/point_fast_jax_implementation.md)
+  - the six-category status plan now exists in
+    [point_fast_jax_plan.md](/docs/status/point_fast_jax_plan.md)
+  - the required six-category coverage matrix now exists in
+    [point_fast_jax_category_matrix.md](/docs/reports/point_fast_jax_category_matrix.md)
+- `in_progress`
+  - create the per-category point-mode audit that classifies current surfaces as
+    `direct_fast`, `recurrence_fast`, `approx_fast`, or `precise_only_for_now`
+  - land category-owned `jit` / `vmap` / safe-box parity tests for the six
+    top-level categories rather than one broad smoke test
+  - refactor point kernels so Python control flow, dynamic shapes, Arb objects,
+    and precise fallback logic remain outside the hot path
+  - build shared point-fast infrastructure for logspace, recurrence,
+    approximants, and region routing
+- `planned`
+  - add machine-readable point-fast capability metadata for downstream routing
 
 ## Cross-repo provider boundary
 
