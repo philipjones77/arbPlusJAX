@@ -103,9 +103,9 @@ clearer if each eventually had a more explicit owner.
 ### Wrappers and routing helpers
 
 - `ball_wrappers`
-  Covered indirectly through API, mode, and point-wrapper surfaces.
+  Directly covered by `tests/test_ball_wrappers_contracts.py`.
 - `baseline_wrappers`
-  Covered indirectly through API and reference-facing surfaces.
+  Directly covered by `tests/test_baseline_wrappers_contracts.py`.
 - `calc_wrappers`
   Directly covered by `tests/test_calc_wrappers_contracts.py`.
 - `core_wrappers`
@@ -119,7 +119,7 @@ clearer if each eventually had a more explicit owner.
 - `hypgeom_wrappers`
   Covered indirectly through hypergeometric chassis and mode tests.
 - `mat_wrappers`
-  Covered indirectly through `test_mat_modes.py` and matrix chassis tests.
+  Directly covered by `tests/test_mat_wrappers_contracts.py`.
 - `modular_elliptic_wrappers`
   Covered indirectly through elliptic/modular chassis tests.
 - `poly_wrappers`
@@ -164,6 +164,9 @@ focused test file instead of relying on incidental coverage.
 
 The latest concrete additions are:
 
+- `tests/test_ball_wrappers_contracts.py`
+- `tests/test_baseline_wrappers_contracts.py`
+- `tests/test_mat_wrappers_contracts.py`
 - `tests/test_wrappers_common_contracts.py`
 - `tests/test_double_interval_wrappers_contracts.py`
 - `tests/test_core_wrappers_contracts.py`
