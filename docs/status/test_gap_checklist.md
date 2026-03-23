@@ -36,14 +36,17 @@ These modules already have clearly named test owners in `tests/`.
 - `acb_mat`
 - `arb_mat`
 - `bool_mat`
+- `kernel_helpers`
 - `jcb_mat`
 - `jrb_mat`
 - `matfree_adjoints`
+- `mat_common`
 - `matrix_free_basic`
 - `mp_mode`
 - `scb_block_mat`
 - `scb_mat`
 - `scb_vblock_mat`
+- `sampling_helpers`
 - `srb_block_mat`
 - `srb_mat`
 - `srb_vblock_mat`
@@ -78,12 +81,15 @@ These modules already have clearly named test owners in `tests/`.
 
 - `api`
 - `capability_registry`
+- `checks`
+- `coeffs`
 - `cusf_compat`
 - `elementary`
 - `function_provenance`
 - `jax_diagnostics`
 - `jax_precision`
 - `point_wrappers`
+- `precision`
 - `public_metadata`
 - `runtime`
 - `soft_ops`
@@ -129,23 +135,11 @@ clearer if each eventually had a more explicit owner.
   Directly covered by `tests/test_iterative_solvers_contracts.py`.
 - `krylov_solvers`
 - `transform_common`
-- `kernel_helpers`
-  Covered indirectly through stable-kernel and special-function surfaces.
-- `mat_common`
-  Covered indirectly through dense matrix tests.
-- `sampling_helpers`
-  Covered indirectly through stochastic/logdet paths.
 - `sparse_common`
   Directly covered by `tests/test_sparse_common_contracts.py`.
 
 ### Metadata, support, and validation
 
-- `checks`
-  Covered indirectly through status and implementation tests.
-- `coeffs`
-  Covered indirectly through polynomial and analytic families.
-- `precision`
-  Covered indirectly through `jax_precision` tests and package import behavior.
 - `soft_types`
   Directly covered by `tests/test_soft_types_contracts.py`.
 - `validation`
@@ -169,6 +163,12 @@ focused test file instead of relying on incidental coverage.
 
 The latest concrete additions are:
 
+- `tests/test_checks_contracts.py`
+- `tests/test_coeffs_contracts.py`
+- `tests/test_precision_contracts.py`
+- `tests/test_kernel_helpers_contracts.py`
+- `tests/test_mat_common_contracts.py`
+- `tests/test_sampling_helpers_contracts.py`
 - `tests/test_sparse_common_contracts.py`
 - `tests/test_iterative_solvers_contracts.py`
 - `tests/test_soft_types_contracts.py`

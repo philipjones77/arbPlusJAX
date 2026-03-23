@@ -168,6 +168,7 @@ Status: `in_progress`
     `ball_wrappers`, `baseline_wrappers`, `calc_wrappers`, `core_wrappers`,
     `double_interval_wrappers`, `hypgeom_wrappers`, `mat_wrappers`,
     `poly_wrappers`, and `wrappers_common`
+  - direct owner tests now exist for `checks`, `coeffs`, and `precision`
   - keep precision-routing and dtype policy explicit instead of letting wrapper
     behavior drift by family
 - `planned`
@@ -254,6 +255,8 @@ Status: `in_progress`
     rather than duplicated wrappers
   - direct owner tests now exist for `matrix_free_core`
   - direct owner tests now exist for `krylov_solvers`
+  - direct owner tests now exist for `kernel_helpers`, `mat_common`, and
+    `sampling_helpers`
   - eigensolver diagnostics surfaces exist across Lanczos, Arnoldi, restarted,
     block, Krylov-Schur, Davidson, Jacobi-Davidson, shift-invert, and contour
     entry points
@@ -515,8 +518,9 @@ Status: `in_progress`
     and `soft_ops`
   - direct owner tests now exist for `public_metadata` and
     `capability_registry`
+  - direct owner tests now exist for `checks`, `coeffs`, `precision`,
+    `validation`, and `soft_types`
 - `in_progress`
-  - direct owner tests now exist for `validation` and `soft_types`
   - keep stable versus experimental API status explicit in metadata and status
     reports
   - keep naming cleanup moving toward canonical mathematical names with
@@ -534,6 +538,18 @@ Status: `in_progress`
 Status: `in_progress`
 
 Highest priority:
+- landed
+  [test_checks_contracts.py](/tests/test_checks_contracts.py)
+- landed
+  [test_coeffs_contracts.py](/tests/test_coeffs_contracts.py)
+- landed
+  [test_precision_contracts.py](/tests/test_precision_contracts.py)
+- landed
+  [test_kernel_helpers_contracts.py](/tests/test_kernel_helpers_contracts.py)
+- landed
+  [test_mat_common_contracts.py](/tests/test_mat_common_contracts.py)
+- landed
+  [test_sampling_helpers_contracts.py](/tests/test_sampling_helpers_contracts.py)
 - landed
   [test_sparse_common_contracts.py](/tests/test_sparse_common_contracts.py)
 - landed
