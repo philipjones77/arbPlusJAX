@@ -252,6 +252,7 @@ Status: `in_progress`
     block-sparse, and variable-block sparse adapters
   - reusable midpoint Krylov solve scaffolding now lives in `matrix_free_core`
     rather than duplicated wrappers
+  - direct owner tests now exist for `matrix_free_core`
   - eigensolver diagnostics surfaces exist across Lanczos, Arnoldi, restarted,
     block, Krylov-Schur, Davidson, Jacobi-Davidson, shift-invert, and contour
     entry points
@@ -259,7 +260,6 @@ Status: `in_progress`
 ### Core Operator Infrastructure
 
 - `in_progress`
-  - add a direct owner test for `matrix_free_core`
   - add direct owner tests for `krylov_solvers` and `iterative_solvers`
   - deepen the new `basic` semantics for operator-first surfaces
   - harden flexible-preconditioner policy beyond the current shared
@@ -534,10 +534,6 @@ Status: `in_progress`
 
 Highest priority:
 - add
-  [test_matrix_free_core_contracts.py](/tests/test_matrix_free_core_contracts.py)
-
-Next priority:
-- add
   [test_block_sparse_core_contracts.py](/tests/test_block_sparse_core_contracts.py)
 - add
   [test_sparse_core_contracts.py](/tests/test_sparse_core_contracts.py)
@@ -547,7 +543,7 @@ Next priority:
   [test_transform_common_contracts.py](/tests/test_transform_common_contracts.py)
 
 Execution order:
-1. Add the six highest-priority direct-owner tests above.
+1. Add the four highest-priority direct-owner tests above.
 2. Re-run the CPU chassis and profile suite.
 3. Expand AD and compile-behavior assertions where those tests expose weak
    spots.
