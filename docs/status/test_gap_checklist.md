@@ -50,6 +50,8 @@ These modules already have clearly named test owners in `tests/`.
 
 ### Special-function and transform layers
 
+- `barnesg`
+- `bessel_kernels`
 - `boost_hypgeom`
 - `cubesselk`
 - `dft`
@@ -154,13 +156,6 @@ clearer if each eventually had a more explicit owner.
 - `validation`
   Covered indirectly through runtime/API correctness checks.
 
-### Special-function support modules
-
-- `bessel_kernels`
-  Covered indirectly through Bessel/Hankel/spherical Bessel tests.
-- `barnesg`
-  Covered indirectly through Barnes/double-gamma-facing tests, but should have a clearer direct owner.
-
 ## 3. Modules That Still Need Explicit Test Owners
 
 These are the places where the repo is most likely to benefit from adding a
@@ -171,12 +166,6 @@ focused test file instead of relying on incidental coverage.
 - `matrix_free_core`
   Add a focused shared-substrate contract test file for operator plans,
   restart helpers, generalized operator plans, and shape/static-arg behavior.
-- `bessel_kernels`
-  Add a direct low-level kernel contract file so cylindrical kernels are tested
-  independently from higher-level spherical/Hankel wrappers.
-- `barnesg`
-  Add a direct Barnes G surface test instead of relying on adjacent
-  double-gamma coverage.
 
 ### Next priority
 
@@ -194,10 +183,8 @@ focused test file instead of relying on incidental coverage.
 The first concrete additions should be:
 
 - `tests/test_matrix_free_core_contracts.py`
-- `tests/test_bessel_kernels_contracts.py`
-- `tests/test_barnesg_contracts.py`
 
-Then, if those are green:
+Then, if that is green:
 
 - `tests/test_block_sparse_core_contracts.py`
 - `tests/test_sparse_core_contracts.py`

@@ -454,7 +454,7 @@ Status: `in_progress`
     helper consolidation, family-specific adaptive/rigorous kernels, complex AD
     audits, and compile-noise reduction outside the current representative
     families
-  - add dedicated direct-owner tests for `bessel_kernels` and `barnesg`
+  - direct owner tests now exist for `bessel_kernels` and `barnesg`
   - extend benchmark and RF77-facing usage/report coverage where diagnostics
     exist but packaging is still incomplete
 - `planned`
@@ -535,10 +535,6 @@ Status: `in_progress`
 Highest priority:
 - add
   [test_matrix_free_core_contracts.py](/tests/test_matrix_free_core_contracts.py)
-- add
-  [test_bessel_kernels_contracts.py](/tests/test_bessel_kernels_contracts.py)
-- add
-  [test_barnesg_contracts.py](/tests/test_barnesg_contracts.py)
 
 Next priority:
 - add
