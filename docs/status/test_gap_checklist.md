@@ -82,6 +82,7 @@ These modules already have clearly named test owners in `tests/`.
 - `api`
 - `capability_registry`
 - `checks`
+- `core_wrappers`
 - `coeffs`
 - `cusf_compat`
 - `elementary`
@@ -106,15 +107,15 @@ clearer if each eventually had a more explicit owner.
 - `baseline_wrappers`
   Covered indirectly through API and reference-facing surfaces.
 - `calc_wrappers`
-  Covered indirectly through `arb_calc` / `acb_calc` and API tests.
+  Directly covered by `tests/test_calc_wrappers_contracts.py`.
 - `core_wrappers`
-  Covered indirectly through scalar chassis and mode tests.
+  Directly covered by `tests/test_core_wrappers_contracts.py`.
 - `dft_wrappers`
   Covered indirectly through DFT chassis tests.
 - `dirichlet_wrappers`
   Covered indirectly through Dirichlet chassis tests.
 - `double_interval_wrappers`
-  Covered indirectly through interval and mode tests.
+  Directly covered by `tests/test_double_interval_wrappers_contracts.py`.
 - `hypgeom_wrappers`
   Covered indirectly through hypergeometric chassis and mode tests.
 - `mat_wrappers`
@@ -124,7 +125,7 @@ clearer if each eventually had a more explicit owner.
 - `poly_wrappers`
   Covered indirectly through polynomial chassis tests.
 - `wrappers_common`
-  Covered indirectly through all wrapper-driven surfaces.
+  Directly covered by `tests/test_wrappers_common_contracts.py`.
 
 ### Shared matrix infrastructure
 
@@ -163,6 +164,10 @@ focused test file instead of relying on incidental coverage.
 
 The latest concrete additions are:
 
+- `tests/test_wrappers_common_contracts.py`
+- `tests/test_double_interval_wrappers_contracts.py`
+- `tests/test_core_wrappers_contracts.py`
+- `tests/test_calc_wrappers_contracts.py`
 - `tests/test_checks_contracts.py`
 - `tests/test_coeffs_contracts.py`
 - `tests/test_precision_contracts.py`

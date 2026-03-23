@@ -165,9 +165,10 @@ Status: `in_progress`
     test surface
 - `in_progress`
   - continue tightening wrapper ownership for:
-    `ball_wrappers`, `baseline_wrappers`, `calc_wrappers`, `core_wrappers`,
-    `double_interval_wrappers`, `hypgeom_wrappers`, `mat_wrappers`,
-    `poly_wrappers`, and `wrappers_common`
+    `ball_wrappers`, `baseline_wrappers`, `hypgeom_wrappers`,
+    `mat_wrappers`, and `poly_wrappers`
+  - direct owner tests now exist for `wrappers_common`, `core_wrappers`,
+    `calc_wrappers`, and `double_interval_wrappers`
   - direct owner tests now exist for `checks`, `coeffs`, and `precision`
   - keep precision-routing and dtype policy explicit instead of letting wrapper
     behavior drift by family
@@ -538,6 +539,14 @@ Status: `in_progress`
 Status: `in_progress`
 
 Highest priority:
+- landed
+  [test_wrappers_common_contracts.py](/tests/test_wrappers_common_contracts.py)
+- landed
+  [test_double_interval_wrappers_contracts.py](/tests/test_double_interval_wrappers_contracts.py)
+- landed
+  [test_core_wrappers_contracts.py](/tests/test_core_wrappers_contracts.py)
+- landed
+  [test_calc_wrappers_contracts.py](/tests/test_calc_wrappers_contracts.py)
 - landed
   [test_checks_contracts.py](/tests/test_checks_contracts.py)
 - landed
