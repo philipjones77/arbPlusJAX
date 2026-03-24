@@ -8,6 +8,7 @@ from arbplusjax import acb_core
 from arbplusjax import dft
 from arbplusjax import dft_wrappers as dw
 from arbplusjax import double_interval as di
+from arbplusjax import nufft
 
 
 def _rand_complex(n: int, seed: int = 0) -> jax.Array:
@@ -125,3 +126,74 @@ def test_dft_point_and_basic_ad_smoke() -> None:
     basic_grad = jax.grad(basic_loss)(jnp.asarray([0.25, -0.5, 1.0, 0.75], dtype=jnp.float64))
     assert basic_grad.shape == (4,)
     assert bool(jnp.all(jnp.isfinite(basic_grad)))
+
+
+def test_nufft_cached_type1_plan_reuse_padded_batch_and_diagnostics_match_uncached() -> None:
+    points = jnp.asarray(np.linspace(0.0, 1.0, 48, endpoint=False), dtype=jnp.float64)
+    values0 = _rand_complex(48, seed=241)
+    values1 = (0.75 - 0.2j) * values0
+    values_batch = jnp.stack([values0, values1], axis=0)
+    plan = nufft.nufft_type1_cached_prepare(points, 24, method="lanczos")
+
+    fixed = nufft.nufft_type1_cached_apply_batch_fixed(plan, values_batch)
+    padded = nufft.nufft_type1_cached_apply_batch_padded(plan, values_batch, pad_to=4)
+    diag_out, diagnostics = nufft.nufft_type1_cached_apply_with_diagnostics(plan, values0)
+    ref = jax.vmap(lambda row: nufft.nufft_type1(points, row, 24, method="lanczos"))(values_batch)
+
+    np.testing.assert_allclose(np.asarray(fixed), np.asarray(ref), rtol=1e-12, atol=1e-12)
+    np.testing.assert_allclose(np.asarray(padded), np.asarray(ref), rtol=1e-12, atol=1e-12)
+    np.testing.assert_allclose(
+        np.asarray(nufft.nufft_type1_cached_apply_batch_fixed(plan, values_batch)),
+        np.asarray(fixed),
+        rtol=1e-12,
+        atol=1e-12,
+    )
+    np.testing.assert_allclose(
+        np.asarray(diag_out),
+        np.asarray(nufft.nufft_type1_cached_apply(plan, values0)),
+        rtol=1e-12,
+        atol=1e-12,
+    )
+    assert diagnostics["method"] == "lanczos"
+    assert diagnostics["mode_shape"] == (24,)
+
+
+def test_nufft_type2_cached_plan_reuse_and_ad_smoke() -> None:
+    points = jnp.stack(
+        (
+            jnp.asarray(np.linspace(0.0, 1.0, 30, endpoint=False), dtype=jnp.float64),
+            jnp.asarray(np.linspace(0.125, 0.875, 30, endpoint=False), dtype=jnp.float64),
+        ),
+        axis=-1,
+    )
+    modes0 = _rand_complex(56, seed=251).reshape(8, 7)
+    modes1 = (0.5 + 0.1j) * modes0
+    modes_batch = jnp.stack([modes0, modes1], axis=0)
+    plan = nufft.nufft_type2_nd_cached_prepare(points, (8, 7), method="lanczos")
+
+    fixed = nufft.nufft_type2_cached_apply_batch_fixed(plan, modes_batch)
+    padded = nufft.nufft_type2_cached_apply_batch_padded(plan, modes_batch, pad_to=4)
+    diag_out, diagnostics = nufft.nufft_type2_cached_apply_with_diagnostics(plan, modes0)
+    ref = jax.vmap(lambda grid: nufft.nufft_type2_2d(points, grid, method="lanczos"))(modes_batch)
+
+    np.testing.assert_allclose(np.asarray(fixed), np.asarray(ref), rtol=1e-12, atol=1e-12)
+    np.testing.assert_allclose(np.asarray(padded), np.asarray(ref), rtol=1e-12, atol=1e-12)
+    np.testing.assert_allclose(
+        np.asarray(diag_out),
+        np.asarray(nufft.nufft_type2_cached_apply(plan, modes0)),
+        rtol=1e-12,
+        atol=1e-12,
+    )
+    assert diagnostics["method"] == "lanczos"
+    assert diagnostics["mode_shape"] == (8, 7)
+
+    def loss(re_im: jax.Array) -> jax.Array:
+        z = re_im[0::2] + 1j * re_im[1::2]
+        modes = z.reshape(8, 7)
+        y = nufft.nufft_type2_cached_apply(plan, modes)
+        return jnp.real(jnp.vdot(y, y))
+
+    vec = jnp.stack([jnp.real(modes0), jnp.imag(modes0)], axis=-1).reshape(-1)
+    grad = jax.grad(loss)(vec)
+    assert grad.shape == vec.shape
+    assert bool(jnp.all(jnp.isfinite(grad)))
