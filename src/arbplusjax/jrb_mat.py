@@ -4686,6 +4686,16 @@ def jrb_mat_normal_probes_like(x: jax.Array, *, key: jax.Array, num: int) -> jax
     return matrix_free_core.normal_probes_real(_jrb_point_interval, x.shape[-2], key=key, num=num)
 
 
+def jrb_mat_orthogonal_rademacher_probes_like(x: jax.Array, *, key: jax.Array, num: int) -> jax.Array:
+    x = jrb_mat_as_interval_vector(x)
+    return matrix_free_core.orthogonal_rademacher_probe_block_real(_jrb_point_interval, x.shape[-2], key=key, num=num)
+
+
+def jrb_mat_orthogonal_normal_probes_like(x: jax.Array, *, key: jax.Array, num: int) -> jax.Array:
+    x = jrb_mat_as_interval_vector(x)
+    return matrix_free_core.orthogonal_normal_probe_block_real(_jrb_point_interval, x.shape[-2], key=key, num=num)
+
+
 @partial(jax.jit, static_argnames=("prec_bits",))
 def jrb_mat_matmul_basic_prec(a: jax.Array, b: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return di.round_interval_outward(jrb_mat_matmul_basic(a, b), prec_bits)
@@ -5236,6 +5246,8 @@ __all__ = [
     "jrb_mat_bcoo_inverse_diagonal_with_diagnostics_point",
     "jrb_mat_rademacher_probes_like",
     "jrb_mat_normal_probes_like",
+    "jrb_mat_orthogonal_rademacher_probes_like",
+    "jrb_mat_orthogonal_normal_probes_like",
     "jrb_mat_matmul_basic_prec",
     "jrb_mat_matvec_basic_prec",
     "jrb_mat_solve_basic_prec",

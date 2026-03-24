@@ -1547,6 +1547,56 @@ def normal_probes_complex(point_from_midpoint, length: int, *, key: jax.Array, n
     return jax.vmap(point_from_midpoint)(mids)
 
 
+def orthogonal_rademacher_probe_block_real(point_from_midpoint, length: int, *, key: jax.Array, num: int) -> jax.Array:
+    if num <= 0:
+        raise ValueError("num must be > 0")
+    if num > length:
+        raise ValueError("num must be <= length for orthogonal real probe blocks")
+    samples = jax.random.rademacher(key, shape=(length, num), dtype=jnp.float64)
+    q, _ = jnp.linalg.qr(samples, mode="reduced")
+    mids = q.T
+    return jax.vmap(point_from_midpoint)(mids)
+
+
+def orthogonal_normal_probe_block_real(point_from_midpoint, length: int, *, key: jax.Array, num: int) -> jax.Array:
+    if num <= 0:
+        raise ValueError("num must be > 0")
+    if num > length:
+        raise ValueError("num must be <= length for orthogonal real probe blocks")
+    samples = jax.random.normal(key, shape=(length, num), dtype=jnp.float64)
+    q, _ = jnp.linalg.qr(samples, mode="reduced")
+    mids = q.T
+    return jax.vmap(point_from_midpoint)(mids)
+
+
+def orthogonal_rademacher_probe_block_complex(point_from_midpoint, length: int, *, key: jax.Array, num: int) -> jax.Array:
+    if num <= 0:
+        raise ValueError("num must be > 0")
+    if num > length:
+        raise ValueError("num must be <= length for orthogonal complex probe blocks")
+    key_re, key_im = jax.random.split(key)
+    re = jax.random.rademacher(key_re, shape=(length, num), dtype=jnp.float64)
+    im = jax.random.rademacher(key_im, shape=(length, num), dtype=jnp.float64)
+    samples = (re + 1j * im) / jnp.sqrt(jnp.asarray(2.0, dtype=jnp.float64))
+    q, _ = jnp.linalg.qr(samples, mode="reduced")
+    mids = q.T
+    return jax.vmap(point_from_midpoint)(mids)
+
+
+def orthogonal_normal_probe_block_complex(point_from_midpoint, length: int, *, key: jax.Array, num: int) -> jax.Array:
+    if num <= 0:
+        raise ValueError("num must be > 0")
+    if num > length:
+        raise ValueError("num must be <= length for orthogonal complex probe blocks")
+    key_re, key_im = jax.random.split(key)
+    re = jax.random.normal(key_re, shape=(length, num), dtype=jnp.float64)
+    im = jax.random.normal(key_im, shape=(length, num), dtype=jnp.float64)
+    samples = (re + 1j * im) / jnp.sqrt(jnp.asarray(2.0, dtype=jnp.float64))
+    q, _ = jnp.linalg.qr(samples, mode="reduced")
+    mids = q.T
+    return jax.vmap(point_from_midpoint)(mids)
+
+
 __all__ = [
     "OperatorPlan",
     "ScaledOperator",
@@ -1625,4 +1675,8 @@ __all__ = [
     "normal_probes_real",
     "rademacher_probes_complex",
     "normal_probes_complex",
+    "orthogonal_rademacher_probe_block_real",
+    "orthogonal_normal_probe_block_real",
+    "orthogonal_rademacher_probe_block_complex",
+    "orthogonal_normal_probe_block_complex",
 ]

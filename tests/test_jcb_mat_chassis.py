@@ -409,6 +409,10 @@ def test_matrix_free_complex_trace_and_logdet_estimators_on_diagonal_case():
 
     sampled = jcb_mat.jcb_mat_normal_probes_like(p1, key=jax.random.PRNGKey(0), num=4)
     _check(sampled.shape == (4, 2, 4))
+    orth = jcb_mat.jcb_mat_orthogonal_normal_probes_like(p1, key=jax.random.PRNGKey(0), num=2)
+    orth_mid = acb_core.acb_midpoint(orth)
+    _check(orth.shape == (2, 2, 4))
+    _check(bool(jnp.allclose(orth_mid @ jnp.conjugate(orth_mid.T), jnp.eye(2, dtype=jnp.complex128), atol=1e-6)))
 
 
 def test_arnoldi_funm_action_has_custom_vjp_wrt_input_vector():

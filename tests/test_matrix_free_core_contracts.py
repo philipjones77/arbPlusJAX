@@ -204,3 +204,17 @@ def test_contour_rational_and_logdet_solve_helpers_have_stable_contracts():
     assert result.aux.operator == "op"
     assert result.aux.solve_diagnostics["kind"] == "solve"
     assert result.aux.logdet_diagnostics["count"] == 2
+
+
+def test_orthogonal_probe_block_helpers_return_orthonormal_midpoints():
+    key = jnp.asarray([0, 321], dtype=jnp.uint32)
+
+    real_block = mfc.orthogonal_rademacher_probe_block_real(_identity_point_from_midpoint, 4, key=key, num=2)
+    real_mid = jnp.asarray(real_block)
+    assert real_mid.shape == (2, 4)
+    assert jnp.allclose(real_mid @ real_mid.T, jnp.eye(2, dtype=jnp.float64), atol=1e-6)
+
+    complex_block = mfc.orthogonal_normal_probe_block_complex(_identity_point_from_midpoint, 4, key=key, num=2)
+    complex_mid = jnp.asarray(complex_block)
+    assert complex_mid.shape == (2, 4)
+    assert jnp.allclose(complex_mid @ jnp.conjugate(complex_mid.T), jnp.eye(2, dtype=jnp.complex128), atol=1e-6)

@@ -357,6 +357,10 @@ def test_matrix_free_trace_and_logdet_estimators_on_diagonal_case():
 
     sampled = jrb_mat.jrb_mat_rademacher_probes_like(p1, key=jax.random.PRNGKey(0), num=4)
     _check(sampled.shape == (4, 2, 2))
+    orth = jrb_mat.jrb_mat_orthogonal_rademacher_probes_like(p1, key=jax.random.PRNGKey(0), num=2)
+    orth_mid = di.midpoint(orth)
+    _check(orth.shape == (2, 2, 2))
+    _check(bool(jnp.allclose(orth_mid @ orth_mid.T, jnp.eye(2, dtype=jnp.float64), atol=1e-6)))
 
 
 def test_lanczos_funm_action_has_custom_vjp_wrt_input_vector():

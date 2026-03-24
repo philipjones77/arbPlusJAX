@@ -327,6 +327,8 @@ Status: `in_progress`
   - public matrix-free rational spectral-action surfaces now exist on
     `jrb_mat` / `jcb_mat`, backed by the shared core helper substrate and
     diagonal-case chassis proofs
+  - orthogonal probe-block generation now exists in `matrix_free_core` with
+    public `jrb_mat` / `jcb_mat` wrappers for real and complex probe blocks
 
 ### Core Operator Infrastructure
 

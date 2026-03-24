@@ -4863,6 +4863,16 @@ def jcb_mat_normal_probes_like(x: jax.Array, *, key: jax.Array, num: int) -> jax
     return matrix_free_core.normal_probes_complex(_jcb_point_box, x.shape[-2], key=key, num=num)
 
 
+def jcb_mat_orthogonal_rademacher_probes_like(x: jax.Array, *, key: jax.Array, num: int) -> jax.Array:
+    x = jcb_mat_as_box_vector(x)
+    return matrix_free_core.orthogonal_rademacher_probe_block_complex(_jcb_point_box, x.shape[-2], key=key, num=num)
+
+
+def jcb_mat_orthogonal_normal_probes_like(x: jax.Array, *, key: jax.Array, num: int) -> jax.Array:
+    x = jcb_mat_as_box_vector(x)
+    return matrix_free_core.orthogonal_normal_probe_block_complex(_jcb_point_box, x.shape[-2], key=key, num=num)
+
+
 @partial(jax.jit, static_argnames=("prec_bits",))
 def jcb_mat_matmul_basic_prec(a: jax.Array, b: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return acb_core.acb_box_round_prec(jcb_mat_matmul_basic(a, b), prec_bits)
@@ -5443,6 +5453,8 @@ __all__ = [
     "jcb_mat_hutchpp_trace_point",
     "jcb_mat_rademacher_probes_like",
     "jcb_mat_normal_probes_like",
+    "jcb_mat_orthogonal_rademacher_probes_like",
+    "jcb_mat_orthogonal_normal_probes_like",
     "jcb_mat_matmul_basic_prec",
     "jcb_mat_matvec_basic_prec",
     "jcb_mat_solve_basic_prec",
