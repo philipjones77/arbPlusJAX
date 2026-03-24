@@ -657,6 +657,9 @@ def test_hypgeom_point_batch_uses_direct_point_kernels():
 def test_acb_hypgeom_point_batch_uses_direct_point_kernels():
     z = jnp.linspace(jnp.complex64(0.1 + 0.05j), jnp.complex64(0.4 + 0.2j), 4)
     a = jnp.linspace(jnp.complex64(1.1 + 0.0j), jnp.complex64(1.3 + 0.1j), 4)
+    b = jnp.linspace(jnp.complex64(0.2 + 0.0j), jnp.complex64(0.35 + 0.05j), 4)
+    lam = jnp.linspace(jnp.complex64(0.6 + 0.0j), jnp.complex64(0.8 + 0.1j), 4)
+    zeros = jnp.zeros_like(z)
 
     cases = [
         ("hypgeom.acb_hypgeom_gamma", (a,), point_wrappers.acb_hypgeom_gamma_point(a)),
@@ -671,7 +674,54 @@ def test_acb_hypgeom_point_batch_uses_direct_point_kernels():
         ("hypgeom.acb_hypgeom_li", (z,), point_wrappers.acb_hypgeom_li_point(z)),
         ("hypgeom.acb_hypgeom_dilog", (z,), point_wrappers.acb_hypgeom_dilog_point(z)),
         ("hypgeom.acb_hypgeom_fresnel", (z,), point_wrappers.acb_hypgeom_fresnel_point(z)),
+        ("hypgeom.acb_hypgeom_legendre_p", (2, zeros, z), point_wrappers.acb_hypgeom_legendre_p_point(2, zeros, z)),
+        ("hypgeom.acb_hypgeom_jacobi_p", (2, a, b, z), point_wrappers.acb_hypgeom_jacobi_p_point(2, a, b, z)),
+        ("hypgeom.acb_hypgeom_gegenbauer_c", (2, lam, z), point_wrappers.acb_hypgeom_gegenbauer_c_point(2, lam, z)),
+        ("hypgeom.acb_hypgeom_chebyshev_t", (2, z), point_wrappers.acb_hypgeom_chebyshev_t_point(2, z)),
+        ("hypgeom.acb_hypgeom_chebyshev_u", (2, z), point_wrappers.acb_hypgeom_chebyshev_u_point(2, z)),
+        ("hypgeom.acb_hypgeom_laguerre_l", (2, a, z), point_wrappers.acb_hypgeom_laguerre_l_point(2, a, z)),
+        ("hypgeom.acb_hypgeom_hermite_h", (2, z), point_wrappers.acb_hypgeom_hermite_h_point(2, z)),
     ]
     for name, args, direct in cases:
         via_api = api.eval_point_batch(name, *args, dtype="float32", pad_to=8)
         assert _allclose_or_tuple(via_api, direct, rtol=1e-5, atol=1e-5)
+
+
+def test_hypgeom_complex_orthogonal_point_ad_smoke():
+    def _box(x, y):
+        xr = jnp.asarray(x, dtype=jnp.float64)
+        yr = jnp.asarray(y, dtype=jnp.float64)
+        return jnp.stack((xr, xr, yr, yr))
+
+    leg_rx = jax.grad(
+        lambda x: hypgeom.acb_midpoint(
+            hypgeom.acb_hypgeom_legendre_p(3, _box(0.0, 0.0), _box(x, 1e-3))
+        ).real
+    )
+    jac_rx = jax.grad(
+        lambda x: hypgeom.acb_midpoint(
+            hypgeom.acb_hypgeom_jacobi_p(3, _box(0.2, 0.0), _box(0.3, 0.0), _box(x, 1e-3))
+        ).real
+    )
+    geg_rx = jax.grad(
+        lambda x: hypgeom.acb_midpoint(
+            hypgeom.acb_hypgeom_gegenbauer_c(3, _box(0.7, 0.0), _box(x, 1e-3))
+        ).real
+    )
+    cheb_t_rx = jax.grad(lambda x: hypgeom.acb_midpoint(hypgeom.acb_hypgeom_chebyshev_t(3, _box(x, 1e-3))).real)
+    cheb_u_rx = jax.grad(lambda x: hypgeom.acb_midpoint(hypgeom.acb_hypgeom_chebyshev_u(3, _box(x, 1e-3))).real)
+    lag_rx = jax.grad(
+        lambda x: hypgeom.acb_midpoint(
+            hypgeom.acb_hypgeom_laguerre_l(3, _box(0.2, 0.0), _box(x, 1e-3))
+        ).real
+    )
+    herm_rx = jax.grad(lambda x: hypgeom.acb_midpoint(hypgeom.acb_hypgeom_hermite_h(3, _box(x, 1e-3))).real)
+
+    for x in (jnp.float64(-0.5), jnp.float64(-0.1), jnp.float64(0.3), jnp.float64(0.7)):
+        assert jnp.isfinite(leg_rx(x))
+        assert jnp.isfinite(jac_rx(x))
+        assert jnp.isfinite(geg_rx(x))
+        assert jnp.isfinite(cheb_t_rx(x))
+        assert jnp.isfinite(cheb_u_rx(x))
+        assert jnp.isfinite(lag_rx(x))
+        assert jnp.isfinite(herm_rx(x))

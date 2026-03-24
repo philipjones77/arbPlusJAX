@@ -194,8 +194,8 @@ ROWS: tuple[HypgeomRow, ...] = (
         "shared_helper_layer",
         "mostly",
         "fixed-shape padded batch available for basic/adaptive/rigorous",
-        "targeted",
-        "These have explicit rigorous kernels and now have dedicated fixed-shape batch entry points for basic/adaptive/rigorous modes.",
+        "point batch + real/complex AD audited",
+        "These have explicit rigorous kernels, dedicated fixed-shape batch entry points for basic/adaptive/rigorous modes, direct point-batch API coverage, and real/complex point-AD smoke coverage.",
     ),
     HypgeomRow(
         "arb_hypgeom_chebyshev_t / chebyshev_u / laguerre_l / hermite_h",
@@ -211,8 +211,8 @@ ROWS: tuple[HypgeomRow, ...] = (
         "shared_helper_layer",
         "mostly",
         "fixed-shape padded batch available for basic/adaptive/rigorous; direct family mode-batch cores",
-        "targeted",
-        "Canonical point/basic/adaptive/rigorous support exists and now has fixed-shape batch paths plus direct family mode-batch dispatch and stronger endpoint/corner tightening, but it is still more generic than Legendre/Jacobi/Gegenbauer.",
+        "point batch + real/complex AD audited",
+        "Canonical point/basic/adaptive/rigorous support exists and now has fixed-shape batch paths, direct family mode-batch dispatch, explicit direct point-batch API coverage, and real/complex point-AD smoke coverage, but it is still more generic than Legendre/Jacobi/Gegenbauer.",
     ),
     HypgeomRow(
         "boost_hypergeometric_1f0 / 0f1 / 1f1 / 2f0 / pfq",
