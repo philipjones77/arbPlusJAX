@@ -34,6 +34,7 @@ def test_canonical_notebooks_include_production_pattern_section() -> None:
     for name in names:
         text = _notebook_text(EXAMPLES_DIR / name)
         assert "## Production Pattern" in text
+        assert "## Fast JAX Point Pattern" in text
         assert "## AD Product Pattern" in text
         assert "## Extending Benchmarks" in text
 
@@ -51,6 +52,7 @@ def test_canonical_notebooks_show_production_controls_or_caching() -> None:
     }
     for name, keywords in keyword_sets.items():
         text = _notebook_text(EXAMPLES_DIR / name)
+        assert "bind_point_batch_jit" in text or "point_jit" in text or "cached_apply_jit" in text or "jax.jit(" in text
         for keyword in keywords:
             assert keyword in text, f"{name} missing {keyword}"
 

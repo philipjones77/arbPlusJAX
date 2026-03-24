@@ -26,6 +26,10 @@ Each family should separate into three layers:
 
 The immediate target is the middle layer.
 
+For public API-facing families, the default compiled service entrypoint should
+be `api.bind_point_batch_jit(...)` unless there is a narrower family-owned JIT
+surface that is materially better.
+
 ## Common Fast-Point Infrastructure
 
 The shared infrastructure that point-fast families should converge onto is:
@@ -53,6 +57,7 @@ Proof surface:
 
 - scalar chassis tests
 - scalar API/service tests
+- representative compiled batch proof via `bind_point_batch_jit`
 
 ### 2. Interval / box / precision modes
 
@@ -67,6 +72,7 @@ Proof surface:
 
 - wrapper and precision-routing tests
 - shape and dtype propagation tests
+- representative compiled point-wrapper proof via `bind_point_batch_jit`
 
 ### 3. Dense matrix functionality
 
@@ -80,6 +86,7 @@ Proof surface:
 
 - dense chassis tests
 - dense plan/mode/structured tests
+- representative compiled dense point-batch proof via `bind_point_batch_jit`
 
 ### 4. Sparse / block-sparse / vblock functionality
 
@@ -93,6 +100,7 @@ Proof surface:
 
 - sparse chassis tests
 - sparse format/mode/structured tests
+- representative compiled sparse point-batch proof via `bind_point_batch_jit`
 
 ### 5. Matrix-free / operator functionality
 
@@ -106,6 +114,7 @@ Proof surface:
 
 - `jrb_mat` / `jcb_mat` chassis tests
 - matrix-free core/basic/logdet/adjoint tests
+- representative compiled point-estimator proof on `*_point_jit` surfaces
 
 ### 6. Special functions
 
@@ -119,6 +128,8 @@ Proof surface:
 
 - hypgeom/gamma/Bessel/incomplete-tail tests
 - service-contract tests for special families
+- representative compiled special-function point-batch proof via
+  `bind_point_batch_jit`
 
 ## Conversion Order
 

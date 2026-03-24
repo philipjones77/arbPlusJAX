@@ -265,6 +265,14 @@ That means using stable:
 Benchmarks do not need to eliminate all recompiles, but they should separate
 intentional recompiles from accidental calling-pattern churn.
 
+Canonical cache-aware benchmarks should also say which reuse pattern is under
+test, for example:
+
+- bound compiled API callable reuse
+- prepared-plan reuse
+- padded fixed-shape batch reuse
+- direct family batch-kernel reuse
+
 ## Matrix-Specific Rule
 
 For matrix/operator benchmarks, every benchmark row should aim to separate:

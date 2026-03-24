@@ -144,6 +144,15 @@ Examples of usually compile-relevant inputs:
 - Avoid hidden module-global mutation for algorithm control.
 - Prefer fixed-shape kernels and batch-friendly outputs.
 - Keep symbolic planning and canonicalization outside traced numerical kernels unless explicitly documented otherwise.
+- Reuse-oriented calling patterns should expose explicit binders, prepared plans, padded-batch controls, or other cache-aware public surfaces when they materially reduce avoidable recompilation.
+
+### Caching and prepared-plan rule
+
+- Cache-aware public surfaces belong under the governed runtime/API contract, not only in notebook folklore.
+- Bound compiled callables should keep static kwargs, shapes, and dtype controls stable across repeated calls.
+- Prepared-plan surfaces should make structural reuse explicit through prepare/apply or equivalent public APIs.
+- Callers should be able to see ordinary cache invalidation boundaries such as dtype change, shape change, method change, backend change, or structural object change.
+- The companion cache/recompile policy is defined in [caching_recompilation_standard.md](/docs/standards/caching_recompilation_standard.md).
 
 ## Diagnostics Standard
 

@@ -201,6 +201,8 @@ That means showing the appropriate combination of:
 - fixed dtype, mode, and precision policy across repeated calls
 - optional `pad_to` and `chunk_size` controls when they are relevant for
   reducing avoidable recompiles or handling variable request sizes
+- an explicit note about what is being reused: binder cache, prepared plan,
+  padded batch shape, or equivalent reuse boundary
 
 If a family does not use one of these patterns, the notebook should say so
 explicitly instead of leaving the calling convention implicit.

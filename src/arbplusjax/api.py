@@ -548,6 +548,17 @@ def _midpoint_from_interval_like(out: object):
     if arr.ndim >= 1 and arr.shape[-1] == 4:
         return acb_core.acb_midpoint(arr)
     return out
+
+
+def _direct_point_batch_fixed(fn: Callable, *args, **kwargs):
+    return fn(*args, **kwargs)
+
+
+def _direct_point_batch_padded(fn: Callable, *args, pad_to: int, **kwargs):
+    call_args, _ = pad_mixed_batch_args_repeat_last(args, pad_to=pad_to)
+    return fn(*call_args, **kwargs)
+
+
 def _normalize_hypgeom_name(name: str) -> str:
     if name.startswith("hypgeom."):
         return name.split(".", 1)[1]
@@ -1394,9 +1405,19 @@ def eval_point(
     dtype: str | jnp.dtype | None = None,
     **kwargs,
 ) -> jax.Array:
-    fn = _point_jit_fn(name) if jit else _resolve_point_fn(name)
+    call_kwargs = kwargs
+    if jit and kwargs:
+        frozen_kwargs = _freeze_static_kwargs(kwargs)
+        if frozen_kwargs is not None:
+            fn = _point_jit_fn_with_static_kwargs(name, frozen_kwargs)
+            call_kwargs = {}
+        else:
+            fn = jax.jit(lambda *aa: _resolve_point_fn(name)(*aa, **kwargs))
+            call_kwargs = {}
+    else:
+        fn = _point_jit_fn(name) if jit else _resolve_point_fn(name)
     target = _resolve_dtype_for_args(args, dtype)
-    out = fn(*tuple(_cast_arg_to_dtype(arg, target) for arg in args), **kwargs)
+    out = fn(*tuple(_cast_arg_to_dtype(arg, target) for arg in args), **call_kwargs)
     return _cast_out_to_dtype(out, target)
 
 
@@ -1414,6 +1435,13 @@ def eval_point_batch(
     if direct_fast is not None:
         return _cast_out_to_dtype(direct_fast, target)
     batch_args, n = pad_batch_args(cast_args, pad_to=pad_to, pad_value=pad_value)
+    if kwargs:
+        frozen_kwargs = _freeze_static_kwargs(kwargs)
+        if frozen_kwargs is not None:
+            out = _point_batch_fn_with_static_kwargs(name, frozen_kwargs)(*batch_args)
+        else:
+            out = jax.vmap(lambda *aa: eval_point(name, *aa, dtype=target, **kwargs))(*batch_args)
+        return trim_batch_out(_cast_out_to_dtype(out, target), n)
     batched = _point_batch_fn(name)
     out = batched(*batch_args, **kwargs)
     return trim_batch_out(_cast_out_to_dtype(out, target), n)
@@ -1826,6 +1854,34 @@ def bind_point_batch(
     return wrapped
 
 
+def bind_point_batch_jit(
+    name: str,
+    dtype: str | jnp.dtype | None = None,
+    pad_to: int | None = None,
+    pad_value: float | complex = 0.0,
+    **bound_kwargs,
+) -> Callable:
+    """Return a compiled point-batch callable with static routing policy.
+
+    This is the public service surface for point-mode fast-JAX examples and
+    category proof tests. `chunk_size` is intentionally excluded here because
+    Python chunk orchestration is outside the compiled numeric hot path.
+    """
+
+    @jax.jit
+    def wrapped(*args):
+        return eval_point_batch(
+            name,
+            *args,
+            dtype=dtype,
+            pad_to=pad_to,
+            pad_value=pad_value,
+            **bound_kwargs,
+        )
+
+    return wrapped
+
+
 def bind_interval_batch(
     name: str,
     mode: str = "basic",
@@ -1879,12 +1935,80 @@ def _point_batch_fn(name: str):
     return _batched
 
 
+def _freeze_static_kwargs(value):
+    if value is None or isinstance(value, (bool, int, float, complex, str)):
+        return value
+    if isinstance(value, tuple):
+        frozen_items = tuple(_freeze_static_kwargs(item) for item in value)
+        if any(item is _UNFREEZABLE for item in frozen_items):
+            return _UNFREEZABLE
+        return ("__tuple__", frozen_items)
+    if isinstance(value, list):
+        frozen_items = tuple(_freeze_static_kwargs(item) for item in value)
+        if any(item is _UNFREEZABLE for item in frozen_items):
+            return _UNFREEZABLE
+        return ("__list__", frozen_items)
+    if isinstance(value, dict):
+        frozen_items = []
+        for key, item in sorted(value.items()):
+            frozen_item = _freeze_static_kwargs(item)
+            if frozen_item is _UNFREEZABLE:
+                return _UNFREEZABLE
+            frozen_items.append((key, frozen_item))
+        return ("__dict__", tuple(frozen_items))
+    return _UNFREEZABLE
+
+
+def _thaw_static_kwargs(value):
+    if not isinstance(value, tuple) or not value:
+        return value
+    tag = value[0]
+    if tag == "__tuple__":
+        return tuple(_thaw_static_kwargs(item) for item in value[1])
+    if tag == "__list__":
+        return [_thaw_static_kwargs(item) for item in value[1]]
+    if tag == "__dict__":
+        return {key: _thaw_static_kwargs(item) for key, item in value[1]}
+    return value
+
+
+_UNFREEZABLE = object()
+
+
+@lru_cache(maxsize=None)
+def _point_jit_fn_with_static_kwargs(name: str, frozen_kwargs):
+    fn = _resolve_point_fn(name)
+    kwargs = _thaw_static_kwargs(frozen_kwargs)
+    if _is_host_point_backend(name):
+        return lambda *vals: fn(*vals, **kwargs)
+
+    @jax.jit
+    def _compiled(*vals):
+        return fn(*vals, **kwargs)
+
+    return _compiled
+
+
 @lru_cache(maxsize=None)
 def _point_jit_fn(name: str):
     fn = _resolve_point_fn(name)
     if _is_host_point_backend(name):
         return fn
     return jax.jit(fn)
+
+
+@lru_cache(maxsize=None)
+def _point_batch_fn_with_static_kwargs(name: str, frozen_kwargs):
+    fn = _resolve_point_fn(name)
+    kwargs = _thaw_static_kwargs(frozen_kwargs)
+    if _is_host_point_backend(name):
+        return lambda *vals: jax.vmap(lambda *aa: fn(*aa, **kwargs))(*vals)
+
+    @jax.jit
+    def _batched(*vals):
+        return jax.vmap(lambda *aa: fn(*aa, **kwargs))(*vals)
+
+    return _batched
 
 
 @lru_cache(maxsize=None)
@@ -1961,6 +2085,7 @@ __all__ = [
     "incomplete_bessel_k_lower_limit_derivative",
     "bind_point",
     "bind_point_batch",
+    "bind_point_batch_jit",
     "bind_interval",
     "bind_point_jit",
     "bind_interval_jit",
@@ -2523,6 +2648,32 @@ def incomplete_bessel_k_batch(
         samples_per_panel=samples_per_panel,
     )
     return jax.vmap(fn)(nu, z, lower_limit)
+
+
+_DIRECT_POINT_BATCH_FASTPATHS.update(
+    {
+        "incomplete_gamma_upper": (
+            partial(_direct_point_batch_fixed, incomplete_gamma_upper_batch),
+            partial(_direct_point_batch_padded, incomplete_gamma_upper_batch),
+        ),
+        "incomplete_gamma_lower": (
+            partial(_direct_point_batch_fixed, incomplete_gamma_lower_batch),
+            partial(_direct_point_batch_padded, incomplete_gamma_lower_batch),
+        ),
+        "laplace_bessel_k_tail": (
+            partial(_direct_point_batch_fixed, laplace_bessel_k_tail_batch),
+            partial(_direct_point_batch_padded, laplace_bessel_k_tail_batch),
+        ),
+        "incomplete_bessel_i": (
+            partial(_direct_point_batch_fixed, incomplete_bessel_i_batch),
+            partial(_direct_point_batch_padded, incomplete_bessel_i_batch),
+        ),
+        "incomplete_bessel_k": (
+            partial(_direct_point_batch_fixed, incomplete_bessel_k_batch),
+            partial(_direct_point_batch_padded, incomplete_bessel_k_batch),
+        ),
+    }
+)
 
 
 def hankel1(nu, z, *, method: str = "auto"):

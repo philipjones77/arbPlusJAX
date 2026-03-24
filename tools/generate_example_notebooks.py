@@ -156,6 +156,16 @@ def _ad_pattern_cells(guidance: str, code: str):
     ]
 
 
+def _fast_jax_pattern_cells(guidance: str, code: str):
+    return [
+        nbf.v4.new_markdown_cell(
+            "## Fast JAX Point Pattern\n\n"
+            f"{guidance}"
+        ),
+        nbf.v4.new_code_cell(code),
+    ]
+
+
 def _core_scalar_notebook() -> list:
     cells = [
         nbf.v4.new_markdown_cell(
@@ -219,6 +229,16 @@ def _core_scalar_notebook() -> list:
             "display(service_results)",
             "To benchmark another scalar family, either add another existing benchmark entrypoint to the `bench_dir` loop below or extend the representative operations in "
             "`benchmark_core_scalar_service_api.py` / `benchmark_core_scalar_batch_padding.py` and rerun this notebook."
+        ),
+        *_fast_jax_pattern_cells(
+            "For the true compiled point path, use `api.bind_point_batch_jit(...)` with stable `dtype` and `pad_to`. "
+            "This is the API-level fast-JAX surface for repeated point evaluation.",
+            "import jax\n"
+            "fast_real = jnp.linspace(0.1, 1.2, 8, dtype=jnp.float32)\n"
+            "fast_bound = api.bind_point_batch_jit('arb_fpwrap_double_exp', dtype='float32', pad_to=8)\n"
+            "fast_vals = fast_bound(fast_real)\n"
+            "fast_vmap = jax.vmap(lambda t: api.eval_point('arb_fpwrap_double_exp', t, dtype='float32'))(fast_real)\n"
+            "display({'jit_shape': fast_vals.shape, 'jit_dtype': fast_vals.dtype, 'jit_matches_vmap': bool(jnp.allclose(fast_vals, fast_vmap))})"
         ),
         *_ad_pattern_cells(
             "AD should be shown on the production-facing bound callables, not only on local toy functions. "
@@ -456,6 +476,15 @@ def _api_surface_notebook() -> list:
             "display(api_service_results)",
             "To extend routed benchmarks, add the target operation or implementation branch in `benchmark_api_surface.py`, `benchmark_special_function_service_api.py`, or `benchmark_matrix_service_api.py`, depending on whether the concern is generic API routing, special-function services, or matrix services."
         ),
+        *_fast_jax_pattern_cells(
+            "The routed API should still show the compiled point-batch path explicitly. "
+            "Use `bind_point_batch_jit()` when a routed function is going to be called repeatedly in a point-mode service loop.",
+            "import jax\n"
+            "jit_gamma = api.bind_point_batch_jit('incomplete_gamma_upper', dtype='float64', pad_to=8, method='quadrature', regularized=True)\n"
+            "jit_out = jit_gamma(real_batch, jnp.asarray([1.0, 1.1, 1.2, 1.3, 1.4], dtype=jnp.float64))\n"
+            "vmap_out = jax.vmap(lambda s_i, z_i: api.evaluate('incomplete_gamma_upper', s_i, z_i, method='quadrature', regularized=True))(real_batch, jnp.asarray([1.0, 1.1, 1.2, 1.3, 1.4], dtype=jnp.float64))\n"
+            "display({'jit_shape': jit_out.shape, 'jit_matches_vmap': bool(jnp.allclose(jit_out, vmap_out, rtol=1e-6, atol=1e-6))})"
+        ),
         *_ad_pattern_cells(
             "The routed API should demonstrate AD through the same public metadata-aware entrypoints used in product code. "
             "This section differentiates a routed special-function call and plots primal and gradient behavior together.",
@@ -630,6 +659,16 @@ def _dense_matrix_surface_notebook() -> list:
             "display(dense_service)",
             "To extend dense benchmarks, add a stable metric in `benchmark_dense_matrix_surface.py`; use that same metric key in the matrix workbook so dense, sparse, and matrix-free surfaces remain comparable."
         ),
+        *_fast_jax_pattern_cells(
+            "Dense point-mode fast JAX should run through the compiled public batch surface with cached-apply style operations where available.",
+            "import jax\n"
+            "dense_batch = di.interval(jnp.stack([a_mid, a_mid], axis=0), jnp.stack([a_mid, a_mid], axis=0))\n"
+            "rhs_batch_fast = di.interval(jnp.stack([vec_mid, vec_mid], axis=0), jnp.stack([vec_mid, vec_mid], axis=0))\n"
+            "dense_fast = api.bind_point_batch_jit('arb_mat_matvec', dtype='float64', pad_to=4)\n"
+            "dense_fast_out = dense_fast(dense_batch, rhs_batch_fast)\n"
+            "dense_vmap = jax.vmap(lambda aa, xx: api.eval_point('arb_mat_matvec', aa, xx, dtype='float64'))(dense_batch, rhs_batch_fast)\n"
+            "display({'jit_shape': dense_fast_out.shape, 'jit_matches_vmap': bool(jnp.allclose(dense_fast_out, dense_vmap))})"
+        ),
         *_ad_pattern_cells(
             "Dense AD should be demonstrated on the production-facing plan-based or operator-plan surface rather than only on a raw midpoint helper. "
             "This section differentiates a dense operator-plan objective and plots primal and gradient behavior over a scale sweep.",
@@ -778,6 +817,14 @@ def _sparse_matrix_surface_notebook() -> list:
             "}\n"
             "display(sparse_service_results)",
             "To extend sparse benchmarks, add the target sparse/storage/mode combination inside `benchmark_sparse_matrix_surface.py` and keep the printed metric keys stable so downstream notebook parsing still works."
+        ),
+        *_fast_jax_pattern_cells(
+            "Sparse point-mode fast JAX should use the compiled batch binder on a prepared operator or cached plan, with shape-stable RHS batches.",
+            "import jax\n"
+            "sparse_fast = api.bind_point_batch_jit('srb_mat_matvec_cached_apply', dtype='float64', pad_to=4)\n"
+            "sparse_fast_out = sparse_fast(real_cached, rhs_batch)\n"
+            "sparse_vmap = jax.vmap(lambda row: api.eval_point('srb_mat_matvec_cached_apply', real_cached, row, dtype='float64'))(rhs_batch)\n"
+            "display({'jit_shape': sparse_fast_out.shape, 'jit_matches_vmap': bool(jnp.allclose(sparse_fast_out, sparse_vmap))})"
         ),
         *_ad_pattern_cells(
             "Sparse AD should be demonstrated through stable public operations that are realistically differentiated in downstream models. "
@@ -931,6 +978,13 @@ def _matrix_free_operator_surface_notebook() -> list:
             "display(matrix_free_service)",
             "To benchmark another operator path, add a new metric block in `benchmark_matrix_free_krylov.py` with a stable metric name and then include that section in the notebook parsing."
         ),
+        *_fast_jax_pattern_cells(
+            "Matrix-free fast JAX uses the family-owned compiled point kernels directly. "
+            "The important contract is still the same: fixed problem shape, fixed Krylov steps, and no dynamic rescue logic in the hot path.",
+            "logdet_jit = jrb_mat.jrb_mat_logdet_slq_point_jit(plan, probes, 6)\n"
+            "logdet_ref = jrb_mat.jrb_mat_logdet_slq_point(plan, probes, 6)\n"
+            "display({'jit_value': logdet_jit, 'jit_matches_point': bool(jnp.allclose(logdet_jit, logdet_ref, rtol=1e-6, atol=1e-6))})"
+        ),
         *_ad_pattern_cells(
             "Matrix-free AD should be shown on operator-plan-first usage, since that is the production surface. "
             "This section differentiates a solve-based scalar objective and plots primal and gradient behavior over a scale sweep.",
@@ -1081,6 +1135,13 @@ def _fft_nufft_surface_notebook() -> list:
             "display(transform_service)",
             "To extend transform benchmarks, add the new DFT/NUFFT case in `benchmark_fft_nufft.py` with a stable `name` field so the CSV-style summary in this notebook remains compatible."
         ),
+        *_fast_jax_pattern_cells(
+            "Transforms already have explicit compiled kernels. "
+            "For fast JAX usage, keep the plan cached and compare the compiled repeated path against the direct result.",
+            "fast_transform = nufft.nufft_type1_cached_apply_jit(plan, values)\n"
+            "direct_transform = nufft.nufft_type1(points, values, 8, method='lanczos')\n"
+            "display({'jit_shape': fast_transform.shape, 'jit_matches_direct': bool(jnp.allclose(fast_transform, direct_transform, rtol=1e-6, atol=1e-6))})"
+        ),
         *_ad_pattern_cells(
             "Transform AD should be shown through a realistic loss on transform outputs rather than isolated scalar identities. "
             "This section differentiates a NUFFT energy objective and plots primal versus gradient over a scale sweep.",
@@ -1202,6 +1263,14 @@ def _gamma_family_surface_notebook() -> list:
             "display(gamma_service)",
             "To benchmark more gamma-family functions, extend the representative operation list in `benchmark_special_function_service_api.py` or add a dedicated comparison/benchmark entrypoint if the function has special reference needs."
         ),
+        *_fast_jax_pattern_cells(
+            "Special-function fast JAX at the API level should use the compiled point-batch binder on a safe box with fixed method policy.",
+            "import jax\n"
+            "gamma_fast = api.bind_point_batch_jit('incomplete_gamma_upper', dtype='float64', pad_to=8, method='quadrature', regularized=True)\n"
+            "gamma_fast_out = gamma_fast(s, z)\n"
+            "gamma_vmap = jax.vmap(lambda s_i, z_i: api.eval_point('incomplete_gamma_upper', s_i, z_i, dtype='float64', method='quadrature', regularized=True))(s, z)\n"
+            "display({'jit_shape': gamma_fast_out.shape, 'jit_matches_vmap': bool(jnp.allclose(gamma_fast_out, gamma_vmap, rtol=1e-6, atol=1e-6))})"
+        ),
         *_ad_pattern_cells(
             "Special-function AD should be shown on the production-facing differentiated surface with explicit method policy. "
             "This section validates incomplete-gamma derivatives over a sweep and plots primal versus gradient.",
@@ -1318,6 +1387,15 @@ def _barnes_double_gamma_surface_notebook() -> list:
             "}\n"
             "display(barnes_service)",
             "To extend Barnes/double-gamma benchmarks, add new printed metrics in `benchmark_barnes_double_gamma.py` or split out a schema-backed service benchmark if repeated-call API usage becomes a primary concern."
+        ),
+        *_fast_jax_pattern_cells(
+            "Barnes-family point evaluation is still more specialized than the lightweight scalar helpers. "
+            "The fast-JAX proof here is a family-owned compiled derivative path rather than a generic repeated batch service.",
+            "import jax\n"
+            "barnes_fast = jax.jit(lambda xs: jax.vmap(lambda t: jnp.real(double_gamma.ifj_barnesdoublegamma(jnp.asarray(t + 0.05j, dtype=jnp.complex128), 1.0, dps=60)))(xs))\n"
+            "barnes_x = jnp.linspace(0.8, 2.0, 8, dtype=jnp.float64)\n"
+            "barnes_fast_out = barnes_fast(barnes_x)\n"
+            "display({'jit_shape': barnes_fast_out.shape, 'finite': bool(jnp.all(jnp.isfinite(barnes_fast_out)))})"
         ),
         *_ad_pattern_cells(
             "Barnes-family AD should be shown explicitly because these surfaces are more specialized and their derivative expectations are less obvious to users. "

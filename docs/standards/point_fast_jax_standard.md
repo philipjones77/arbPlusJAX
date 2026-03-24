@@ -192,6 +192,9 @@ Python-heavy adaptive behavior into the compiled kernel.
 A point-mode family is `fast JAX ready` only when all of the following are
 true:
 
+- the public service surface exposes a compiled point-batch callable, normally
+  through `api.bind_point_batch_jit(...)`, when that family is intended for
+  repeated API-level point evaluation
 - `jax.jit` works on the fast evaluator
 - `jax.vmap` works on the fast evaluator
 - no Python loops remain in the numerical hot path

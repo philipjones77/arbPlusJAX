@@ -9,6 +9,7 @@ OUT_PATH = REPO_ROOT / "docs" / "reports" / "report_status_refresh_inventory.md"
 
 GENERATED_BY = {
     "docs/reports/README.md": "python tools/generate_docs_indexes.py",
+    "docs/reports/cache_aware_surface_inventory.md": "python tools/cache_aware_surface_report.py",
     "docs/reports/current_repo_mapping.md": "python tools/generate_docs_indexes.py",
     "docs/reports/function_provenance_registry.md": "python tools/function_provenance_report.py",
     "docs/reports/function_capability_registry.json": "python tools/function_provenance_report.py",
@@ -21,6 +22,7 @@ GENERATED_BY = {
     "docs/reports/matrix_surface_workbook.md": "python benchmarks/matrix_surface_workbook.py --n 4 --warmup 0 --runs 1 --steps 4",
     "docs/reports/comparison_backend_defaults.md": "python tools/comparison_backend_defaults_report.py",
     "docs/reports/point_fast_jax_category_matrix.md": "python tools/point_fast_jax_category_report.py",
+    "docs/reports/point_fast_jax_function_inventory.md": "python tools/point_fast_jax_function_report.py",
     "docs/reports/report_status_refresh_inventory.md": "python tools/report_status_refresh_inventory.py",
     "docs/status/README.md": "python tools/generate_docs_indexes.py",
 }

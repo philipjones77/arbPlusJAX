@@ -26,8 +26,10 @@ This standard applies to canonical Arb-like functions, alternative implementatio
 - Canonical example notebooks should teach the intended production calling style for their family.
 - Repeated-call surfaces should prefer binder reuse, cached prepare/apply flows, or both where relevant.
 - Variable-size service traffic should use stable dtype/mode controls and optional padding or chunking when that materially reduces recompiles.
+- Cache-aware public surfaces should be tracked in generated reports rather than left implicit.
 - Benchmarks should separate cold, warm, and recompile behavior when JAX compilation cost is part of the practical calling contract.
 - Canonical tests, benchmarks, and examples should expose runtime selection through explicit `float32`/`float64` and CPU/GPU parameterization even when only one execution slice is exercised in the current environment.
+- Cache-aware production behavior should follow [caching_recompilation_standard.md](/docs/standards/caching_recompilation_standard.md).
 
 ## Status interpretation
 

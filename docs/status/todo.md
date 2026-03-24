@@ -103,11 +103,20 @@ Status: `in_progress`
     [point_fast_jax_plan.md](/docs/status/point_fast_jax_plan.md)
   - the required six-category coverage matrix now exists in
     [point_fast_jax_category_matrix.md](/docs/reports/point_fast_jax_category_matrix.md)
+  - all public point functions now have compiled single-call, compiled batch,
+    and family-owned direct batch public surfaces; see
+    [point_fast_jax_function_inventory.md](/docs/reports/point_fast_jax_function_inventory.md)
+  - family-level direct-batch proof coverage now exists for the previously
+    generic-batch incomplete-tail set:
+    `incomplete_gamma_upper`, `incomplete_gamma_lower`,
+    `incomplete_bessel_i`, `incomplete_bessel_k`, and
+    `laplace_bessel_k_tail`
 - `in_progress`
   - create the per-category point-mode audit that classifies current surfaces as
     `direct_fast`, `recurrence_fast`, `approx_fast`, or `precise_only_for_now`
-  - land category-owned `jit` / `vmap` / safe-box parity tests for the six
-    top-level categories rather than one broad smoke test
+  - widen the now-landed category and incomplete-tail proof slices into deeper
+    family-by-family numerical proof coverage across the remaining large public
+    matrix/core/hypergeometric surfaces
   - refactor point kernels so Python control flow, dynamic shapes, Arb objects,
     and precise fallback logic remain outside the hot path
   - build shared point-fast infrastructure for logspace, recurrence,

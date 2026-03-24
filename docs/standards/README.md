@@ -15,6 +15,7 @@ Primary owner:
 
 Specialized companion documents:
 - [engineering_standard.md](/docs/standards/engineering_standard.md)
+- [caching_recompilation_standard.md](/docs/standards/caching_recompilation_standard.md)
 - [jax_surface_policy_standard.md](/docs/standards/jax_surface_policy_standard.md)
 - [precision_standard.md](/docs/standards/precision_standard.md)
 - [core_scalar_service_calling_standard.md](/docs/standards/core_scalar_service_calling_standard.md)
@@ -22,6 +23,7 @@ Specialized companion documents:
 Consolidation note:
 - treat `jax_api_runtime_standard.md` as the canonical runtime/API contract
 - treat `engineering_standard.md` as the hardening and status-interpretation overlay
+- treat `caching_recompilation_standard.md` as the explicit cache, binder-reuse, prepared-plan, and recompilation-discipline companion
 - treat `core_scalar_service_calling_standard.md` as a tranche-specific specialization, not a second general runtime policy
 - API calling shape, binder reuse, diagnostics payloads, logging hooks, and the rule that diagnostics/profiling stay outside the mandatory numeric hot path all belong to this runtime concept
 
@@ -87,6 +89,7 @@ Consolidation note:
 ## Detailed Standards
 - [benchmark_grouping_standard.md](/docs/standards/benchmark_grouping_standard.md)
 - [benchmark_validation_policy_standard.md](/docs/standards/benchmark_validation_policy_standard.md)
+- [caching_recompilation_standard.md](/docs/standards/caching_recompilation_standard.md)
 - [configuration_standard.md](/docs/standards/configuration_standard.md)
 - [contract_and_provider_boundary_standard.md](/docs/standards/contract_and_provider_boundary_standard.md)
 - [core_scalar_service_calling_standard.md](/docs/standards/core_scalar_service_calling_standard.md)
