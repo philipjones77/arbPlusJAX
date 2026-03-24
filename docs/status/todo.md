@@ -66,6 +66,9 @@ Status: `in_progress`
     [run_test_harness.py](/tools/run_test_harness.py) for `matrix`,
     `special`, and `bench-smoke`; see
     [cpu_validation_profiles.md](/docs/reports/cpu_validation_profiles.md)
+  - a dedicated sparse-matrix harness profile exists in
+    [run_test_harness.py](/tools/run_test_harness.py) on top of the landed
+    sparse point layer
 - `in_progress`
   - unify long-run benchmark scheduling and report collection behind a single
     environment manifest and execution policy
@@ -74,8 +77,8 @@ Status: `in_progress`
   - keep docs landing pages, report indexes, status indexes, and current repo
     mapping generated automatically so push/commit does not rely on hand-edited
     tree summaries
-  - add a dedicated sparse-matrix harness profile on top of the now-landed
-    sparse point layer
+  - re-run and retain a bounded sparse CPU validation slice in
+    [cpu_validation_profiles.md](/docs/reports/cpu_validation_profiles.md)
   - normalize more legacy benchmark scripts onto the shared benchmark-report
     schema instead of stdout-only summaries; direct normalized coverage now
     includes `benchmark_arb_poly.py`, `benchmark_acb_poly.py`,
@@ -248,8 +251,10 @@ Status: `in_progress`
   - strengthen large-`n` determinant enclosures beyond midpoint fallback
   - exact-reference dense chassis checks now cover `inv`, `qr`, cached matvec,
     determinant, trace, and matrix norms for real and complex dense matrices
-  - add parity/reference checks for banded matvec and keep expanding larger-`n`
-    determinant enclosure quality beyond midpoint fallback
+  - dense chassis coverage now also includes point/basic/JIT/API parity checks
+    for banded matvec on real and complex paths
+  - keep expanding larger-`n` determinant enclosure quality beyond midpoint
+    fallback and current 5x5/6x6 reference-nesting checks
   - separate midpoint-first solve-family implementations from true interval/box
     linear-algebra kernels in status and engineering reports
   - deepen rigorous treatment for solve/inverse/factorization paths instead of

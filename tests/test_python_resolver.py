@@ -36,3 +36,15 @@ def test_resolve_python_falls_back_to_current_interpreter_without_jax_env(monkey
     monkeypatch.delenv("CONDA_DEFAULT_ENV", raising=False)
 
     assert python_resolver.resolve_python() == "/usr/bin/python-current"
+
+
+def test_jax_platform_env_cpu_is_explicitly_cpu_only() -> None:
+    env = python_resolver.jax_platform_env("cpu")
+    assert env["JAX_PLATFORMS"] == "cpu"
+    assert env["CUDA_VISIBLE_DEVICES"] == ""
+    assert env["JAX_CUDA_VISIBLE_DEVICES"] == ""
+
+
+def test_jax_platform_env_gpu_requests_cuda() -> None:
+    env = python_resolver.jax_platform_env("gpu")
+    assert env == {"JAX_PLATFORMS": "cuda"}

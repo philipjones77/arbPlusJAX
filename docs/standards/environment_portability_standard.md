@@ -51,6 +51,11 @@ Environment-sensitive flows should use explicit knobs such as:
 - `JAX_PLATFORMS`
 - harness `--jax-mode`
 
+When the requested mode is CPU, shared harness helpers should set an explicitly
+CPU-only environment rather than merely relying on fallback behavior. That means
+CPU validation runs should suppress accidental CUDA-device probing noise through
+the shared environment helper layer.
+
 Do not bury platform selection in hard-coded notebook cells or machine-specific
 path assumptions.
 

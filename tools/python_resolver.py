@@ -88,6 +88,12 @@ def jax_platform_env(mode: str) -> dict[str, str]:
     m = mode.strip().lower()
     if m in ("", "auto"):
         return {}
-    if m in ("cpu", "gpu"):
-        return {"JAX_PLATFORMS": "cpu" if m == "cpu" else "cuda"}
+    if m == "cpu":
+        return {
+            "JAX_PLATFORMS": "cpu",
+            "CUDA_VISIBLE_DEVICES": "",
+            "JAX_CUDA_VISIBLE_DEVICES": "",
+        }
+    if m == "gpu":
+        return {"JAX_PLATFORMS": "cuda"}
     raise ValueError(f"Unsupported JAX mode: {mode}. Use auto|cpu|gpu.")

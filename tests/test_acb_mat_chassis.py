@@ -16,6 +16,13 @@ def _box(re_lo: float, re_hi: float, im_lo: float, im_hi: float) -> jnp.ndarray:
     return acb_core.acb_box(_interval(re_lo, re_hi), _interval(im_lo, im_hi))
 
 
+def _masked_band_dense(a_mid: jnp.ndarray, *, lower_bandwidth: int, upper_bandwidth: int) -> jnp.ndarray:
+    rows = jnp.arange(a_mid.shape[-2])[:, None]
+    cols = jnp.arange(a_mid.shape[-1])[None, :]
+    mask = (cols - rows <= upper_bandwidth) & (rows - cols <= lower_bandwidth)
+    return jnp.where(mask, a_mid, jnp.zeros_like(a_mid))
+
+
 def test_jit_compiles_and_keeps_interval_order():
     m = jnp.array(
         [
@@ -480,33 +487,86 @@ def test_dense_exact_reference_paths_cover_cached_qr_inv_det_trace_and_norms():
     _check(bool(jnp.allclose(acb_core.acb_midpoint(infn), jnp.linalg.norm(a_mid, ord=jnp.inf))))
 
 
-def test_large_n_det_enclosure_contains_midpoint_reference_and_precision_nesting():
+def test_banded_matvec_reference_and_api_paths():
     a_mid = jnp.array(
         [
-            [4.0 + 0.0j, 1.0 - 0.5j, 0.0 + 0.0j, -1.0 + 0.25j, 2.0 + 0.0j],
-            [0.5 + 0.5j, 3.5 + 0.0j, 1.5 - 0.25j, 0.0 + 0.0j, -0.5 + 0.75j],
-            [0.0 + 0.0j, 1.0 + 0.0j, 5.0 + 0.0j, 1.0 - 1.0j, 0.25 + 0.0j],
-            [1.0 - 0.25j, 0.0 + 0.0j, 0.5 + 1.0j, 2.5 + 0.0j, 1.0 + 0.0j],
-            [2.0 + 0.0j, -0.5 - 0.75j, 0.0 + 0.0j, 1.0 + 0.5j, 4.5 + 0.0j],
+            [4.0 + 0.5j, 1.0 - 0.25j, 0.0 + 0.0j, 0.0 + 0.0j, 0.0 + 0.0j],
+            [2.0 + 0.0j, 5.0 - 0.5j, -1.0 + 0.25j, 0.0 + 0.0j, 0.0 + 0.0j],
+            [0.5 - 0.25j, 1.5 + 0.0j, 6.0 + 0.5j, 2.0 - 0.25j, 0.0 + 0.0j],
+            [0.0 + 0.0j, -0.25 + 0.75j, 3.0 + 0.0j, 7.0 + 0.0j, 1.0 + 0.0j],
+            [0.0 + 0.0j, 0.0 + 0.0j, 0.75 - 0.5j, 2.0 + 0.25j, 8.0 + 0.0j],
         ],
         dtype=jnp.complex128,
     )
-    radius = jnp.full(a_mid.shape, 1e-6, dtype=jnp.float64)
-    a = acb_core.acb_box(
-        di.interval(jnp.real(a_mid) - radius, jnp.real(a_mid) + radius),
-        di.interval(jnp.imag(a_mid) - radius, jnp.imag(a_mid) + radius),
+    x_mid = jnp.array([1.0 + 0.0j, -2.0 + 1.0j, 0.5 - 0.5j, 3.0 + 0.25j, -1.5 + 0.0j], dtype=jnp.complex128)
+    a = acb_core.acb_box(di.interval(jnp.real(a_mid), jnp.real(a_mid)), di.interval(jnp.imag(a_mid), jnp.imag(a_mid)))
+    x = acb_core.acb_box(di.interval(jnp.real(x_mid), jnp.real(x_mid)), di.interval(jnp.imag(x_mid), jnp.imag(x_mid)))
+    lower_bandwidth = 2
+    upper_bandwidth = 1
+
+    point = acb_mat.acb_mat_banded_matvec(a, x, lower_bandwidth=lower_bandwidth, upper_bandwidth=upper_bandwidth)
+    basic = acb_mat.acb_mat_banded_matvec_basic(a, x, lower_bandwidth=lower_bandwidth, upper_bandwidth=upper_bandwidth)
+    point_jit = acb_mat.acb_mat_banded_matvec_jit(a, x, lower_bandwidth=lower_bandwidth, upper_bandwidth=upper_bandwidth)
+    batch_x = jnp.stack([x, x], axis=0)
+    batch_a = jnp.stack([a, a], axis=0)
+    batch = acb_mat.acb_mat_banded_matvec_batch_fixed(a, batch_x, lower_bandwidth=lower_bandwidth, upper_bandwidth=upper_bandwidth)
+    api_basic = api.eval_interval_batch(
+        "acb_mat_banded_matvec",
+        batch_a,
+        batch_x,
+        mode="basic",
+        lower_bandwidth=lower_bandwidth,
+        upper_bandwidth=upper_bandwidth,
     )
+    ref = _masked_band_dense(a_mid, lower_bandwidth=lower_bandwidth, upper_bandwidth=upper_bandwidth) @ x_mid
 
-    det_basic = acb_mat.acb_mat_det_basic(a)
-    det_rigorous = acb_mat.acb_mat_det_rigorous(a)
-    det_hi = acb_mat.acb_mat_det_prec(a, prec_bits=53)
-    det_lo = acb_mat.acb_mat_det_prec(a, prec_bits=20)
-    ref = jnp.linalg.det(a_mid)
-    ref_box = acb_core.acb_box(di.interval(jnp.real(ref), jnp.real(ref)), di.interval(jnp.imag(ref), jnp.imag(ref)))
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(point), ref)))
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(basic), ref)))
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(point_jit), ref)))
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(batch), jnp.stack([ref, ref], axis=0))))
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(api_basic), jnp.stack([ref, ref], axis=0))))
 
-    _check(bool(di.contains(acb_core.acb_real(det_basic), acb_core.acb_real(ref_box))))
-    _check(bool(di.contains(acb_core.acb_imag(det_basic), acb_core.acb_imag(ref_box))))
-    _check(bool(di.contains(acb_core.acb_real(det_rigorous), acb_core.acb_real(ref_box))))
-    _check(bool(di.contains(acb_core.acb_imag(det_rigorous), acb_core.acb_imag(ref_box))))
-    _check(bool(di.contains(acb_core.acb_real(det_lo), acb_core.acb_real(det_hi))))
-    _check(bool(di.contains(acb_core.acb_imag(det_lo), acb_core.acb_imag(det_hi))))
+
+def test_large_n_det_enclosure_contains_midpoint_reference_and_precision_nesting():
+    cases = (
+        jnp.array(
+            [
+                [4.0 + 0.0j, 1.0 - 0.5j, 0.0 + 0.0j, -1.0 + 0.25j, 2.0 + 0.0j],
+                [0.5 + 0.5j, 3.5 + 0.0j, 1.5 - 0.25j, 0.0 + 0.0j, -0.5 + 0.75j],
+                [0.0 + 0.0j, 1.0 + 0.0j, 5.0 + 0.0j, 1.0 - 1.0j, 0.25 + 0.0j],
+                [1.0 - 0.25j, 0.0 + 0.0j, 0.5 + 1.0j, 2.5 + 0.0j, 1.0 + 0.0j],
+                [2.0 + 0.0j, -0.5 - 0.75j, 0.0 + 0.0j, 1.0 + 0.5j, 4.5 + 0.0j],
+            ],
+            dtype=jnp.complex128,
+        ),
+        jnp.array(
+            [
+                [6.0 + 0.0j, -1.0 + 0.25j, 0.0 + 0.0j, 0.5 + 0.0j, 0.0 + 0.0j, 0.0 + 0.0j],
+                [1.5 - 0.5j, 5.5 + 0.0j, 1.0 + 0.25j, -0.25 + 0.0j, 0.0 + 0.0j, 0.0 + 0.0j],
+                [0.0 + 0.0j, 1.0 + 0.0j, 4.5 + 0.5j, 1.0 - 0.5j, 0.75 + 0.25j, 0.0 + 0.0j],
+                [0.5 + 0.0j, 0.0 + 0.0j, 1.25 + 0.5j, 5.0 + 0.0j, 1.0 - 0.25j, -0.5 + 0.0j],
+                [0.0 + 0.0j, 0.0 + 0.0j, 0.5 - 0.25j, 1.5 + 0.0j, 4.75 + 0.0j, 1.0 + 0.5j],
+                [0.0 + 0.0j, 0.0 + 0.0j, 0.0 + 0.0j, -0.5 + 0.0j, 1.0 - 0.5j, 3.5 + 0.0j],
+            ],
+            dtype=jnp.complex128,
+        ),
+    )
+    for a_mid in cases:
+        radius = jnp.full(a_mid.shape, 1e-6, dtype=jnp.float64)
+        a = acb_core.acb_box(
+            di.interval(jnp.real(a_mid) - radius, jnp.real(a_mid) + radius),
+            di.interval(jnp.imag(a_mid) - radius, jnp.imag(a_mid) + radius),
+        )
+        det_basic = acb_mat.acb_mat_det_basic(a)
+        det_rigorous = acb_mat.acb_mat_det_rigorous(a)
+        det_hi = acb_mat.acb_mat_det_prec(a, prec_bits=53)
+        det_lo = acb_mat.acb_mat_det_prec(a, prec_bits=20)
+        ref = jnp.linalg.det(a_mid)
+        ref_box = acb_core.acb_box(di.interval(jnp.real(ref), jnp.real(ref)), di.interval(jnp.imag(ref), jnp.imag(ref)))
+
+        _check(bool(di.contains(acb_core.acb_real(det_basic), acb_core.acb_real(ref_box))))
+        _check(bool(di.contains(acb_core.acb_imag(det_basic), acb_core.acb_imag(ref_box))))
+        _check(bool(di.contains(acb_core.acb_real(det_rigorous), acb_core.acb_real(ref_box))))
+        _check(bool(di.contains(acb_core.acb_imag(det_rigorous), acb_core.acb_imag(ref_box))))
+        _check(bool(di.contains(acb_core.acb_real(det_lo), acb_core.acb_real(det_hi))))
+        _check(bool(di.contains(acb_core.acb_imag(det_lo), acb_core.acb_imag(det_hi))))
