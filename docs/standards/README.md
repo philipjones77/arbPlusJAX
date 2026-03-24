@@ -17,6 +17,7 @@ Specialized companion documents:
 - [engineering_standard.md](/docs/standards/engineering_standard.md)
 - [caching_recompilation_standard.md](/docs/standards/caching_recompilation_standard.md)
 - [jax_surface_policy_standard.md](/docs/standards/jax_surface_policy_standard.md)
+- [lazy_import_standard.md](/docs/standards/lazy_import_standard.md)
 - [precision_standard.md](/docs/standards/precision_standard.md)
 - [core_scalar_service_calling_standard.md](/docs/standards/core_scalar_service_calling_standard.md)
 
@@ -24,6 +25,7 @@ Consolidation note:
 - treat `jax_api_runtime_standard.md` as the canonical runtime/API contract
 - treat `engineering_standard.md` as the hardening and status-interpretation overlay
 - treat `caching_recompilation_standard.md` as the explicit cache, binder-reuse, prepared-plan, and recompilation-discipline companion
+- treat `lazy_import_standard.md` as the import-time load and public lazy-boundary companion
 - treat `core_scalar_service_calling_standard.md` as a tranche-specific specialization, not a second general runtime policy
 - API calling shape, binder reuse, diagnostics payloads, logging hooks, and the rule that diagnostics/profiling stay outside the mandatory numeric hot path all belong to this runtime concept
 
@@ -101,6 +103,7 @@ Consolidation note:
 - [generated_documentation_standard.md](/docs/standards/generated_documentation_standard.md)
 - [jax_api_runtime_standard.md](/docs/standards/jax_api_runtime_standard.md)
 - [jax_surface_policy_standard.md](/docs/standards/jax_surface_policy_standard.md)
+- [lazy_import_standard.md](/docs/standards/lazy_import_standard.md)
 - [point_fast_jax_standard.md](/docs/standards/point_fast_jax_standard.md)
 - [precision_standard.md](/docs/standards/precision_standard.md)
 - [pytest_test_naming_standard.md](/docs/standards/pytest_test_naming_standard.md)

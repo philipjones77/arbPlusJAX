@@ -91,6 +91,7 @@ def render_root_readme() -> str:
         "## Notes",
         "",
         "- JAX is the primary implementation surface.",
+        "- The package root uses lazy public-module loading to keep import-time cost low.",
         "- Reference software and external engines are validation/comparison layers, not the default runtime path.",
         "- See [NOTICE](/NOTICE) for acknowledgments and reference links.",
     ]
@@ -209,6 +210,7 @@ def render_standards_readme() -> str:
         f"- {_doc_link(DOCS_ROOT / 'standards' / 'engineering_standard.md')}",
         f"- {_doc_link(DOCS_ROOT / 'standards' / 'caching_recompilation_standard.md')}",
         f"- {_doc_link(DOCS_ROOT / 'standards' / 'jax_surface_policy_standard.md')}",
+        f"- {_doc_link(DOCS_ROOT / 'standards' / 'lazy_import_standard.md')}",
         f"- {_doc_link(DOCS_ROOT / 'standards' / 'precision_standard.md')}",
         f"- {_doc_link(DOCS_ROOT / 'standards' / 'core_scalar_service_calling_standard.md')}",
         "",
@@ -216,6 +218,7 @@ def render_standards_readme() -> str:
         "- treat `jax_api_runtime_standard.md` as the canonical runtime/API contract",
         "- treat `engineering_standard.md` as the hardening and status-interpretation overlay",
         "- treat `caching_recompilation_standard.md` as the explicit cache, binder-reuse, prepared-plan, and recompilation-discipline companion",
+        "- treat `lazy_import_standard.md` as the import-time load and public lazy-boundary companion",
         "- treat `core_scalar_service_calling_standard.md` as a tranche-specific specialization, not a second general runtime policy",
         "- API calling shape, binder reuse, diagnostics payloads, logging hooks, and the rule that diagnostics/profiling stay outside the mandatory numeric hot path all belong to this runtime concept",
         "",

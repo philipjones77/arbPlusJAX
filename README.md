@@ -52,5 +52,6 @@ PYTHONPATH=src python -m pytest tests -q -m "not parity"
 ## Notes
 
 - JAX is the primary implementation surface.
+- The package root uses lazy public-module loading to keep import-time cost low.
 - Reference software and external engines are validation/comparison layers, not the default runtime path.
 - See [NOTICE](/NOTICE) for acknowledgments and reference links.

@@ -222,6 +222,8 @@ Recommended fields include:
 - Use lazy loading at clear public boundaries when it reduces import cost or avoids optional heavyweight dependencies.
 - Do not scatter lazy indirection unpredictably across runtime kernels.
 - Favor lazy package-root exports and lazy unified facades.
+- Keep package-root eager imports to the minimum needed for shared runtime defaults and lazy dispatch setup.
+- The companion repo-level import policy is defined in [lazy_import_standard.md](/docs/standards/lazy_import_standard.md).
 
 ## Optional Dependency Standard
 
