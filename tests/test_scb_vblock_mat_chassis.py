@@ -103,3 +103,34 @@ def test_variable_block_complex_basic_det_inv_and_square():
     _check(bool(jnp.allclose(det_basic, jnp.linalg.det(dense), rtol=1e-8, atol=1e-8)))
     _check(bool(jnp.allclose(inv_basic, jnp.linalg.inv(dense), rtol=1e-6, atol=1e-6)))
     _check(bool(jnp.allclose(scb_vblock_mat.scb_vblock_mat_to_dense(sqr_basic), dense @ dense, rtol=1e-8, atol=1e-8)))
+
+
+def test_variable_block_complex_non_square_partitions_support_lu_and_qr_solves():
+    dense = jnp.array(
+        [
+            [4.0 + 0.0j, 1.0 - 0.25j, 0.0 + 0.0j, 0.0 + 0.0j],
+            [1.0 + 0.25j, 5.0 + 0.0j, 0.5 - 0.1j, 0.0 + 0.0j],
+            [0.0 + 0.0j, 0.5 + 0.1j, 3.5 + 0.0j, 1.0 - 0.2j],
+            [0.0 + 0.0j, 0.0 + 0.0j, 1.0 + 0.2j, 2.5 + 0.0j],
+        ],
+        dtype=jnp.complex128,
+    )
+    rhs = jnp.array([1.0 + 0.0j, -2.0 + 0.5j, 0.5 - 0.25j, 3.0 + 0.0j], dtype=jnp.complex128)
+    row_sizes = jnp.array([1, 3], dtype=jnp.int32)
+    col_sizes = jnp.array([2, 2], dtype=jnp.int32)
+    x = scb_vblock_mat.scb_vblock_mat_from_dense_csr(dense, row_block_sizes=row_sizes, col_block_sizes=col_sizes)
+
+    lu_sol = scb_vblock_mat.scb_vblock_mat_lu_solve(scb_vblock_mat.scb_vblock_mat_lu(x), rhs)
+    qr_sol = scb_vblock_mat.scb_vblock_mat_qr_solve(scb_vblock_mat.scb_vblock_mat_qr(x), rhs)
+    tri_sol = scb_vblock_mat.scb_vblock_mat_triangular_solve(
+        scb_vblock_mat.scb_vblock_mat_from_dense_csr(
+            jnp.triu(dense), row_block_sizes=row_sizes, col_block_sizes=col_sizes
+        ),
+        rhs,
+        lower=False,
+        unit_diagonal=False,
+    )
+
+    _check(bool(jnp.allclose(lu_sol, jnp.linalg.solve(dense, rhs), rtol=1e-8, atol=1e-8)))
+    _check(bool(jnp.allclose(qr_sol, jnp.linalg.solve(dense, rhs), rtol=1e-8, atol=1e-8)))
+    _check(bool(jnp.allclose(tri_sol, jnp.linalg.solve(jnp.triu(dense), rhs), rtol=1e-8, atol=1e-8)))

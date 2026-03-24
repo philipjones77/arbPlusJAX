@@ -278,6 +278,9 @@ Status: `in_progress`
   - variable-block `srb_vblock_mat` / `scb_vblock_mat` surfaces exist for
     partitioned COO/CSR, dense conversion, apply, cached apply, matmul, and
     direct solve/factorization helpers
+  - variable-block direct factorization/solve helpers now support square dense
+    matrices even when row/column partition vectors differ, instead of
+    requiring hidden square-partition layouts
   - direct-owner tests now exist for `block_sparse_core` and `sparse_core`
 - `in_progress`
   - for the current sparse/block/vblock tranche, keep hardening focused on

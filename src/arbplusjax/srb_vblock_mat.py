@@ -393,33 +393,11 @@ def srb_vblock_mat_rmatvec_cached_apply_batch_padded(plan: sc.VariableBlockSpars
 
 
 def _vblock_triangular_solve_vector(x: sc.VariableBlockSparseCSR, b: jax.Array, *, lower: bool, unit_diagonal: bool) -> jax.Array:
-    row_ids = sc.csr_row_ids(x.indptr, rows=x.row_block_sizes.shape[0], nnz=x.data.shape[0])
-    max_br, max_bc = x.data.shape[1], x.data.shape[2]
-    checks.check(bool(jnp.array_equal(x.row_block_sizes, x.col_block_sizes)), "srb_vblock_mat.triangular_solve.square_partition")
-    rhs_blocks = _pack_variable_blocks(b, x.row_block_sizes, max_br)
-    out_blocks = jnp.zeros_like(rhs_blocks)
-    order = range(x.row_block_sizes.shape[0]) if lower else range(x.row_block_sizes.shape[0] - 1, -1, -1)
-    solved = out_blocks
-    for i in order:
-        row_mask = row_ids == i
-        cols = jnp.where(row_mask, x.indices, -1)
-        blocks = jnp.where(row_mask[:, None, None], x.data, 0.0)
-        rs = int(x.row_block_sizes[i])
-        rhs_block = rhs_blocks[i, :rs]
-        accum = jnp.zeros((rs,), dtype=x.data.dtype)
-        diag = jnp.eye(rs, dtype=x.data.dtype)
-        for k in range(x.data.shape[0]):
-            if bool(row_mask[k]):
-                j = int(cols[k])
-                cs = int(x.col_block_sizes[j])
-                block = blocks[k, :rs, :cs]
-                if j == i:
-                    diag = block if not unit_diagonal else block
-                else:
-                    accum = accum + block @ solved[j, :cs]
-        value = jnp.linalg.solve(diag, rhs_block - accum)
-        solved = solved.at[i, :rs].set(value)
-    return _unpack_variable_blocks(solved, x.row_block_sizes, x.rows)
+    dense = srb_vblock_mat_to_dense(x)
+    tri = jnp.tril(dense) if lower else jnp.triu(dense)
+    if unit_diagonal:
+        tri = tri.at[jnp.diag_indices(tri.shape[0])].set(1.0)
+    return jnp.linalg.solve(tri, b)
 
 
 def srb_vblock_mat_triangular_solve(x: sc.VariableBlockSparseCOO | sc.VariableBlockSparseCSR, b: jax.Array, *, lower: bool, unit_diagonal: bool = False) -> jax.Array:
