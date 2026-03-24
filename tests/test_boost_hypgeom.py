@@ -117,3 +117,84 @@ def test_boost_helper_and_pfq_point_ad_smoke():
         _check(bool(jnp.isfinite(hyp1f1_grad(z))))
         _check(bool(jnp.isfinite(hyp2f1_grad(z))))
         _check(bool(jnp.isfinite(pfq_grad(z))))
+
+
+def test_boost_regularized_batches_match_and_contain_basic():
+    b = di.interval(
+        jnp.linspace(jnp.float64(1.2), jnp.float64(1.4), 3),
+        jnp.linspace(jnp.float64(1.23), jnp.float64(1.43), 3),
+    )
+    a = di.interval(
+        jnp.linspace(jnp.float64(1.0), jnp.float64(1.2), 3),
+        jnp.linspace(jnp.float64(1.03), jnp.float64(1.23), 3),
+    )
+    z = di.interval(
+        jnp.linspace(jnp.float64(0.1), jnp.float64(0.3), 3),
+        jnp.linspace(jnp.float64(0.12), jnp.float64(0.32), 3),
+    )
+
+    fixed_0f1 = boost_hypgeom.boost_hypergeometric_0f1_batch_fixed_prec(b, z, prec_bits=53, regularized=True)
+    padded_0f1 = boost_hypgeom.boost_hypergeometric_0f1_batch_padded_prec(b, z, pad_to=8, prec_bits=53, regularized=True)
+    _check(bool(jnp.allclose(fixed_0f1, padded_0f1[: z.shape[0]], rtol=1e-12, atol=1e-12)))
+    rig_0f1 = boost_hypgeom.boost_hypergeometric_0f1_batch_mode_fixed(b, z, impl="rigorous", prec_bits=53, regularized=True)
+    adp_0f1 = boost_hypgeom.boost_hypergeometric_0f1_batch_mode_fixed(b, z, impl="adaptive", prec_bits=53, regularized=True)
+    _check(_contains_all(rig_0f1, fixed_0f1))
+    _check(_contains_all(adp_0f1, fixed_0f1))
+
+    fixed_1f1 = boost_hypgeom.boost_hypergeometric_1f1_batch_fixed_prec(a, b, z, prec_bits=53, regularized=True)
+    padded_1f1 = boost_hypgeom.boost_hypergeometric_1f1_batch_padded_prec(a, b, z, pad_to=8, prec_bits=53, regularized=True)
+    _check(bool(jnp.allclose(fixed_1f1, padded_1f1[: z.shape[0]], rtol=1e-12, atol=1e-12)))
+    rig_1f1 = boost_hypgeom.boost_hypergeometric_1f1_batch_mode_fixed(a, b, z, impl="rigorous", prec_bits=53, regularized=True)
+    adp_1f1 = boost_hypgeom.boost_hypergeometric_1f1_batch_mode_fixed(a, b, z, impl="adaptive", prec_bits=53, regularized=True)
+    rig_1f1_padded = boost_hypgeom.boost_hypergeometric_1f1_batch_mode_padded(
+        a, b, z, pad_to=8, impl="rigorous", prec_bits=53, regularized=True
+    )
+    adp_1f1_padded = boost_hypgeom.boost_hypergeometric_1f1_batch_mode_padded(
+        a, b, z, pad_to=8, impl="adaptive", prec_bits=53, regularized=True
+    )
+    _check(bool(jnp.allclose(rig_1f1, rig_1f1_padded[: z.shape[0]], rtol=1e-12, atol=1e-12)))
+    _check(bool(jnp.allclose(adp_1f1, adp_1f1_padded[: z.shape[0]], rtol=1e-12, atol=1e-12)))
+
+
+def test_boost_reciprocal_pfq_batches_match_and_helper_aliases_stay_aligned():
+    pa = jnp.stack(
+        (
+            jnp.linspace(jnp.float64(0.6), jnp.float64(0.8), 3),
+            jnp.linspace(jnp.float64(0.9), jnp.float64(1.1), 3),
+        ),
+        axis=1,
+    )
+    pb = jnp.linspace(jnp.float64(1.4), jnp.float64(1.6), 3)[:, None]
+    z = di.interval(
+        jnp.linspace(jnp.float64(0.1), jnp.float64(0.3), 3),
+        jnp.linspace(jnp.float64(0.12), jnp.float64(0.32), 3),
+    )
+
+    fixed_basic = boost_hypgeom.boost_hypergeometric_pfq_batch_fixed_prec(
+        pa, pb, z, prec_bits=53, reciprocal=True, n_terms=40
+    )
+    padded_basic = boost_hypgeom.boost_hypergeometric_pfq_batch_padded_prec(
+        pa, pb, z, pad_to=8, prec_bits=53, reciprocal=True, n_terms=40
+    )
+    _check(bool(jnp.allclose(fixed_basic, padded_basic[: z.shape[0]], rtol=1e-12, atol=1e-12)))
+    for mode in ("rigorous", "adaptive"):
+        fixed_mode = boost_hypgeom.boost_hypergeometric_pfq_batch_mode_fixed(
+            pa, pb, z, impl=mode, prec_bits=53, reciprocal=True, n_terms=40
+        )
+        _check(_contains_all(fixed_mode, fixed_basic))
+
+    a = di.interval(jnp.float64(1.1), jnp.float64(1.2))
+    b = di.interval(jnp.float64(2.2), jnp.float64(2.3))
+    c = di.interval(jnp.float64(3.2), jnp.float64(3.3))
+    zz = di.interval(jnp.float64(0.1), jnp.float64(0.2))
+    for mode in ("point", "basic", "rigorous", "adaptive"):
+        series = boost_hypgeom.boost_hyp1f1_series(a, b, zz, mode=mode, prec_bits=80)
+        asym = boost_hypgeom.boost_hyp1f1_asym(a, b, zz, mode=mode, prec_bits=80)
+        _check(bool(jnp.allclose(jnp.asarray(series), jnp.asarray(asym), rtol=1e-12, atol=1e-12)))
+        base = boost_hypgeom.boost_hyp2f1_series(a, b, c, zz, mode=mode, prec_bits=80)
+        for alt in (
+            boost_hypgeom.boost_hyp2f1_cf(a, b, c, zz, mode=mode, prec_bits=80),
+            boost_hypgeom.boost_hyp2f1_pade(a, b, c, zz, mode=mode, prec_bits=80),
+            boost_hypgeom.boost_hyp2f1_rational(a, b, c, zz, mode=mode, prec_bits=80),
+        ):
+            _check(bool(jnp.allclose(jnp.asarray(base), jnp.asarray(alt), rtol=1e-12, atol=1e-12)))

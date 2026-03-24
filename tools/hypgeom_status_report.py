@@ -229,7 +229,7 @@ ROWS: tuple[HypgeomRow, ...] = (
         "mixed",
         "fixed-shape fixed/padded point/basic/adaptive/rigorous batch available on the main families",
         "primary-family point AD + pfq fixed/padded mode-batch audited",
-        "Four modes exist and the main families now use direct point kernels plus fixed-shape fixed/padded batch fastpaths on the shared substrate; pfq now has explicit fixed-vs-padded and mode-containment proofs, but tightening still delegates more heavily to canonical or wrapper-level behavior than the canonical hypgeom families.",
+        "Four modes exist and the main families now use direct point kernels plus fixed-shape fixed/padded batch fastpaths on the shared substrate; pfq now has explicit fixed-vs-padded and reciprocal/mode-containment proofs, and regularized `0f1`/`1f1` fixed-vs-padded containment is audited, but tightening still delegates more heavily to canonical or wrapper-level behavior than the canonical hypgeom families.",
     ),
     HypgeomRow(
         "boost_hyp1f1_series / asym / hyp2f1_series / cf / pade / rational / hyp1f2_series",
@@ -244,9 +244,9 @@ ROWS: tuple[HypgeomRow, ...] = (
         "mixed",
         "n/a",
         "mixed",
-        "no fixed-shape audit",
-        "mixed",
-        "Useful for comparing method families, but not yet engineered to the same standard as canonical kernels.",
+        "no dedicated fixed-shape audit",
+        "helper alias consistency + point AD audited",
+        "Useful for comparing method families; helper aliases now have explicit cross-mode consistency checks and point-AD smoke, but they are not yet engineered to the same standard as canonical kernels.",
     ),
     HypgeomRow(
         "cusf_hyp1f1 / cusf_hyp2f1",

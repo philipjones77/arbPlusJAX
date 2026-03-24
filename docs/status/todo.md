@@ -538,6 +538,9 @@ Status: `in_progress`
     Boost `pfq` fixed/padded mode-batch proofs and helper/`pfq` point-AD smoke
     are landed, and CuSF `hyp1f1`/`hyp2f1` now have explicit mode containment
     plus point-AD checks
+  - regularized Boost `0f1`/`1f1` fixed-vs-padded containment and reciprocal
+    `pfq` fixed-vs-padded/mode-containment proofs are now landed
+  - Boost helper aliases now have explicit cross-mode consistency checks
   - direct owner tests now exist for `bessel_kernels` and `barnesg`
   - extend benchmark and RF77-facing usage/report coverage where diagnostics
     exist but packaging is still incomplete
