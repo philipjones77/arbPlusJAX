@@ -329,6 +329,9 @@ Status: `in_progress`
     diagonal-case chassis proofs
   - orthogonal probe-block generation now exists in `matrix_free_core` with
     public `jrb_mat` / `jcb_mat` wrappers for real and complex probe blocks
+  - reusable pilot-variance and adaptive probe-budget helpers now exist in
+    `matrix_free_core`, with public trace-estimator probe statistics/adaptive
+    count surfaces on `jrb_mat` / `jcb_mat`
 
 ### Core Operator Infrastructure
 

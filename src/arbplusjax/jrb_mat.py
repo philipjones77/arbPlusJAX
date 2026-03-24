@@ -4165,6 +4165,32 @@ def jrb_mat_trace_estimator_point(matvec, probes: jax.Array) -> jax.Array:
     )
 
 
+def jrb_mat_trace_estimator_probe_statistics_point(matvec, probes: jax.Array) -> tuple[jax.Array, jax.Array, jax.Array]:
+    coerced = di.as_interval(probes)
+    samples = jax.vmap(lambda v: jrb_mat_trace_integrand_point(matvec, v))(coerced)
+    return matrix_free_core.probe_sample_statistics(samples)
+
+
+def jrb_mat_trace_estimator_adaptive_probe_count(
+    matvec,
+    pilot_probes: jax.Array,
+    *,
+    target_stderr: float,
+    min_probes: int | None = None,
+    max_probes: int | None = None,
+    block_size: int = 1,
+) -> jax.Array:
+    coerced = di.as_interval(pilot_probes)
+    samples = jax.vmap(lambda v: jrb_mat_trace_integrand_point(matvec, v))(coerced)
+    return matrix_free_core.adaptive_probe_count_from_pilot(
+        samples,
+        target_stderr=target_stderr,
+        min_probes=min_probes,
+        max_probes=max_probes,
+        block_size=block_size,
+    )
+
+
 def jrb_mat_logdet_slq_point(matvec, probes: jax.Array, steps: int) -> jax.Array:
     return mat_common.estimator_mean(
         probes,
@@ -5194,6 +5220,8 @@ __all__ = [
     "jrb_mat_trace_integrand_point",
     "jrb_mat_funm_trace_integrand_lanczos_point",
     "jrb_mat_trace_estimator_point",
+    "jrb_mat_trace_estimator_probe_statistics_point",
+    "jrb_mat_trace_estimator_adaptive_probe_count",
     "jrb_mat_trace_estimator_with_diagnostics_point",
     "jrb_mat_logdet_slq_point",
     "jrb_mat_logdet_slq_basic",

@@ -3920,6 +3920,33 @@ def jcb_mat_trace_estimator_point(matvec, probes: jax.Array, adjoint_matvec=None
     )
 
 
+def jcb_mat_trace_estimator_probe_statistics_point(matvec, probes: jax.Array, adjoint_matvec=None) -> tuple[jax.Array, jax.Array, jax.Array]:
+    coerced = acb_core.as_acb_box(probes)
+    samples = jax.vmap(lambda v: jcb_mat_trace_integrand_point(matvec, v, adjoint_matvec))(coerced)
+    return matrix_free_core.probe_sample_statistics(samples)
+
+
+def jcb_mat_trace_estimator_adaptive_probe_count(
+    matvec,
+    pilot_probes: jax.Array,
+    adjoint_matvec=None,
+    *,
+    target_stderr: float,
+    min_probes: int | None = None,
+    max_probes: int | None = None,
+    block_size: int = 1,
+) -> jax.Array:
+    coerced = acb_core.as_acb_box(pilot_probes)
+    samples = jax.vmap(lambda v: jcb_mat_trace_integrand_point(matvec, v, adjoint_matvec))(coerced)
+    return matrix_free_core.adaptive_probe_count_from_pilot(
+        samples,
+        target_stderr=target_stderr,
+        min_probes=min_probes,
+        max_probes=max_probes,
+        block_size=block_size,
+    )
+
+
 def jcb_mat_logdet_slq_point(matvec, probes: jax.Array, steps: int, adjoint_matvec=None) -> jax.Array:
     return mat_common.estimator_mean(
         probes,
@@ -5403,6 +5430,8 @@ __all__ = [
     "jcb_mat_trace_integrand_point",
     "jcb_mat_funm_trace_integrand_arnoldi_point",
     "jcb_mat_trace_estimator_point",
+    "jcb_mat_trace_estimator_probe_statistics_point",
+    "jcb_mat_trace_estimator_adaptive_probe_count",
     "jcb_mat_trace_estimator_with_diagnostics_point",
     "jcb_mat_logdet_slq_point",
     "jcb_mat_logdet_slq_basic",

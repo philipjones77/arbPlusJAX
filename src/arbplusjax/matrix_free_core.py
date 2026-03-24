@@ -1597,6 +1597,51 @@ def orthogonal_normal_probe_block_complex(point_from_midpoint, length: int, *, k
     return jax.vmap(point_from_midpoint)(mids)
 
 
+def probe_sample_statistics(samples: jax.Array) -> tuple[jax.Array, jax.Array, jax.Array]:
+    values = jnp.asarray(samples)
+    if values.ndim == 0:
+        raise ValueError("samples must have at least one probe axis")
+    count = values.shape[0]
+    if count <= 0:
+        raise ValueError("samples must contain at least one probe")
+    mean = jnp.mean(values, axis=0)
+    centered = values - mean
+    sq_norm = jnp.real(centered * jnp.conjugate(centered))
+    variance = jnp.mean(sq_norm, axis=0) if count == 1 else jnp.sum(sq_norm, axis=0) / jnp.asarray(count - 1, dtype=jnp.float64)
+    stderr = jnp.sqrt(variance / jnp.asarray(count, dtype=jnp.float64))
+    return mean, variance, stderr
+
+
+def adaptive_probe_count_from_pilot(
+    pilot_samples: jax.Array,
+    *,
+    target_stderr: float,
+    min_probes: int | None = None,
+    max_probes: int | None = None,
+    block_size: int = 1,
+) -> jax.Array:
+    values = jnp.asarray(pilot_samples)
+    if values.ndim == 0:
+        raise ValueError("pilot_samples must have a probe axis")
+    count = int(values.shape[0])
+    if count <= 0:
+        raise ValueError("pilot_samples must contain at least one probe")
+    if block_size <= 0:
+        raise ValueError("block_size must be > 0")
+    _, _, stderr = probe_sample_statistics(values)
+    stderr_scalar = jnp.max(jnp.asarray(stderr, dtype=jnp.float64))
+    target = jnp.maximum(jnp.asarray(target_stderr, dtype=jnp.float64), jnp.asarray(1e-30, dtype=jnp.float64))
+    required = jnp.ceil((stderr_scalar / target) ** 2 * jnp.asarray(count, dtype=jnp.float64)).astype(jnp.int32)
+    required = jnp.maximum(required, jnp.asarray(count if min_probes is None else min_probes, dtype=jnp.int32))
+    if max_probes is not None:
+        required = jnp.minimum(required, jnp.asarray(max_probes, dtype=jnp.int32))
+    block = jnp.asarray(block_size, dtype=jnp.int32)
+    rounded = block * ((required + block - 1) // block)
+    if max_probes is not None:
+        rounded = jnp.minimum(rounded, jnp.asarray(max_probes, dtype=jnp.int32))
+    return rounded
+
+
 __all__ = [
     "OperatorPlan",
     "ScaledOperator",
@@ -1679,4 +1724,6 @@ __all__ = [
     "orthogonal_normal_probe_block_real",
     "orthogonal_rademacher_probe_block_complex",
     "orthogonal_normal_probe_block_complex",
+    "probe_sample_statistics",
+    "adaptive_probe_count_from_pilot",
 ]

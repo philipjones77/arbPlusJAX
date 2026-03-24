@@ -218,3 +218,28 @@ def test_orthogonal_probe_block_helpers_return_orthonormal_midpoints():
     complex_mid = jnp.asarray(complex_block)
     assert complex_mid.shape == (2, 4)
     assert jnp.allclose(complex_mid @ jnp.conjugate(complex_mid.T), jnp.eye(2, dtype=jnp.complex128), atol=1e-6)
+
+
+def test_probe_statistics_and_adaptive_budget_helpers_have_stable_contracts():
+    real_samples = jnp.asarray([1.0, 3.0, 5.0], dtype=jnp.float64)
+    mean, variance, stderr = mfc.probe_sample_statistics(real_samples)
+    assert jnp.allclose(mean, jnp.asarray(3.0))
+    assert jnp.allclose(variance, jnp.asarray(4.0))
+    assert stderr > 0.0
+
+    complex_samples = jnp.asarray([1.0 + 1.0j, 3.0 + 1.0j], dtype=jnp.complex128)
+    mean_c, variance_c, stderr_c = mfc.probe_sample_statistics(complex_samples)
+    assert jnp.allclose(mean_c, jnp.asarray(2.0 + 1.0j))
+    assert variance_c > 0.0
+    assert stderr_c > 0.0
+
+    recommended = mfc.adaptive_probe_count_from_pilot(
+        real_samples,
+        target_stderr=0.5,
+        min_probes=3,
+        max_probes=16,
+        block_size=2,
+    )
+    assert int(recommended) >= 3
+    assert int(recommended) <= 16
+    assert int(recommended) % 2 == 0

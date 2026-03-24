@@ -413,6 +413,21 @@ def test_matrix_free_complex_trace_and_logdet_estimators_on_diagonal_case():
     orth_mid = acb_core.acb_midpoint(orth)
     _check(orth.shape == (2, 2, 4))
     _check(bool(jnp.allclose(orth_mid @ jnp.conjugate(orth_mid.T), jnp.eye(2, dtype=jnp.complex128), atol=1e-6)))
+    mean, variance, stderr = jcb_mat.jcb_mat_trace_estimator_probe_statistics_point(op, probes)
+    recommended = jcb_mat.jcb_mat_trace_estimator_adaptive_probe_count(
+        op,
+        probes,
+        target_stderr=1.0,
+        min_probes=2,
+        max_probes=8,
+        block_size=2,
+    )
+    _check(bool(jnp.allclose(mean, trace_est, rtol=1e-6, atol=1e-6)))
+    _check(bool(variance >= 0.0))
+    _check(bool(stderr >= 0.0))
+    _check(int(recommended) >= 2)
+    _check(int(recommended) <= 8)
+    _check(int(recommended) % 2 == 0)
 
 
 def test_arnoldi_funm_action_has_custom_vjp_wrt_input_vector():
