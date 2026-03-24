@@ -59,7 +59,7 @@ def _eta_series_interval(s: jax.Array, n_terms: int) -> jax.Array:
 
 def _zeta_tail_bound(s: jax.Array, n_terms: int) -> tuple[jax.Array, jax.Array]:
     s = di.as_interval(s)
-    sigma = s[0]
+    sigma = s[..., 0]
     n = jnp.float64(n_terms + 1)
     ok = sigma > 1.0
     tail = jnp.where(ok, jnp.exp((1.0 - sigma) * jnp.log(n)) / (sigma - 1.0), jnp.inf)
@@ -68,7 +68,7 @@ def _zeta_tail_bound(s: jax.Array, n_terms: int) -> tuple[jax.Array, jax.Array]:
 
 def _eta_tail_bound(s: jax.Array, n_terms: int) -> tuple[jax.Array, jax.Array]:
     s = di.as_interval(s)
-    sigma = s[0]
+    sigma = s[..., 0]
     n = jnp.float64(n_terms + 1)
     ok = sigma > 0.0
     tail = jnp.where(ok, jnp.exp(-sigma * jnp.log(n)), jnp.inf)
@@ -103,7 +103,7 @@ def dirichlet_zeta_rigorous(s: jax.Array, n_terms: int = 64) -> jax.Array:
     hi = out[..., 1] + tail
     out = di.interval(di._below(lo), di._above(hi))
     finite = jnp.isfinite(out[..., 0]) & jnp.isfinite(out[..., 1])
-    return jnp.where(ok & finite[..., None], out, _full_interval_like(s))
+    return jnp.where((ok & finite)[..., None], out, _full_interval_like(s))
 
 
 def dirichlet_eta_rigorous(s: jax.Array, n_terms: int = 64) -> jax.Array:
@@ -114,7 +114,7 @@ def dirichlet_eta_rigorous(s: jax.Array, n_terms: int = 64) -> jax.Array:
     hi = out[..., 1] + tail
     out = di.interval(di._below(lo), di._above(hi))
     finite = jnp.isfinite(out[..., 0]) & jnp.isfinite(out[..., 1])
-    return jnp.where(ok & finite[..., None], out, _full_interval_like(s))
+    return jnp.where((ok & finite)[..., None], out, _full_interval_like(s))
 
 
 @partial(jax.jit, static_argnames=("n_terms", "prec_bits"))

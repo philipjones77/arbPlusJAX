@@ -28,6 +28,7 @@ def test_canonical_notebooks_include_production_pattern_section() -> None:
         "example_sparse_matrix_surface.ipynb",
         "example_matrix_free_operator_surface.ipynb",
         "example_fft_nufft_surface.ipynb",
+        "example_dirichlet_surface.ipynb",
         "example_gamma_family_surface.ipynb",
         "example_barnes_double_gamma_surface.ipynb",
     )
@@ -47,6 +48,7 @@ def test_canonical_notebooks_show_production_controls_or_caching() -> None:
         "example_sparse_matrix_surface.ipynb": ("cached_prepare", "cached_apply", "pad_to"),
         "example_matrix_free_operator_surface.ipynb": ("plan_prepare", "preconditioner"),
         "example_fft_nufft_surface.ipynb": ("cached_prepare", "cached_apply"),
+        "example_dirichlet_surface.ipynb": ("bind_point_batch_jit", "n_terms", "prec_bits"),
         "example_gamma_family_surface.ipynb": ("bind_point_batch", "bind_interval_batch"),
         "example_barnes_double_gamma_surface.ipynb": ("diagnostics", "prec_bits", "dps"),
     }
@@ -65,6 +67,7 @@ def test_canonical_notebooks_show_ad_validation_and_plotting() -> None:
         "example_sparse_matrix_surface.ipynb",
         "example_matrix_free_operator_surface.ipynb",
         "example_fft_nufft_surface.ipynb",
+        "example_dirichlet_surface.ipynb",
         "example_gamma_family_surface.ipynb",
         "example_barnes_double_gamma_surface.ipynb",
     )
@@ -83,6 +86,7 @@ def test_canonical_notebooks_expose_runtime_portability_contracts() -> None:
         "example_sparse_matrix_surface.ipynb",
         "example_matrix_free_operator_surface.ipynb",
         "example_fft_nufft_surface.ipynb",
+        "example_dirichlet_surface.ipynb",
         "example_gamma_family_surface.ipynb",
         "example_barnes_double_gamma_surface.ipynb",
     )

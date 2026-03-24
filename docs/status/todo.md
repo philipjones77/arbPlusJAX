@@ -579,6 +579,12 @@ Status: `in_progress`
   - direct test owners already exist for `acb_dirichlet`, `acb_elliptic`,
     `acb_modular`, `acb_poly`, `arb_poly`, `bernoulli`, `dirichlet`, `dlog`,
     and `partitions`
+  - Dirichlet now has dedicated engineering coverage in
+    `tests/test_dirichlet_engineering.py`
+  - Dirichlet now has a dedicated canonical notebook:
+    `examples/example_dirichlet_surface.ipynb`
+  - the real Dirichlet rigorous batch path now handles batched tail bounds and
+    validity masking correctly in `src/arbplusjax/dirichlet.py`
 - `in_progress`
   - continue closing the large missing-C implementation gap in
     `acb_dirichlet`, `arb_poly`, `acb_poly`, `dirichlet`, `acb_modular`, and

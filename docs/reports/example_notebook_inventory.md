@@ -1,4 +1,4 @@
-Last updated: 2026-03-22T22:15:00Z
+Last updated: 2026-03-24T12:30:00Z
 
 # Example Notebook Inventory
 
@@ -23,6 +23,7 @@ Current notebook root:
 - `example_core_scalar_surface.ipynb`
 - `example_dense_matrix_surface.ipynb`
 - `example_dense_structured_spectral.ipynb`
+- `example_dirichlet_surface.ipynb`
 - `example_fft_nufft_surface.ipynb`
 - `example_gamma_family_surface.ipynb`
 - `example_hypgeom_robust_modes_sweep.ipynb`
@@ -52,6 +53,7 @@ Current notebook coverage:
 - `example_special_modes_sweep.ipynb`
 - `example_bessel_modes_sweep.ipynb`
 - `example_hypgeom_robust_modes_sweep.ipynb`
+- `example_dirichlet_surface.ipynb`
 - `example_gamma_family_surface.ipynb`
 - `example_barnes_double_gamma_surface.ipynb`
 
@@ -61,7 +63,7 @@ Status:
 
 Notes:
 
-- Bessel, hypergeometric, gamma, and Barnes/double-gamma families now have dedicated notebooks.
+- Bessel, hypergeometric, Dirichlet, gamma, and Barnes/double-gamma families now have dedicated notebooks.
 - Tail-acceleration-specific and narrower per-subfamily notebooks can still be added later without changing category coverage.
 
 ### Dense matrix
@@ -128,7 +130,7 @@ Status:
 
 Notes:
 
-- Dirichlet, modular, elliptic, Bernoulli, partitions, and related families still do not have dedicated family notebooks.
+- Modular, elliptic, Bernoulli, partitions, and related families still do not have dedicated family notebooks.
 
 ## Required Notebook Content Checklist
 
@@ -150,11 +152,8 @@ Each functionality-group notebook should include:
 
 ## Missing High-Priority Notebooks
 
-- `example_sparse_matrix_surface.ipynb`
-- `example_matrix_free_operator_surface.ipynb`
-- `example_fft_nufft_surface.ipynb`
-- `example_gamma_family_surface.ipynb`
-- `example_barnes_double_gamma_surface.ipynb`
+- no current top-level notebook gaps in the canonical covered groups
+- modular, elliptic, Bernoulli, partitions, and related analytic/algebraic families remain optional follow-on dedicated family notebooks
 
 ## Notes
 

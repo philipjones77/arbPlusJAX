@@ -13,6 +13,7 @@ def test_high_priority_example_notebooks_exist() -> None:
         "example_sparse_matrix_surface.ipynb",
         "example_matrix_free_operator_surface.ipynb",
         "example_fft_nufft_surface.ipynb",
+        "example_dirichlet_surface.ipynb",
         "example_gamma_family_surface.ipynb",
         "example_barnes_double_gamma_surface.ipynb",
     }

@@ -1223,6 +1223,154 @@ def _fft_nufft_surface_notebook() -> list:
     return cells
 
 
+def _dirichlet_surface_notebook() -> list:
+    cells = [
+        nbf.v4.new_markdown_cell(
+            "# Example Dirichlet Surface\n\n"
+            "Canonical Dirichlet family notebook for real interval zeta/eta and complex-box `acb_dirichlet` point/basic surfaces."
+        ),
+        *_common_setup_cells("example_dirichlet_surface"),
+        nbf.v4.new_markdown_cell(
+            "## Direct Usage\n\n"
+            "Construct representative real intervals and complex boxes, then evaluate Dirichlet zeta and eta on both the real and complex helper surfaces."
+        ),
+        nbf.v4.new_code_cell(
+            "import jax.numpy as jnp\n"
+            "from arbplusjax import acb_core, acb_dirichlet, api, dirichlet, double_interval as di\n"
+            "\n"
+            "s_real = di.interval(jnp.array([1.5, 2.0, 2.5], dtype=jnp.float64), jnp.array([1.55, 2.05, 2.55], dtype=jnp.float64))\n"
+            "s_complex = acb_core.acb_box(\n"
+            "    di.interval(jnp.array([1.5, 2.0, 2.5], dtype=jnp.float64), jnp.array([1.55, 2.05, 2.55], dtype=jnp.float64)),\n"
+            "    di.interval(jnp.array([-0.2, -0.05, 0.1], dtype=jnp.float64), jnp.array([-0.15, 0.0, 0.15], dtype=jnp.float64)),\n"
+            ")\n"
+            "direct_results = {\n"
+            "    'dirichlet_zeta': dirichlet.dirichlet_zeta_batch(s_real, n_terms=32),\n"
+            "    'dirichlet_eta': dirichlet.dirichlet_eta_batch(s_real, n_terms=32),\n"
+            "    'acb_dirichlet_zeta': acb_dirichlet.acb_dirichlet_zeta_batch(s_complex, n_terms=48),\n"
+            "    'acb_dirichlet_eta': acb_dirichlet.acb_dirichlet_eta_batch(s_complex, n_terms=48),\n"
+            "}\n"
+            "display(direct_results)"
+        ),
+        *_production_pattern_cells(
+            "Production Pattern",
+            "For repeated Dirichlet usage, keep `n_terms`, `dtype`, and `pad_to` stable. "
+            "Use the real batch JIT path directly for interval zeta/eta, and use the API-bound compiled point batch for the complex `acb_dirichlet` surfaces.",
+            "real_zeta = dirichlet.dirichlet_zeta_batch_jit(s_real, n_terms=32)\n"
+            "real_eta = dirichlet.dirichlet_eta_batch_jit(s_real, n_terms=32)\n"
+            "real_zeta_basic = dirichlet.dirichlet_zeta_batch_prec_jit(s_real, n_terms=32, prec_bits=53)\n"
+            "complex_zeta_bound = api.bind_point_batch_jit('acb_dirichlet_zeta', dtype='float64', pad_to=8, n_terms=48)\n"
+            "complex_eta_bound = api.bind_point_batch_jit('acb_dirichlet_eta', dtype='float64', pad_to=8, n_terms=48)\n"
+            "service_results = {\n"
+            "    'real_zeta_jit': real_zeta,\n"
+            "    'real_eta_jit': real_eta,\n"
+            "    'real_zeta_basic': real_zeta_basic,\n"
+            "    'complex_zeta_bound': complex_zeta_bound(s_complex),\n"
+            "    'complex_eta_bound': complex_eta_bound(s_complex),\n"
+            "}\n"
+            "display(service_results)",
+            "To extend Dirichlet benchmarks, add stable metric rows to `benchmark_dirichlet.py` and `benchmark_acb_dirichlet.py`, and keep the stdout summary format stable for notebook parsing."
+        ),
+        *_fast_jax_pattern_cells(
+            "The complex Dirichlet helper family already has a compiled point-batch API path. "
+            "Keep `n_terms` static and `pad_to` fixed so repeated compiled calls stay on the same kernel.",
+            "import jax\n"
+            "jit_bound = api.bind_point_batch_jit('acb_dirichlet_zeta', dtype='float64', pad_to=8, n_terms=48)\n"
+            "jit_vals = jit_bound(s_complex)\n"
+            "vmap_vals = jax.vmap(lambda s_i: api.eval_point('acb_dirichlet_zeta', s_i, n_terms=48))(s_complex)\n"
+            "display({'jit_shape': jit_vals.shape, 'jit_matches_vmap': bool(jnp.allclose(jit_vals, vmap_vals, rtol=1e-10, atol=1e-10))})"
+        ),
+        *_ad_pattern_cells(
+            "AD should be shown on the actual Dirichlet public surfaces. "
+            "This section differentiates the real interval midpoint path and the real part of the complex-box zeta path, then plots primal and gradient values.",
+            "import jax\n"
+            "sweep = jnp.linspace(1.3, 2.7, 24, dtype=jnp.float64)\n"
+            "real_primal = jax.vmap(lambda x: jnp.squeeze(di.midpoint(dirichlet.dirichlet_zeta(di.interval(x, x), n_terms=32))))(sweep)\n"
+            "real_grad = jax.vmap(jax.grad(lambda x: jnp.squeeze(di.midpoint(dirichlet.dirichlet_zeta(di.interval(x, x), n_terms=32)))))(sweep)\n"
+            "complex_primal = jax.vmap(lambda x: jnp.real(acb_core.acb_midpoint(acb_dirichlet.acb_dirichlet_zeta(acb_core.acb_box(di.interval(x, x), di.interval(0.2, 0.2)), n_terms=48))))(sweep)\n"
+            "complex_grad = jax.vmap(jax.grad(lambda x: jnp.real(acb_core.acb_midpoint(acb_dirichlet.acb_dirichlet_zeta(acb_core.acb_box(di.interval(x, x), di.interval(0.2, 0.2)), n_terms=48))))))(sweep)\n"
+            "ad_df = pd.DataFrame({'s': [float(v) for v in sweep], 'real_primal': [float(v) for v in real_primal], 'real_grad': [float(v) for v in real_grad], 'complex_primal': [float(v) for v in complex_primal], 'complex_grad': [float(v) for v in complex_grad]})\n"
+            "display(ad_df.head())\n"
+            "ax = ad_df.plot(x='s', y=['real_primal', 'real_grad', 'complex_primal', 'complex_grad'], figsize=(10, 4), title='Dirichlet AD Validation')\n"
+            "ax.set_ylabel('value')\n"
+            "plt.tight_layout()\n"
+            "plt.savefig(EXAMPLE_OUTPUT_ROOT / f'ad_validation_{JAX_MODE}.png', dpi=160, bbox_inches='tight')\n"
+            "plt.show()"
+        ),
+        nbf.v4.new_markdown_cell(
+            "## Validation Summary\n\n"
+            "Run the Dirichlet chassis and engineering tests that back the real and complex helper surfaces."
+        ),
+        nbf.v4.new_code_cell(
+            "tests = run([\n"
+            "    PYTHON, '-m', 'pytest', '-q',\n"
+            "    'tests/test_dirichlet_chassis.py',\n"
+            "    'tests/test_acb_dirichlet_chassis.py',\n"
+            "    'tests/test_dirichlet_engineering.py',\n"
+            "], capture=True)\n"
+            "print(tests.stdout)\n"
+            "if tests.stderr:\n"
+            "    print(tests.stderr)\n"
+            "(EXAMPLE_OUTPUT_ROOT / f'pytest_{JAX_MODE}.txt').write_text(tests.stdout + ('\\n' + tests.stderr if tests.stderr else ''), encoding='utf-8')"
+        ),
+        nbf.v4.new_markdown_cell(
+            "## Benchmark Summary\n\n"
+            "Run the real and complex Dirichlet benchmark entrypoints and summarize their reported warm timings."
+        ),
+        nbf.v4.new_code_cell(
+            "real_report = EXAMPLE_OUTPUT_ROOT / f'dirichlet_real_{JAX_MODE}.json'\n"
+            "complex_report = EXAMPLE_OUTPUT_ROOT / f'dirichlet_complex_{JAX_MODE}.json'\n"
+            "run([PYTHON, 'benchmarks/benchmark_dirichlet.py', '--which', 'zeta', '--samples', '512', '--terms', '32', '--dtype', JAX_DTYPE, '--jax-mode', JAX_MODE, '--output', str(real_report)])\n"
+            "run([PYTHON, 'benchmarks/benchmark_acb_dirichlet.py', '--which', 'zeta', '--samples', '512', '--terms', '48', '--dtype', JAX_DTYPE, '--jax-mode', JAX_MODE, '--output', str(complex_report)])\n"
+            "bench_rows = []\n"
+            "for path in (real_report, complex_report):\n"
+            "    payload = json.loads(path.read_text())\n"
+            "    bench_rows.extend(payload['records'])\n"
+            "bench_df = pd.DataFrame(bench_rows)\n"
+            "bench_df.to_csv(EXAMPLE_OUTPUT_ROOT / f'dirichlet_benchmark_summary_{JAX_MODE}.csv', index=False)\n"
+            "display(bench_df[['implementation', 'operation', 'dtype', 'warm_time_s']])"
+        ),
+        nbf.v4.new_markdown_cell(
+            "## Comparison Summary\n\n"
+            "Run the existing reference compare scripts when the local C reference libraries are available; otherwise record the missing-reference state explicitly."
+        ),
+        nbf.v4.new_code_cell(
+            "compare_cmds = [\n"
+            "    [PYTHON, 'benchmarks/compare_dirichlet.py', '--samples', '256', '--terms', '24', '--which', 'zeta'],\n"
+            "    [PYTHON, 'benchmarks/compare_acb_dirichlet.py', '--samples', '256', '--terms', '24'],\n"
+            "]\n"
+            "comparison_rows = []\n"
+            "for cmd in compare_cmds:\n"
+            "    completed = subprocess.run(cmd, cwd=REPO_ROOT, env=RUN_ENV, text=True, capture_output=True)\n"
+            "    comparison_rows.append({'script': cmd[1], 'returncode': completed.returncode, 'stdout': completed.stdout[-2000:], 'stderr': completed.stderr[-2000:]})\n"
+            "    print(completed.stdout)\n"
+            "    if completed.stderr:\n"
+            "        print(completed.stderr)\n"
+            "(EXAMPLE_OUTPUT_ROOT / f'comparison_status_{JAX_MODE}.json').write_text(json.dumps(comparison_rows, indent=2) + '\\n', encoding='utf-8')\n"
+            "display(pd.DataFrame(comparison_rows)[['script', 'returncode']])"
+        ),
+        nbf.v4.new_markdown_cell(
+            "## Plots\n\n"
+            "Plot the benchmark summary and the real midpoint relation `eta = (1 - 2^(1-s)) zeta` over the representative sweep."
+        ),
+        nbf.v4.new_code_cell(
+            "eta_mid = jax.vmap(lambda x: jnp.squeeze(di.midpoint(dirichlet.dirichlet_eta(di.interval(x, x), n_terms=32))))(sweep)\n"
+            "relation_df = pd.DataFrame({'s': [float(v) for v in sweep], 'zeta_mid': [float(v) for v in real_primal], 'eta_mid': [float(v) for v in eta_mid]})\n"
+            "relation_df['eta_from_zeta'] = (1.0 - 2.0 ** (1.0 - relation_df['s'])) * relation_df['zeta_mid']\n"
+            "ax = bench_df.plot(x='implementation', y='warm_time_s', kind='bar', figsize=(8, 4), title='Dirichlet Warm Time Summary')\n"
+            "ax.set_ylabel('warm_time_s')\n"
+            "plt.tight_layout()\n"
+            "plt.savefig(EXAMPLE_OUTPUT_ROOT / f'dirichlet_benchmark_summary_{JAX_MODE}.png', dpi=160, bbox_inches='tight')\n"
+            "plt.show()\n"
+            "ax = relation_df.plot(x='s', y=['eta_mid', 'eta_from_zeta'], figsize=(8, 4), title='Dirichlet Eta Relation Check')\n"
+            "ax.set_ylabel('value')\n"
+            "plt.tight_layout()\n"
+            "plt.savefig(EXAMPLE_OUTPUT_ROOT / f'dirichlet_eta_relation_{JAX_MODE}.png', dpi=160, bbox_inches='tight')\n"
+            "plt.show()"
+        ),
+    ]
+    return cells
+
+
 def _gamma_family_surface_notebook() -> list:
     cells = [
         nbf.v4.new_markdown_cell(
@@ -1482,6 +1630,7 @@ def main() -> None:
         "example_sparse_matrix_surface.ipynb": _sparse_matrix_surface_notebook(),
         "example_matrix_free_operator_surface.ipynb": _matrix_free_operator_surface_notebook(),
         "example_fft_nufft_surface.ipynb": _fft_nufft_surface_notebook(),
+        "example_dirichlet_surface.ipynb": _dirichlet_surface_notebook(),
         "example_gamma_family_surface.ipynb": _gamma_family_surface_notebook(),
         "example_barnes_double_gamma_surface.ipynb": _barnes_double_gamma_surface_notebook(),
     }
