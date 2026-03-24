@@ -108,9 +108,9 @@ ROWS: tuple[HypgeomRow, ...] = (
         "shared_dispatch_separate_mode_kernels",
         "shared_helper_layer",
         "mostly",
-        "fixed-shape padded batch available for basic/adaptive/rigorous; direct family mode-batch cores",
-        "boundary-audited",
-        "Point/basic/adaptive/rigorous are present; this family now has dedicated fixed-shape batch entry points plus direct family mode-batch dispatch and explicit sample-based tightening, but it remains less specialized than the headline families.",
+        "fixed-shape fixed/padded batch available for basic/adaptive/rigorous; direct family mode-batch cores",
+        "boundary-audited + fixed/padded mode-batch audited",
+        "Point/basic/adaptive/rigorous are present; this family now has dedicated fixed-shape fixed/padded batch entry points, direct family mode-batch dispatch, explicit sample-based tightening, and real/complex fixed-vs-padded mode-batch proof coverage, but it remains less specialized than the headline families.",
     ),
     HypgeomRow(
         "arb_hypgeom_gamma / acb_hypgeom_gamma",
@@ -227,9 +227,9 @@ ROWS: tuple[HypgeomRow, ...] = (
         "shared_dispatch_separate_mode_kernels",
         "shared_helper_layer",
         "mixed",
-        "fixed-shape padded point/basic/adaptive/rigorous batch available on the main families",
-        "mixed",
-        "Four modes exist and the main families now use direct point kernels plus fixed-shape batch fastpaths on the shared substrate, but tightening still delegates more heavily to canonical or wrapper-level behavior than the canonical hypgeom families.",
+        "fixed-shape fixed/padded point/basic/adaptive/rigorous batch available on the main families",
+        "primary-family point AD + pfq fixed/padded mode-batch audited",
+        "Four modes exist and the main families now use direct point kernels plus fixed-shape fixed/padded batch fastpaths on the shared substrate; pfq now has explicit fixed-vs-padded and mode-containment proofs, but tightening still delegates more heavily to canonical or wrapper-level behavior than the canonical hypgeom families.",
     ),
     HypgeomRow(
         "boost_hyp1f1_series / asym / hyp2f1_series / cf / pade / rational / hyp1f2_series",
@@ -262,8 +262,8 @@ ROWS: tuple[HypgeomRow, ...] = (
         "n/a",
         "mixed",
         "no fixed-shape audit",
-        "mixed",
-        "Four modes exist, but this family is still a compatibility layer rather than a deeply tightened canonical path.",
+        "point AD + mode containment audited on hyp1f1/2f1",
+        "Four modes exist with explicit mode-containment and point-AD checks on `hyp1f1`/`hyp2f1`, but this family is still a compatibility layer rather than a deeply tightened canonical path.",
     ),
 )
 

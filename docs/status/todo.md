@@ -530,9 +530,14 @@ Status: `in_progress`
   - reduce runtime cost of rigorous/adaptive `bdg_*` samplers in
     `src/arbplusjax/ball_wrappers.py`
   - continue hypergeometric engineering cleanup:
-    helper consolidation, family-specific adaptive/rigorous kernels, complex AD
-    audits, and compile-noise reduction outside the current representative
-    families
+    helper consolidation, family-specific adaptive/rigorous kernels, and
+    compile-noise reduction outside the current representative families
+  - `pfq` fixed/padded basic and adaptive/rigorous mode-batch proofs are now
+    landed on the canonical real/complex paths
+  - alternative hypergeometric hardening is now stronger:
+    Boost `pfq` fixed/padded mode-batch proofs and helper/`pfq` point-AD smoke
+    are landed, and CuSF `hyp1f1`/`hyp2f1` now have explicit mode containment
+    plus point-AD checks
   - direct owner tests now exist for `bessel_kernels` and `barnesg`
   - extend benchmark and RF77-facing usage/report coverage where diagnostics
     exist but packaging is still incomplete

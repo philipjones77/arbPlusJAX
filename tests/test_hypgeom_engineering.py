@@ -540,6 +540,43 @@ def test_hypgeom_pfq_and_u_boundary_sweeps():
         assert jnp.isfinite(hypu_grad(z))
 
 
+def test_hypgeom_pfq_fixed_and_padded_batches_match_for_basic_rigorous_and_adaptive():
+    z = _iv_batch(0.1, 0.3, 3)
+    pfq_a = _pfq_real_params(3, 2, 0.6)
+    pfq_b = _pfq_real_params(3, 1, 1.4)
+
+    fixed_basic = hypgeom.arb_hypgeom_pfq_batch_fixed_prec(pfq_a, pfq_b, z, prec_bits=53)
+    padded_basic = hypgeom.arb_hypgeom_pfq_batch_padded_prec(pfq_a, pfq_b, z, pad_to=8, prec_bits=53)
+    assert _allclose_or_tuple(fixed_basic, padded_basic[: z.shape[0]])
+
+    for mode in ("rigorous", "adaptive"):
+        fixed_mode = hypgeom_wrappers.arb_hypgeom_pfq_batch_mode_fixed(pfq_a, pfq_b, z, impl=mode, prec_bits=53)
+        padded_mode = hypgeom_wrappers.arb_hypgeom_pfq_batch_mode_padded(pfq_a, pfq_b, z, pad_to=8, impl=mode, prec_bits=53)
+        assert _allclose_or_tuple(fixed_mode, padded_mode[: z.shape[0]])
+        assert bool(jnp.all(di.contains(fixed_mode, fixed_basic)))
+
+    def _box_batch(lo_re, hi_re, n):
+        lo = jnp.linspace(jnp.float32(lo_re), jnp.float32(hi_re), n)
+        hi = lo + jnp.float32(0.05)
+        return jnp.stack((lo, hi, jnp.zeros_like(lo), jnp.zeros_like(lo)), axis=-1)
+
+    zc = _box_batch(0.1, 0.3, 3)
+    pfq_ac = _pfq_box_params(3, 2, 0.6)
+    pfq_bc = _pfq_box_params(3, 1, 1.4)
+    fixed_basic_complex = hypgeom.acb_hypgeom_pfq_batch_fixed_prec(pfq_ac, pfq_bc, zc, prec_bits=53)
+    padded_basic_complex = hypgeom.acb_hypgeom_pfq_batch_padded_prec(pfq_ac, pfq_bc, zc, pad_to=8, prec_bits=53)
+    assert _allclose_or_tuple(fixed_basic_complex, padded_basic_complex[: zc.shape[0]])
+
+    for mode in ("rigorous", "adaptive"):
+        fixed_mode_complex = hypgeom_wrappers.acb_hypgeom_pfq_batch_mode_fixed(
+            pfq_ac, pfq_bc, zc, impl=mode, prec_bits=53
+        )
+        padded_mode_complex = hypgeom_wrappers.acb_hypgeom_pfq_batch_mode_padded(
+            pfq_ac, pfq_bc, zc, pad_to=8, impl=mode, prec_bits=53
+        )
+        assert _allclose_or_tuple(fixed_mode_complex, padded_mode_complex[: zc.shape[0]])
+
+
 def test_hypgeom_1f1_2f1_and_incomplete_gamma_boundary_sweeps():
     hyp1f1_grad = jax.grad(lambda z: hypgeom._real_hyp1f1_regime(jnp.float64(1.25), jnp.float64(2.5), z))
     for z in (jnp.float64(5.9), jnp.float64(6.0), jnp.float64(6.1)):

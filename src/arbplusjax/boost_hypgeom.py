@@ -261,6 +261,10 @@ def _boost_pfq_point_real(a: jax.Array, b: jax.Array, z: jax.Array, *, reciproca
     aa = jnp.asarray(a, dtype=jnp.float64)
     bb = jnp.asarray(b, dtype=jnp.float64)
     zz = jnp.asarray(z, dtype=jnp.float64)
+    if aa.ndim == 1 and bb.ndim == 1:
+        if zz.ndim == 0:
+            return _real_boost_pfq_point_scalar(aa, bb, zz, reciprocal=reciprocal, n_terms=n_terms)
+        return jax.vmap(lambda zi: _real_boost_pfq_point_scalar(aa, bb, zi, reciprocal=reciprocal, n_terms=n_terms))(zz)
     return jax.vmap(
         lambda ai, bi, zi: _real_boost_pfq_point_scalar(ai, bi, zi, reciprocal=reciprocal, n_terms=n_terms)
     )(aa, bb, zz)
@@ -270,6 +274,12 @@ def _boost_pfq_point_complex(a: jax.Array, b: jax.Array, z: jax.Array, *, recipr
     aa = jnp.asarray(a, dtype=jnp.complex128)
     bb = jnp.asarray(b, dtype=jnp.complex128)
     zz = jnp.asarray(z, dtype=jnp.complex128)
+    if aa.ndim == 1 and bb.ndim == 1:
+        if zz.ndim == 0:
+            return _complex_boost_pfq_point_scalar(aa, bb, zz, reciprocal=reciprocal, n_terms=n_terms)
+        return jax.vmap(
+            lambda zi: _complex_boost_pfq_point_scalar(aa, bb, zi, reciprocal=reciprocal, n_terms=n_terms)
+        )(zz)
     return jax.vmap(
         lambda ai, bi, zi: _complex_boost_pfq_point_scalar(ai, bi, zi, reciprocal=reciprocal, n_terms=n_terms)
     )(aa, bb, zz)
@@ -899,9 +909,16 @@ def boost_hyp2f1_rational(a: jax.Array, b: jax.Array, c: jax.Array, z: jax.Array
     return boost_hyp2f1_series(a, b, c, z, mode=mode, prec_bits=prec_bits, dps=dps)
 
 
+def _pfq_param_scalar(x: jax.Array) -> jax.Array:
+    arr = jnp.asarray(x)
+    if arr.ndim >= 1 and arr.shape[-1] == 2:
+        return di.midpoint(di.as_interval(arr))
+    return jnp.asarray(arr, dtype=jnp.float64)
+
+
 def boost_hyp1f2_series(a: jax.Array, b1: jax.Array, b2: jax.Array, z: jax.Array, mode: str = "point", prec_bits: int | None = None, dps: int | None = None):
-    aa = jnp.asarray([a], dtype=jnp.float64)
-    bb = jnp.asarray([b1, b2], dtype=jnp.float64)
+    aa = jnp.reshape(_pfq_param_scalar(a), (1,))
+    bb = jnp.stack((_pfq_param_scalar(b1), _pfq_param_scalar(b2)))
     return boost_hypergeometric_pfq(aa, bb, z, mode=mode, prec_bits=prec_bits, dps=dps)
 
 

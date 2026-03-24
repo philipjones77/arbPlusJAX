@@ -78,3 +78,42 @@ def test_boost_api_registry_and_complex_point():
     zc = jnp.asarray(0.2 + 0.1j, dtype=jnp.complex128)
     cpt = boost_hypgeom.boost_hypergeometric_1f1(1.5 + 0.0j, 2.5 + 0.0j, zc, mode="point")
     _check(bool(jnp.all(jnp.isfinite(jnp.real(cpt)) & jnp.isfinite(jnp.imag(cpt)))))
+
+
+def test_boost_pfq_fixed_and_padded_batches_match_and_modes_contain_basic():
+    pa = jnp.stack(
+        (
+            jnp.linspace(jnp.float64(0.6), jnp.float64(0.8), 3),
+            jnp.linspace(jnp.float64(0.9), jnp.float64(1.1), 3),
+        ),
+        axis=1,
+    )
+    pb = jnp.linspace(jnp.float64(1.4), jnp.float64(1.6), 3)[:, None]
+    zz = jnp.linspace(jnp.float64(0.1), jnp.float64(0.3), 3)
+    z = di.interval(zz, zz + jnp.float64(0.05))
+
+    fixed_point = boost_hypgeom.boost_hypergeometric_pfq_batch_fixed_point(pa, pb, z)
+    padded_point = boost_hypgeom.boost_hypergeometric_pfq_batch_padded_point(pa, pb, z, pad_to=8)
+    _check(bool(jnp.allclose(fixed_point, padded_point[: z.shape[0]], rtol=1e-12, atol=1e-12)))
+
+    fixed_basic = boost_hypgeom.boost_hypergeometric_pfq_batch_fixed_prec(pa, pb, z, prec_bits=53)
+    padded_basic = boost_hypgeom.boost_hypergeometric_pfq_batch_padded_prec(pa, pb, z, pad_to=8, prec_bits=53)
+    _check(bool(jnp.allclose(fixed_basic, padded_basic[: z.shape[0]], rtol=1e-12, atol=1e-12)))
+
+    for mode in ("rigorous", "adaptive"):
+        fixed_mode = boost_hypgeom.boost_hypergeometric_pfq_batch_mode_fixed(pa, pb, z, impl=mode, prec_bits=53)
+        padded_mode = boost_hypgeom.boost_hypergeometric_pfq_batch_mode_padded(pa, pb, z, pad_to=8, impl=mode, prec_bits=53)
+        _check(bool(jnp.allclose(fixed_mode, padded_mode[: z.shape[0]], rtol=1e-12, atol=1e-12)))
+        _check(_contains_all(fixed_mode, fixed_basic))
+
+
+def test_boost_helper_and_pfq_point_ad_smoke():
+    hyp1f1_grad = jax.grad(lambda z: boost_hypgeom.boost_hyp1f1_series(1.25, 2.5, z, mode="point"))
+    hyp2f1_grad = jax.grad(lambda z: boost_hypgeom.boost_hyp2f1_series(0.5, 0.75, 1.5, z, mode="point"))
+    pfq_a = jnp.asarray([0.6, 0.9], dtype=jnp.float64)
+    pfq_b = jnp.asarray([1.4], dtype=jnp.float64)
+    pfq_grad = jax.grad(lambda z: boost_hypgeom.boost_hypergeometric_pfq(pfq_a, pfq_b, z, mode="point"))
+    for z in (jnp.float64(0.1), jnp.float64(0.3), jnp.float64(0.5)):
+        _check(bool(jnp.isfinite(hyp1f1_grad(z))))
+        _check(bool(jnp.isfinite(hyp2f1_grad(z))))
+        _check(bool(jnp.isfinite(pfq_grad(z))))

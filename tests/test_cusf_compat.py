@@ -1,3 +1,4 @@
+import jax
 import jax.numpy as jnp
 
 from arbplusjax import cusf_compat
@@ -47,3 +48,28 @@ def test_cusf_helpers_and_hyp_modes():
     h2 = cusf_compat.cusf_hyp2f1(a, b, b, z, mode="basic", prec_bits=80)
     _check(h1.shape == (2,))
     _check(h2.shape == (2,))
+
+
+def test_cusf_hypgeom_mode_containment_and_point_ad():
+    a = di.interval(jnp.float64(1.0), jnp.float64(1.01))
+    b = di.interval(jnp.float64(2.0), jnp.float64(2.01))
+    c = di.interval(jnp.float64(2.5), jnp.float64(2.51))
+    z = di.interval(jnp.float64(0.2), jnp.float64(0.21))
+
+    h1_basic = cusf_compat.cusf_hyp1f1(a, b, z, mode="basic", prec_bits=80)
+    h1_rig = cusf_compat.cusf_hyp1f1(a, b, z, mode="rigorous", prec_bits=80)
+    h1_adp = cusf_compat.cusf_hyp1f1(a, b, z, mode="adaptive", prec_bits=80)
+    _check(bool(jnp.all(di.contains(h1_rig, h1_basic))))
+    _check(bool(jnp.all(di.contains(h1_adp, h1_basic))))
+
+    h2_basic = cusf_compat.cusf_hyp2f1(a, b, c, z, mode="basic", prec_bits=80)
+    h2_rig = cusf_compat.cusf_hyp2f1(a, b, c, z, mode="rigorous", prec_bits=80)
+    h2_adp = cusf_compat.cusf_hyp2f1(a, b, c, z, mode="adaptive", prec_bits=80)
+    _check(bool(jnp.all(di.contains(h2_rig, h2_basic))))
+    _check(bool(jnp.all(di.contains(h2_adp, h2_basic))))
+
+    hyp1f1_grad = jax.grad(lambda x: cusf_compat.cusf_hyp1f1(jnp.float64(1.25), jnp.float64(2.5), x, mode="point"))
+    hyp2f1_grad = jax.grad(lambda x: cusf_compat.cusf_hyp2f1(jnp.float64(0.5), jnp.float64(0.75), jnp.float64(1.5), x, mode="point"))
+    for x in (jnp.float64(0.1), jnp.float64(0.3), jnp.float64(0.5)):
+        _check(bool(jnp.isfinite(hyp1f1_grad(x))))
+        _check(bool(jnp.isfinite(hyp2f1_grad(x))))
