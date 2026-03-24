@@ -93,3 +93,24 @@ def test_block_sparse_real_diagnostics():
     _check(mv_diag.block_rows == 2)
     _check(cached_diag.cached)
     _check(solve_diag.method == "gmres")
+
+
+def test_block_sparse_real_basic_det_inv_and_square():
+    dense = jnp.array(
+        [
+            [4.0, 1.0, 0.0, 0.0],
+            [1.0, 5.0, 0.5, 0.0],
+            [0.0, 0.5, 3.5, 1.0],
+            [0.0, 0.0, 1.0, 2.5],
+        ],
+        dtype=jnp.float64,
+    )
+    csr = srb_block_mat.srb_block_mat_from_dense_csr(dense, block_shape=(2, 2))
+
+    det_basic = srb_block_mat.srb_block_mat_det_basic(csr)
+    inv_basic = srb_block_mat.srb_block_mat_inv_basic(csr)
+    sqr_basic = srb_block_mat.srb_block_mat_sqr_basic(csr)
+
+    _check(bool(jnp.allclose(det_basic, jnp.linalg.det(dense), rtol=1e-8, atol=1e-8)))
+    _check(bool(jnp.allclose(inv_basic, jnp.linalg.inv(dense), rtol=1e-6, atol=1e-6)))
+    _check(bool(jnp.allclose(srb_block_mat.srb_block_mat_to_dense(sqr_basic), dense @ dense, rtol=1e-8, atol=1e-8)))

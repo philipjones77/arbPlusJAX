@@ -73,3 +73,26 @@ def test_variable_block_real_cached_batch_and_diagnostics():
     _check(solve_diag.method == "lu")
     _check(lu_diag.direct)
     _check(qr_diag.direct)
+
+
+def test_variable_block_real_basic_det_inv_and_square():
+    dense = jnp.array(
+        [
+            [4.0, 1.0, 0.0, 0.0],
+            [1.0, 5.0, 0.5, 0.0],
+            [0.0, 0.5, 3.5, 1.0],
+            [0.0, 0.0, 1.0, 2.5],
+        ],
+        dtype=jnp.float64,
+    )
+    row_sizes = jnp.array([1, 3], dtype=jnp.int32)
+    col_sizes = jnp.array([2, 2], dtype=jnp.int32)
+    csr = srb_vblock_mat.srb_vblock_mat_from_dense_csr(dense, row_block_sizes=row_sizes, col_block_sizes=col_sizes)
+
+    det_basic = srb_vblock_mat.srb_vblock_mat_det_basic(csr)
+    inv_basic = srb_vblock_mat.srb_vblock_mat_inv_basic(csr)
+    sqr_basic = srb_vblock_mat.srb_vblock_mat_sqr_basic(csr)
+
+    _check(bool(jnp.allclose(det_basic, jnp.linalg.det(dense), rtol=1e-8, atol=1e-8)))
+    _check(bool(jnp.allclose(inv_basic, jnp.linalg.inv(dense), rtol=1e-6, atol=1e-6)))
+    _check(bool(jnp.allclose(srb_vblock_mat.srb_vblock_mat_to_dense(sqr_basic), dense @ dense, rtol=1e-8, atol=1e-8)))

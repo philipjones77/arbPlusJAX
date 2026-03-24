@@ -280,8 +280,9 @@ Status: `in_progress`
     direct solve/factorization helpers
   - direct-owner tests now exist for `block_sparse_core` and `sparse_core`
 - `in_progress`
-  - extend sparse interval/box storage and wrappers into fuller four-mode
-    coverage
+  - for the current sparse/block/vblock tranche, keep hardening focused on
+    `point` and `basic` coverage rather than expanding adaptive/rigorous mode
+    surfaces
   - strengthen symbolic and numeric sparse direct-factorization quality beyond
     the current point-mode LU/QR layer
   - remove hidden assumptions in variable-block direct factorizations that
