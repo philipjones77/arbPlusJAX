@@ -281,18 +281,16 @@ Status: `in_progress`
   - variable-block direct factorization/solve helpers now support square dense
     matrices even when row/column partition vectors differ, instead of
     requiring hidden square-partition layouts
+  - for the current sparse/block/vblock tranche, hardening has been completed
+    for `point` and `basic` coverage rather than pretending adaptive/rigorous
+    sparse modes were finished in the same pass
+  - the retained sparse CPU validation profile now runs through
+    [tools/run_test_harness.py](/tools/run_test_harness.py) and is recorded in
+    [cpu_validation_profiles.md](/docs/reports/cpu_validation_profiles.md)
+  - the sparse, block-sparse, and variable-block benchmark/report layer now
+    follows the shared schema with pytest-owned runtime-report checks
   - direct-owner tests now exist for `block_sparse_core` and `sparse_core`
 - `in_progress`
-  - for the current sparse/block/vblock tranche, keep hardening focused on
-    `point` and `basic` coverage rather than expanding adaptive/rigorous mode
-    surfaces
-  - strengthen symbolic and numeric sparse direct-factorization quality beyond
-    the current point-mode LU/QR layer
-  - remove hidden assumptions in variable-block direct factorizations that
-    require square row/column partitions
-  - continue normalizing the block-sparse and variable-block benchmark/report
-    layer so every retained matrix sparse surface follows the shared schema
-    and pytest-owned runtime-report contract
   - direct owner tests now exist for `sparse_common`
 - `planned`
   - add interval/box block-sparse and variable-block sparse modes

@@ -1,4 +1,4 @@
-Last updated: 2026-03-23T00:00:00Z
+Last updated: 2026-03-24T00:00:00Z
 
 # CPU Validation Profiles
 
@@ -16,6 +16,7 @@ Policy lives in:
 Run date:
 
 - 2026-03-23
+- 2026-03-24
 
 Interpreter and runtime:
 
@@ -31,12 +32,14 @@ Interpreter and runtime:
 - `python tools/run_test_harness.py --profile matrix --jax-mode cpu --outdir tests/_runs/matrix_cpu_2026-03-23`
 - `python tools/run_test_harness.py --profile special --jax-mode cpu --outdir tests/_runs/special_cpu_2026-03-23`
 - `python tools/run_test_harness.py --profile bench-smoke --jax-mode cpu --outdir tests/_runs/bench_smoke_cpu_2026-03-23`
+- `python tools/run_test_harness.py --profile sparse --jax-mode cpu --outdir tests/_runs/sparse_cpu_2026-03-24`
 
 ## Results
 
 - `matrix`: `114 passed`, `48 warnings`, `289.72s`
 - `special`: `64 passed`, `39.43s`
 - `bench-smoke`: `7 passed`, `15 deselected`, `16.08s`
+- `sparse`: `48 passed`, `196.60s`
 
 ## What This Confirms
 
@@ -44,6 +47,8 @@ Interpreter and runtime:
   chassis slice
 - the current incomplete-tail and special-function tranche remains green under
   the dedicated `special` profile
+- the sparse/block/vblock point/basic slice now has a retained CPU harness run
+  instead of only a manifest stub
 - benchmark smoke remains separated from correctness ownership while still
   exercising the normalized benchmark CLI surface on CPU
 - the runtime-manifest path works consistently across these test profiles
