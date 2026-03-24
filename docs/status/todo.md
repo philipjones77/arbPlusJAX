@@ -62,6 +62,12 @@ Status: `in_progress`
     now emits the shared benchmark-report JSON schema instead of only printing
     timings
   - Windows, Linux, and Colab run instructions are documented
+  - a CPU-safe Colab bootstrap surface now exists in
+    [requirements-colab.txt](/requirements-colab.txt)
+    and
+    [colab_bootstrap.sh](/tools/colab_bootstrap.sh),
+    with checked-in platform profile metadata in
+    [platform_bootstrap_profiles.json](/configs/platform_bootstrap_profiles.json)
   - bounded CPU validation profiles were re-run through
     [run_test_harness.py](/tools/run_test_harness.py) for `matrix`,
     `special`, and `bench-smoke`; see

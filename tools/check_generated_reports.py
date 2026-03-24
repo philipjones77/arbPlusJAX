@@ -41,6 +41,7 @@ def main() -> None:
             "tests/test_example_notebook_content_contracts.py",
             "tests/test_matrix_surface_workbook_contracts.py",
             "tests/test_repo_link_policy.py",
+            "tests/test_platform_bootstrap_contracts.py",
         ]
     )
 

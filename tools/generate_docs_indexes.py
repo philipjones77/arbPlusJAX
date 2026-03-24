@@ -82,6 +82,12 @@ def render_root_readme() -> str:
         "python -m pip install -e .",
         "```",
         "",
+        "Colab bootstrap:",
+        "",
+        "```bash",
+        "python -m pip install -r requirements-colab.txt",
+        "```",
+        "",
         "Direct source-tree test run:",
         "",
         "```bash",
@@ -93,6 +99,7 @@ def render_root_readme() -> str:
         "- JAX is the primary implementation surface.",
         "- The package root uses lazy public-module loading to keep import-time cost low.",
         "- Reference software and external engines are validation/comparison layers, not the default runtime path.",
+        "- Linux, Windows, and Colab all use the same source tree; Colab has a CPU-safe bootstrap surface in [requirements-colab.txt](/requirements-colab.txt) and [tools/colab_bootstrap.sh](/tools/colab_bootstrap.sh).",
         "- See [NOTICE](/NOTICE) for acknowledgments and reference links.",
     ]
     return "\n".join(lines) + "\n"

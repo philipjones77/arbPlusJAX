@@ -65,7 +65,7 @@ The benchmark harness already supports batched JAX mode by default.
 
 In Colab:
 
-1. Runtime -> Change runtime type -> `T4/L4/A100 GPU`.
+1. Runtime -> choose CPU or `T4/L4/A100 GPU`.
 2. In a notebook cell:
 
 ```bash
@@ -74,14 +74,22 @@ cd /content
 # Replace REPO_URL with your real GitHub repo URL.
 REPO_URL="https://github.com/<YOUR_ORG_OR_USER>/arbplusJAX.git" \
 BRANCH="main" \
-INSTALL_GPU_JAX=1 \
+INSTALL_GPU_JAX=0 \
 bash /content/arbplusJAX/tools/colab_bootstrap.sh /content/arbplusJAX
 ```
 
-3. Validate GPU:
+3. Validate runtime:
 
 ```bash
 !python /content/arbplusJAX/tools/check_jax_runtime.py --quick-bench
+```
+
+Optional GPU upgrade:
+
+```bash
+%%bash
+cd /content/arbplusJAX
+INSTALL_GPU_JAX=1 bash tools/colab_bootstrap.sh /content/arbplusJAX
 ```
 
 4. Run larger sweeps and persist output to Drive:
@@ -107,8 +115,8 @@ for p in run_dir.glob('run_*'):
 5. Run correctness checks in Colab when needed:
 
 ```bash
-!python /content/arbplusJAX/tools/run_test_harness.py --profile chassis --jax-mode gpu
-!python /content/arbplusJAX/tools/run_test_harness.py --profile bench-smoke --jax-mode gpu
+!python /content/arbplusJAX/tools/run_test_harness.py --profile chassis --jax-mode cpu
+!python /content/arbplusJAX/tools/run_test_harness.py --profile bench-smoke --jax-mode cpu
 ```
 
 ## 5) Windows compatibility note

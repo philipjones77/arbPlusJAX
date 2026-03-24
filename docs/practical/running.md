@@ -10,6 +10,7 @@ This page is for the practical question: how should someone actually run arbPlus
 - use `tools/run_test_harness.py` for correctness-oriented validation
 - use `benchmarks/run_benchmarks.py` for benchmark sweeps and backend comparison
 - use [linux_gpu_colab_implementation.md](/docs/implementation/linux_gpu_colab_implementation.md) for Colab and Linux GPU runs
+- use [requirements-colab.txt](/requirements-colab.txt) and [colab_bootstrap.sh](/tools/colab_bootstrap.sh) for a CPU-safe Colab bootstrap that matches the local source-tree install
 
 ## Day-to-day workflow
 
@@ -17,6 +18,7 @@ This page is for the practical question: how should someone actually run arbPlus
 - parity only when Arb C references are available
 - benchmark smoke checks separately from correctness
 - long benchmark sweeps outside the normal test loop
+- keep Linux, Windows, and Colab on the same source tree and the same repo entrypoints; switch backend mode with environment/harness flags rather than editing notebooks or scripts
 
 ## Supporting references
 

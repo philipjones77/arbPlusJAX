@@ -1,0 +1,26 @@
+{
+  "linux": {
+    "purpose": "Native Linux source-tree bootstrap and CPU-first validation.",
+    "owner": "tools/setup_linux_gpu.sh + pyproject.toml",
+    "execution_surface": "local Linux shell",
+    "backend_scope": "CPU/GPU portable",
+    "bootstrap_command": "python -m pip install -e .",
+    "validation_command": "python tools/run_test_harness.py --profile chassis --jax-mode cpu"
+  },
+  "windows": {
+    "purpose": "Native Windows source-tree bootstrap and CPU-first validation.",
+    "owner": "pyproject.toml + tools/run_test_harness.py",
+    "execution_surface": "PowerShell / cmd.exe",
+    "backend_scope": "CPU/GPU portable",
+    "bootstrap_command": "python -m pip install -e .",
+    "validation_command": "python .\\tools\\run_test_harness.py --profile chassis --jax-mode cpu"
+  },
+  "colab": {
+    "purpose": "Google Colab source-tree bootstrap using a CPU-safe default and optional GPU upgrade.",
+    "owner": "tools/colab_bootstrap.sh + requirements-colab.txt",
+    "execution_surface": "Google Colab notebook shell cell",
+    "backend_scope": "CPU/GPU portable",
+    "bootstrap_command": "bash tools/colab_bootstrap.sh /content/arbplusJAX",
+    "validation_command": "python tools/check_jax_runtime.py --quick-bench"
+  }
+}

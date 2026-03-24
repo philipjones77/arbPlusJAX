@@ -6,12 +6,12 @@ set -euo pipefail
 #   !bash tools/colab_bootstrap.sh
 
 REPO_DIR="${1:-$(pwd)}"
-INSTALL_GPU_JAX="${INSTALL_GPU_JAX:-1}"
+INSTALL_GPU_JAX="${INSTALL_GPU_JAX:-0}"
 JAX_GPU_EXTRAS="${JAX_GPU_EXTRAS:-jax[cuda12]}"
-INSTALL_BENCHMARK_BASE="${INSTALL_BENCHMARK_BASE:-1}"
 INSTALL_NUFFTAX="${INSTALL_NUFFTAX:-0}"
 INSTALL_JAX_FINUFFT_CPU="${INSTALL_JAX_FINUFFT_CPU:-0}"
 INSTALL_PETSC_SLEPC="${INSTALL_PETSC_SLEPC:-0}"
+REQUIREMENTS_FILE="${REQUIREMENTS_FILE:-requirements-colab.txt}"
 
 install_pkg() {
   python -m pip install -U "$@"
@@ -33,17 +33,10 @@ fi
 
 cd "$REPO_DIR"
 install_pkg pip setuptools wheel
+install_pkg -r "$REQUIREMENTS_FILE"
 
 if [[ "$INSTALL_GPU_JAX" == "1" ]]; then
   install_pkg "$JAX_GPU_EXTRAS"
-else
-  install_pkg jax jaxlib
-fi
-
-python -m pip install -e .
-
-if [[ "$INSTALL_BENCHMARK_BASE" == "1" ]]; then
-  install_pkg pytest scipy mpmath
 fi
 
 if [[ "$INSTALL_NUFFTAX" == "1" ]]; then
@@ -64,7 +57,8 @@ fi
 export XLA_PYTHON_CLIENT_PREALLOCATE=false
 
 echo "Colab bootstrap complete at $REPO_DIR"
-echo "INSTALL_BENCHMARK_BASE=$INSTALL_BENCHMARK_BASE"
+echo "REQUIREMENTS_FILE=$REQUIREMENTS_FILE"
+echo "INSTALL_GPU_JAX=$INSTALL_GPU_JAX"
 echo "INSTALL_NUFFTAX=$INSTALL_NUFFTAX"
 echo "INSTALL_JAX_FINUFFT_CPU=$INSTALL_JAX_FINUFFT_CPU"
 echo "INSTALL_PETSC_SLEPC=$INSTALL_PETSC_SLEPC"

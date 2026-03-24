@@ -44,6 +44,7 @@ Recommendation:
 Windows PowerShell:
 
 ```powershell
+python -m pip install -e .
 python .\tools\run_test_harness.py --profile chassis --jax-mode cpu
 python .\tools\run_benchmarks.py --profile quick
 ```
@@ -51,6 +52,7 @@ python .\tools\run_benchmarks.py --profile quick
 Linux:
 
 ```bash
+python -m pip install -e .
 python tools/run_test_harness.py --profile chassis --jax-mode cpu
 python benchmarks/run_benchmarks.py --profile quick
 ```
@@ -58,8 +60,10 @@ python benchmarks/run_benchmarks.py --profile quick
 Google Colab:
 
 ```bash
+!python -m pip install -r /content/arbplusJAX/requirements-colab.txt
+!bash /content/arbplusJAX/tools/colab_bootstrap.sh /content/arbplusJAX
 !python /content/arbplusJAX/tools/check_jax_runtime.py --quick-bench
-!python /content/arbplusJAX/tools/run_test_harness.py --profile chassis --jax-mode gpu
+!python /content/arbplusJAX/tools/run_test_harness.py --profile chassis --jax-mode cpu
 !python /content/arbplusJAX/benchmarks/run_benchmarks.py --profile quick
 ```
 

@@ -12,6 +12,7 @@ Policy lives in:
 Checked-in configuration now also lives in:
 
 - [cpu_validation_profiles.json](/configs/cpu_validation_profiles.json)
+- [platform_bootstrap_profiles.json](/configs/platform_bootstrap_profiles.json)
 
 ## Current Portable Entry Points
 
@@ -45,11 +46,14 @@ Current portability-relevant behavior:
 
 ### Colab bootstrap
 
+- [requirements-colab.txt](/requirements-colab.txt)
 - [colab_bootstrap.sh](/tools/colab_bootstrap.sh)
 
 Status:
 
 - present
+- CPU-safe default bootstrap present
+- optional GPU upgrade path present
 
 ### Example notebooks
 
@@ -78,15 +82,16 @@ Status:
 
 ## Current Strengths
 
+- native Windows, Linux/WSL, and Colab now share the same source-tree install model
 - WSL is already used in practice for local JAX runs
 - Google Colab is already mentioned in test/example run docs
 - runtime manifests already capture environment details
 - examples/tests/benchmarks already have explicit environment-aware harness entrypoints
 - the bounded CPU validation slice is now expressed as checked-in config under `configs/`
+- a checked-in platform bootstrap profile now records the intended install/validation entrypoints
 
 ## Current Gaps
 
-- portability guidance is spread across multiple docs
 - not every notebook or experiment currently summarizes portability assumptions explicitly
 - the third-party comparison software install matrix is still documented in prose rather than a single machine-readable inventory
 

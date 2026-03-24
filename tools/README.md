@@ -97,7 +97,7 @@ scripts. Those belong under `benchmarks/`.
   - Use from repo utilities that need source-tree execution.
 
 - `colab_bootstrap.sh`
-  - Bootstraps a Colab environment for this repo, with optional benchmark software toggles.
+  - Bootstraps a Colab environment for this repo from [requirements-colab.txt](/requirements-colab.txt), with optional GPU and comparison-software toggles.
   - Intended to be run inside Colab after cloning the repo.
 
 - `setup_linux_gpu.sh`

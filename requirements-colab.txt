@@ -1,0 +1,15 @@
+# arbPlusJAX Colab bootstrap surface
+#
+# Purpose:
+# - provide a stable, CPU-safe default install path for Google Colab
+# - keep the runtime source tree identical to local Linux/Windows use
+# - layer notebook/runtime helpers on top of the package metadata in pyproject.toml
+#
+# Notes:
+# - `-e .` remains the authoritative runtime dependency entrypoint
+# - GPU JAX stays optional through tools/colab_bootstrap.sh
+
+-e .
+matplotlib>=3.8
+mpmath>=1.3
+ipykernel>=6.29

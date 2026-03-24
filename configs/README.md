@@ -24,3 +24,8 @@ Policy lives in:
 
 - [configuration_standard.md](/docs/standards/configuration_standard.md)
 - [repo_standards.md](/docs/standards/repo_standards.md)
+
+Current examples:
+
+- [cpu_validation_profiles.json](/configs/cpu_validation_profiles.json)
+- [platform_bootstrap_profiles.json](/configs/platform_bootstrap_profiles.json)

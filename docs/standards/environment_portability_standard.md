@@ -34,6 +34,7 @@ Those belong to:
 
 Primary portability targets:
 
+- native Windows
 - WSL
 - Google Colab
 
@@ -96,7 +97,12 @@ available.
 
 For this repo, Colab support should prefer:
 
+- [requirements-colab.txt](/requirements-colab.txt)
 - [colab_bootstrap.sh](/tools/colab_bootstrap.sh)
+
+The default Colab bootstrap should be CPU-safe and source-tree compatible.
+GPU enablement may be layered on top as an explicit optional step rather than
+being the only supported default.
 
 ### 6. WSL must be treated as a first-class local platform
 
@@ -105,7 +111,21 @@ WSL is not a special exception path. It is a normal supported run target.
 Runbooks, examples, and harness flows should work from WSL without requiring a
 separate code layout.
 
-### 7. Benchmark and test harnesses must remain portable
+### 7. Native Windows must remain a first-class local platform
+
+Windows should not require a different repo structure, a different package
+layout, or notebook-specific source edits.
+
+Portable docs should provide Windows launch examples for:
+
+- editable install
+- test harness
+- benchmark harness
+
+Use platform-appropriate command syntax in the runbooks, but keep the runtime
+entrypoints identical.
+
+### 8. Benchmark and test harnesses must remain portable
 
 Portability-critical entrypoints should remain:
 
@@ -144,13 +164,15 @@ Examples:
 
 ## Required Portable Surfaces
 
-The following repo surfaces should remain portable across WSL and Colab:
+The following repo surfaces should remain portable across native Windows, WSL,
+Linux, and Colab:
 
 - example notebooks
 - test harness
 - benchmark harness
 - runtime manifest collection
 - experiment layout
+- a CPU-safe bootstrap/install surface
 
 ## Reports Rule
 
