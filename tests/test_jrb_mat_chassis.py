@@ -660,6 +660,32 @@ def test_named_matrix_free_real_function_actions_match_diagonal_case():
     pow_action = jrb_mat.jrb_mat_pow_action_lanczos_point(op, x, exponent=2, steps=2)
     _check(bool(jnp.allclose(di.midpoint(pow_action), jnp.asarray([16.0, 81.0]) * x_mid, rtol=1e-6, atol=1e-6)))
 
+    rational_action = jrb_mat.jrb_mat_rational_action_point(
+        op,
+        x,
+        shifts=jnp.asarray([1.0, 2.0], dtype=jnp.float64),
+        weights=jnp.asarray([0.5, -1.0], dtype=jnp.float64),
+        polynomial_coefficients=jnp.asarray([1.0], dtype=jnp.float64),
+        symmetric=True,
+    )
+    rational_basic = jrb_mat.jrb_mat_rational_action_basic(
+        op,
+        x,
+        shifts=jnp.asarray([1.0, 2.0], dtype=jnp.float64),
+        weights=jnp.asarray([0.5, -1.0], dtype=jnp.float64),
+        polynomial_coefficients=jnp.asarray([1.0], dtype=jnp.float64),
+        symmetric=True,
+    )
+    rational_diag = jnp.asarray(
+        [
+            1.0 + 0.5 / (4.0 - 1.0) - 1.0 / (4.0 - 2.0),
+            1.0 + 0.5 / (9.0 - 1.0) - 1.0 / (9.0 - 2.0),
+        ],
+        dtype=jnp.float64,
+    )
+    _check(bool(jnp.allclose(di.midpoint(rational_action), rational_diag * x_mid, rtol=1e-6, atol=1e-6)))
+    _check(bool(jnp.all(di.contains(rational_basic, rational_action))))
+
 
 def test_real_solve_inverse_and_det_matrix_free_apis_match_diagonal_case():
     a = _mat2(2.0, 0.0, 0.0, 4.0)

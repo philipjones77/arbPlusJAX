@@ -613,6 +613,34 @@ def test_complex_solve_inverse_det_and_leja_matrix_free_apis_match_diagonal_case
     _check(bool(jnp.allclose(leja_logdet, jnp.log(6.0 + 0.0j), rtol=1e-5, atol=1e-5)))
     _check(bool(jnp.allclose(leja_det, 6.0 + 0.0j, rtol=1e-5, atol=1e-5)))
 
+    rational_action = jcb_mat.jcb_mat_rational_action_point(
+        op,
+        x,
+        shifts=jnp.asarray([1.0 + 0.0j, -1.0 + 0.5j], dtype=jnp.complex128),
+        weights=jnp.asarray([0.5 + 0.0j, -0.25 + 0.5j], dtype=jnp.complex128),
+        polynomial_coefficients=jnp.asarray([1.0 + 0.0j], dtype=jnp.complex128),
+        hermitian=False,
+    )
+    rational_basic = jcb_mat.jcb_mat_rational_action_basic(
+        op,
+        x,
+        shifts=jnp.asarray([1.0 + 0.0j, -1.0 + 0.5j], dtype=jnp.complex128),
+        weights=jnp.asarray([0.5 + 0.0j, -0.25 + 0.5j], dtype=jnp.complex128),
+        polynomial_coefficients=jnp.asarray([1.0 + 0.0j], dtype=jnp.complex128),
+        hermitian=False,
+    )
+    x_mid_complex = acb_core.acb_midpoint(x)
+    rational_diag = jnp.asarray(
+        [
+            1.0 + 0.5 / ((2.0 + 0.0j) - (1.0 + 0.0j)) + (-0.25 + 0.5j) / ((2.0 + 0.0j) - (-1.0 + 0.5j)),
+            1.0 + 0.5 / ((3.0 + 0.0j) - (1.0 + 0.0j)) + (-0.25 + 0.5j) / ((3.0 + 0.0j) - (-1.0 + 0.5j)),
+        ],
+        dtype=jnp.complex128,
+    )
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(rational_action), rational_diag * x_mid_complex, rtol=1e-5, atol=1e-5)))
+    _check(bool(jnp.all(di.contains(acb_core.acb_real(rational_basic), acb_core.acb_real(rational_action)))))
+    _check(bool(jnp.all(di.contains(acb_core.acb_imag(rational_basic), acb_core.acb_imag(rational_action)))))
+
 
 def test_complex_minres_matrix_free_apis_match_hermitian_indefinite_diagonal_case():
     a = _mat2(2.0 + 0.0j, 0.0 + 0.0j, 0.0 + 0.0j, -3.0 + 0.0j)

@@ -2177,6 +2177,92 @@ def jrb_mat_poly_action_basic(matvec, x: jax.Array, coefficients: jax.Array) -> 
     )
 
 
+def jrb_mat_rational_action_point(
+    matvec,
+    x: jax.Array,
+    *,
+    shifts: jax.Array,
+    weights: jax.Array,
+    polynomial_coefficients: jax.Array | None = None,
+    x0: jax.Array | None = None,
+    tol: float = 1e-8,
+    atol: float = 0.0,
+    maxiter: int | None = None,
+    symmetric: bool = True,
+    preconditioner=None,
+) -> jax.Array:
+    x_checked = jrb_mat_as_interval_vector(x)
+    x_mid = _jrb_mid_vector(x_checked)
+
+    def apply_operator(v_mid: jax.Array) -> jax.Array:
+        return di.midpoint(jrb_mat_operator_apply_point(matvec, _jrb_point_interval(v_mid)))
+
+    def solve_shifted(shift, v_mid: jax.Array) -> jax.Array:
+        shift_arr = jnp.asarray(shift, dtype=jnp.float64)
+        shifted = matrix_free_core.shell_operator_plan(
+            lambda y, context: di.midpoint(jrb_mat_operator_apply_point(context["operator"], _jrb_point_interval(y)))
+            - context["shift"] * jnp.asarray(y, dtype=jnp.float64),
+            context={"operator": matvec, "shift": shift_arr},
+            orientation="forward",
+            algebra="jrb",
+        )
+        solved = jrb_mat_solve_action_point(
+            shifted,
+            _jrb_point_interval(v_mid),
+            x0=x0,
+            tol=tol,
+            atol=atol,
+            maxiter=maxiter,
+            symmetric=symmetric,
+            preconditioner=preconditioner,
+        )
+        return di.midpoint(solved)
+
+    out_mid = matrix_free_core.rational_spectral_action_midpoint(
+        apply_operator,
+        solve_shifted,
+        x_mid,
+        shifts=shifts,
+        weights=weights,
+        polynomial_coefficients=polynomial_coefficients,
+        coeff_dtype=jnp.float64,
+    )
+    return _jrb_point_interval(out_mid)
+
+
+def jrb_mat_rational_action_basic(
+    matvec,
+    x: jax.Array,
+    *,
+    shifts: jax.Array,
+    weights: jax.Array,
+    polynomial_coefficients: jax.Array | None = None,
+    x0: jax.Array | None = None,
+    tol: float = 1e-8,
+    atol: float = 0.0,
+    maxiter: int | None = None,
+    symmetric: bool = True,
+    preconditioner=None,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return matrix_free_basic.action_basic(
+        jrb_mat_rational_action_point,
+        matvec,
+        x,
+        shifts=shifts,
+        weights=weights,
+        polynomial_coefficients=polynomial_coefficients,
+        x0=x0,
+        tol=tol,
+        atol=atol,
+        maxiter=maxiter,
+        symmetric=symmetric,
+        preconditioner=preconditioner,
+        round_output=_jrb_round_basic,
+        prec_bits=prec_bits,
+    )
+
+
 def jrb_mat_expm_action_point(matvec, x: jax.Array, terms: int = 16) -> jax.Array:
     return matrix_free_core.expm_action_point(
         matvec,
@@ -5006,6 +5092,8 @@ __all__ = [
     "jrb_mat_operator_apply_basic",
     "jrb_mat_poly_action_point",
     "jrb_mat_poly_action_basic",
+    "jrb_mat_rational_action_point",
+    "jrb_mat_rational_action_basic",
     "jrb_mat_expm_action_point",
     "jrb_mat_expm_action_basic",
     "jrb_mat_lanczos_tridiag_point",

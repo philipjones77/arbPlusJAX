@@ -324,6 +324,9 @@ Status: `in_progress`
   - `matrix_free_core` now includes reusable contour-integral action helpers,
     rational/polynomial spectral-action helpers, and a shared operator-first
     `logdet_solve` combiner used by the real/complex Jones wrappers
+  - public matrix-free rational spectral-action surfaces now exist on
+    `jrb_mat` / `jcb_mat`, backed by the shared core helper substrate and
+    diagonal-case chassis proofs
 
 ### Core Operator Infrastructure
 
