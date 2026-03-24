@@ -652,6 +652,10 @@ Next priority:
   [test_krylov_solvers_contracts.py](/tests/test_krylov_solvers_contracts.py)
 - landed
   [test_transform_common_contracts.py](/tests/test_transform_common_contracts.py)
+- landed
+  [test_dft_engineering.py](/tests/test_dft_engineering.py)
+  for cached DFT plan reuse, padded-batch stability, wrapper-mode containment,
+  and point/basic AD smoke
 
 Execution order:
 1. Re-run the CPU chassis and profile suite after the newly landed direct-owner
