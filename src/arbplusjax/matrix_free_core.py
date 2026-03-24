@@ -774,6 +774,31 @@ def make_logdet_solve_result(
     )
 
 
+def combine_logdet_solve_point(
+    *,
+    operator,
+    rhs,
+    probes,
+    solve_with_diagnostics,
+    logdet_with_diagnostics,
+    preconditioner=None,
+    structured: str = "general",
+    algebra: str,
+) -> LogdetSolveResult:
+    solve_value, solve_diag = solve_with_diagnostics(operator, rhs)
+    logdet_value, logdet_diag = logdet_with_diagnostics(operator, probes)
+    return make_logdet_solve_result(
+        logdet=logdet_value,
+        solve=solve_value,
+        operator=operator,
+        logdet_diagnostics=logdet_diag,
+        solve_diagnostics=solve_diag,
+        preconditioner=preconditioner,
+        structured=structured,
+        algebra=algebra,
+    )
+
+
 def _operator_apply_linear_midpoint(operator, v_mid: jax.Array, *, midpoint_vector, sparse_bcoo_matvec, dtype):
     if isinstance(operator, ScaledOperator):
         applied = _operator_apply_linear_midpoint(
@@ -1218,6 +1243,91 @@ def contour_filter_subspace_point(
     return orthonormalize_columns(filtered)
 
 
+def contour_integral_action_point(
+    solve_shifted,
+    x: jax.Array,
+    *,
+    center,
+    radius,
+    quadrature_order: int,
+    node_weight_fn=None,
+) -> jax.Array:
+    nodes, weights = contour_quadrature_nodes(center, radius, quadrature_order=quadrature_order)
+    vector = jnp.asarray(x)
+    out_dtype = jnp.result_type(vector.dtype, jnp.complex128)
+    init = jnp.zeros_like(vector, dtype=out_dtype)
+
+    def body(acc, nw):
+        node, weight = nw
+        kernel = jnp.asarray(1.0 if node_weight_fn is None else node_weight_fn(node), dtype=out_dtype)
+        value = jnp.asarray(solve_shifted(node, vector), dtype=out_dtype)
+        return acc + jnp.asarray(weight, dtype=out_dtype) * kernel * value, None
+
+    value, _ = lax.scan(body, init, (nodes, weights))
+    return value
+
+
+def polynomial_spectral_action_midpoint(
+    apply_operator,
+    x_mid: jax.Array,
+    coefficients: jax.Array,
+    *,
+    coeff_dtype,
+) -> jax.Array:
+    coeffs = jnp.asarray(coefficients, dtype=coeff_dtype)
+    if coeffs.ndim != 1:
+        raise ValueError("coefficients must be rank-1")
+    x_arr = jnp.asarray(x_mid)
+    out_dtype = jnp.result_type(x_arr.dtype, coeffs.dtype)
+    init = (jnp.asarray(x_arr, dtype=out_dtype), jnp.zeros_like(x_arr, dtype=out_dtype))
+
+    def step(carry, coeff):
+        term, acc = carry
+        next_acc = acc + coeff * term
+        next_term = jnp.asarray(apply_operator(term), dtype=out_dtype)
+        return (next_term, next_acc), None
+
+    (_, acc), _ = lax.scan(step, init, coeffs)
+    return acc
+
+
+def rational_spectral_action_midpoint(
+    apply_operator,
+    solve_shifted,
+    x_mid: jax.Array,
+    *,
+    shifts: jax.Array,
+    weights: jax.Array,
+    polynomial_coefficients: jax.Array | None = None,
+    coeff_dtype,
+) -> jax.Array:
+    x_arr = jnp.asarray(x_mid)
+    shifts_arr = jnp.asarray(shifts)
+    weights_arr = jnp.asarray(weights, dtype=coeff_dtype)
+    if shifts_arr.ndim != 1 or weights_arr.ndim != 1 or shifts_arr.shape[0] != weights_arr.shape[0]:
+        raise ValueError("shifts and weights must be rank-1 with matching length")
+    out_dtype = jnp.result_type(x_arr.dtype, weights_arr.dtype, shifts_arr.dtype)
+    acc = jnp.zeros_like(x_arr, dtype=out_dtype)
+    if polynomial_coefficients is not None:
+        acc = acc + jnp.asarray(
+            polynomial_spectral_action_midpoint(
+                apply_operator,
+                x_arr,
+                polynomial_coefficients,
+                coeff_dtype=coeff_dtype,
+            ),
+            dtype=out_dtype,
+        )
+
+    def body(carry, sw):
+        shift, weight = sw
+        resolved = jnp.asarray(solve_shifted(shift, x_arr), dtype=out_dtype)
+        return carry + jnp.asarray(weight, dtype=out_dtype) * resolved, None
+
+    value, _ = lax.scan(body, acc, (shifts_arr, weights_arr))
+    return value
+
+
 def complexify_real_linear_operator(real_apply, v: jax.Array) -> jax.Array:
     vv = jnp.asarray(v, dtype=jnp.complex128)
     re = jnp.asarray(real_apply(jnp.real(vv)), dtype=jnp.float64)
@@ -1482,6 +1592,7 @@ __all__ = [
     "make_shifted_solve_plan",
     "make_recycled_krylov_state",
     "make_logdet_solve_result",
+    "combine_logdet_solve_point",
     "finite_difference_jacobi_preconditioner_plan",
     "multi_shift_solve_point",
     "krylov_diagnostics",
@@ -1501,6 +1612,9 @@ __all__ = [
     "restarted_subspace_iteration_point",
     "contour_quadrature_nodes",
     "contour_filter_subspace_point",
+    "contour_integral_action_point",
+    "polynomial_spectral_action_midpoint",
+    "rational_spectral_action_midpoint",
     "complexify_real_linear_operator",
     "operator_apply_point",
     "poly_action_point",

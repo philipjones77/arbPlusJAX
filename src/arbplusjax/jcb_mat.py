@@ -4455,23 +4455,26 @@ def jcb_mat_logdet_solve_point(
     hermitian: bool = False,
     preconditioner=None,
 ) -> matrix_free_core.LogdetSolveResult:
-    solve_value, solve_diag = jcb_mat_solve_action_with_diagnostics_point(
-        matvec,
-        rhs,
-        x0=x0,
-        tol=tol,
-        atol=atol,
-        maxiter=maxiter,
-        hermitian=hermitian,
-        preconditioner=preconditioner,
-    )
-    logdet_value, logdet_diag = jcb_mat_logdet_slq_with_diagnostics_point(matvec, probes, steps, adjoint_matvec)
-    return matrix_free_core.make_logdet_solve_result(
-        logdet=logdet_value,
-        solve=solve_value,
+    return matrix_free_core.combine_logdet_solve_point(
         operator=matvec,
-        logdet_diagnostics=logdet_diag,
-        solve_diagnostics=solve_diag,
+        rhs=rhs,
+        probes=probes,
+        solve_with_diagnostics=lambda operator, rhs_value: jcb_mat_solve_action_with_diagnostics_point(
+            operator,
+            rhs_value,
+            x0=x0,
+            tol=tol,
+            atol=atol,
+            maxiter=maxiter,
+            hermitian=hermitian,
+            preconditioner=preconditioner,
+        ),
+        logdet_with_diagnostics=lambda operator, probe_value: jcb_mat_logdet_slq_with_diagnostics_point(
+            operator,
+            probe_value,
+            steps,
+            adjoint_matvec,
+        ),
         preconditioner=preconditioner,
         structured=_jcb_structure_tag(hermitian=hermitian, hpd=hermitian),
         algebra="jcb",

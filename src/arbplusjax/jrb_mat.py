@@ -4536,23 +4536,21 @@ def jrb_mat_logdet_solve_point(
     symmetric: bool = True,
     preconditioner=None,
 ) -> matrix_free_core.LogdetSolveResult:
-    solve_value, solve_diag = jrb_mat_solve_action_with_diagnostics_point(
-        matvec,
-        rhs,
-        x0=x0,
-        tol=tol,
-        atol=atol,
-        maxiter=maxiter,
-        symmetric=symmetric,
-        preconditioner=preconditioner,
-    )
-    logdet_value, logdet_diag = jrb_mat_logdet_slq_with_diagnostics_point(matvec, probes, steps)
-    return matrix_free_core.make_logdet_solve_result(
-        logdet=logdet_value,
-        solve=solve_value,
+    return matrix_free_core.combine_logdet_solve_point(
         operator=matvec,
-        logdet_diagnostics=logdet_diag,
-        solve_diagnostics=solve_diag,
+        rhs=rhs,
+        probes=probes,
+        solve_with_diagnostics=lambda operator, rhs_value: jrb_mat_solve_action_with_diagnostics_point(
+            operator,
+            rhs_value,
+            x0=x0,
+            tol=tol,
+            atol=atol,
+            maxiter=maxiter,
+            symmetric=symmetric,
+            preconditioner=preconditioner,
+        ),
+        logdet_with_diagnostics=lambda operator, probe_value: jrb_mat_logdet_slq_with_diagnostics_point(operator, probe_value, steps),
         preconditioner=preconditioner,
         structured=_jrb_structure_tag(symmetric=symmetric, spd=symmetric),
         algebra="jrb",

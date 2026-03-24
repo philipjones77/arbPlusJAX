@@ -154,3 +154,53 @@ def test_contour_probe_and_point_helpers_preserve_shape_contracts():
     probes_complex = mfc.normal_probes_complex(_identity_point_from_midpoint, 4, key=key, num=2)
     assert probes_real.shape == (3, 4)
     assert probes_complex.shape == (2, 4)
+
+
+def test_contour_rational_and_logdet_solve_helpers_have_stable_contracts():
+    x = jnp.asarray([1.0, -2.0], dtype=jnp.float64)
+
+    contour = mfc.contour_integral_action_point(
+        lambda shift, v: v / (shift + 1.0),
+        x,
+        center=1.0 + 0.0j,
+        radius=0.5,
+        quadrature_order=6,
+        node_weight_fn=lambda node: node,
+    )
+    assert contour.shape == x.shape
+    assert jnp.all(jnp.isfinite(jnp.real(contour)))
+
+    poly = mfc.polynomial_spectral_action_midpoint(
+        lambda v: 2.0 * v,
+        x,
+        jnp.asarray([1.0, 0.5], dtype=jnp.float64),
+        coeff_dtype=jnp.float64,
+    )
+    assert jnp.allclose(poly, x + 0.5 * (2.0 * x))
+
+    rational = mfc.rational_spectral_action_midpoint(
+        lambda v: 2.0 * v,
+        lambda shift, v: v / (shift + 2.0),
+        x,
+        shifts=jnp.asarray([0.0, 1.0], dtype=jnp.float64),
+        weights=jnp.asarray([1.0, -0.5], dtype=jnp.float64),
+        polynomial_coefficients=jnp.asarray([1.0], dtype=jnp.float64),
+        coeff_dtype=jnp.float64,
+    )
+    expected = x + (1.0 / 2.0) * x - 0.5 * ((1.0 / 3.0) * x)
+    assert jnp.allclose(rational, expected)
+
+    result = mfc.combine_logdet_solve_point(
+        operator="op",
+        rhs=x,
+        probes=jnp.stack([x, -x], axis=0),
+        solve_with_diagnostics=lambda operator, rhs_value: (rhs_value / 2.0, {"operator": operator, "kind": "solve"}),
+        logdet_with_diagnostics=lambda operator, probe_value: (jnp.asarray(3.0), {"operator": operator, "kind": "logdet", "count": probe_value.shape[0]}),
+        structured="symmetric",
+        algebra="jrb",
+    )
+    assert jnp.allclose(result.solve, x / 2.0)
+    assert jnp.allclose(result.logdet, jnp.asarray(3.0))
+    assert result.aux.operator == "op"
+    assert result.aux.solve_diagnostics["kind"] == "solve"
+    assert result.aux.logdet_diagnostics["count"] == 2

@@ -321,6 +321,9 @@ Status: `in_progress`
   - eigensolver diagnostics surfaces exist across Lanczos, Arnoldi, restarted,
     block, Krylov-Schur, Davidson, Jacobi-Davidson, shift-invert, and contour
     entry points
+  - `matrix_free_core` now includes reusable contour-integral action helpers,
+    rational/polynomial spectral-action helpers, and a shared operator-first
+    `logdet_solve` combiner used by the real/complex Jones wrappers
 
 ### Core Operator Infrastructure
 
@@ -331,12 +334,9 @@ Status: `in_progress`
     preconditioned `minres` path
   - harden locking, restart, and correction-equation policy for the landed
     Davidson/Jacobi-Davidson/shift-invert/contour eigensolver tranche
-  - add contour-integral matrix-function infrastructure in `matrix_free_core`
-    with reusable quadrature and spectral-transform substrate
-  - add broader rational and polynomial spectral-transform infrastructure in
-    `matrix_free_core`, with public exposure through `jrb_mat` / `jcb_mat`
-  - add a unified operator-first `logdet_solve` abstraction for dense, sparse,
-    and matrix-free SPD workflows
+  - keep extending the new contour-integral/spectral-transform/operator-first
+    helper substrate from the current core action/combiner layer into more
+    public `jrb_mat` / `jcb_mat` matrix-function surfaces
 
 ### Estimators And Approximation Paths
 
