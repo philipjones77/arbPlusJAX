@@ -368,6 +368,8 @@ Status: `in_progress`
     helper substrate
   - public contour-integral `sin` / `cos` action wrappers now also exist on
     `jrb_mat` / `jcb_mat`
+  - public contour-integral `sinh` / `cosh` / `tanh` action wrappers now also
+    exist on `jrb_mat` / `jcb_mat`
   - shared eigensolver convergence accounting now lives in
     `matrix_free_core.eig_convergence_summary` instead of duplicated
     real/complex residual-threshold bookkeeping
@@ -508,6 +510,9 @@ Status: `in_progress`
     - Hutch++ variance scans across probe counts and seeds
     - orthogonal-probe variance scans versus i.i.d. Rademacher probes at fixed
       compute budgets
+  - a dedicated lightweight matrix-free tranche test file now exists so the
+    newer shared-core contracts can be exercised without routing every change
+    through the heaviest chassis modules
 
 ## Curvature Layer
 

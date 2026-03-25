@@ -213,6 +213,8 @@ The landed surface is broader than the original matrix-free tranche:
   on the real and complex Jones matrix-free surfaces
 - contour-integral `sin` and `cos` action wrappers now also exist on the real
   and complex Jones matrix-free surfaces
+- contour-integral `sinh`, `cosh`, and `tanh` action wrappers now also exist
+  on the real and complex Jones matrix-free surfaces
 - shell preconditioners can now carry explicit transpose/adjoint callbacks
   through the shared implicit-solve path instead of silently falling back to
   the forward callback

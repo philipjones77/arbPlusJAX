@@ -4402,6 +4402,78 @@ def jcb_mat_cos_action_contour_point(
     )
 
 
+def jcb_mat_sinh_action_contour_point(
+    matvec,
+    x: jax.Array,
+    *,
+    center,
+    radius,
+    quadrature_order: int = 16,
+    preconditioner=None,
+    tol: float = 1e-8,
+    atol: float = 0.0,
+    maxiter: int | None = None,
+) -> jax.Array:
+    return _jcb_point_box(
+        matrix_free_core.contour_integral_action_point(
+            lambda shift, v: _jcb_shifted_solve_mid(matvec, v, shift=shift, preconditioner=preconditioner, tol=tol, atol=atol, maxiter=maxiter),
+            acb_core.acb_midpoint(jcb_mat_as_box_vector(x)),
+            center=center,
+            radius=radius,
+            quadrature_order=quadrature_order,
+            node_weight_fn=lambda node: jnp.sinh(node) / (2.0j * jnp.pi),
+        )
+    )
+
+
+def jcb_mat_cosh_action_contour_point(
+    matvec,
+    x: jax.Array,
+    *,
+    center,
+    radius,
+    quadrature_order: int = 16,
+    preconditioner=None,
+    tol: float = 1e-8,
+    atol: float = 0.0,
+    maxiter: int | None = None,
+) -> jax.Array:
+    return _jcb_point_box(
+        matrix_free_core.contour_integral_action_point(
+            lambda shift, v: _jcb_shifted_solve_mid(matvec, v, shift=shift, preconditioner=preconditioner, tol=tol, atol=atol, maxiter=maxiter),
+            acb_core.acb_midpoint(jcb_mat_as_box_vector(x)),
+            center=center,
+            radius=radius,
+            quadrature_order=quadrature_order,
+            node_weight_fn=lambda node: jnp.cosh(node) / (2.0j * jnp.pi),
+        )
+    )
+
+
+def jcb_mat_tanh_action_contour_point(
+    matvec,
+    x: jax.Array,
+    *,
+    center,
+    radius,
+    quadrature_order: int = 16,
+    preconditioner=None,
+    tol: float = 1e-8,
+    atol: float = 0.0,
+    maxiter: int | None = None,
+) -> jax.Array:
+    return _jcb_point_box(
+        matrix_free_core.contour_integral_action_point(
+            lambda shift, v: _jcb_shifted_solve_mid(matvec, v, shift=shift, preconditioner=preconditioner, tol=tol, atol=atol, maxiter=maxiter),
+            acb_core.acb_midpoint(jcb_mat_as_box_vector(x)),
+            center=center,
+            radius=radius,
+            quadrature_order=quadrature_order,
+            node_weight_fn=lambda node: jnp.tanh(node) / (2.0j * jnp.pi),
+        )
+    )
+
+
 def jcb_mat_logdet_estimate_point(matvec, probes: jax.Array, steps: int, adjoint_matvec=None) -> jax.Array:
     return jcb_mat_logdet_slq_point(matvec, probes, steps, adjoint_matvec)
 
@@ -5848,6 +5920,9 @@ __all__ = [
     "jcb_mat_sign_action_contour_point",
     "jcb_mat_sin_action_contour_point",
     "jcb_mat_cos_action_contour_point",
+    "jcb_mat_sinh_action_contour_point",
+    "jcb_mat_cosh_action_contour_point",
+    "jcb_mat_tanh_action_contour_point",
     "jcb_mat_expm_action_point",
     "jcb_mat_expm_action_basic",
     "jcb_mat_arnoldi_hessenberg_point",

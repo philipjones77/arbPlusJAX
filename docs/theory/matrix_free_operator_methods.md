@@ -151,6 +151,9 @@ The current shared postprocessing layer also exposes:
   probe-statistics summaries
 - reusable low-rank deflation metadata carrying a compact basis, its operator
   image, and the exact low-rank trace contribution for residual estimators
+- contour-integral action evaluation for `log`, `sqrt`, `root`, `sign`,
+  `sin`, `cos`, `sinh`, `cosh`, and `tanh` on the current operator-first Jones
+  surfaces
 - cached rational-Hutch++ metadata carrying compact deflation state together
   with the rational approximation parameters needed to reuse the same residual
   estimator across repeated trace or logdet evaluations

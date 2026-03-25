@@ -1585,9 +1585,9 @@ def eig_restart_column_order(evals: jax.Array, residuals: jax.Array, *, which: s
         spectral_key = -spectral_key
     elif code not in {"smallest", "sa", "sm"}:
         raise ValueError("which must be one of {'largest', 'smallest', 'la', 'sa', 'lm', 'sm'}")
-    primary = jnp.where(locked_mask, 0.0, 1.0)
+    primary = jnp.where(locked_mask, jnp.zeros_like(residual_norms), jnp.ones_like(residual_norms))
     secondary = jnp.where(locked_mask, residual_norms, spectral_key)
-    tertiary = jnp.where(locked_mask, 0.0, residual_norms)
+    tertiary = jnp.where(locked_mask, jnp.zeros_like(residual_norms), residual_norms)
     return jnp.lexsort((tertiary, secondary, primary))
 
 
