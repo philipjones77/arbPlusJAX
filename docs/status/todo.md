@@ -1,4 +1,4 @@
-Last updated: 2026-03-23T00:00:00Z
+Last updated: 2026-03-25T00:00:00Z
 
 # TODO
 
@@ -83,8 +83,6 @@ Status: `in_progress`
   - keep docs landing pages, report indexes, status indexes, and current repo
     mapping generated automatically so push/commit does not rely on hand-edited
     tree summaries
-  - re-run and retain a bounded sparse CPU validation slice in
-    [cpu_validation_profiles.md](/docs/reports/cpu_validation_profiles.md)
   - normalize more legacy benchmark scripts onto the shared benchmark-report
     schema instead of stdout-only summaries; direct normalized coverage now
     includes `benchmark_arb_poly.py`, `benchmark_acb_poly.py`,
@@ -98,6 +96,9 @@ Status: `in_progress`
 - `planned`
   - add a single repo-facing execution checklist that names the minimum CPU,
     parity, GPU, and benchmark slices required for a release-quality change
+  - retain a broader periodic CPU validation slice for the newest matrix-free
+    estimator and contour-action tranches once the heavier test/runtime slices
+    settle
 
 ## Cross-cutting point-fast JAX conversion
 

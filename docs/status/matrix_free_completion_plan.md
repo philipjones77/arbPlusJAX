@@ -1,4 +1,4 @@
-Last updated: 2026-03-22T00:00:00Z
+Last updated: 2026-03-25T00:00:00Z
 
 # Matrix-Free Completion Plan
 
@@ -34,7 +34,11 @@ The goal is dense-style functional parity where matrix-free semantics make sense
   - `sqrt`
   - `root`
   - `sign`
-  - selected trigonometric / hyperbolic wrappers
+  - `sin`
+  - `cos`
+  - `sinh`
+  - `cosh`
+  - `tanh`
   - integer powers
 - solve-action and inverse-action APIs
 - operator-owned symmetric / Hermitian indefinite solve surface via `minres`
@@ -66,6 +70,25 @@ The goal is dense-style functional parity where matrix-free semantics make sense
 - parameter-differentiable sparse `BCOO` and dense operator-plan constructors now exist in `jrb_mat` / `jcb_mat`
 - diagnostics-aware `basic` wrappers now exist for the main matrix-free solve/inverse/logdet families and the public log-action Krylov wrappers
 - sparse interval/box storage wrappers now exist in `srb_mat` / `scb_mat`
+- shared Hutch++ and SLQ metadata-preparation, probe-statistics stopping, and
+  postprocessing helpers now live in
+  [matrix_free_core.py](/src/arbplusjax/matrix_free_core.py) instead of
+  duplicated real/complex Jones wrapper logic
+- low-rank deflation and cached rational Hutch++ metadata now exist as compact
+  reusable operator-state payloads on the real and complex Jones surfaces
+- operator-first solve surfaces now route through
+  `matrix_free_core.implicit_krylov_solve_midpoint` using
+  `jax.lax.custom_linear_solve` where the current transpose/adjoint policy
+  supports implicit solves
+- shell preconditioners can now carry explicit transpose/adjoint callbacks
+  through the shared preconditioner policy instead of degrading to forward
+  reuse in transpose solves
+- a latent-Gaussian Laplace worked example now exists in
+  [example_latent_gaussian_laplace.py](/examples/example_latent_gaussian_laplace.py)
+- a lightweight dedicated regression slice now exists in
+  [test_matrix_free_recent_tranches.py](/tests/test_matrix_free_recent_tranches.py)
+  so the newest shared-core matrix-free work can be validated without always
+  routing through the heaviest chassis modules
 - dedicated `basic` matrix-free tests in [test_matrix_free_basic.py](/tests/test_matrix_free_basic.py)
 - point chassis coverage in:
   - [test_jrb_mat_chassis.py](/tests/test_jrb_mat_chassis.py)
@@ -86,9 +109,15 @@ The goal is dense-style functional parity where matrix-free semantics make sense
 - matrix-free eigensolvers now exist for partial spectra, including restarted and block variants, and diagnostics/report surfaces now exist across the family, but they are still early operator-subspace implementations:
   - residual-history and deflation-count metadata now exist across the main diagnostics surface
   - restarted, Davidson, and Jacobi-Davidson paths now preserve locked Ritz vectors more consistently across iterations
-  - richer locking / restart / correction-equation policy still needs hardening
+  - shared convergence accounting and restart-column prioritization are now centralized, but richer restart-window truncation and wanted/unwanted partition policy still need hardening
   - correction-equation quality and preconditioned outer-loop policy still need hardening
   - the newer Davidson, Jacobi-Davidson, shift-invert, and contour paths now pass the dedicated chassis suite but are not yet mature solver products
+- cached rational Hutch++ metadata, shared deflation state, and shared
+  probe-budget stopping helpers are landed, but the fuller cached-adjoint
+  rational-Krylov projected-state VJP path is still open
+- the newest contour-action tranche now has a clean dedicated pytest slice,
+  but broader heavy-chassis pytest completion is still slower than the newer
+  lightweight regression path
 
 ### Remaining
 
@@ -125,7 +154,9 @@ Required matrix-free policy categories:
 - route every eligible complex Hermitian / HPD function through the structured path explicitly
 - tighten complex Hermitian/HPD kernels so they prefer Hermitian projected solvers instead of generic Arnoldi where possible
 - make structured aliases visible as first-class entrypoints rather than relying on user convention
-- refine the current preconditioned `minres` policy into an explicitly documented structure/preconditioner contract rather than a single shared midpoint path
+- refine the current preconditioned `minres` policy and the newer
+  transpose-aware shell-preconditioner contract into an explicitly documented
+  structure/preconditioner contract rather than a single shared midpoint path
 - keep `eigsh` in the structured matrix-free layer:
   - symmetric real should use the Lanczos family
   - Hermitian complex should use Hermitian Lanczos rather than generic Arnoldi for partial spectra
@@ -179,7 +210,8 @@ Required matrix-free policy categories:
 
 ## 8. Preconditioners, Multi-Shift, And Recycling
 
-- harden and broaden the current reusable preconditioner-plan abstraction in [matrix_free_core.py](/src/arbplusjax/matrix_free_core.py)
+- harden and broaden the current reusable preconditioner-plan abstraction in
+  [matrix_free_core.py](/src/arbplusjax/matrix_free_core.py)
 - extend the current shared multi-shift solve substrate toward rational matrix functions and shifted trace/logdet estimators
 - add recycled Krylov basis support for closely related solves and hypergradient-style repeated adjoints
 - add block multi-RHS Krylov support as a standard path, not only as a special-case wrapper
@@ -191,6 +223,18 @@ Required matrix-free policy categories:
   - complex Hermitian / HPD should prefer Hermitian-specialized block/multi-shift solvers where possible
   - general nonsymmetric paths should use shared-basis GMRES / Arnoldi-style recycling
 - design AD around plan objects and implicit adjoint solves, not one-off callable closures
+
+## 9. Estimator And Contour Extensions
+
+- extend the contour-integral public surface beyond the now-landed
+  `log` / `sqrt` / `root` / `sign` / `sin` / `cos` / `sinh` / `cosh` /
+  `tanh` wrappers into more public matrix-function actions only where the
+  contour policy remains numerically coherent
+- keep the cached rational Hutch++ layer compact and pytree-safe while
+  extending it toward fuller rational-Krylov trace/logdet projected-state VJP
+  behavior
+- broaden probe-budget and stopping contracts from the newer lightweight slice
+  into the heavier chassis and benchmark-owned estimator paths
 
 ## PETSc Reference Points
 
@@ -258,7 +302,7 @@ Still to deepen:
   - owner: [jrb_mat.py](/src/arbplusjax/jrb_mat.py), [jcb_mat.py](/src/arbplusjax/jcb_mat.py)
   - status: still open for more sophisticated restart selection, convergence safeguards, and stronger preconditioned correction solves
 
-## 9. Documentation
+## 10. Documentation
 
 - add a practical `basic` matrix-free guide once the semantic layer is fully specified
 - add a matrix-free capability/status table covering:
@@ -278,10 +322,12 @@ Still to deepen:
 ## Recommended Execution Order
 
 1. Finish `basic` semantics for existing point families.
-2. Complete plan-native JIT coverage for the current public matrix-free surface.
+2. Keep extending the structured/public contour and estimator surfaces on top of
+   the landed shared core.
 3. Tighten structured Hermitian/HPD specialization.
-4. Add reusable preconditioner, multi-shift, and recycled-Krylov infrastructure.
+4. Harden reusable preconditioner, multi-shift, and recycled-Krylov
+   infrastructure.
 5. Expand sparse plan coverage at the plan layer.
-6. Add AD tests for plan-based and structured paths.
-7. Expand benchmarks with compile/recompile and gradient slices.
+6. Add more AD tests for plan-based, cached-adjoint, and structured paths.
+7. Expand benchmarks with compile/recompile, probe-budget, and gradient slices.
 8. Finish the capability matrix and non-goal documentation.

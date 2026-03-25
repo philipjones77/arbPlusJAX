@@ -1,4 +1,4 @@
-Last updated: 2026-03-23T00:00:00Z
+Last updated: 2026-03-25T00:00:00Z
 
 # Report And Status Refresh Inventory
 
@@ -20,6 +20,8 @@ Policy:
 | [docs/reports/core_numeric_scalars_status.md](/docs/reports/core_numeric_scalars_status.md) | `manual-authoritative` | `update when scalar hardening or scalar status rollup changes` |
 | [docs/reports/cpu_validation_profiles.md](/docs/reports/cpu_validation_profiles.md) | `manual-authoritative` | `rerun CPU validation profiles and update from retained run manifests/results` |
 | [docs/reports/current_repo_mapping.md](/docs/reports/current_repo_mapping.md) | `generated` | `python tools/generate_docs_indexes.py` |
+| [docs/reports/dense_matrix_engineering_status.md](/docs/reports/dense_matrix_engineering_status.md) | `manual-authoritative` | `update the owning source document directly` |
+| [docs/reports/dense_matrix_surface_benchmark.md](/docs/reports/dense_matrix_surface_benchmark.md) | `manual-authoritative` | `update the owning source document directly` |
 | [docs/reports/environment_portability_inventory.md](/docs/reports/environment_portability_inventory.md) | `manual-authoritative` | `update when environment targets, bootstrap scripts, or portability support changes` |
 | [docs/reports/example_notebook_inventory.md](/docs/reports/example_notebook_inventory.md) | `manual-authoritative` | `regenerate notebooks and refresh inventory when canonical notebook set changes` |
 | [docs/reports/function_engineering_status.md](/docs/reports/function_engineering_status.md) | `generated` | `python tools/function_provenance_report.py` |

@@ -57,7 +57,7 @@ def _status_rows() -> list[tuple[str, str, str]]:
 
 def render() -> str:
     lines = [
-        "Last updated: 2026-03-23T00:00:00Z",
+        "Last updated: 2026-03-25T00:00:00Z",
         "",
         "# Report And Status Refresh Inventory",
         "",
