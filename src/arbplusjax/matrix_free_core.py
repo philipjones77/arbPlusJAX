@@ -407,6 +407,55 @@ class DeflatedOperatorMetadata:
         )
 
 
+@jax.tree_util.register_pytree_node_class
+@dataclass(frozen=True)
+class RationalHutchppMetadata:
+    operator: object
+    deflation: DeflatedOperatorMetadata
+    shifts: object
+    weights: object
+    polynomial_coefficients: object | None
+    preconditioner: object | None
+    tol: object
+    atol: object
+    structured: str
+    algebra: str
+    maxiter: int | None
+
+    def tree_flatten(self):
+        return (
+            self.operator,
+            self.deflation,
+            self.shifts,
+            self.weights,
+            self.polynomial_coefficients,
+            self.preconditioner,
+            self.tol,
+            self.atol,
+        ), {
+            "structured": self.structured,
+            "algebra": self.algebra,
+            "maxiter": self.maxiter,
+        }
+
+    @classmethod
+    def tree_unflatten(cls, aux_data, children):
+        operator, deflation, shifts, weights, polynomial_coefficients, preconditioner, tol, atol = children
+        return cls(
+            operator=operator,
+            deflation=deflation,
+            shifts=shifts,
+            weights=weights,
+            polynomial_coefficients=polynomial_coefficients,
+            preconditioner=preconditioner,
+            tol=tol,
+            atol=atol,
+            structured=aux_data["structured"],
+            algebra=aux_data["algebra"],
+            maxiter=aux_data["maxiter"],
+        )
+
+
 _STRUCTURE_CODE = {
     "general": 0,
     "symmetric": 1,
@@ -2287,6 +2336,35 @@ def make_deflated_operator_metadata(
     )
 
 
+def make_rational_hutchpp_metadata(
+    *,
+    operator,
+    deflation: DeflatedOperatorMetadata,
+    shifts: jax.Array,
+    weights: jax.Array,
+    polynomial_coefficients: jax.Array | None = None,
+    preconditioner=None,
+    tol: float = 1e-8,
+    atol: float = 0.0,
+    structured: str,
+    algebra: str,
+    maxiter: int | None = None,
+) -> RationalHutchppMetadata:
+    return RationalHutchppMetadata(
+        operator=operator,
+        deflation=deflation,
+        shifts=jnp.asarray(shifts),
+        weights=jnp.asarray(weights),
+        polynomial_coefficients=None if polynomial_coefficients is None else jnp.asarray(polynomial_coefficients),
+        preconditioner=preconditioner,
+        tol=jnp.asarray(tol),
+        atol=jnp.asarray(atol),
+        structured=structured,
+        algebra=algebra,
+        maxiter=maxiter,
+    )
+
+
 def prepare_deflated_operator_metadata_point(
     action_fn,
     sketch_probes: jax.Array,
@@ -2669,6 +2747,7 @@ __all__ = [
     "probe_statistics_should_stop",
     "expand_subspace_with_corrections",
     "make_deflated_operator_metadata",
+    "make_rational_hutchpp_metadata",
     "prepare_deflated_operator_metadata_point",
     "deflated_operator_apply_midpoint",
     "deflated_trace_estimate_from_metadata_point",

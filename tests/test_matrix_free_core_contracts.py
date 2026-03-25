@@ -344,6 +344,35 @@ def test_deflated_operator_metadata_and_trace_helpers_have_stable_contracts():
     assert bool(jnp.allclose(mfc.hutchpp_trace_from_metadata(metadata), 13.0, atol=1e-6))
 
 
+def test_rational_hutchpp_metadata_has_stable_contracts():
+    deflation = mfc.make_deflated_operator_metadata(
+        basis=jnp.eye(2, dtype=jnp.float64),
+        image=jnp.diag(jnp.asarray([2.0, 3.0], dtype=jnp.float64)),
+        low_rank_trace=jnp.asarray(5.0, dtype=jnp.float64),
+    )
+    metadata = mfc.make_rational_hutchpp_metadata(
+        operator="sentinel",
+        deflation=deflation,
+        shifts=jnp.asarray([1.0], dtype=jnp.float64),
+        weights=jnp.asarray([0.5], dtype=jnp.float64),
+        polynomial_coefficients=jnp.asarray([1.0, 2.0], dtype=jnp.float64),
+        preconditioner=None,
+        tol=1e-7,
+        atol=1e-9,
+        structured="symmetric",
+        algebra="jrb",
+        maxiter=12,
+    )
+    leaves, treedef = jax.tree_util.tree_flatten(metadata)
+    rebuilt = jax.tree_util.tree_unflatten(treedef, leaves)
+    assert rebuilt.structured == "symmetric"
+    assert rebuilt.algebra == "jrb"
+    assert rebuilt.maxiter == 12
+    assert bool(jnp.allclose(jnp.asarray(rebuilt.shifts), jnp.asarray([1.0], dtype=jnp.float64)))
+    assert bool(jnp.allclose(jnp.asarray(rebuilt.weights), jnp.asarray([0.5], dtype=jnp.float64)))
+    assert bool(jnp.allclose(jnp.asarray(rebuilt.polynomial_coefficients), jnp.asarray([1.0, 2.0], dtype=jnp.float64)))
+
+
 def test_generic_slq_and_hutchpp_consolidation_helpers_have_stable_contracts():
     def action_fn(v):
         return di.interval(di.midpoint(v), di.midpoint(v))

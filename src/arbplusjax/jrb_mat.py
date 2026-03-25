@@ -1979,6 +1979,155 @@ def jrb_mat_trace_estimate_deflated_point(
     )
 
 
+def jrb_mat_rational_trace_hutchpp_prepare_point(
+    matvec,
+    sketch_probes: jax.Array,
+    *,
+    shifts: jax.Array,
+    weights: jax.Array,
+    polynomial_coefficients: jax.Array | None = None,
+    x0: jax.Array | None = None,
+    tol: float = 1e-8,
+    atol: float = 0.0,
+    maxiter: int | None = None,
+    symmetric: bool = True,
+    preconditioner=None,
+) -> matrix_free_core.RationalHutchppMetadata:
+    def action_fn(probe):
+        return jrb_mat_rational_action_point(
+            matvec,
+            probe,
+            shifts=shifts,
+            weights=weights,
+            polynomial_coefficients=polynomial_coefficients,
+            x0=x0,
+            tol=tol,
+            atol=atol,
+            maxiter=maxiter,
+            symmetric=symmetric,
+            preconditioner=preconditioner,
+        )
+
+    deflation = jrb_mat_deflated_operator_prepare_point(action_fn, sketch_probes)
+    return matrix_free_core.make_rational_hutchpp_metadata(
+        operator=matvec,
+        deflation=deflation,
+        shifts=shifts,
+        weights=weights,
+        polynomial_coefficients=polynomial_coefficients,
+        preconditioner=preconditioner,
+        tol=tol,
+        atol=atol,
+        structured="symmetric" if symmetric else "general",
+        algebra="jrb",
+        maxiter=maxiter,
+    )
+
+
+def jrb_mat_rational_trace_hutchpp_from_metadata_point(
+    metadata: matrix_free_core.RationalHutchppMetadata,
+    residual_probes: jax.Array,
+) -> matrix_free_core.HutchppTraceMetadata:
+    def action_fn(probe):
+        return jrb_mat_rational_action_point(
+            metadata.operator,
+            probe,
+            shifts=jnp.asarray(metadata.shifts),
+            weights=jnp.asarray(metadata.weights),
+            polynomial_coefficients=metadata.polynomial_coefficients,
+            tol=float(jnp.asarray(metadata.tol)),
+            atol=float(jnp.asarray(metadata.atol)),
+            maxiter=metadata.maxiter,
+            symmetric=(metadata.structured != "general"),
+            preconditioner=metadata.preconditioner,
+        )
+
+    return jrb_mat_trace_estimate_deflated_point(action_fn, metadata.deflation, residual_probes)
+
+
+def jrb_mat_rational_trace_hutchpp_point(
+    matvec,
+    sketch_probes: jax.Array,
+    residual_probes: jax.Array,
+    *,
+    shifts: jax.Array,
+    weights: jax.Array,
+    polynomial_coefficients: jax.Array | None = None,
+    x0: jax.Array | None = None,
+    tol: float = 1e-8,
+    atol: float = 0.0,
+    maxiter: int | None = None,
+    symmetric: bool = True,
+    preconditioner=None,
+) -> jax.Array:
+    metadata = jrb_mat_rational_trace_hutchpp_prepare_point(
+        matvec,
+        sketch_probes,
+        shifts=shifts,
+        weights=weights,
+        polynomial_coefficients=polynomial_coefficients,
+        x0=x0,
+        tol=tol,
+        atol=atol,
+        maxiter=maxiter,
+        symmetric=symmetric,
+        preconditioner=preconditioner,
+    )
+    estimate = jrb_mat_rational_trace_hutchpp_from_metadata_point(metadata, residual_probes)
+    return jnp.asarray(matrix_free_core.hutchpp_trace_from_metadata(estimate), dtype=jnp.float64)
+
+
+def jrb_mat_rational_trace_hutchpp_basic(
+    matvec,
+    sketch_probes: jax.Array,
+    residual_probes: jax.Array,
+    *,
+    shifts: jax.Array,
+    weights: jax.Array,
+    polynomial_coefficients: jax.Array | None = None,
+    x0: jax.Array | None = None,
+    tol: float = 1e-8,
+    atol: float = 0.0,
+    maxiter: int | None = None,
+    symmetric: bool = True,
+    preconditioner=None,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return matrix_free_basic.scalar_functional_basic(
+        jrb_mat_rational_trace_hutchpp_point,
+        matvec,
+        sketch_probes,
+        residual_probes,
+        shifts=shifts,
+        weights=weights,
+        polynomial_coefficients=polynomial_coefficients,
+        x0=x0,
+        tol=tol,
+        atol=atol,
+        maxiter=maxiter,
+        symmetric=symmetric,
+        preconditioner=preconditioner,
+        lift_scalar=_jrb_point_interval,
+        round_output=_jrb_round_basic,
+        prec_bits=prec_bits,
+    )
+
+
+def jrb_mat_logdet_rational_hutchpp_prepare_point(*args, **kwargs) -> matrix_free_core.RationalHutchppMetadata:
+    return jrb_mat_rational_trace_hutchpp_prepare_point(*args, **kwargs)
+
+
+def jrb_mat_logdet_rational_hutchpp_from_metadata_point(
+    metadata: matrix_free_core.RationalHutchppMetadata,
+    residual_probes: jax.Array,
+) -> matrix_free_core.HutchppTraceMetadata:
+    return jrb_mat_rational_trace_hutchpp_from_metadata_point(metadata, residual_probes)
+
+
+def jrb_mat_logdet_rational_hutchpp_point(*args, **kwargs) -> jax.Array:
+    return jrb_mat_rational_trace_hutchpp_point(*args, **kwargs)
+
+
 def jrb_mat_hutchpp_trace_point(action_fn, sketch_probes: jax.Array, residual_probes: jax.Array) -> jax.Array:
     """Estimate tr(F) from an action oracle using Hutch++ probe partitions."""
     metadata = jrb_mat_hutchpp_trace_with_metadata_point(action_fn, sketch_probes, residual_probes)
@@ -5636,6 +5785,13 @@ __all__ = [
     "jrb_mat_hutchpp_trace_estimate_basic",
     "jrb_mat_deflated_operator_prepare_point",
     "jrb_mat_trace_estimate_deflated_point",
+    "jrb_mat_rational_trace_hutchpp_prepare_point",
+    "jrb_mat_rational_trace_hutchpp_from_metadata_point",
+    "jrb_mat_rational_trace_hutchpp_point",
+    "jrb_mat_rational_trace_hutchpp_basic",
+    "jrb_mat_logdet_rational_hutchpp_prepare_point",
+    "jrb_mat_logdet_rational_hutchpp_from_metadata_point",
+    "jrb_mat_logdet_rational_hutchpp_point",
     "jrb_mat_logdet_leja_hutchpp_point",
     "jrb_mat_logdet_leja_hutchpp_with_diagnostics_point",
     "jrb_mat_det_leja_hutchpp_point",

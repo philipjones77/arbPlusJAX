@@ -374,6 +374,9 @@ Status: `in_progress`
   - low-rank deflation metadata and residual trace-estimation helpers now live
     in shared `matrix_free_core`, with public real/complex Jones wrappers for
     preparing and reusing deflated operator state across probe passes
+  - cached rational Hutch++ metadata now exists for the real/complex Jones
+    wrappers, so rational trace and rational-logdet approximants can reuse the
+    same compact deflation state instead of rebuilding it on every pass
   - operator-first solve surfaces on `jrb_mat` / `jcb_mat` now route through
     `matrix_free_core.implicit_krylov_solve_midpoint` using
     `jax.lax.custom_linear_solve` where the current transpose/adjoint policy
@@ -423,6 +426,9 @@ Status: `in_progress`
     - return compact projected-state metadata only:
       poles, small projected matrices/recurrences, probe metadata,
       deflation/locking maps, and residual estimates
+    - a first cached rational Hutch++ metadata layer is now landed; the
+      remaining work is the fuller projected-state custom-VJP path rather than
+      first-surface creation
     - do not backpropagate through Krylov iteration, restart policy, PSD
       detection, pole selection, or nugget heuristics
     - VJP should use implicit adjoint solves reconstructed from the cached

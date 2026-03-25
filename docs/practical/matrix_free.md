@@ -205,6 +205,9 @@ The landed surface is broader than the original matrix-free tranche:
 - Hutch++ metadata now carries reusable low-rank and residual statistics
 - low-rank deflation metadata can now be prepared once and reused across
   residual trace-estimation passes on the real and complex Jones surfaces
+- cached rational Hutch++ metadata can now be prepared once and reused for
+  rational trace and rational-logdet estimators on the real and complex Jones
+  surfaces
 - adaptive probe-budget helpers exist in shared `matrix_free_core`
 - contour-integral `log`, `sqrt`, `root`, and `sign` action wrappers now exist
   on the real and complex Jones matrix-free surfaces

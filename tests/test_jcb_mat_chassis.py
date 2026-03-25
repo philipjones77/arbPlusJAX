@@ -483,6 +483,65 @@ def test_hermitian_slq_preparation_heat_trace_spectral_density_and_hutchpp_metad
     _check(bool(jnp.allclose(deflated.low_rank_trace + deflated.residual_trace, hutch_value, rtol=1e-6, atol=1e-6)))
 
 
+def test_cached_complex_rational_hutchpp_logdet_matches_diagonal_oracle():
+    a = _mat2(2.0 + 0.0j, 0.0 + 0.0j, 0.0 + 0.0j, 3.0 + 0.0j)
+    op = jcb_mat.jcb_mat_dense_operator(a)
+    log2 = jnp.log(jnp.asarray(2.0, dtype=jnp.float64))
+    slope = jnp.log(jnp.asarray(3.0 / 2.0, dtype=jnp.float64))
+    intercept = log2 - 2.0 * slope
+    coeffs = jnp.asarray([intercept, slope], dtype=jnp.float64)
+    sketch = jnp.asarray([_vec2(1.0 + 0.0j, 0.0 + 0.0j)], dtype=jnp.complex128)
+    residual = jnp.asarray([_vec2(0.0 + 0.0j, 1.0 + 0.0j)], dtype=jnp.complex128)
+
+    metadata = jcb_mat.jcb_mat_logdet_rational_hutchpp_prepare_point(
+        op,
+        sketch,
+        shifts=jnp.zeros((0,), dtype=jnp.complex128),
+        weights=jnp.zeros((0,), dtype=jnp.complex128),
+        polynomial_coefficients=coeffs,
+        hermitian=True,
+    )
+    cached = jcb_mat.jcb_mat_logdet_rational_hutchpp_from_metadata_point(metadata, residual)
+    direct = jcb_mat.jcb_mat_logdet_rational_hutchpp_point(
+        op,
+        sketch,
+        residual,
+        shifts=jnp.zeros((0,), dtype=jnp.complex128),
+        weights=jnp.zeros((0,), dtype=jnp.complex128),
+        polynomial_coefficients=coeffs,
+        hermitian=True,
+    )
+    exact = jnp.log(2.0 + 0.0j) + jnp.log(3.0 + 0.0j)
+    _check(bool(jnp.allclose(matrix_free_core.hutchpp_trace_from_metadata(cached), exact, rtol=1e-6, atol=1e-6)))
+    _check(bool(jnp.allclose(direct, exact, rtol=1e-6, atol=1e-6)))
+
+
+def test_cached_complex_rational_hutchpp_logdet_has_residual_probe_gradient():
+    a = _mat2(2.0 + 0.0j, 0.0 + 0.0j, 0.0 + 0.0j, 3.0 + 0.0j)
+    op = jcb_mat.jcb_mat_dense_operator(a)
+    log2 = jnp.log(jnp.asarray(2.0, dtype=jnp.float64))
+    slope = jnp.log(jnp.asarray(3.0 / 2.0, dtype=jnp.float64))
+    intercept = log2 - 2.0 * slope
+    coeffs = jnp.asarray([intercept, slope], dtype=jnp.float64)
+    sketch = jnp.asarray([_vec2(1.0 + 0.0j, 0.0 + 0.0j)], dtype=jnp.complex128)
+    metadata = jcb_mat.jcb_mat_logdet_rational_hutchpp_prepare_point(
+        op,
+        sketch,
+        shifts=jnp.zeros((0,), dtype=jnp.complex128),
+        weights=jnp.zeros((0,), dtype=jnp.complex128),
+        polynomial_coefficients=coeffs,
+        hermitian=True,
+    )
+
+    def loss(t):
+        residual = jnp.asarray([_vec2(0.0 + 0.0j, t + 0.0j)], dtype=jnp.complex128)
+        estimate = jcb_mat.jcb_mat_logdet_rational_hutchpp_from_metadata_point(metadata, residual)
+        return jnp.real(matrix_free_core.hutchpp_trace_from_metadata(estimate))
+
+    grad = jax.grad(loss)(jnp.asarray(1.0, dtype=jnp.float64))
+    _check(bool(jnp.allclose(grad, 2.0 * jnp.log(3.0), rtol=1e-6, atol=1e-6)))
+
+
 def test_hermitian_slq_heat_trace_gradient_matches_diagonal_oracle():
     op = jcb_mat.jcb_mat_dense_operator(_mat2(2.0 + 0.0j, 0.0 + 0.0j, 0.0 + 0.0j, 3.0 + 0.0j))
     p1 = _vec2(1.0 + 0.0j, 1.0 + 0.0j)

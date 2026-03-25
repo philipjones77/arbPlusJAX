@@ -151,6 +151,9 @@ The current shared postprocessing layer also exposes:
   probe-statistics summaries
 - reusable low-rank deflation metadata carrying a compact basis, its operator
   image, and the exact low-rank trace contribution for residual estimators
+- cached rational-Hutch++ metadata carrying compact deflation state together
+  with the rational approximation parameters needed to reuse the same residual
+  estimator across repeated trace or logdet evaluations
 
 ## 5. Solve And Inverse Actions
 
@@ -198,6 +201,9 @@ For solve and Laplace-style correction paths the current contract is:
 The same design rule now applies to the estimator stack:
 
 - cache projected SLQ or Hutch++ metadata, not full primal iteration histories
+- for rational trace/logdet work, cache compact deflation state plus the small
+  rational approximation description rather than replaying shifted solves from
+  scratch when only residual probes change
 - keep restart, locking, correction-equation, and adaptive probe-budget policy
   outside the differentiated estimator boundary
 - prefer projected-state reuse and implicit adjoints over replaying primal
