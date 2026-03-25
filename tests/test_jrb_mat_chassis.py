@@ -378,6 +378,74 @@ def test_matrix_free_trace_and_logdet_estimators_on_diagonal_case():
     _check(int(recommended) % 2 == 0)
 
 
+def test_slq_preparation_heat_trace_spectral_density_and_hutchpp_metadata_on_diagonal_case():
+    a = _mat2(2.0, 0.0, 0.0, 3.0)
+    op = jrb_mat.jrb_mat_dense_operator(a)
+    p1 = _vec2(1.0, 1.0)
+    p2 = _vec2(1.0, -1.0)
+    probes = jnp.stack([p1, p2], axis=0)
+
+    metadata = jrb_mat.jrb_mat_slq_prepare_point(op, probes, 2, target_stderr=1e-4, min_probes=2, max_probes=8, block_size=2)
+    logdet = jrb_mat.jrb_mat_logdet_estimate_point(op, probes, 2)
+    heat = jrb_mat.jrb_mat_heat_trace_slq_from_metadata_point(metadata, 0.5)
+    hist = jrb_mat.jrb_mat_spectral_density_slq_from_metadata_point(
+        metadata,
+        jnp.asarray([1.0, 2.5, 4.0], dtype=jnp.float64),
+        normalize=True,
+    )
+
+    _check(bool(jnp.allclose(metadata.statistics.mean, logdet, rtol=1e-6, atol=1e-6)))
+    _check(bool(jnp.allclose(heat, jnp.exp(-1.0) + jnp.exp(-1.5), rtol=1e-6, atol=1e-6)))
+    _check(bool(jnp.allclose(jnp.sum(hist), 1.0, atol=1e-6)))
+    _check(int(metadata.statistics.recommended_probe_count) % 2 == 0)
+
+    hutch = jrb_mat.jrb_mat_hutchpp_trace_with_metadata_point(
+        lambda v: jrb_mat.jrb_mat_log_action_lanczos_point(op, v, 2),
+        probes[:1],
+        probes[1:],
+        target_stderr=1e-4,
+        min_probes=1,
+        max_probes=4,
+        block_size=1,
+    )
+    hutch_value = jrb_mat.jrb_mat_hutchpp_trace_estimate_point(
+        lambda v: jrb_mat.jrb_mat_log_action_lanczos_point(op, v, 2),
+        probes[:1],
+        probes[1:],
+    )
+    _check(bool(jnp.allclose(hutch.low_rank_trace + hutch.residual_trace, hutch_value, rtol=1e-6, atol=1e-6)))
+
+    deflation = jrb_mat.jrb_mat_deflated_operator_prepare_point(
+        lambda v: jrb_mat.jrb_mat_log_action_lanczos_point(op, v, 2),
+        probes[:1],
+    )
+    deflated = jrb_mat.jrb_mat_trace_estimate_deflated_point(
+        lambda v: jrb_mat.jrb_mat_log_action_lanczos_point(op, v, 2),
+        deflation,
+        probes[1:],
+        target_stderr=1e-4,
+        min_probes=1,
+        max_probes=4,
+        block_size=1,
+    )
+    _check(bool(jnp.allclose(deflated.low_rank_trace + deflated.residual_trace, hutch_value, rtol=1e-6, atol=1e-6)))
+
+
+def test_slq_heat_trace_gradient_matches_diagonal_oracle():
+    op = jrb_mat.jrb_mat_dense_operator(_mat2(2.0, 0.0, 0.0, 3.0))
+    p1 = _vec2(1.0, 1.0)
+    p2 = _vec2(1.0, -1.0)
+    probes = jnp.stack([p1, p2], axis=0)
+
+    def loss(t):
+        metadata = jrb_mat.jrb_mat_slq_prepare_point(op, probes, 2)
+        return jrb_mat.jrb_mat_heat_trace_slq_from_metadata_point(metadata, t)
+
+    g = jax.grad(loss)(jnp.asarray(0.5, dtype=jnp.float64))
+    expected = -2.0 * jnp.exp(-1.0) - 3.0 * jnp.exp(-1.5)
+    _check(bool(jnp.allclose(g, expected, rtol=1e-6, atol=1e-6)))
+
+
 def test_lanczos_funm_action_has_custom_vjp_wrt_input_vector():
     a = _mat2(2.0, 0.0, 0.0, 3.0)
     op = jrb_mat.jrb_mat_dense_operator(a)
@@ -704,6 +772,19 @@ def test_named_matrix_free_real_function_actions_match_diagonal_case():
     )
     _check(bool(jnp.allclose(di.midpoint(rational_action), rational_diag * x_mid, rtol=1e-6, atol=1e-6)))
     _check(bool(jnp.all(di.contains(rational_basic, rational_action))))
+
+    contour_log = jrb_mat.jrb_mat_log_action_contour_point(op, x, center=6.5 + 0.0j, radius=3.0, quadrature_order=32)
+    contour_sqrt = jrb_mat.jrb_mat_sqrt_action_contour_point(op, x, center=6.5 + 0.0j, radius=3.0, quadrature_order=32)
+    contour_root = jrb_mat.jrb_mat_root_action_contour_point(op, x, degree=2, center=6.5 + 0.0j, radius=3.0, quadrature_order=32)
+    contour_sign = jrb_mat.jrb_mat_sign_action_contour_point(op, x, center=6.5 + 0.0j, radius=3.0, quadrature_order=32)
+    contour_sin = jrb_mat.jrb_mat_sin_action_contour_point(op, x, center=6.5 + 0.0j, radius=3.0, quadrature_order=32)
+    contour_cos = jrb_mat.jrb_mat_cos_action_contour_point(op, x, center=6.5 + 0.0j, radius=3.0, quadrature_order=32)
+    _check(bool(jnp.allclose(di.midpoint(contour_log), di.midpoint(log_action), rtol=1e-5, atol=1e-5)))
+    _check(bool(jnp.allclose(di.midpoint(contour_sqrt), di.midpoint(sqrt_action), rtol=1e-5, atol=1e-5)))
+    _check(bool(jnp.allclose(di.midpoint(contour_root), di.midpoint(root_action), rtol=1e-5, atol=1e-5)))
+    _check(bool(jnp.allclose(di.midpoint(contour_sign), di.midpoint(sign_action), rtol=1e-5, atol=1e-5)))
+    _check(bool(jnp.allclose(di.midpoint(contour_sin), di.midpoint(sin_action), rtol=1e-5, atol=1e-5)))
+    _check(bool(jnp.allclose(di.midpoint(contour_cos), jnp.asarray([jnp.cos(4.0), jnp.cos(9.0)]) * x_mid, rtol=1e-5, atol=1e-5)))
 
 
 def test_real_solve_inverse_and_det_matrix_free_apis_match_diagonal_case():

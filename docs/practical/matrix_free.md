@@ -1,4 +1,4 @@
-Last updated: 2026-03-20T06:25:37Z
+Last updated: 2026-03-25T16:20:00Z
 
 # Matrix-Free Practical Guide
 
@@ -150,6 +150,29 @@ For repeated logdet or determinant estimation:
 - prefer the dedicated `*_logdet_slq_point_jit` and `*_det_slq_point_jit` wrappers
 - reuse the same probe shape
 - keep the same number of Lanczos / Arnoldi steps across the loop
+- if you also need heat-trace or spectral-density summaries, prepare the SLQ
+  metadata once and reuse it instead of recomputing separate probe reductions
+- if you also need Hutch++ residual statistics or adaptive probe-count advice,
+  reuse the returned metadata rather than recomputing pilot variance passes
+
+For repeated contour-integral matrix-function actions:
+
+- prefer the dedicated contour wrappers on `jrb_mat` / `jcb_mat` for `log`,
+  `sqrt`, `root`, and `sign`
+- keep `center`, `radius`, and `quadrature_order` fixed across repeated calls
+  to avoid unnecessary recompilation and policy churn
+- use the structured real/complex operator aliases whenever the spectrum really
+  satisfies the symmetric / Hermitian assumptions used to pick the shifted
+  solve path
+
+For repeated solve-plus-logdet workloads:
+
+- prefer the shared operator-first `*_logdet_solve_*` bundles rather than
+  calling solve and logdet separately
+- these surfaces now retain compact transpose-operator metadata so the implicit
+  adjoint path does not need to replay the full primal iteration history
+- keep solver choice, structure flags, and probe shapes fixed if you want
+  stable cache reuse
 
 For repeated solves:
 
@@ -173,3 +196,28 @@ Matrix-free is the right tool when you want:
 - trace / logdet / determinant estimators
 - solve / inverse actions
 - sparse or implicit operator access
+
+## 9. Current Practical Limits
+
+The landed surface is broader than the original matrix-free tranche:
+
+- SLQ metadata can now be reused for heat-trace and spectral-density summaries
+- Hutch++ metadata now carries reusable low-rank and residual statistics
+- low-rank deflation metadata can now be prepared once and reused across
+  residual trace-estimation passes on the real and complex Jones surfaces
+- adaptive probe-budget helpers exist in shared `matrix_free_core`
+- contour-integral `log`, `sqrt`, `root`, and `sign` action wrappers now exist
+  on the real and complex Jones matrix-free surfaces
+- contour-integral `sin` and `cos` action wrappers now also exist on the real
+  and complex Jones matrix-free surfaces
+- shell preconditioners can now carry explicit transpose/adjoint callbacks
+  through the shared implicit-solve path instead of silently falling back to
+  the forward callback
+
+The remaining heavy work is still advanced-method hardening:
+
+- flexible preconditioner policy beyond the current shared MINRES-centric path
+- AD-safe cached rational-Krylov trace/logdet
+- low-rank deflation and recycling
+- fuller variance/stopping contracts around probe blocks
+- broader public contour-integral matrix-function coverage

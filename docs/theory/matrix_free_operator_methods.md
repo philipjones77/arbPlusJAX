@@ -1,4 +1,4 @@
-Last updated: 2026-03-20T06:25:37Z
+Last updated: 2026-03-25T16:20:00Z
 
 # Matrix-Free Operator Methods
 
@@ -111,6 +111,16 @@ Dense projected kernels are used for:
 - `tanh`
 - integer powers
 
+The current operator layer also includes contour-integral action helpers in the
+shared core. These now back public real/complex matrix-free wrappers for:
+
+- `log`
+- `sqrt`
+- `root`
+- `sign`
+- `sin`
+- `cos`
+
 This gives a unified story:
 
 - the outer algorithm stays matrix-free
@@ -132,6 +142,16 @@ $$
 
 Sparse SPD log-determinant also has a Leja plus Hutch++ path documented separately in [sparse_symmetric_leja_hutchpp_logdet.md](/docs/theory/sparse_symmetric_leja_hutchpp_logdet.md).
 
+The current shared postprocessing layer also exposes:
+
+- reusable SLQ quadrature metadata
+- heat-trace evaluation from cached SLQ nodes and weights
+- spectral-density histograms from cached SLQ nodes and weights
+- Hutch++ metadata carrying low-rank and residual contributions together with
+  probe-statistics summaries
+- reusable low-rank deflation metadata carrying a compact basis, its operator
+  image, and the exact low-rank trace contribution for residual estimators
+
 ## 5. Solve And Inverse Actions
 
 Matrix-free inverse functionality is exposed as solve actions:
@@ -151,7 +171,7 @@ The inverse-action API is intentionally just a solve-action alias with a differe
 
 ## 6. AD Design
 
-The matrix-free layer uses `custom_vjp` for callable operator paths in the Krylov action and trace-integrand machinery. This avoids differentiating naively through every Krylov loop iteration.
+The matrix-free layer uses `custom_vjp` for callable operator paths in the Krylov action and trace-integrand machinery, and now uses `jax.lax.custom_linear_solve` on the operator-first solve surfaces. This avoids differentiating naively through every Krylov loop iteration.
 
 There is an important JAX constraint:
 
@@ -165,6 +185,24 @@ So the current design splits these paths:
 
 This split is necessary to avoid tracer errors and to keep prepared operators reusable without forcing closure-based JIT wrappers.
 
+For solve and Laplace-style correction paths the current contract is:
+
+- keep the forward solve operator-first and matrix-free
+- cache only compact operator metadata needed for the transpose solve
+- use transpose or adjoint solves in the backward pass rather than replaying the primal Krylov history
+- keep damping, jitter, and structural safety checks outside the differentiated linear-solve boundary
+- when shell preconditioners are used, explicit transpose/adjoint callbacks can
+  now be carried through the same shared preconditioner policy rather than
+  assuming the forward callback is valid in every backward or transpose solve
+
+The same design rule now applies to the estimator stack:
+
+- cache projected SLQ or Hutch++ metadata, not full primal iteration histories
+- keep restart, locking, correction-equation, and adaptive probe-budget policy
+  outside the differentiated estimator boundary
+- prefer projected-state reuse and implicit adjoints over replaying primal
+  Lanczos/Arnoldi loops
+
 ## 7. What Is Optimized Today
 
 The strongest current matrix-free optimizations are:
@@ -174,6 +212,10 @@ The strongest current matrix-free optimizations are:
 - explicit right-action and adjoint plans
 - structured aliases for symmetric / Hermitian / SPD / HPD paths
 - plan-safe JIT wrappers for repeated solve / inverse / logdet / det use
+- shared SLQ/Hutch++ metadata preparation and postprocessing
+- shared correction-expansion helpers for restarted Davidson/JD-style subspace
+  updates
+- orthogonal probe-block and adaptive probe-budget helpers
 
 ## 8. What Still Needs A Separate Basic Layer
 

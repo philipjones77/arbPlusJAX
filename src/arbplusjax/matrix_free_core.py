@@ -150,25 +150,42 @@ class RecycledKrylovState:
 @dataclass(frozen=True)
 class LogdetSolveAux:
     operator: object
+    transpose_operator: object | None
     logdet_diagnostics: object
     solve_diagnostics: object
     preconditioner: object | None
+    solver: str
+    implicit_adjoint: bool
     structured: str
     algebra: str
 
     def tree_flatten(self):
-        children = (self.operator, self.logdet_diagnostics, self.solve_diagnostics, self.preconditioner)
-        aux = {"structured": self.structured, "algebra": self.algebra}
+        children = (
+            self.operator,
+            self.transpose_operator,
+            self.logdet_diagnostics,
+            self.solve_diagnostics,
+            self.preconditioner,
+        )
+        aux = {
+            "solver": self.solver,
+            "implicit_adjoint": self.implicit_adjoint,
+            "structured": self.structured,
+            "algebra": self.algebra,
+        }
         return children, aux
 
     @classmethod
     def tree_unflatten(cls, aux_data, children):
-        operator, logdet_diagnostics, solve_diagnostics, preconditioner = children
+        operator, transpose_operator, logdet_diagnostics, solve_diagnostics, preconditioner = children
         return cls(
             operator=operator,
+            transpose_operator=transpose_operator,
             logdet_diagnostics=logdet_diagnostics,
             solve_diagnostics=solve_diagnostics,
             preconditioner=preconditioner,
+            solver=aux_data["solver"],
+            implicit_adjoint=aux_data["implicit_adjoint"],
             structured=aux_data["structured"],
             algebra=aux_data["algebra"],
         )
@@ -189,6 +206,48 @@ class LogdetSolveResult:
         del aux_data
         logdet, solve, aux = children
         return cls(logdet=logdet, solve=solve, aux=aux)
+
+
+@jax.tree_util.register_pytree_node_class
+@dataclass(frozen=True)
+class ImplicitAdjointSolveMetadata:
+    operator: object
+    transpose_operator: object | None
+    preconditioner: object | None
+    transpose_preconditioner: object | None
+    solver: str
+    structured: str
+    algebra: str
+    implicit_adjoint: bool
+
+    def tree_flatten(self):
+        children = (
+            self.operator,
+            self.transpose_operator,
+            self.preconditioner,
+            self.transpose_preconditioner,
+        )
+        aux = {
+            "solver": self.solver,
+            "structured": self.structured,
+            "algebra": self.algebra,
+            "implicit_adjoint": self.implicit_adjoint,
+        }
+        return children, aux
+
+    @classmethod
+    def tree_unflatten(cls, aux_data, children):
+        operator, transpose_operator, preconditioner, transpose_preconditioner = children
+        return cls(
+            operator=operator,
+            transpose_operator=transpose_operator,
+            preconditioner=preconditioner,
+            transpose_preconditioner=transpose_preconditioner,
+            solver=aux_data["solver"],
+            structured=aux_data["structured"],
+            algebra=aux_data["algebra"],
+            implicit_adjoint=aux_data["implicit_adjoint"],
+        )
 
 
 @jax.tree_util.register_pytree_node_class
@@ -233,6 +292,118 @@ class FiniteDifferenceOperatorPayload:
             context=context,
             relative_error=aux_data["relative_error"],
             umin=aux_data["umin"],
+        )
+
+
+@jax.tree_util.register_pytree_node_class
+@dataclass(frozen=True)
+class ProbeEstimateStatistics:
+    mean: object
+    variance: object
+    stderr: object
+    probe_count: object
+    recommended_probe_count: object
+
+    def tree_flatten(self):
+        return (
+            self.mean,
+            self.variance,
+            self.stderr,
+            self.probe_count,
+            self.recommended_probe_count,
+        ), {}
+
+    @classmethod
+    def tree_unflatten(cls, aux_data, children):
+        del aux_data
+        mean, variance, stderr, probe_count, recommended_probe_count = children
+        return cls(
+            mean=mean,
+            variance=variance,
+            stderr=stderr,
+            probe_count=probe_count,
+            recommended_probe_count=recommended_probe_count,
+        )
+
+
+@jax.tree_util.register_pytree_node_class
+@dataclass(frozen=True)
+class SlqQuadratureMetadata:
+    projected: object
+    beta0: object
+    nodes: object
+    weights: object
+    statistics: ProbeEstimateStatistics
+    steps: object
+    hermitian: object
+
+    def tree_flatten(self):
+        return (
+            self.projected,
+            self.beta0,
+            self.nodes,
+            self.weights,
+            self.statistics,
+            self.steps,
+            self.hermitian,
+        ), {}
+
+    @classmethod
+    def tree_unflatten(cls, aux_data, children):
+        del aux_data
+        projected, beta0, nodes, weights, statistics, steps, hermitian = children
+        return cls(
+            projected=projected,
+            beta0=beta0,
+            nodes=nodes,
+            weights=weights,
+            statistics=statistics,
+            steps=steps,
+            hermitian=hermitian,
+        )
+
+
+@jax.tree_util.register_pytree_node_class
+@dataclass(frozen=True)
+class HutchppTraceMetadata:
+    basis: object
+    low_rank_trace: object
+    residual_trace: object
+    statistics: ProbeEstimateStatistics
+
+    def tree_flatten(self):
+        return (self.basis, self.low_rank_trace, self.residual_trace, self.statistics), {}
+
+    @classmethod
+    def tree_unflatten(cls, aux_data, children):
+        del aux_data
+        basis, low_rank_trace, residual_trace, statistics = children
+        return cls(
+            basis=basis,
+            low_rank_trace=low_rank_trace,
+            residual_trace=residual_trace,
+            statistics=statistics,
+        )
+
+
+@jax.tree_util.register_pytree_node_class
+@dataclass(frozen=True)
+class DeflatedOperatorMetadata:
+    basis: object
+    image: object
+    low_rank_trace: object
+
+    def tree_flatten(self):
+        return (self.basis, self.image, self.low_rank_trace), {}
+
+    @classmethod
+    def tree_unflatten(cls, aux_data, children):
+        del aux_data
+        basis, image, low_rank_trace = children
+        return cls(
+            basis=basis,
+            image=image,
+            low_rank_trace=low_rank_trace,
         )
 
 
@@ -349,6 +520,28 @@ def shell_preconditioner_plan(callback, *, context=None, orientation: str = "for
         orientation=orientation,
         algebra=algebra,
     )
+
+
+def oriented_shell_preconditioner_plan(
+    *,
+    context,
+    algebra: str,
+    orientation: str,
+    forward_callback,
+    transpose_callback=None,
+    adjoint_callback=None,
+) -> PreconditionerPlan:
+    if orientation == "forward":
+        callback = forward_callback
+    elif orientation == "transpose":
+        callback = transpose_callback if transpose_callback is not None else forward_callback
+    elif orientation == "adjoint":
+        callback = adjoint_callback if adjoint_callback is not None else transpose_callback
+        if callback is None:
+            callback = forward_callback
+    else:
+        raise ValueError(f"unsupported preconditioner orientation: {orientation}")
+    return shell_preconditioner_plan(callback, context=context, orientation=orientation, algebra=algebra)
 
 
 def identity_preconditioner_plan(*, size: int, dtype, algebra: str) -> PreconditionerPlan:
@@ -512,6 +705,130 @@ def sparse_bcoo_jacobi_preconditioner_plan(
     inv_diag = 1.0 / safe
     inv_diag = jnp.where(jnp.abs(diag) > jnp.asarray(eps, dtype=diag.real.dtype), inv_diag, jnp.zeros_like(inv_diag))
     return diagonal_preconditioner_plan(inv_diag, algebra=algebra)
+
+
+def _recover_dense_forward_payload(payload: jax.Array, *, orientation: str):
+    if orientation == "forward":
+        return jnp.asarray(payload)
+    if orientation == "transpose":
+        return jnp.swapaxes(jnp.asarray(payload), -1, -2)
+    if orientation == "adjoint":
+        return jnp.conjugate(jnp.swapaxes(jnp.asarray(payload), -1, -2))
+    raise ValueError(f"unsupported dense orientation: {orientation}")
+
+
+def _orient_sparse_bcoo_payload(payload, *, orientation: str, conjugate_transpose: bool):
+    sparse_cls = payload.__class__
+    if orientation == "forward":
+        return sparse_cls(
+            data=payload.data,
+            indices=payload.indices,
+            rows=payload.rows,
+            cols=payload.cols,
+            algebra=payload.algebra,
+        )
+    if orientation == "transpose":
+        return sparse_cls(
+            data=payload.data,
+            indices=payload.indices[:, ::-1],
+            rows=payload.cols,
+            cols=payload.rows,
+            algebra=payload.algebra,
+        )
+    if orientation == "adjoint":
+        return sparse_cls(
+            data=jnp.conjugate(payload.data) if conjugate_transpose else payload.data,
+            indices=payload.indices[:, ::-1],
+            rows=payload.cols,
+            cols=payload.rows,
+            algebra=payload.algebra,
+        )
+    raise ValueError(f"unsupported sparse orientation: {orientation}")
+
+
+def _recover_sparse_bcoo_forward_payload(payload, *, orientation: str):
+    if orientation == "forward":
+        return payload
+    if orientation == "transpose":
+        return _orient_sparse_bcoo_payload(payload, orientation="transpose", conjugate_transpose=False)
+    if orientation == "adjoint":
+        return _orient_sparse_bcoo_payload(payload, orientation="adjoint", conjugate_transpose=True)
+    raise ValueError(f"unsupported sparse orientation: {orientation}")
+
+
+def operator_transpose_plan(operator, *, algebra: str | None = None, conjugate: bool = False):
+    target_orientation = "adjoint" if conjugate else "transpose"
+    if isinstance(operator, ScaledOperator):
+        inner = operator_transpose_plan(operator.operator, algebra=algebra, conjugate=conjugate)
+        if inner is None:
+            return None
+        scale = jnp.conjugate(operator.scale) if conjugate else operator.scale
+        return ScaledOperator(operator=inner, scale=scale)
+    if isinstance(operator, OperatorPlan):
+        if operator.kind == "dense":
+            forward_mid = _recover_dense_forward_payload(operator.payload, orientation=operator.orientation)
+            return dense_operator_plan(forward_mid, orientation=target_orientation, algebra=algebra or operator.algebra)
+        if operator.kind == "sparse_bcoo":
+            forward_payload = _recover_sparse_bcoo_forward_payload(operator.payload, orientation=operator.orientation)
+            payload = _orient_sparse_bcoo_payload(
+                forward_payload,
+                orientation=target_orientation,
+                conjugate_transpose=conjugate,
+            )
+            return OperatorPlan(
+                kind="sparse_bcoo",
+                payload=payload,
+                orientation=target_orientation,
+                algebra=algebra or operator.algebra,
+            )
+    return None
+
+
+def preconditioner_transpose_plan(preconditioner, *, algebra: str | None = None, conjugate: bool = False):
+    target_orientation = "adjoint" if conjugate else "transpose"
+    if preconditioner is None:
+        return None
+    if isinstance(preconditioner, PreconditionerPlan):
+        if preconditioner.kind == "identity":
+            return preconditioner
+        if preconditioner.kind == "diagonal":
+            payload = jnp.conjugate(preconditioner.payload) if conjugate else preconditioner.payload
+            return diagonal_preconditioner_plan(payload, algebra=algebra or preconditioner.algebra)
+        if preconditioner.kind == "dense":
+            forward_mid = _recover_dense_forward_payload(preconditioner.payload, orientation=preconditioner.orientation)
+            return dense_preconditioner_plan(forward_mid, orientation=target_orientation, algebra=algebra or preconditioner.algebra)
+        if preconditioner.kind == "sparse_bcoo":
+            forward_payload = _recover_sparse_bcoo_forward_payload(preconditioner.payload, orientation=preconditioner.orientation)
+            payload = _orient_sparse_bcoo_payload(
+                forward_payload,
+                orientation=target_orientation,
+                conjugate_transpose=conjugate,
+            )
+            return PreconditionerPlan(
+                kind="sparse_bcoo",
+                payload=payload,
+                orientation=target_orientation,
+                algebra=algebra or preconditioner.algebra,
+            )
+        if preconditioner.kind == "shell":
+            payload = preconditioner.payload
+            ctx = payload.context
+            if isinstance(ctx, dict) and "transpose_callback" in ctx:
+                return oriented_shell_preconditioner_plan(
+                    context=ctx,
+                    algebra=algebra or preconditioner.algebra,
+                    orientation=target_orientation,
+                    forward_callback=ctx.get("forward_callback", payload.callback),
+                    transpose_callback=ctx.get("transpose_callback"),
+                    adjoint_callback=ctx.get("adjoint_callback"),
+                )
+            return shell_preconditioner_plan(
+                payload.callback,
+                context=ctx,
+                orientation=target_orientation,
+                algebra=algebra or preconditioner.algebra,
+            )
+    return None
 
 
 def operator_plan_apply(plan: OperatorPlan, v: jax.Array, *, midpoint_vector, sparse_bcoo_matvec, dtype):
@@ -754,9 +1071,12 @@ def make_logdet_solve_result(
     logdet,
     solve,
     operator,
+    transpose_operator,
     logdet_diagnostics,
     solve_diagnostics,
     preconditioner=None,
+    solver: str = "",
+    implicit_adjoint: bool = False,
     structured: str = "general",
     algebra: str,
 ) -> LogdetSolveResult:
@@ -765,9 +1085,12 @@ def make_logdet_solve_result(
         solve=solve,
         aux=LogdetSolveAux(
             operator=operator,
+            transpose_operator=transpose_operator,
             logdet_diagnostics=logdet_diagnostics,
             solve_diagnostics=solve_diagnostics,
             preconditioner=preconditioner,
+            solver=solver,
+            implicit_adjoint=implicit_adjoint,
             structured=structured,
             algebra=algebra,
         ),
@@ -777,11 +1100,14 @@ def make_logdet_solve_result(
 def combine_logdet_solve_point(
     *,
     operator,
+    transpose_operator,
     rhs,
     probes,
     solve_with_diagnostics,
     logdet_with_diagnostics,
     preconditioner=None,
+    solver: str = "",
+    implicit_adjoint: bool = False,
     structured: str = "general",
     algebra: str,
 ) -> LogdetSolveResult:
@@ -791,9 +1117,12 @@ def combine_logdet_solve_point(
         logdet=logdet_value,
         solve=solve_value,
         operator=operator,
+        transpose_operator=transpose_operator,
         logdet_diagnostics=logdet_diag,
         solve_diagnostics=solve_diag,
         preconditioner=preconditioner,
+        solver=solver,
+        implicit_adjoint=implicit_adjoint,
         structured=structured,
         algebra=algebra,
     )
@@ -954,6 +1283,107 @@ def krylov_solve_midpoint(
 
     residual = jnp.linalg.norm(mv(x_mid) - rhs_mid)
     return x_mid, info, residual, jnp.linalg.norm(rhs_mid)
+
+
+def implicit_krylov_solve_midpoint(
+    operator,
+    rhs: jax.Array,
+    *,
+    x0: jax.Array | None = None,
+    tol: float = 1e-8,
+    atol: float = 0.0,
+    maxiter: int | None = None,
+    preconditioner=None,
+    solver: str,
+    structured: str,
+    midpoint_vector,
+    lift_vector,
+    sparse_bcoo_matvec,
+    dtype,
+    transpose_operator=None,
+    transpose_preconditioner=None,
+    use_implicit_adjoint: bool | None = None,
+):
+    rhs_mid = midpoint_vector(rhs)
+    x0_mid = None if x0 is None else midpoint_vector(x0)
+    conjugate = jnp.issubdtype(jnp.asarray(rhs_mid).dtype, jnp.complexfloating)
+    if transpose_operator is None:
+        transpose_operator = operator_transpose_plan(operator, conjugate=conjugate)
+    if transpose_preconditioner is None:
+        transpose_preconditioner = preconditioner_transpose_plan(preconditioner, conjugate=conjugate)
+    if use_implicit_adjoint is None:
+        use_implicit_adjoint = structured in {"symmetric", "spd", "hermitian", "hpd"} or transpose_operator is not None
+
+    def mv(v):
+        return operator_apply_midpoint(
+            operator,
+            lift_vector(v),
+            midpoint_vector=midpoint_vector,
+            sparse_bcoo_matvec=sparse_bcoo_matvec,
+            dtype=dtype,
+        )
+
+    def build_preconditioner(plan):
+        if plan is None:
+            return None
+        return lambda v: preconditioner_apply_midpoint(
+            plan,
+            lift_vector(v),
+            midpoint_vector=midpoint_vector,
+            sparse_bcoo_matvec=sparse_bcoo_matvec,
+            dtype=dtype,
+        )
+
+    def solve_impl(matvec_fn, rhs_value, *, preconditioner_plan):
+        precond = build_preconditioner(preconditioner_plan)
+        if solver == "cg":
+            return iterative_solvers.cg(matvec_fn, rhs_value, x0=x0_mid, tol=tol, atol=atol, maxiter=maxiter, M=precond)
+        if solver == "gmres":
+            return iterative_solvers.gmres(matvec_fn, rhs_value, x0=x0_mid, tol=tol, atol=atol, maxiter=maxiter, M=precond)
+        if solver == "minres":
+            return iterative_solvers.minres(matvec_fn, rhs_value, x0=x0_mid, tol=tol, atol=atol, maxiter=maxiter, M=precond)
+        raise ValueError(f"unsupported Krylov solver: {solver}")
+
+    transpose_structured = structured in {"symmetric", "spd", "hermitian", "hpd"}
+
+    def transpose_mv(v):
+        if transpose_operator is None:
+            raise ValueError("transpose solve requested without a transpose/adjoint operator.")
+        return operator_apply_midpoint(
+            transpose_operator,
+            lift_vector(v),
+            midpoint_vector=midpoint_vector,
+            sparse_bcoo_matvec=sparse_bcoo_matvec,
+            dtype=dtype,
+        )
+
+    if use_implicit_adjoint:
+        transpose_solve = None if transpose_structured else (
+            lambda matvec_fn, rhs_value: solve_impl(transpose_mv, rhs_value, preconditioner_plan=transpose_preconditioner)
+        )
+        x_mid, info = lax.custom_linear_solve(
+            mv,
+            rhs_mid,
+            lambda matvec_fn, rhs_value: solve_impl(matvec_fn, rhs_value, preconditioner_plan=preconditioner),
+            transpose_solve=transpose_solve,
+            symmetric=transpose_structured,
+            has_aux=True,
+        )
+    else:
+        x_mid, info = solve_impl(mv, rhs_mid, preconditioner_plan=preconditioner)
+
+    residual = jnp.linalg.norm(mv(x_mid) - rhs_mid)
+    metadata = ImplicitAdjointSolveMetadata(
+        operator=operator,
+        transpose_operator=transpose_operator,
+        preconditioner=preconditioner,
+        transpose_preconditioner=transpose_preconditioner,
+        solver=solver,
+        structured=structured,
+        algebra=getattr(operator, "algebra", "matrix_free"),
+        implicit_adjoint=bool(use_implicit_adjoint),
+    )
+    return x_mid, info, residual, jnp.linalg.norm(rhs_mid), metadata
 
 
 def krylov_diagnostics(
@@ -1155,6 +1585,24 @@ def eig_restart_basis_from_pairs(
         pieces.append(refill_basis[:, : target_cols - keep])
     basis = orthonormalize_columns(jnp.concatenate(pieces, axis=1))
     return basis[:, :target_cols]
+
+
+def eig_convergence_summary(
+    residuals: jax.Array,
+    *,
+    tol: float,
+    requested: int,
+) -> tuple[jax.Array, jax.Array, jax.Array, jax.Array]:
+    residuals_arr = jnp.asarray(residuals, dtype=jnp.float64)
+    if residuals_arr.size == 0:
+        zero = jnp.asarray(0, dtype=jnp.int32)
+        return zero, zero, zero, jnp.asarray(False)
+    converged_mask = residuals_arr <= jnp.asarray(tol, dtype=jnp.float64)
+    converged_count = jnp.sum(converged_mask.astype(jnp.int32))
+    requested_arr = jnp.asarray(requested, dtype=jnp.int32)
+    locked_count = jnp.minimum(converged_count, requested_arr)
+    deflated_count = converged_count
+    return converged_count, locked_count, deflated_count, jnp.asarray(converged_count >= requested_arr)
 
 
 def ritz_pairs_from_basis(apply_block, basis: jax.Array, *, k: int, which: str, hermitian: bool = True):
@@ -1612,6 +2060,36 @@ def probe_sample_statistics(samples: jax.Array) -> tuple[jax.Array, jax.Array, j
     return mean, variance, stderr
 
 
+def make_probe_estimate_statistics(
+    samples: jax.Array,
+    *,
+    target_stderr: float | None = None,
+    min_probes: int | None = None,
+    max_probes: int | None = None,
+    block_size: int = 1,
+) -> ProbeEstimateStatistics:
+    values = jnp.asarray(samples)
+    mean, variance, stderr = probe_sample_statistics(values)
+    probe_count = jnp.asarray(values.shape[0], dtype=jnp.int32)
+    if target_stderr is None:
+        recommended = probe_count
+    else:
+        recommended = adaptive_probe_count_from_pilot(
+            values,
+            target_stderr=target_stderr,
+            min_probes=min_probes,
+            max_probes=max_probes,
+            block_size=block_size,
+        )
+    return ProbeEstimateStatistics(
+        mean=mean,
+        variance=variance,
+        stderr=stderr,
+        probe_count=probe_count,
+        recommended_probe_count=jnp.asarray(recommended, dtype=jnp.int32),
+    )
+
+
 def adaptive_probe_count_from_pilot(
     pilot_samples: jax.Array,
     *,
@@ -1642,6 +2120,457 @@ def adaptive_probe_count_from_pilot(
     return rounded
 
 
+def probe_statistics_target_met(
+    statistics: ProbeEstimateStatistics,
+    *,
+    target_stderr: float,
+) -> jax.Array:
+    target = jnp.asarray(target_stderr, dtype=jnp.float64)
+    return jnp.asarray(jnp.max(jnp.asarray(statistics.stderr, dtype=jnp.float64)) <= target)
+
+
+def probe_statistics_should_stop(
+    statistics: ProbeEstimateStatistics,
+    *,
+    target_stderr: float,
+    max_probes: int | None = None,
+) -> jax.Array:
+    met = probe_statistics_target_met(statistics, target_stderr=target_stderr)
+    if max_probes is None:
+        return met
+    return jnp.asarray(met | (jnp.asarray(statistics.probe_count, dtype=jnp.int32) >= jnp.asarray(max_probes, dtype=jnp.int32)))
+
+
+def expand_subspace_with_corrections(
+    basis: jax.Array,
+    vecs: jax.Array,
+    residuals: jax.Array,
+    *,
+    orthonormalize_columns_fn,
+    apply_preconditioner=None,
+    vals: jax.Array | None = None,
+    target_cols: int,
+    which: str = "largest",
+    lock_tol: float = 1e-4,
+    jacobi_davidson: bool = False,
+    conjugate_inner: bool = False,
+) -> jax.Array:
+    max_new_cols = max(0, min(int(target_cols) - int(basis.shape[1]), int(residuals.shape[1])))
+    if vals is not None and max_new_cols > 0:
+        order = eig_expansion_column_order(vals, residuals, which=which, lock_tol=lock_tol)
+        chosen = order[:max_new_cols]
+        vecs = vecs[:, chosen]
+        residuals = residuals[:, chosen]
+    corrections = residuals
+    residual_norms = jnp.linalg.norm(corrections, axis=0, keepdims=True)
+    safe_norms = jnp.where(residual_norms > 1e-12, residual_norms, 1.0)
+    corrections = corrections / safe_norms
+    if apply_preconditioner is not None:
+        corrections = jax.vmap(apply_preconditioner, in_axes=1, out_axes=1)(corrections)
+    if jacobi_davidson:
+        if conjugate_inner:
+            coeffs = jnp.sum(jnp.conj(vecs) * corrections, axis=0, keepdims=True)
+        else:
+            coeffs = jnp.sum(vecs * corrections, axis=0, keepdims=True)
+        projected = corrections - vecs * coeffs
+        proj_norms = jnp.linalg.norm(projected, axis=0, keepdims=True)
+        corrections = jnp.where(
+            proj_norms > 1e-12,
+            projected / jnp.where(proj_norms > 1e-12, proj_norms, 1.0),
+            0.0,
+        )
+    correction_norms = jnp.linalg.norm(corrections, axis=0, keepdims=True)
+    corrections = jnp.where(correction_norms > 1e-10, corrections, 0.0)
+    trial = jnp.concatenate([basis, corrections], axis=1)
+    basis_next = orthonormalize_columns_fn(trial)
+    if basis_next.shape[1] < target_cols:
+        pad = basis[:, : target_cols - basis_next.shape[1]]
+        basis_next = orthonormalize_columns_fn(jnp.concatenate([basis_next, pad], axis=1))
+    return basis_next[:, :target_cols]
+
+
+def apply_action_over_probe_block_point(
+    action_fn,
+    probes: jax.Array,
+    *,
+    coerce_probes,
+    midpoint_value,
+) -> jax.Array:
+    coerced = coerce_probes(probes)
+    outputs = jax.vmap(action_fn)(coerced)
+    return midpoint_value(outputs)
+
+
+def hutchpp_trace_with_metadata_projected_point(
+    action_fn,
+    sketch_probes: jax.Array,
+    residual_probes: jax.Array,
+    *,
+    coerce_probes,
+    midpoint_value,
+    point_from_midpoint,
+    basis_dtype,
+    trace_inner,
+    residual_project,
+    quadratic_reduce,
+    zero_scalar,
+    target_stderr: float | None = None,
+    min_probes: int | None = None,
+    max_probes: int | None = None,
+    block_size: int = 1,
+) -> HutchppTraceMetadata:
+    sketch = coerce_probes(sketch_probes)
+    residual = coerce_probes(residual_probes)
+    n = int(sketch.shape[-2] if sketch.shape[0] > 0 else residual.shape[-2])
+
+    if sketch.shape[0] > 0:
+        y_cols = jnp.swapaxes(
+            apply_action_over_probe_block_point(
+                action_fn,
+                sketch,
+                coerce_probes=coerce_probes,
+                midpoint_value=midpoint_value,
+            ),
+            0,
+            1,
+        )
+        q, _ = jnp.linalg.qr(y_cols, mode="reduced")
+        fq_cols = jnp.swapaxes(
+            apply_action_over_probe_block_point(
+                action_fn,
+                jax.vmap(point_from_midpoint)(q.T),
+                coerce_probes=coerce_probes,
+                midpoint_value=midpoint_value,
+            ),
+            0,
+            1,
+        )
+        trace_lr = trace_inner(q, fq_cols)
+    else:
+        q = jnp.zeros((n, 0), dtype=basis_dtype)
+        trace_lr = zero_scalar
+
+    if residual.shape[0] > 0:
+        z = midpoint_value(residual)
+        z_proj = residual_project(z, q)
+        hz = apply_action_over_probe_block_point(
+            action_fn,
+            jax.vmap(point_from_midpoint)(z_proj),
+            coerce_probes=coerce_probes,
+            midpoint_value=midpoint_value,
+        )
+        residual_samples = quadratic_reduce(z_proj, hz)
+    else:
+        residual_samples = jnp.zeros((1,), dtype=jnp.asarray(zero_scalar).dtype)
+
+    return make_hutchpp_trace_metadata(
+        basis=q,
+        low_rank_trace=trace_lr,
+        residual_samples=residual_samples,
+        target_stderr=target_stderr,
+        min_probes=min_probes,
+        max_probes=max_probes,
+        block_size=block_size,
+    )
+
+
+def make_deflated_operator_metadata(
+    *,
+    basis: jax.Array,
+    image: jax.Array,
+    low_rank_trace,
+) -> DeflatedOperatorMetadata:
+    return DeflatedOperatorMetadata(
+        basis=jnp.asarray(basis),
+        image=jnp.asarray(image),
+        low_rank_trace=low_rank_trace,
+    )
+
+
+def prepare_deflated_operator_metadata_point(
+    action_fn,
+    sketch_probes: jax.Array,
+    *,
+    coerce_probes,
+    midpoint_value,
+    point_from_midpoint,
+    basis_dtype,
+    trace_inner,
+) -> DeflatedOperatorMetadata:
+    sketch = coerce_probes(sketch_probes)
+    n = int(sketch.shape[-2])
+    if sketch.shape[0] == 0:
+        empty = jnp.zeros((n, 0), dtype=basis_dtype)
+        return make_deflated_operator_metadata(
+            basis=empty,
+            image=empty,
+            low_rank_trace=jnp.asarray(0.0, dtype=basis_dtype),
+        )
+    y_cols = jnp.swapaxes(
+        apply_action_over_probe_block_point(
+            action_fn,
+            sketch,
+            coerce_probes=coerce_probes,
+            midpoint_value=midpoint_value,
+        ),
+        0,
+        1,
+    )
+    q, _ = jnp.linalg.qr(y_cols, mode="reduced")
+    aq = jnp.swapaxes(
+        apply_action_over_probe_block_point(
+            action_fn,
+            jax.vmap(point_from_midpoint)(q.T),
+            coerce_probes=coerce_probes,
+            midpoint_value=midpoint_value,
+        ),
+        0,
+        1,
+    )
+    return make_deflated_operator_metadata(
+        basis=q,
+        image=aq,
+        low_rank_trace=trace_inner(q, aq),
+    )
+
+
+def deflated_operator_apply_midpoint(
+    x_mid: jax.Array,
+    *,
+    deflation: DeflatedOperatorMetadata,
+    apply_operator_midpoint,
+    conjugate_inner: bool = False,
+) -> jax.Array:
+    x_arr = jnp.asarray(x_mid)
+    ax = jnp.asarray(apply_operator_midpoint(x_arr))
+    basis = jnp.asarray(deflation.basis)
+    if basis.shape[1] == 0:
+        return ax
+    if conjugate_inner:
+        coeffs = jnp.conjugate(basis).T @ x_arr
+    else:
+        coeffs = basis.T @ x_arr
+    return ax - jnp.asarray(deflation.image) @ coeffs
+
+
+def deflated_trace_estimate_from_metadata_point(
+    action_fn,
+    deflation: DeflatedOperatorMetadata,
+    residual_probes: jax.Array,
+    *,
+    coerce_probes,
+    midpoint_value,
+    point_from_midpoint,
+    residual_project,
+    quadratic_reduce,
+    target_stderr: float | None = None,
+    min_probes: int | None = None,
+    max_probes: int | None = None,
+    block_size: int = 1,
+) -> HutchppTraceMetadata:
+    residual = coerce_probes(residual_probes)
+    if residual.shape[0] > 0:
+        z = midpoint_value(residual)
+        z_proj = residual_project(z, jnp.asarray(deflation.basis))
+        hz = apply_action_over_probe_block_point(
+            lambda probe: point_from_midpoint(
+                deflated_operator_apply_midpoint(
+                    midpoint_value(probe),
+                    deflation=deflation,
+                    apply_operator_midpoint=lambda v_mid: midpoint_value(action_fn(point_from_midpoint(v_mid))),
+                    conjugate_inner=jnp.iscomplexobj(jnp.asarray(deflation.basis)),
+                )
+            ),
+            jax.vmap(point_from_midpoint)(z_proj),
+            coerce_probes=coerce_probes,
+            midpoint_value=midpoint_value,
+        )
+        residual_samples = quadratic_reduce(z_proj, hz)
+    else:
+        residual_samples = jnp.zeros((1,), dtype=jnp.asarray(deflation.low_rank_trace).dtype)
+    return make_hutchpp_trace_metadata(
+        basis=deflation.basis,
+        low_rank_trace=deflation.low_rank_trace,
+        residual_samples=residual_samples,
+        target_stderr=target_stderr,
+        min_probes=min_probes,
+        max_probes=max_probes,
+        block_size=block_size,
+    )
+
+
+def slq_nodes_weights(projected: jax.Array, beta0, *, hermitian: bool) -> tuple[jax.Array, jax.Array]:
+    projected_arr = jnp.asarray(projected)
+    beta0_arr = jnp.asarray(beta0)
+    if hermitian:
+        nodes, vecs = jnp.linalg.eigh(projected_arr)
+        first_row = vecs[0, :]
+        weights = (jnp.real(beta0_arr * jnp.conjugate(beta0_arr)) * jnp.real(first_row * jnp.conjugate(first_row))).astype(jnp.float64)
+        return jnp.asarray(nodes), weights
+    nodes, vecs = jnp.linalg.eig(projected_arr)
+    first_row = vecs[0, :]
+    weights = (beta0_arr * jnp.conjugate(beta0_arr)) * (first_row * jnp.conjugate(first_row))
+    return jnp.asarray(nodes), jnp.asarray(weights)
+
+
+def slq_scalar_quadrature(nodes: jax.Array, weights: jax.Array, scalar_fun, *, scalar_postprocess=None):
+    values = weights * scalar_fun(nodes)
+    total = jnp.sum(values)
+    return total if scalar_postprocess is None else scalar_postprocess(total)
+
+
+def slq_heat_trace(nodes: jax.Array, weights: jax.Array, time):
+    time_value = jnp.asarray(time)
+    return slq_scalar_quadrature(
+        nodes,
+        weights,
+        lambda vals: jnp.exp(-time_value * vals),
+    )
+
+
+def slq_spectral_density(nodes: jax.Array, weights: jax.Array, bin_edges: jax.Array, *, normalize: bool = False) -> jax.Array:
+    edges = jnp.asarray(bin_edges)
+    vals = jnp.asarray(nodes)
+    coeffs = jnp.real(jnp.asarray(weights, dtype=jnp.complex128))
+    left = vals[:, None] >= edges[:-1][None, :]
+    right = vals[:, None] < edges[1:][None, :]
+    last_bin = vals[:, None] == edges[-1][None, :]
+    mask = (left & right) | (last_bin & (jnp.arange(edges.shape[0] - 1) == edges.shape[0] - 2)[None, :])
+    hist = jnp.sum(jnp.where(mask, coeffs[:, None], 0.0), axis=0)
+    if normalize:
+        total = jnp.sum(hist)
+        hist = jnp.where(total > 0, hist / total, hist)
+    return hist
+
+
+def slq_functional_statistics_from_metadata(
+    metadata: SlqQuadratureMetadata,
+    scalar_function,
+) -> ProbeEstimateStatistics:
+    values = jax.vmap(lambda nodes, weights: scalar_function(nodes, weights))(metadata.nodes, metadata.weights)
+    return make_probe_estimate_statistics(values)
+
+
+def slq_functional_mean_from_metadata(
+    metadata: SlqQuadratureMetadata,
+    scalar_function,
+):
+    return slq_functional_statistics_from_metadata(metadata, scalar_function).mean
+
+
+def slq_heat_trace_from_metadata(metadata: SlqQuadratureMetadata, time):
+    return slq_functional_mean_from_metadata(
+        metadata,
+        lambda nodes, weights: slq_heat_trace(nodes, weights, time),
+    )
+
+
+def slq_spectral_density_from_metadata(
+    metadata: SlqQuadratureMetadata,
+    bin_edges: jax.Array,
+    *,
+    normalize: bool = False,
+) -> jax.Array:
+    return jnp.mean(
+        jax.vmap(lambda nodes, weights: slq_spectral_density(nodes, weights, bin_edges, normalize=normalize))(metadata.nodes, metadata.weights),
+        axis=0,
+    )
+
+
+def hutchpp_trace_from_metadata(metadata: HutchppTraceMetadata):
+    return metadata.low_rank_trace + metadata.residual_trace
+
+
+def slq_prepare_metadata_point(
+    lanczos_tridiag,
+    probes: jax.Array,
+    steps: int,
+    *,
+    coerce_probes,
+    hermitian: bool,
+    scalar_fun,
+    scalar_postprocess=None,
+    target_stderr: float | None = None,
+    min_probes: int | None = None,
+    max_probes: int | None = None,
+    block_size: int = 1,
+) -> SlqQuadratureMetadata:
+    coerced = coerce_probes(probes)
+    projected, beta0 = jax.vmap(lambda v: lanczos_tridiag(v, steps)[1:])(coerced)
+    sample_values = jax.vmap(
+        lambda proj, beta: slq_scalar_quadrature(
+            *slq_nodes_weights(proj, beta, hermitian=hermitian),
+            scalar_fun,
+            scalar_postprocess=scalar_postprocess,
+        )
+    )(projected, beta0)
+    return make_slq_quadrature_metadata(
+        projected,
+        beta0,
+        sample_values,
+        hermitian=hermitian,
+        target_stderr=target_stderr,
+        min_probes=min_probes,
+        max_probes=max_probes,
+        block_size=block_size,
+    )
+
+
+def make_slq_quadrature_metadata(
+    projected: jax.Array,
+    beta0,
+    sample_values: jax.Array,
+    *,
+    hermitian: bool,
+    target_stderr: float | None = None,
+    min_probes: int | None = None,
+    max_probes: int | None = None,
+    block_size: int = 1,
+) -> SlqQuadratureMetadata:
+    nodes, weights = jax.vmap(lambda proj, beta: slq_nodes_weights(proj, beta, hermitian=hermitian))(jnp.asarray(projected), jnp.asarray(beta0))
+    stats = make_probe_estimate_statistics(
+        sample_values,
+        target_stderr=target_stderr,
+        min_probes=min_probes,
+        max_probes=max_probes,
+        block_size=block_size,
+    )
+    return SlqQuadratureMetadata(
+        projected=projected,
+        beta0=beta0,
+        nodes=nodes,
+        weights=weights,
+        statistics=stats,
+        steps=jnp.asarray(jnp.asarray(projected).shape[-1], dtype=jnp.int32),
+        hermitian=jnp.asarray(hermitian),
+    )
+
+
+def make_hutchpp_trace_metadata(
+    *,
+    basis: jax.Array,
+    low_rank_trace,
+    residual_samples: jax.Array,
+    target_stderr: float | None = None,
+    min_probes: int | None = None,
+    max_probes: int | None = None,
+    block_size: int = 1,
+) -> HutchppTraceMetadata:
+    stats = make_probe_estimate_statistics(
+        residual_samples,
+        target_stderr=target_stderr,
+        min_probes=min_probes,
+        max_probes=max_probes,
+        block_size=block_size,
+    )
+    return HutchppTraceMetadata(
+        basis=basis,
+        low_rank_trace=low_rank_trace,
+        residual_trace=stats.mean,
+        statistics=stats,
+    )
+
+
 __all__ = [
     "OperatorPlan",
     "ScaledOperator",
@@ -1650,6 +2579,11 @@ __all__ = [
     "RecycledKrylovState",
     "LogdetSolveAux",
     "LogdetSolveResult",
+    "ImplicitAdjointSolveMetadata",
+    "ProbeEstimateStatistics",
+    "SlqQuadratureMetadata",
+    "HutchppTraceMetadata",
+    "DeflatedOperatorMetadata",
     "ShellCallbackPayload",
     "FiniteDifferenceOperatorPayload",
     "structure_code",
@@ -1664,6 +2598,7 @@ __all__ = [
     "generalized_shell_operator_plan",
     "dense_preconditioner_plan",
     "shell_preconditioner_plan",
+    "oriented_shell_preconditioner_plan",
     "identity_preconditioner_plan",
     "diagonal_preconditioner_plan",
     "dense_jacobi_preconditioner_plan",
@@ -1675,6 +2610,8 @@ __all__ = [
     "sparse_bcoo_operator_plan",
     "sparse_bcoo_preconditioner_plan",
     "sparse_bcoo_jacobi_preconditioner_plan",
+    "operator_transpose_plan",
+    "preconditioner_transpose_plan",
     "operator_plan_apply",
     "preconditioner_plan_apply",
     "operator_apply_midpoint",
@@ -1690,6 +2627,7 @@ __all__ = [
     "combine_logdet_solve_point",
     "finite_difference_jacobi_preconditioner_plan",
     "multi_shift_solve_point",
+    "implicit_krylov_solve_midpoint",
     "krylov_diagnostics",
     "dense_funm_hermitian_eigh",
     "dense_funm_general_eig",
@@ -1725,5 +2663,27 @@ __all__ = [
     "orthogonal_rademacher_probe_block_complex",
     "orthogonal_normal_probe_block_complex",
     "probe_sample_statistics",
+    "make_probe_estimate_statistics",
     "adaptive_probe_count_from_pilot",
+    "probe_statistics_target_met",
+    "probe_statistics_should_stop",
+    "expand_subspace_with_corrections",
+    "make_deflated_operator_metadata",
+    "prepare_deflated_operator_metadata_point",
+    "deflated_operator_apply_midpoint",
+    "deflated_trace_estimate_from_metadata_point",
+    "apply_action_over_probe_block_point",
+    "hutchpp_trace_with_metadata_projected_point",
+    "slq_nodes_weights",
+    "slq_scalar_quadrature",
+    "slq_heat_trace",
+    "slq_spectral_density",
+    "slq_functional_statistics_from_metadata",
+    "slq_functional_mean_from_metadata",
+    "slq_heat_trace_from_metadata",
+    "slq_spectral_density_from_metadata",
+    "slq_prepare_metadata_point",
+    "hutchpp_trace_from_metadata",
+    "make_slq_quadrature_metadata",
+    "make_hutchpp_trace_metadata",
 ]

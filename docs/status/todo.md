@@ -10,7 +10,7 @@ Organization rule:
   [test_coverage_matrix.md](/docs/status/test_coverage_matrix.md).
 - Test-owner priorities follow
   [test_gap_checklist.md](/docs/status/test_gap_checklist.md).
-- Generated inventories and detailed provenance stay in `docs/status/reports/`,
+- Generated inventories and detailed provenance stay in `docs/reports/`,
   not here.
 
 Status legend:
@@ -163,7 +163,9 @@ Status: `in_progress`
     aliases for incomplete gamma upper and incomplete Bessel `I`/`K`;
     continue narrowing terminology and diagnostics expectations around those
     hooks
-  - make incomplete-Bessel provider-grade next
+  - incomplete-Bessel now has explicit downstream provider aliases and a
+    normalized family benchmark; remaining work is numerical maturity and
+    diagnostics tightening rather than missing provider/report surfaces
 - `planned`
   - document a narrower capability-contract surface specifically for
     downstream-provider use once the Barnes/promotion/incomplete-Bessel tranche
@@ -250,25 +252,27 @@ Status: `in_progress`
   - point/basic/adaptive/rigorous API exposure exists for the main chassis
   - dense benchmark and example coverage exist in
     [benchmark_dense_matrix_surface.py](/benchmarks/benchmark_dense_matrix_surface.py),
-    [dense_matrix_surface_benchmark.md](/docs/status/reports/dense_matrix_surface_benchmark.md),
+    [dense_matrix_surface_benchmark.md](/docs/reports/dense_matrix_surface_benchmark.md),
     and
     [example_dense_matrix_surface.ipynb](/examples/example_dense_matrix_surface.ipynb)
 - `in_progress`
-  - strengthen large-`n` determinant enclosures beyond midpoint fallback
   - exact-reference dense chassis checks now cover `inv`, `qr`, cached matvec,
     determinant, trace, and matrix norms for real and complex dense matrices
   - dense chassis coverage now also includes point/basic/JIT/API parity checks
     for banded matvec on real and complex paths
-  - keep expanding larger-`n` determinant enclosure quality beyond midpoint
-    fallback and current 5x5/6x6 reference-nesting checks
+  - large-`n` determinant rigor now uses midpoint-perturbation / Hadamard
+    and determinant-Lipschitz enclosures instead of aliasing `basic`; keep
+    tightening conditioning-aware quality beyond the current 5x5/6x6
+    reference-nesting checks
   - separate midpoint-first solve-family implementations from true interval/box
     linear-algebra kernels in status and engineering reports
-  - deepen rigorous treatment for solve/inverse/factorization paths instead of
-    relying on wrapper-level outward boxing around midpoint kernels
+  - rigorous SPD/HPD, LU, and generic dense solve/inverse paths now use
+    residual-enclosed midpoint solves
+  - rigorous factor outputs now have widened `cho` / `ldl` / `lu` / `qr`
+    surfaces instead of returning only midpoint factors
 - `planned`
-  - align dense matrix status reporting with the same engineering fields used by
-    function status reports: hardening, AD audit, batch support, and pure-JAX
-    aspiration
+  - generate dense engineering status from the capability registry instead of
+    maintaining [dense_matrix_engineering_status.md](/docs/reports/dense_matrix_engineering_status.md)
 
 ## 4. Sparse / Block-Sparse / VBlock Functionality
 
@@ -296,12 +300,22 @@ Status: `in_progress`
   - the sparse, block-sparse, and variable-block benchmark/report layer now
     follows the shared schema with pytest-owned runtime-report checks
   - direct-owner tests now exist for `block_sparse_core` and `sparse_core`
+  - wrapper-level mode-dispatch surfaces now also exist for block-sparse and
+    variable-block sparse families through
+    [mat_wrappers.py](/src/arbplusjax/mat_wrappers.py), with direct owner tests
+    in
+    [test_block_vblock_sparse_mode_surface.py](/tests/test_block_vblock_sparse_mode_surface.py)
 - `in_progress`
   - direct owner tests now exist for `sparse_common`
 - `planned`
-  - add interval/box block-sparse and variable-block sparse modes
-  - add more benchmark coverage that separates storage-format overhead from
-    solver quality
+  - extend native interval/box sparse coverage beyond block/vblock `basic`
+    determinant, inverse, and square into more of the core sparse surface;
+    main-stack sparse `basic` LU/Cholesky plan preparation should stay on dense
+    interval/box plans rather than reusing sparse point plans
+  - extend the storage-format preparation versus solver-quality benchmark split
+    beyond the current block/vblock reports; the main sparse surface should
+    track `storage_prepare` and `cached_prepare` separately from solve and
+    apply timings
 
 ## 5. Matrix-Free / Operator Functionality
 
@@ -338,19 +352,53 @@ Status: `in_progress`
   - reusable pilot-variance and adaptive probe-budget helpers now exist in
     `matrix_free_core`, with public trace-estimator probe statistics/adaptive
     count surfaces on `jrb_mat` / `jcb_mat`
+  - shared Hutch++ and SLQ block-action/metadata-preparation logic now lives in
+    `matrix_free_core`, with the real/complex Jones wrappers reduced to
+    algebra-specific coercion and midpoint policy
+  - SLQ/Hutch++ postprocessing now lives in shared `matrix_free_core` helpers
+    rather than duplicated real/complex wrapper code
+  - the public estimator aliases now line up more cleanly across `jrb_mat` and
+    `jcb_mat`, including `trace_estimate_*`, `logdet_estimate_*`, and heat-trace
+    basic surfaces
+  - shared probe-statistics stopping helpers and shared correction-expansion
+    helpers now live in `matrix_free_core` instead of duplicated real/complex
+    wrapper logic
+  - public contour-integral `log`, `sqrt`, `root`, and `sign` action wrappers
+    now exist on `jrb_mat` / `jcb_mat`, backed by the shared contour-integral
+    helper substrate
+  - public contour-integral `sin` / `cos` action wrappers now also exist on
+    `jrb_mat` / `jcb_mat`
+  - shared eigensolver convergence accounting now lives in
+    `matrix_free_core.eig_convergence_summary` instead of duplicated
+    real/complex residual-threshold bookkeeping
+  - low-rank deflation metadata and residual trace-estimation helpers now live
+    in shared `matrix_free_core`, with public real/complex Jones wrappers for
+    preparing and reusing deflated operator state across probe passes
+  - operator-first solve surfaces on `jrb_mat` / `jcb_mat` now route through
+    `matrix_free_core.implicit_krylov_solve_midpoint` using
+    `jax.lax.custom_linear_solve` where the current transpose/adjoint policy
+    supports implicit adjoints
+  - shell preconditioners can now carry explicit transpose/adjoint callbacks
+    through the shared preconditioner policy instead of degrading to forward
+    reuse in transpose solves
+  - solve/logdet bundles now retain compact transpose-operator metadata in the
+    shared `matrix_free_core` auxiliary payload
+  - fp64 solve/logdet gradient proof coverage now exists for the implicit
+    adjoint path, and a latent-Gaussian Laplace worked example now exists under
+    `examples/example_latent_gaussian_laplace.py`
 
 ### Core Operator Infrastructure
 
 - `in_progress`
   - direct owner tests now exist for `iterative_solvers`
   - deepen the new `basic` semantics for operator-first surfaces
-  - harden flexible-preconditioner policy beyond the current shared
-    preconditioned `minres` path
+  - keep extending flexible-preconditioner policy beyond the newly landed
+    transpose-aware shell-preconditioner contract
   - harden locking, restart, and correction-equation policy for the landed
     Davidson/Jacobi-Davidson/shift-invert/contour eigensolver tranche
   - keep extending the new contour-integral/spectral-transform/operator-first
-    helper substrate from the current core action/combiner layer into more
-    public `jrb_mat` / `jcb_mat` matrix-function surfaces
+    helper substrate beyond the now-landed `log` / `sqrt` / `root` / `sign`
+    wrappers into more public `jrb_mat` / `jcb_mat` matrix-function surfaces
 
 ### Estimators And Approximation Paths
 
@@ -424,7 +472,8 @@ Status: `in_progress`
       pivoted Cholesky, Nyström, or related low-rank operator-first methods
     - evaluate the projected low-rank contribution exactly on the compact
       subspace and probe only the residual operator
-    - expose a reusable deflated-operator plan so Hutchinson, Hutch++, SLQ, and
+    - keep extending the newly landed shared deflation metadata beyond current
+      residual trace-estimation reuse so Hutchinson, Hutch++, SLQ, and
       rational-Krylov estimators can share the same deflation path
     - recycle the cached subspace across nearby parameter values and repeated
       solves, with refresh rules based on residual mass or variance drift
@@ -453,6 +502,57 @@ Status: `in_progress`
     - Hutch++ variance scans across probe counts and seeds
     - orthogonal-probe variance scans versus i.i.d. Rademacher probes at fixed
       compute budgets
+
+## Curvature Layer
+
+### Shared Helper Placement
+
+- `in_progress`
+  - curvature is now being treated as a shared helper layer rather than being
+    folded into one runtime category
+  - target placement is `src/arbplusjax/curvature/`
+  - current implementation note exists at
+    [curvature_implementation.md](/docs/implementation/curvature_implementation.md)
+  - root package and architecture docs now recognize curvature as a
+    cross-cutting layer used by dense, sparse, and matrix-free stacks
+
+### Phase 1 Core Operator Surface
+
+- `in_progress`
+  - harden the newly introduced shared operator surface:
+    - `CurvatureOperator`
+    - `CurvatureSpec`
+    - HVP builders
+    - dense Hessian builders
+    - posterior-precision composition
+    - generic solve and Newton-step helpers
+    - PSD/symmetrization helpers
+  - keep the implementation operator-first and matrix-optional
+  - minimize duplication by delegating to current dense and Jones
+    matrix-free/sparse surfaces where they already exist
+
+### Phase 2 Bayesian And Approximation Surfaces
+
+- `planned`
+  - generalized Gauss-Newton and Fisher operators
+  - inverse-diagonal estimation
+  - selected-inverse extraction
+  - operator-first `logdet` integration
+
+### Phase 3 Spectral And Posterior Summaries
+
+- `planned`
+  - low-rank curvature approximations
+  - Lanczos curvature approximations
+  - posterior marginal-variance extraction
+  - custom VJP/JVP support for scalable evidence terms
+
+### Phase 4 Advanced Stabilization
+
+- `planned`
+  - trust-region and advanced damping policy
+  - curvature regime detection
+  - automated approximation selection
     - FWHT and QR probe-block parity checks for unbiased trace estimation on
       small reference problems
     - low-rank-deflated estimator variance scans versus undeflated estimators
@@ -527,6 +627,8 @@ Status: `in_progress`
   - bring incomplete `I` to the same regime maturity as incomplete `K`
   - finish hardening and characterization of the `bdg_*` Barnes and
     double-gamma family
+  - keep extending Barnes/double-gamma diagnostics and provider contracts
+    beyond the current scalar IFJ surface
   - reduce runtime cost of rigorous/adaptive `bdg_*` samplers in
     `src/arbplusjax/ball_wrappers.py`
   - continue hypergeometric engineering cleanup:
@@ -707,4 +809,4 @@ snapshot `2026-02-25T03:51:38Z`.
 - ACB Calc: 0
 
 Use the snapshot above for gap sizing only. Detailed missing-symbol inventories
-belong in `docs/status/reports/missing_impls/`.
+belong in `docs/reports/missing_impls/`.

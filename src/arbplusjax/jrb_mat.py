@@ -217,8 +217,11 @@ def _jrb_eig_diagnostics(
     residuals = _jrb_eig_residuals(matvec, vals, vecs)
     max_residual = jnp.max(residuals) if residuals.size else jnp.asarray(0.0, dtype=jnp.float64)
     requested = vals.shape[-1] if vals.ndim > 0 else 1
-    converged_mask = residuals <= jnp.asarray(tol, dtype=jnp.float64)
-    converged_count = jnp.sum(converged_mask.astype(jnp.int32)) if residuals.size else jnp.asarray(0, dtype=jnp.int32)
+    converged_count, locked_count, deflated_count, converged = matrix_free_core.eig_convergence_summary(
+        residuals,
+        tol=tol,
+        requested=requested,
+    )
     diag = matrix_free_core.krylov_diagnostics(
         JrbMatKrylovDiagnostics,
         algorithm_code=algorithm_code,
@@ -243,11 +246,11 @@ def _jrb_eig_diagnostics(
     )
     return _jrb_update_convergence(
         diag,
-        converged=converged_count >= requested,
+        converged=converged,
         convergence_metric=max_residual,
-        locked_count=requested,
+        locked_count=locked_count,
         residual_history=residuals if residuals.size else jnp.asarray([max_residual], dtype=jnp.float64),
-        deflated_count=converged_count,
+        deflated_count=deflated_count,
     )
 
 
@@ -821,7 +824,8 @@ def jrb_mat_solve_action_with_diagnostics_point(
     preconditioner=None,
 ):
     b = jrb_mat_as_interval_vector(b)
-    x_mid, info, residual, rhs_norm = matrix_free_core.krylov_solve_midpoint(
+    structured = _jrb_structure_tag(symmetric=symmetric)
+    x_mid, info, residual, rhs_norm, solve_meta = matrix_free_core.implicit_krylov_solve_midpoint(
         matvec,
         b,
         x0=x0,
@@ -830,6 +834,7 @@ def jrb_mat_solve_action_with_diagnostics_point(
         maxiter=maxiter,
         preconditioner=preconditioner,
         solver="cg" if symmetric else "gmres",
+        structured=structured,
         midpoint_vector=_jrb_mid_vector,
         lift_vector=_jrb_point_interval,
         sparse_bcoo_matvec=sparse_common.sparse_bcoo_matvec,
@@ -845,19 +850,19 @@ def jrb_mat_solve_action_with_diagnostics_point(
         beta0=jnp.asarray(rhs_norm, dtype=jnp.float64),
         tail_norm=jnp.asarray(info["residuals"][-1], dtype=jnp.float64),
         breakdown=jnp.asarray(False),
-        used_adjoint=jnp.asarray(False),
-        gradient_supported=jnp.asarray(True),
+        used_adjoint=jnp.asarray(solve_meta.implicit_adjoint),
+        gradient_supported=jnp.asarray(solve_meta.implicit_adjoint),
         probe_count=jnp.asarray(1, dtype=jnp.int32),
     )
     diag = _jrb_attach_diag(
         diag,
         regime="structured" if symmetric else "iterative",
         method="cg" if symmetric else "gmres",
-        structure=_jrb_structure_tag(symmetric=symmetric),
+        structure=structured,
         work_units=info["iterations"],
         primal_residual=residual,
         adjoint_residual=0.0,
-        note="matrix_free.solve_action",
+        note="matrix_free.solve_action.implicit_adjoint" if solve_meta.implicit_adjoint else "matrix_free.solve_action",
     )
     diag = _jrb_update_convergence(
         diag,
@@ -928,7 +933,7 @@ def jrb_mat_minres_solve_action_with_diagnostics_point(
     preconditioner=None,
 ):
     b = jrb_mat_as_interval_vector(b)
-    x_mid, info, residual, rhs_norm = matrix_free_core.krylov_solve_midpoint(
+    x_mid, info, residual, rhs_norm, solve_meta = matrix_free_core.implicit_krylov_solve_midpoint(
         matvec,
         b,
         x0=x0,
@@ -937,6 +942,7 @@ def jrb_mat_minres_solve_action_with_diagnostics_point(
         maxiter=maxiter,
         preconditioner=preconditioner,
         solver="minres",
+        structured=_jrb_structure_tag(symmetric=True),
         midpoint_vector=_jrb_mid_vector,
         lift_vector=_jrb_point_interval,
         sparse_bcoo_matvec=sparse_common.sparse_bcoo_matvec,
@@ -952,8 +958,8 @@ def jrb_mat_minres_solve_action_with_diagnostics_point(
         beta0=jnp.asarray(rhs_norm, dtype=jnp.float64),
         tail_norm=jnp.asarray(info["residuals"][-1], dtype=jnp.float64),
         breakdown=jnp.asarray(False),
-        used_adjoint=jnp.asarray(False),
-        gradient_supported=jnp.asarray(True),
+        used_adjoint=jnp.asarray(solve_meta.implicit_adjoint),
+        gradient_supported=jnp.asarray(solve_meta.implicit_adjoint),
         probe_count=jnp.asarray(1, dtype=jnp.int32),
     )
     diag = _jrb_attach_diag(
@@ -964,7 +970,7 @@ def jrb_mat_minres_solve_action_with_diagnostics_point(
         work_units=info["iterations"],
         primal_residual=residual,
         adjoint_residual=0.0,
-        note="matrix_free.minres_solve_action",
+        note="matrix_free.minres_solve_action.implicit_adjoint" if solve_meta.implicit_adjoint else "matrix_free.minres_solve_action",
     )
     diag = _jrb_update_convergence(
         diag,
@@ -1895,35 +1901,110 @@ def jrb_mat_log_action_leja_with_diagnostics_point(
 
 
 def _jrb_apply_block_action_point(action_fn, probes: jax.Array) -> jax.Array:
-    coerced = di.as_interval(probes)
-    outputs = jax.vmap(action_fn)(coerced)
-    return di.midpoint(outputs)
+    return matrix_free_core.apply_action_over_probe_block_point(
+        action_fn,
+        probes,
+        coerce_probes=di.as_interval,
+        midpoint_value=di.midpoint,
+    )
+
+
+def jrb_mat_hutchpp_trace_with_metadata_point(
+    action_fn,
+    sketch_probes: jax.Array,
+    residual_probes: jax.Array,
+    *,
+    target_stderr: float | None = None,
+    min_probes: int | None = None,
+    max_probes: int | None = None,
+    block_size: int = 1,
+) -> matrix_free_core.HutchppTraceMetadata:
+    return matrix_free_core.hutchpp_trace_with_metadata_projected_point(
+        action_fn,
+        sketch_probes,
+        residual_probes,
+        coerce_probes=di.as_interval,
+        midpoint_value=di.midpoint,
+        point_from_midpoint=_jrb_point_interval,
+        basis_dtype=jnp.float64,
+        trace_inner=lambda q, fq_cols: jnp.trace(q.T @ fq_cols),
+        residual_project=lambda z, q: z - (z @ q) @ q.T,
+        quadratic_reduce=lambda z_proj, hz: jnp.sum(z_proj * hz, axis=-1),
+        zero_scalar=jnp.asarray(0.0, dtype=jnp.float64),
+        target_stderr=target_stderr,
+        min_probes=min_probes,
+        max_probes=max_probes,
+        block_size=block_size,
+    )
+
+
+def jrb_mat_deflated_operator_prepare_point(
+    action_fn,
+    sketch_probes: jax.Array,
+) -> matrix_free_core.DeflatedOperatorMetadata:
+    return matrix_free_core.prepare_deflated_operator_metadata_point(
+        action_fn,
+        sketch_probes,
+        coerce_probes=di.as_interval,
+        midpoint_value=di.midpoint,
+        point_from_midpoint=_jrb_point_interval,
+        basis_dtype=jnp.float64,
+        trace_inner=lambda q, fq_cols: jnp.trace(q.T @ fq_cols),
+    )
+
+
+def jrb_mat_trace_estimate_deflated_point(
+    action_fn,
+    deflation: matrix_free_core.DeflatedOperatorMetadata,
+    residual_probes: jax.Array,
+    *,
+    target_stderr: float | None = None,
+    min_probes: int | None = None,
+    max_probes: int | None = None,
+    block_size: int = 1,
+) -> matrix_free_core.HutchppTraceMetadata:
+    return matrix_free_core.deflated_trace_estimate_from_metadata_point(
+        action_fn,
+        deflation,
+        residual_probes,
+        coerce_probes=di.as_interval,
+        midpoint_value=di.midpoint,
+        point_from_midpoint=_jrb_point_interval,
+        residual_project=lambda z, q: z - (z @ q) @ q.T,
+        quadratic_reduce=lambda z_proj, hz: jnp.sum(z_proj * hz, axis=-1),
+        target_stderr=target_stderr,
+        min_probes=min_probes,
+        max_probes=max_probes,
+        block_size=block_size,
+    )
 
 
 def jrb_mat_hutchpp_trace_point(action_fn, sketch_probes: jax.Array, residual_probes: jax.Array) -> jax.Array:
     """Estimate tr(F) from an action oracle using Hutch++ probe partitions."""
-    sketch = di.as_interval(sketch_probes)
-    residual = di.as_interval(residual_probes)
-    n = int(sketch.shape[-2] if sketch.shape[0] > 0 else residual.shape[-2])
+    metadata = jrb_mat_hutchpp_trace_with_metadata_point(action_fn, sketch_probes, residual_probes)
+    return jnp.asarray(matrix_free_core.hutchpp_trace_from_metadata(metadata), dtype=jnp.float64)
 
-    if sketch.shape[0] > 0:
-        y_cols = jnp.swapaxes(_jrb_apply_block_action_point(action_fn, sketch), 0, 1)
-        q, _ = jnp.linalg.qr(y_cols, mode="reduced")
-        fq_cols = jnp.swapaxes(_jrb_apply_block_action_point(action_fn, jax.vmap(_jrb_point_interval)(q.T)), 0, 1)
-        trace_lr = jnp.trace(q.T @ fq_cols)
-    else:
-        q = jnp.zeros((n, 0), dtype=jnp.float64)
-        trace_lr = jnp.asarray(0.0, dtype=jnp.float64)
 
-    if residual.shape[0] > 0:
-        z = di.midpoint(residual)
-        z_proj = z - (z @ q) @ q.T
-        hz = _jrb_apply_block_action_point(action_fn, jax.vmap(_jrb_point_interval)(z_proj))
-        residual_est = jnp.mean(jnp.sum(z_proj * hz, axis=-1))
-    else:
-        residual_est = jnp.asarray(0.0, dtype=jnp.float64)
+def jrb_mat_hutchpp_trace_estimate_point(action_fn, sketch_probes: jax.Array, residual_probes: jax.Array) -> jax.Array:
+    return jrb_mat_hutchpp_trace_point(action_fn, sketch_probes, residual_probes)
 
-    return jnp.asarray(trace_lr + residual_est, dtype=jnp.float64)
+
+def jrb_mat_hutchpp_trace_estimate_basic(
+    action_fn,
+    sketch_probes: jax.Array,
+    residual_probes: jax.Array,
+    *,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return matrix_free_basic.scalar_functional_basic(
+        jrb_mat_hutchpp_trace_estimate_point,
+        action_fn,
+        sketch_probes,
+        residual_probes,
+        lift_scalar=_jrb_point_interval,
+        round_output=_jrb_round_basic,
+        prec_bits=prec_bits,
+    )
 
 
 def jrb_mat_logdet_leja_hutchpp_point(
@@ -2471,35 +2552,19 @@ def _jrb_expand_subspace_with_corrections(
     preconditioner=None,
     jacobi_davidson: bool = False,
 ) -> jax.Array:
-    max_new_cols = max(0, min(int(target_cols) - int(basis.shape[1]), int(residuals.shape[1])))
-    if vals is not None and max_new_cols > 0:
-        order = matrix_free_core.eig_expansion_column_order(vals, residuals, which=which, lock_tol=lock_tol)
-        chosen = order[:max_new_cols]
-        vecs = vecs[:, chosen]
-        residuals = residuals[:, chosen]
-    corrections = residuals
-    residual_norms = jnp.linalg.norm(corrections, axis=0, keepdims=True)
-    safe_norms = jnp.where(residual_norms > 1e-12, residual_norms, 1.0)
-    corrections = corrections / safe_norms
-    if preconditioner is not None:
-        corrections = jax.vmap(lambda col: _jrb_apply_preconditioner_mid(preconditioner, col), in_axes=1, out_axes=1)(corrections)
-    if jacobi_davidson:
-        coeffs = jnp.sum(vecs * corrections, axis=0, keepdims=True)
-        projected = corrections - vecs * coeffs
-        proj_norms = jnp.linalg.norm(projected, axis=0, keepdims=True)
-        corrections = jnp.where(
-            proj_norms > 1e-12,
-            projected / jnp.where(proj_norms > 1e-12, proj_norms, 1.0),
-            0.0,
-        )
-    correction_norms = jnp.linalg.norm(corrections, axis=0, keepdims=True)
-    corrections = jnp.where(correction_norms > 1e-10, corrections, 0.0)
-    trial = jnp.concatenate([basis, corrections], axis=1)
-    basis_next = _jrb_orthonormalize_columns(trial)
-    if basis_next.shape[1] < target_cols:
-        pad = basis[:, : target_cols - basis_next.shape[1]]
-        basis_next = _jrb_orthonormalize_columns(jnp.concatenate([basis_next, pad], axis=1))
-    return basis_next[:, :target_cols]
+    return matrix_free_core.expand_subspace_with_corrections(
+        basis,
+        vecs,
+        residuals,
+        orthonormalize_columns_fn=_jrb_orthonormalize_columns,
+        apply_preconditioner=None if preconditioner is None else (lambda col: _jrb_apply_preconditioner_mid(preconditioner, col)),
+        vals=vals,
+        target_cols=target_cols,
+        which=which,
+        lock_tol=lock_tol,
+        jacobi_davidson=jacobi_davidson,
+        conjugate_inner=False,
+    )
 
 
 def _jrb_restart_basis_from_pairs(
@@ -4191,6 +4256,75 @@ def jrb_mat_trace_estimator_adaptive_probe_count(
     )
 
 
+def _jrb_mat_slq_prepare_point(
+    matvec,
+    probes: jax.Array,
+    steps: int,
+    *,
+    scalar_fun,
+    scalar_postprocess=lambda value: jnp.real(value),
+    target_stderr: float | None = None,
+    min_probes: int | None = None,
+    max_probes: int | None = None,
+    block_size: int = 1,
+) -> matrix_free_core.SlqQuadratureMetadata:
+    return matrix_free_core.slq_prepare_metadata_point(
+        lambda v, k: jrb_mat_lanczos_tridiag_point(matvec, v, k),
+        probes,
+        steps,
+        coerce_probes=di.as_interval,
+        hermitian=True,
+        scalar_fun=scalar_fun,
+        scalar_postprocess=scalar_postprocess,
+        target_stderr=target_stderr,
+        min_probes=min_probes,
+        max_probes=max_probes,
+        block_size=block_size,
+    )
+
+
+def jrb_mat_slq_prepare_point(
+    matvec,
+    probes: jax.Array,
+    steps: int,
+    *,
+    target_stderr: float | None = None,
+    min_probes: int | None = None,
+    max_probes: int | None = None,
+    block_size: int = 1,
+) -> matrix_free_core.SlqQuadratureMetadata:
+    return _jrb_mat_slq_prepare_point(
+        matvec,
+        probes,
+        steps,
+        scalar_fun=jnp.log,
+        target_stderr=target_stderr,
+        min_probes=min_probes,
+        max_probes=max_probes,
+        block_size=block_size,
+    )
+
+
+def jrb_mat_trace_estimate_point(matvec, probes: jax.Array) -> jax.Array:
+    return jrb_mat_trace_estimator_point(matvec, probes)
+
+
+def jrb_mat_trace_estimate_basic(
+    matvec,
+    probes: jax.Array,
+    *,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return matrix_free_basic.scalar_functional_basic(
+        jrb_mat_trace_estimate_point,
+        matvec,
+        probes,
+        lift_scalar=_jrb_point_interval,
+        round_output=_jrb_round_basic,
+        prec_bits=prec_bits,
+    )
+
+
 def jrb_mat_logdet_slq_point(matvec, probes: jax.Array, steps: int) -> jax.Array:
     return mat_common.estimator_mean(
         probes,
@@ -4198,6 +4332,218 @@ def jrb_mat_logdet_slq_point(matvec, probes: jax.Array, steps: int) -> jax.Array
         lambda v: jrb_mat_funm_trace_integrand_lanczos_point(matvec, v, jnp.log, steps=steps),
         probe_midpoint=di.midpoint,
     )
+
+
+def jrb_mat_log_action_contour_point(
+    matvec,
+    x: jax.Array,
+    *,
+    center,
+    radius,
+    quadrature_order: int = 16,
+    preconditioner=None,
+    tol: float = 1e-8,
+    atol: float = 0.0,
+    maxiter: int | None = None,
+) -> jax.Array:
+    return _jrb_point_interval(
+        matrix_free_core.contour_integral_action_point(
+            lambda shift, v: _jrb_shifted_solve_mid(matvec, v, shift=shift, preconditioner=preconditioner, tol=tol, atol=atol, maxiter=maxiter),
+            di.midpoint(jrb_mat_as_interval_vector(x)),
+            center=center,
+            radius=radius,
+            quadrature_order=quadrature_order,
+            node_weight_fn=lambda node: jnp.log(node) / (2.0j * jnp.pi),
+        )
+    )
+
+
+def jrb_mat_sqrt_action_contour_point(
+    matvec,
+    x: jax.Array,
+    *,
+    center,
+    radius,
+    quadrature_order: int = 16,
+    preconditioner=None,
+    tol: float = 1e-8,
+    atol: float = 0.0,
+    maxiter: int | None = None,
+) -> jax.Array:
+    return _jrb_point_interval(
+        matrix_free_core.contour_integral_action_point(
+            lambda shift, v: _jrb_shifted_solve_mid(matvec, v, shift=shift, preconditioner=preconditioner, tol=tol, atol=atol, maxiter=maxiter),
+            di.midpoint(jrb_mat_as_interval_vector(x)),
+            center=center,
+            radius=radius,
+            quadrature_order=quadrature_order,
+            node_weight_fn=lambda node: jnp.sqrt(node) / (2.0j * jnp.pi),
+        )
+    )
+
+
+def jrb_mat_root_action_contour_point(
+    matvec,
+    x: jax.Array,
+    *,
+    degree: int,
+    center,
+    radius,
+    quadrature_order: int = 16,
+    preconditioner=None,
+    tol: float = 1e-8,
+    atol: float = 0.0,
+    maxiter: int | None = None,
+) -> jax.Array:
+    if degree <= 0:
+        raise ValueError("degree must be > 0")
+    inv_degree = 1.0 / jnp.asarray(degree, dtype=jnp.float64)
+    return _jrb_point_interval(
+        matrix_free_core.contour_integral_action_point(
+            lambda shift, v: _jrb_shifted_solve_mid(matvec, v, shift=shift, preconditioner=preconditioner, tol=tol, atol=atol, maxiter=maxiter),
+            di.midpoint(jrb_mat_as_interval_vector(x)),
+            center=center,
+            radius=radius,
+            quadrature_order=quadrature_order,
+            node_weight_fn=lambda node: jnp.power(node, inv_degree) / (2.0j * jnp.pi),
+        )
+    )
+
+
+def jrb_mat_sign_action_contour_point(
+    matvec,
+    x: jax.Array,
+    *,
+    center,
+    radius,
+    quadrature_order: int = 16,
+    preconditioner=None,
+    tol: float = 1e-8,
+    atol: float = 0.0,
+    maxiter: int | None = None,
+) -> jax.Array:
+    return _jrb_point_interval(
+        matrix_free_core.contour_integral_action_point(
+            lambda shift, v: _jrb_shifted_solve_mid(matvec, v, shift=shift, preconditioner=preconditioner, tol=tol, atol=atol, maxiter=maxiter),
+            di.midpoint(jrb_mat_as_interval_vector(x)),
+            center=center,
+            radius=radius,
+            quadrature_order=quadrature_order,
+            node_weight_fn=lambda node: jnp.sign(node) / (2.0j * jnp.pi),
+        )
+    )
+
+
+def jrb_mat_sin_action_contour_point(
+    matvec,
+    x: jax.Array,
+    *,
+    center,
+    radius,
+    quadrature_order: int = 16,
+    preconditioner=None,
+    tol: float = 1e-8,
+    atol: float = 0.0,
+    maxiter: int | None = None,
+) -> jax.Array:
+    return _jrb_point_interval(
+        matrix_free_core.contour_integral_action_point(
+            lambda shift, v: _jrb_shifted_solve_mid(matvec, v, shift=shift, preconditioner=preconditioner, tol=tol, atol=atol, maxiter=maxiter),
+            di.midpoint(jrb_mat_as_interval_vector(x)),
+            center=center,
+            radius=radius,
+            quadrature_order=quadrature_order,
+            node_weight_fn=lambda node: jnp.sin(node) / (2.0j * jnp.pi),
+        )
+    )
+
+
+def jrb_mat_cos_action_contour_point(
+    matvec,
+    x: jax.Array,
+    *,
+    center,
+    radius,
+    quadrature_order: int = 16,
+    preconditioner=None,
+    tol: float = 1e-8,
+    atol: float = 0.0,
+    maxiter: int | None = None,
+) -> jax.Array:
+    return _jrb_point_interval(
+        matrix_free_core.contour_integral_action_point(
+            lambda shift, v: _jrb_shifted_solve_mid(matvec, v, shift=shift, preconditioner=preconditioner, tol=tol, atol=atol, maxiter=maxiter),
+            di.midpoint(jrb_mat_as_interval_vector(x)),
+            center=center,
+            radius=radius,
+            quadrature_order=quadrature_order,
+            node_weight_fn=lambda node: jnp.cos(node) / (2.0j * jnp.pi),
+        )
+    )
+
+
+def jrb_mat_logdet_estimate_point(matvec, probes: jax.Array, steps: int) -> jax.Array:
+    return jrb_mat_logdet_slq_point(matvec, probes, steps)
+
+
+def jrb_mat_logdet_estimate_basic(
+    matvec,
+    probes: jax.Array,
+    steps: int,
+    *,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return jrb_mat_logdet_slq_basic(matvec, probes, steps, prec_bits=prec_bits)
+
+
+def jrb_mat_heat_trace_slq_from_metadata_point(metadata: matrix_free_core.SlqQuadratureMetadata, time) -> jax.Array:
+    return matrix_free_core.slq_heat_trace_from_metadata(metadata, time)
+
+
+def jrb_mat_heat_trace_slq_point(matvec, probes: jax.Array, steps: int, *, time) -> jax.Array:
+    metadata = _jrb_mat_slq_prepare_point(matvec, probes, steps, scalar_fun=jnp.log)
+    return jrb_mat_heat_trace_slq_from_metadata_point(metadata, time)
+
+
+def jrb_mat_heat_trace_slq_basic(
+    matvec,
+    probes: jax.Array,
+    steps: int,
+    *,
+    time,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+) -> jax.Array:
+    return matrix_free_basic.scalar_functional_basic(
+        jrb_mat_heat_trace_slq_point,
+        matvec,
+        probes,
+        steps,
+        time=time,
+        lift_scalar=_jrb_point_interval,
+        round_output=_jrb_round_basic,
+        prec_bits=prec_bits,
+    )
+
+
+def jrb_mat_spectral_density_slq_from_metadata_point(
+    metadata: matrix_free_core.SlqQuadratureMetadata,
+    bin_edges: jax.Array,
+    *,
+    normalize: bool = False,
+) -> jax.Array:
+    return matrix_free_core.slq_spectral_density_from_metadata(metadata, bin_edges, normalize=normalize)
+
+
+def jrb_mat_spectral_density_slq_point(
+    matvec,
+    probes: jax.Array,
+    steps: int,
+    *,
+    bin_edges: jax.Array,
+    normalize: bool = False,
+) -> jax.Array:
+    metadata = _jrb_mat_slq_prepare_point(matvec, probes, steps, scalar_fun=jnp.log)
+    return jrb_mat_spectral_density_slq_from_metadata_point(metadata, bin_edges, normalize=normalize)
 
 
 def jrb_mat_logdet_slq_basic(
@@ -4648,8 +4994,11 @@ def jrb_mat_logdet_solve_point(
     symmetric: bool = True,
     preconditioner=None,
 ) -> matrix_free_core.LogdetSolveResult:
+    transpose_operator = matrix_free_core.operator_transpose_plan(matvec, conjugate=False)
+    implicit_adjoint = symmetric or transpose_operator is not None
     return matrix_free_core.combine_logdet_solve_point(
         operator=matvec,
+        transpose_operator=transpose_operator,
         rhs=rhs,
         probes=probes,
         solve_with_diagnostics=lambda operator, rhs_value: jrb_mat_solve_action_with_diagnostics_point(
@@ -4664,6 +5013,8 @@ def jrb_mat_logdet_solve_point(
         ),
         logdet_with_diagnostics=lambda operator, probe_value: jrb_mat_logdet_slq_with_diagnostics_point(operator, probe_value, steps),
         preconditioner=preconditioner,
+        solver="cg" if symmetric else "gmres",
+        implicit_adjoint=implicit_adjoint,
         structured=_jrb_structure_tag(symmetric=symmetric, spd=symmetric),
         algebra="jrb",
     )
@@ -5130,6 +5481,12 @@ __all__ = [
     "jrb_mat_poly_action_basic",
     "jrb_mat_rational_action_point",
     "jrb_mat_rational_action_basic",
+    "jrb_mat_log_action_contour_point",
+    "jrb_mat_sqrt_action_contour_point",
+    "jrb_mat_root_action_contour_point",
+    "jrb_mat_sign_action_contour_point",
+    "jrb_mat_sin_action_contour_point",
+    "jrb_mat_cos_action_contour_point",
     "jrb_mat_expm_action_point",
     "jrb_mat_expm_action_basic",
     "jrb_mat_lanczos_tridiag_point",
@@ -5219,11 +5576,16 @@ __all__ = [
     "jrb_mat_expm_action_lanczos_restarted_with_diagnostics_point",
     "jrb_mat_trace_integrand_point",
     "jrb_mat_funm_trace_integrand_lanczos_point",
+    "jrb_mat_slq_prepare_point",
     "jrb_mat_trace_estimator_point",
+    "jrb_mat_trace_estimate_point",
+    "jrb_mat_trace_estimate_basic",
     "jrb_mat_trace_estimator_probe_statistics_point",
     "jrb_mat_trace_estimator_adaptive_probe_count",
     "jrb_mat_trace_estimator_with_diagnostics_point",
     "jrb_mat_logdet_slq_point",
+    "jrb_mat_logdet_estimate_point",
+    "jrb_mat_logdet_estimate_basic",
     "jrb_mat_logdet_slq_basic",
     "jrb_mat_logdet_slq_with_diagnostics_point",
     "jrb_mat_logdet_slq_with_diagnostics_basic",
@@ -5263,7 +5625,17 @@ __all__ = [
     "jrb_mat_tanh_action_spd_with_diagnostics_point",
     "jrb_mat_log_action_leja_point",
     "jrb_mat_log_action_leja_with_diagnostics_point",
+    "jrb_mat_heat_trace_slq_from_metadata_point",
+    "jrb_mat_heat_trace_slq_point",
+    "jrb_mat_heat_trace_slq_basic",
+    "jrb_mat_spectral_density_slq_from_metadata_point",
+    "jrb_mat_spectral_density_slq_point",
     "jrb_mat_hutchpp_trace_point",
+    "jrb_mat_hutchpp_trace_with_metadata_point",
+    "jrb_mat_hutchpp_trace_estimate_point",
+    "jrb_mat_hutchpp_trace_estimate_basic",
+    "jrb_mat_deflated_operator_prepare_point",
+    "jrb_mat_trace_estimate_deflated_point",
     "jrb_mat_logdet_leja_hutchpp_point",
     "jrb_mat_logdet_leja_hutchpp_with_diagnostics_point",
     "jrb_mat_det_leja_hutchpp_point",

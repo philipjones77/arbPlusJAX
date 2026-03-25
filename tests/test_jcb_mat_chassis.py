@@ -430,6 +430,74 @@ def test_matrix_free_complex_trace_and_logdet_estimators_on_diagonal_case():
     _check(int(recommended) % 2 == 0)
 
 
+def test_hermitian_slq_preparation_heat_trace_spectral_density_and_hutchpp_metadata_on_diagonal_case():
+    a = _mat2(2.0 + 0.0j, 0.0 + 0.0j, 0.0 + 0.0j, 3.0 + 0.0j)
+    op = jcb_mat.jcb_mat_dense_operator(a)
+    p1 = _vec2(1.0 + 0.0j, 1.0 + 0.0j)
+    p2 = _vec2(1.0 + 0.0j, -1.0 + 0.0j)
+    probes = jnp.stack([p1, p2], axis=0)
+
+    metadata = jcb_mat.jcb_mat_slq_prepare_hermitian_point(op, probes, 2, target_stderr=1e-4, min_probes=2, max_probes=8, block_size=2)
+    logdet = jcb_mat.jcb_mat_logdet_slq_hermitian_point(op, probes, 2)
+    heat = jcb_mat.jcb_mat_heat_trace_slq_hermitian_from_metadata_point(metadata, 0.5)
+    hist = jcb_mat.jcb_mat_spectral_density_slq_hermitian_from_metadata_point(
+        metadata,
+        jnp.asarray([1.0, 2.5, 4.0], dtype=jnp.float64),
+        normalize=True,
+    )
+
+    _check(bool(jnp.allclose(metadata.statistics.mean, logdet, rtol=1e-6, atol=1e-6)))
+    _check(bool(jnp.allclose(heat, jnp.exp(-1.0) + jnp.exp(-1.5), rtol=1e-6, atol=1e-6)))
+    _check(bool(jnp.allclose(jnp.sum(hist), 1.0, atol=1e-6)))
+    _check(int(metadata.statistics.recommended_probe_count) % 2 == 0)
+
+    hutch = jcb_mat.jcb_mat_hutchpp_trace_with_metadata_point(
+        lambda v: jcb_mat.jcb_mat_log_action_hermitian_point(op, v, 2),
+        probes[:1],
+        probes[1:],
+        target_stderr=1e-4,
+        min_probes=1,
+        max_probes=4,
+        block_size=1,
+    )
+    hutch_value = jcb_mat.jcb_mat_hutchpp_trace_estimate_point(
+        lambda v: jcb_mat.jcb_mat_log_action_hermitian_point(op, v, 2),
+        probes[:1],
+        probes[1:],
+    )
+    _check(bool(jnp.allclose(hutch.low_rank_trace + hutch.residual_trace, hutch_value, rtol=1e-6, atol=1e-6)))
+
+    deflation = jcb_mat.jcb_mat_deflated_operator_prepare_point(
+        lambda v: jcb_mat.jcb_mat_log_action_hermitian_point(op, v, 2),
+        probes[:1],
+    )
+    deflated = jcb_mat.jcb_mat_trace_estimate_deflated_point(
+        lambda v: jcb_mat.jcb_mat_log_action_hermitian_point(op, v, 2),
+        deflation,
+        probes[1:],
+        target_stderr=1e-4,
+        min_probes=1,
+        max_probes=4,
+        block_size=1,
+    )
+    _check(bool(jnp.allclose(deflated.low_rank_trace + deflated.residual_trace, hutch_value, rtol=1e-6, atol=1e-6)))
+
+
+def test_hermitian_slq_heat_trace_gradient_matches_diagonal_oracle():
+    op = jcb_mat.jcb_mat_dense_operator(_mat2(2.0 + 0.0j, 0.0 + 0.0j, 0.0 + 0.0j, 3.0 + 0.0j))
+    p1 = _vec2(1.0 + 0.0j, 1.0 + 0.0j)
+    p2 = _vec2(1.0 + 0.0j, -1.0 + 0.0j)
+    probes = jnp.stack([p1, p2], axis=0)
+
+    def loss(t):
+        metadata = jcb_mat.jcb_mat_slq_prepare_hermitian_point(op, probes, 2)
+        return jnp.real(jcb_mat.jcb_mat_heat_trace_slq_hermitian_from_metadata_point(metadata, t))
+
+    g = jax.grad(loss)(jnp.asarray(0.5, dtype=jnp.float64))
+    expected = -2.0 * jnp.exp(-1.0) - 3.0 * jnp.exp(-1.5)
+    _check(bool(jnp.allclose(g, expected, rtol=1e-6, atol=1e-6)))
+
+
 def test_arnoldi_funm_action_has_custom_vjp_wrt_input_vector():
     a = _mat2(2.0 + 0.0j, 0.0 + 0.0j, 0.0 + 0.0j, 1.0 + 1.0j)
     op = jcb_mat.jcb_mat_dense_operator(a)
@@ -593,6 +661,19 @@ def test_named_matrix_free_complex_function_actions_match_diagonal_case():
     pow_action = jcb_mat.jcb_mat_pow_action_arnoldi_point(op, x, exponent=2, steps=2, adjoint_matvec=adj)
     expected_pow = jnp.asarray([(2.0 + 0.0j) ** 2, (1.0 + 1.0j) ** 2], dtype=jnp.complex128) * x_mid
     _check(bool(jnp.allclose(acb_core.acb_midpoint(pow_action), expected_pow, rtol=1e-6, atol=1e-6)))
+
+    contour_log = jcb_mat.jcb_mat_log_action_contour_point(op, x, center=1.5 + 0.5j, radius=1.25, quadrature_order=32)
+    contour_sqrt = jcb_mat.jcb_mat_sqrt_action_contour_point(op, x, center=1.5 + 0.5j, radius=1.25, quadrature_order=32)
+    contour_root = jcb_mat.jcb_mat_root_action_contour_point(op, x, degree=2, center=1.5 + 0.5j, radius=1.25, quadrature_order=32)
+    contour_sign = jcb_mat.jcb_mat_sign_action_contour_point(op, x, center=1.5 + 0.5j, radius=1.25, quadrature_order=32)
+    contour_sin = jcb_mat.jcb_mat_sin_action_contour_point(op, x, center=1.5 + 0.5j, radius=1.25, quadrature_order=32)
+    contour_cos = jcb_mat.jcb_mat_cos_action_contour_point(op, x, center=1.5 + 0.5j, radius=1.25, quadrature_order=32)
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(contour_log), acb_core.acb_midpoint(log_action), rtol=1e-5, atol=1e-5)))
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(contour_sqrt), acb_core.acb_midpoint(sqrt_action), rtol=1e-5, atol=1e-5)))
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(contour_root), acb_core.acb_midpoint(root_action), rtol=1e-5, atol=1e-5)))
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(contour_sign), acb_core.acb_midpoint(sign_action), rtol=1e-5, atol=1e-5)))
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(contour_sin), acb_core.acb_midpoint(sin_action), rtol=1e-5, atol=1e-5)))
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(contour_cos), jnp.asarray([jnp.cos(2.0 + 0.0j), jnp.cos(1.0 + 1.0j)], dtype=jnp.complex128) * x_mid, rtol=1e-5, atol=1e-5)))
 
 
 def test_complex_solve_inverse_det_and_leja_matrix_free_apis_match_diagonal_case():
