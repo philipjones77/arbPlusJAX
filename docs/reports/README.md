@@ -17,6 +17,8 @@ Current reports:
 - [core_numeric_scalars_status.md](/docs/reports/core_numeric_scalars_status.md)
 - [cpu_validation_profiles.md](/docs/reports/cpu_validation_profiles.md)
 - [current_repo_mapping.md](/docs/reports/current_repo_mapping.md)
+- [dense_matrix_engineering_status.md](/docs/reports/dense_matrix_engineering_status.md)
+- [dense_matrix_surface_benchmark.md](/docs/reports/dense_matrix_surface_benchmark.md)
 - [environment_portability_inventory.md](/docs/reports/environment_portability_inventory.md)
 - [example_notebook_inventory.md](/docs/reports/example_notebook_inventory.md)
 - [function_engineering_status.md](/docs/reports/function_engineering_status.md)
