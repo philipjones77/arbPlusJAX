@@ -535,3 +535,108 @@ def test_large_n_det_enclosure_contains_midpoint_reference_and_precision_nesting
         _check(bool(di.contains(det_basic, di.interval(ref, ref))))
         _check(bool(di.contains(det_rigorous, di.interval(ref, ref))))
         _check(bool(di.contains(det_lo, det_hi)))
+        _check(bool(jnp.any((det_basic[..., 1] - det_basic[..., 0]) > 0.0)))
+        _check(bool(jnp.all((det_rigorous[..., 1] - det_rigorous[..., 0]) >= (det_basic[..., 1] - det_basic[..., 0]))))
+        mags = jnp.maximum(jnp.abs(a[..., 0]), jnp.abs(a[..., 1]))
+        row_norms = jnp.sqrt(jnp.sum(mags * mags, axis=-1))
+        hadamard_radius = jnp.abs(ref) + jnp.prod(row_norms, axis=-1)
+        _check(bool(jnp.all(0.5 * (det_basic[..., 1] - det_basic[..., 0]) <= hadamard_radius)))
+        _check(bool(jnp.all(0.5 * (det_rigorous[..., 1] - det_rigorous[..., 0]) <= hadamard_radius)))
+
+
+def test_rigorous_lu_and_spd_paths_produce_nontrivial_dense_enclosures():
+    a_mid = jnp.array(
+        [
+            [4.0, 1.0, -0.5],
+            [0.5, 3.5, 1.0],
+            [0.25, -0.75, 2.5],
+        ],
+        dtype=jnp.float64,
+    )
+    radius = jnp.full_like(a_mid, 2e-3)
+    a = di.interval(a_mid - radius, a_mid + radius)
+    x_ref = jnp.array([1.0, -2.0, 0.5], dtype=jnp.float64)
+    b_mid = a_mid @ x_ref
+    b = di.interval(b_mid - 1e-3, b_mid + 1e-3)
+
+    lu_plan = arb_mat.arb_mat_dense_lu_solve_plan_prepare(a)
+    lu_sol = arb_mat.arb_mat_solve_lu_rigorous(lu_plan, b)
+
+    spd_mid = jnp.array(
+        [
+            [5.0, 1.0, 0.25],
+            [1.0, 4.5, 0.5],
+            [0.25, 0.5, 3.5],
+        ],
+        dtype=jnp.float64,
+    )
+    spd = di.interval(spd_mid - 1e-3, spd_mid + 1e-3)
+    inv = arb_mat.arb_mat_spd_inv_rigorous(spd)
+    inv_ref = jnp.linalg.inv(spd_mid)
+
+    _check(bool(jnp.all(di.contains(lu_sol, di.interval(x_ref, x_ref)))))
+    _check(bool(jnp.any((lu_sol[..., 1] - lu_sol[..., 0]) > 0.0)))
+    _check(bool(jnp.all(di.contains(inv, di.interval(inv_ref, inv_ref)))))
+    _check(bool(jnp.any((inv[..., 1] - inv[..., 0]) > 0.0)))
+
+
+def test_rigorous_factor_outputs_and_general_solve_inverse_are_nontrivial():
+    a_mid = jnp.array(
+        [
+            [4.0, 1.0, -0.5],
+            [0.5, 3.5, 1.0],
+            [0.25, -0.75, 2.5],
+        ],
+        dtype=jnp.float64,
+    )
+    radius = jnp.full_like(a_mid, 2e-3)
+    a = di.interval(a_mid - radius, a_mid + radius)
+
+    chol_mid = jnp.array(
+        [
+            [2.2, 0.0, 0.0],
+            [0.3, 2.0, 0.0],
+            [0.1, 0.2, 1.8],
+        ],
+        dtype=jnp.float64,
+    )
+    spd_mid = chol_mid @ chol_mid.T
+    spd = di.interval(spd_mid - 1e-3, spd_mid + 1e-3)
+
+    cho = arb_mat.arb_mat_cho_rigorous(spd)
+    ldl_l, ldl_d = arb_mat.arb_mat_ldl_rigorous(spd)
+    p, l, u = arb_mat.arb_mat_lu_rigorous(a)
+    q, r = arb_mat.arb_mat_qr_rigorous(a)
+    lu_plan = arb_mat.arb_mat_dense_lu_solve_plan_prepare_rigorous(a)
+
+    _check(bool(jnp.any((cho[..., 1] - cho[..., 0]) > 0.0)))
+    _check(bool(jnp.any((ldl_l[..., 1] - ldl_l[..., 0]) > 0.0)))
+    _check(bool(jnp.any((ldl_d[..., 1] - ldl_d[..., 0]) > 0.0)))
+    _check(bool(jnp.any((l[..., 1] - l[..., 0]) > 0.0)))
+    _check(bool(jnp.any((u[..., 1] - u[..., 0]) > 0.0)))
+    _check(bool(jnp.any((q[..., 1] - q[..., 0]) > 0.0)))
+    _check(bool(jnp.any((r[..., 1] - r[..., 0]) > 0.0)))
+    _check(bool(jnp.any((lu_plan.l[..., 1] - lu_plan.l[..., 0]) > 0.0)))
+    _check(bool(jnp.allclose(di.midpoint(cho) @ di.midpoint(cho).T, spd_mid, rtol=1e-8, atol=1e-8)))
+    _check(bool(jnp.allclose(di.midpoint(ldl_l) @ jnp.diag(di.midpoint(ldl_d)) @ di.midpoint(ldl_l).T, spd_mid, rtol=1e-8, atol=1e-8)))
+    _check(bool(jnp.allclose(di.midpoint(p) @ a_mid, di.midpoint(l) @ di.midpoint(u), rtol=1e-8, atol=1e-8)))
+    _check(bool(jnp.allclose(di.midpoint(q) @ di.midpoint(r), a_mid, rtol=1e-8, atol=1e-8)))
+    _check(bool(jnp.allclose(jnp.diag(di.midpoint(l)), jnp.ones(3), rtol=0.0, atol=0.0)))
+    _check(bool(jnp.allclose(jnp.diag(di.midpoint(ldl_l)), jnp.ones(3), rtol=0.0, atol=0.0)))
+    _check(bool(jnp.allclose(jnp.diag(di.midpoint(cho)), jnp.diag(chol_mid), rtol=1e-8, atol=1e-8)))
+    _check(bool(jnp.all((l[0, 1:, 1] - l[0, 1:, 0]) == 0.0)))
+    _check(bool(jnp.all((u[1:, 0, 1] - u[1:, 0, 0]) == 0.0)))
+    _check(bool(jnp.all((cho[0, 1:, 1] - cho[0, 1:, 0]) == 0.0)))
+    _check(bool(jnp.all((r[1:, 0, 1] - r[1:, 0, 0]) == 0.0)))
+
+    x_ref = jnp.array([1.0, -2.0, 0.5], dtype=jnp.float64)
+    b_mid = a_mid @ x_ref
+    b = di.interval(b_mid - 1e-3, b_mid + 1e-3)
+    solve = arb_mat.arb_mat_solve_rigorous(a, b)
+    inv = arb_mat.arb_mat_inv_rigorous(a)
+    inv_ref = jnp.linalg.inv(a_mid)
+
+    _check(bool(jnp.all(di.contains(solve, di.interval(x_ref, x_ref)))))
+    _check(bool(jnp.any((solve[..., 1] - solve[..., 0]) > 0.0)))
+    _check(bool(jnp.all(di.contains(inv, di.interval(inv_ref, inv_ref)))))
+    _check(bool(jnp.any((inv[..., 1] - inv[..., 0]) > 0.0)))

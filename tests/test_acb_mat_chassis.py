@@ -570,3 +570,150 @@ def test_large_n_det_enclosure_contains_midpoint_reference_and_precision_nesting
         _check(bool(di.contains(acb_core.acb_imag(det_rigorous), acb_core.acb_imag(ref_box))))
         _check(bool(di.contains(acb_core.acb_real(det_lo), acb_core.acb_real(det_hi))))
         _check(bool(di.contains(acb_core.acb_imag(det_lo), acb_core.acb_imag(det_hi))))
+        _check(bool(jnp.any((acb_core.acb_real(det_basic)[..., 1] - acb_core.acb_real(det_basic)[..., 0]) > 0.0)))
+        _check(
+            bool(
+                jnp.all(
+                    (acb_core.acb_real(det_rigorous)[..., 1] - acb_core.acb_real(det_rigorous)[..., 0])
+                    >= (acb_core.acb_real(det_basic)[..., 1] - acb_core.acb_real(det_basic)[..., 0])
+                )
+            )
+        )
+        mags = jnp.sqrt(
+            jnp.maximum(jnp.abs(acb_core.acb_real(a)[..., 0]), jnp.abs(acb_core.acb_real(a)[..., 1])) ** 2
+            + jnp.maximum(jnp.abs(acb_core.acb_imag(a)[..., 0]), jnp.abs(acb_core.acb_imag(a)[..., 1])) ** 2
+        )
+        row_norms = jnp.sqrt(jnp.sum(mags * mags, axis=-1))
+        hadamard_radius = jnp.abs(ref) + jnp.prod(row_norms, axis=-1)
+        basic_radius = 0.5 * (acb_core.acb_real(det_basic)[..., 1] - acb_core.acb_real(det_basic)[..., 0])
+        rigorous_radius = 0.5 * (acb_core.acb_real(det_rigorous)[..., 1] - acb_core.acb_real(det_rigorous)[..., 0])
+        _check(bool(jnp.all(basic_radius <= hadamard_radius)))
+        _check(bool(jnp.all(rigorous_radius <= hadamard_radius)))
+
+
+def test_rigorous_lu_and_hpd_paths_produce_nontrivial_dense_enclosures():
+    a_mid = jnp.array(
+        [
+            [4.0 + 0.5j, 1.0 - 0.25j, -0.5 + 0.0j],
+            [0.5 + 0.25j, 3.5 + 0.0j, 1.0 - 0.5j],
+            [0.25 - 0.25j, -0.75 + 0.5j, 2.5 + 0.0j],
+        ],
+        dtype=jnp.complex128,
+    )
+    radius = jnp.full(a_mid.shape, 2e-3, dtype=jnp.float64)
+    a = acb_core.acb_box(
+        di.interval(jnp.real(a_mid) - radius, jnp.real(a_mid) + radius),
+        di.interval(jnp.imag(a_mid) - radius, jnp.imag(a_mid) + radius),
+    )
+    x_ref = jnp.array([1.0 + 0.25j, -2.0 + 0.5j, 0.5 - 0.25j], dtype=jnp.complex128)
+    b_mid = a_mid @ x_ref
+    b = acb_core.acb_box(
+        di.interval(jnp.real(b_mid) - 1e-3, jnp.real(b_mid) + 1e-3),
+        di.interval(jnp.imag(b_mid) - 1e-3, jnp.imag(b_mid) + 1e-3),
+    )
+
+    lu_plan = acb_mat.acb_mat_dense_lu_solve_plan_prepare(a)
+    lu_sol = acb_mat.acb_mat_solve_lu_rigorous(lu_plan, b)
+
+    base = jnp.array(
+        [
+            [1.0 + 0.5j, 0.25 - 0.25j, 0.0 + 0.0j],
+            [0.5 + 0.0j, 1.25 + 0.25j, 0.25 - 0.5j],
+            [0.0 + 0.0j, -0.25 + 0.5j, 1.5 + 0.0j],
+        ],
+        dtype=jnp.complex128,
+    )
+    hpd_mid = jnp.conj(base.T) @ base + jnp.eye(3, dtype=jnp.complex128) * 2.0
+    hpd = acb_core.acb_box(
+        di.interval(jnp.real(hpd_mid) - 1e-3, jnp.real(hpd_mid) + 1e-3),
+        di.interval(jnp.imag(hpd_mid) - 1e-3, jnp.imag(hpd_mid) + 1e-3),
+    )
+    inv = acb_mat.acb_mat_hpd_inv_rigorous(hpd)
+    inv_ref = jnp.linalg.inv(hpd_mid)
+    ref_box = acb_core.acb_box(di.interval(jnp.real(inv_ref), jnp.real(inv_ref)), di.interval(jnp.imag(inv_ref), jnp.imag(inv_ref)))
+    x_box = acb_core.acb_box(di.interval(jnp.real(x_ref), jnp.real(x_ref)), di.interval(jnp.imag(x_ref), jnp.imag(x_ref)))
+
+    _check(bool(jnp.all(di.contains(acb_core.acb_real(lu_sol), acb_core.acb_real(x_box)))))
+    _check(bool(jnp.all(di.contains(acb_core.acb_imag(lu_sol), acb_core.acb_imag(x_box)))))
+    _check(bool(jnp.any((acb_core.acb_real(lu_sol)[..., 1] - acb_core.acb_real(lu_sol)[..., 0]) > 0.0)))
+    _check(bool(jnp.all(di.contains(acb_core.acb_real(inv), acb_core.acb_real(ref_box)))))
+    _check(bool(jnp.all(di.contains(acb_core.acb_imag(inv), acb_core.acb_imag(ref_box)))))
+    _check(bool(jnp.any((acb_core.acb_real(inv)[..., 1] - acb_core.acb_real(inv)[..., 0]) > 0.0)))
+
+
+def test_rigorous_factor_outputs_and_general_solve_inverse_are_nontrivial():
+    a_mid = jnp.array(
+        [
+            [4.0 + 0.5j, 1.0 - 0.25j, -0.5 + 0.0j],
+            [0.5 + 0.25j, 3.5 + 0.0j, 1.0 - 0.5j],
+            [0.25 - 0.25j, -0.75 + 0.5j, 2.5 + 0.0j],
+        ],
+        dtype=jnp.complex128,
+    )
+    radius = jnp.full(a_mid.shape, 2e-3, dtype=jnp.float64)
+    a = acb_core.acb_box(
+        di.interval(jnp.real(a_mid) - radius, jnp.real(a_mid) + radius),
+        di.interval(jnp.imag(a_mid) - radius, jnp.imag(a_mid) + radius),
+    )
+
+    chol_base = jnp.array(
+        [
+            [2.2 + 0.0j, 0.0 + 0.0j, 0.0 + 0.0j],
+            [0.3 + 0.1j, 2.0 + 0.0j, 0.0 + 0.0j],
+            [0.1 - 0.1j, 0.2 + 0.15j, 1.8 + 0.0j],
+        ],
+        dtype=jnp.complex128,
+    )
+    hpd_mid = jnp.conj(chol_base.T) @ chol_base
+    hpd = acb_core.acb_box(
+        di.interval(jnp.real(hpd_mid) - 1e-3, jnp.real(hpd_mid) + 1e-3),
+        di.interval(jnp.imag(hpd_mid) - 1e-3, jnp.imag(hpd_mid) + 1e-3),
+    )
+
+    cho = acb_mat.acb_mat_cho_rigorous(hpd)
+    ldl_l, ldl_d = acb_mat.acb_mat_ldl_rigorous(hpd)
+    p, l, u = acb_mat.acb_mat_lu_rigorous(a)
+    q, r = acb_mat.acb_mat_qr_rigorous(a)
+    lu_plan = acb_mat.acb_mat_dense_lu_solve_plan_prepare_rigorous(a)
+
+    _check(bool(jnp.any((acb_core.acb_real(cho)[..., 1] - acb_core.acb_real(cho)[..., 0]) > 0.0)))
+    _check(bool(jnp.any((acb_core.acb_real(ldl_l)[..., 1] - acb_core.acb_real(ldl_l)[..., 0]) > 0.0)))
+    _check(bool(jnp.any((acb_core.acb_real(ldl_d)[..., 1] - acb_core.acb_real(ldl_d)[..., 0]) > 0.0)))
+    _check(bool(jnp.any((acb_core.acb_real(l)[..., 1] - acb_core.acb_real(l)[..., 0]) > 0.0)))
+    _check(bool(jnp.any((acb_core.acb_real(u)[..., 1] - acb_core.acb_real(u)[..., 0]) > 0.0)))
+    _check(bool(jnp.any((acb_core.acb_real(q)[..., 1] - acb_core.acb_real(q)[..., 0]) > 0.0)))
+    _check(bool(jnp.any((acb_core.acb_real(r)[..., 1] - acb_core.acb_real(r)[..., 0]) > 0.0)))
+    _check(bool(jnp.any((acb_core.acb_real(lu_plan.l)[..., 1] - acb_core.acb_real(lu_plan.l)[..., 0]) > 0.0)))
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(cho) @ jnp.conj(acb_core.acb_midpoint(cho).T), hpd_mid, rtol=1e-8, atol=1e-8)))
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(ldl_l) @ jnp.diag(acb_core.acb_midpoint(ldl_d)) @ jnp.conj(acb_core.acb_midpoint(ldl_l).T), hpd_mid, rtol=1e-8, atol=1e-8)))
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(p) @ a_mid, acb_core.acb_midpoint(l) @ acb_core.acb_midpoint(u), rtol=1e-8, atol=1e-8)))
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(q) @ acb_core.acb_midpoint(r), a_mid, rtol=1e-8, atol=1e-8)))
+    _check(bool(jnp.allclose(jnp.diag(acb_core.acb_midpoint(l)), jnp.ones(3, dtype=jnp.complex128), rtol=0.0, atol=0.0)))
+    _check(bool(jnp.allclose(jnp.diag(acb_core.acb_midpoint(ldl_l)), jnp.ones(3, dtype=jnp.complex128), rtol=0.0, atol=0.0)))
+    _check(bool(jnp.all((acb_core.acb_real(l)[0, 1:, 1] - acb_core.acb_real(l)[0, 1:, 0]) < 1e-300)))
+    _check(bool(jnp.all((acb_core.acb_imag(l)[0, 1:, 1] - acb_core.acb_imag(l)[0, 1:, 0]) < 1e-300)))
+    _check(bool(jnp.all((acb_core.acb_real(u)[1:, 0, 1] - acb_core.acb_real(u)[1:, 0, 0]) < 1e-300)))
+    _check(bool(jnp.all((acb_core.acb_imag(u)[1:, 0, 1] - acb_core.acb_imag(u)[1:, 0, 0]) < 1e-300)))
+    _check(bool(jnp.all((acb_core.acb_real(cho)[0, 1:, 1] - acb_core.acb_real(cho)[0, 1:, 0]) < 1e-300)))
+    _check(bool(jnp.all((acb_core.acb_imag(cho)[0, 1:, 1] - acb_core.acb_imag(cho)[0, 1:, 0]) < 1e-300)))
+    _check(bool(jnp.all((acb_core.acb_real(r)[1:, 0, 1] - acb_core.acb_real(r)[1:, 0, 0]) < 1e-300)))
+    _check(bool(jnp.all((acb_core.acb_imag(r)[1:, 0, 1] - acb_core.acb_imag(r)[1:, 0, 0]) < 1e-300)))
+
+    x_ref = jnp.array([1.0 + 0.25j, -2.0 + 0.5j, 0.5 - 0.25j], dtype=jnp.complex128)
+    b_mid = a_mid @ x_ref
+    b = acb_core.acb_box(
+        di.interval(jnp.real(b_mid) - 1e-3, jnp.real(b_mid) + 1e-3),
+        di.interval(jnp.imag(b_mid) - 1e-3, jnp.imag(b_mid) + 1e-3),
+    )
+    solve = acb_mat.acb_mat_solve_rigorous(a, b)
+    inv = acb_mat.acb_mat_inv_rigorous(a)
+    inv_ref = jnp.linalg.inv(a_mid)
+    ref_box = acb_core.acb_box(di.interval(jnp.real(inv_ref), jnp.real(inv_ref)), di.interval(jnp.imag(inv_ref), jnp.imag(inv_ref)))
+    x_box = acb_core.acb_box(di.interval(jnp.real(x_ref), jnp.real(x_ref)), di.interval(jnp.imag(x_ref), jnp.imag(x_ref)))
+
+    _check(bool(jnp.all(di.contains(acb_core.acb_real(solve), acb_core.acb_real(x_box)))))
+    _check(bool(jnp.all(di.contains(acb_core.acb_imag(solve), acb_core.acb_imag(x_box)))))
+    _check(bool(jnp.any((acb_core.acb_real(solve)[..., 1] - acb_core.acb_real(solve)[..., 0]) > 0.0)))
+    _check(bool(jnp.all(di.contains(acb_core.acb_real(inv), acb_core.acb_real(ref_box)))))
+    _check(bool(jnp.all(di.contains(acb_core.acb_imag(inv), acb_core.acb_imag(ref_box)))))
+    _check(bool(jnp.any((acb_core.acb_real(inv)[..., 1] - acb_core.acb_real(inv)[..., 0]) > 0.0)))

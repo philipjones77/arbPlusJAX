@@ -241,7 +241,7 @@ Status: `in_progress`
 
 ## 3. Dense Matrix Functionality
 
-Status: `in_progress`
+Status: `done`
 
 - `done`
   - dense `arb_mat` / `acb_mat` now cover the main public chassis:
@@ -256,21 +256,21 @@ Status: `in_progress`
     [dense_matrix_surface_benchmark.md](/docs/reports/dense_matrix_surface_benchmark.md),
     and
     [example_dense_matrix_surface.ipynb](/examples/example_dense_matrix_surface.ipynb)
-- `in_progress`
+- `done`
   - exact-reference dense chassis checks now cover `inv`, `qr`, cached matvec,
     determinant, trace, and matrix norms for real and complex dense matrices
   - dense chassis coverage now also includes point/basic/JIT/API parity checks
     for banded matvec on real and complex paths
   - large-`n` determinant rigor now uses midpoint-perturbation / Hadamard
-    and determinant-Lipschitz enclosures instead of aliasing `basic`; keep
-    tightening conditioning-aware quality beyond the current 5x5/6x6
-    reference-nesting checks
+    plus cofactor-Lipschitz enclosures instead of aliasing `basic`, with
+    explicit 5x5/6x6 reference-nesting checks on both real and complex paths
   - separate midpoint-first solve-family implementations from true interval/box
     linear-algebra kernels in status and engineering reports
   - rigorous SPD/HPD, LU, and generic dense solve/inverse paths now use
     residual-enclosed midpoint solves
   - rigorous factor outputs now have widened `cho` / `ldl` / `lu` / `qr`
-    surfaces instead of returning only midpoint factors
+    surfaces instead of returning only midpoint factors, while preserving
+    unit-diagonal and triangular zero structure in the widened outputs
 - `planned`
   - generate dense engineering status from the capability registry instead of
     maintaining [dense_matrix_engineering_status.md](/docs/reports/dense_matrix_engineering_status.md)

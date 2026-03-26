@@ -145,6 +145,29 @@ def _box_rad_parts(a: jax.Array) -> tuple[jax.Array, jax.Array]:
     return re_rad, im_rad
 
 
+def _box_rad_upper(a: jax.Array) -> jax.Array:
+    re_rad, im_rad = _box_rad_parts(a)
+    return di._above(jnp.sqrt(re_rad * re_rad + im_rad * im_rad))
+
+
+def _box_abs_upper(x: jax.Array) -> jax.Array:
+    x = acb_mat_as_rhs(x) if jnp.asarray(x).shape[-1] == 4 else acb_mat_as_matrix(x)
+    re = _interval_abs_upper(acb_core.acb_real(x))
+    im = _interval_abs_upper(acb_core.acb_imag(x))
+    return di._above(jnp.sqrt(re * re + im * im))
+
+
+def _interval_abs_upper(x: jax.Array) -> jax.Array:
+    x = di.as_interval(x)
+    return di._above(jnp.maximum(jnp.abs(x[..., 0]), jnp.abs(x[..., 1])))
+
+
+def _hadamard_abs_det_bound(a: jax.Array) -> jax.Array:
+    mags = _box_abs_upper(acb_mat_as_matrix(a))
+    row_norms = di._above(jnp.sqrt(jnp.sum(mags * mags, axis=-1)))
+    return di._above(jnp.prod(row_norms, axis=-1))
+
+
 def _herm_rad_bound_matrix(a: jax.Array) -> jax.Array:
     re_rad, im_rad = _box_rad_parts(a)
     mag = di._above(jnp.sqrt(re_rad * re_rad + im_rad * im_rad))
@@ -178,6 +201,144 @@ def _tightened_complex_eigvecs_box(values: jax.Array, vectors: jax.Array, bound:
     re_iv = di.interval(di._below(vr - radius[..., None, :]), di._above(vr + radius[..., None, :]))
     im_iv = di.interval(di._below(vi - radius[..., None, :]), di._above(vi + radius[..., None, :]))
     return acb_core.acb_box(re_iv, im_iv)
+
+
+def _mul_box_matrix_rhs(a: jax.Array, x: jax.Array) -> jax.Array:
+    x_arr = acb_mat_as_rhs(x)
+    if x_arr.ndim == acb_mat_as_matrix(a).ndim - 1:
+        return acb_mat_matvec_basic(a, x_arr)
+    return acb_mat_matmul_basic(a, x_arr)
+
+
+def _rigorous_linear_solve_enclosure(a: jax.Array, b: jax.Array, x_mid: jax.Array) -> jax.Array:
+    a = acb_mat_as_matrix(a)
+    b = acb_mat_as_rhs(b)
+    mid = _mid_matrix(a)
+    inv_mid = jnp.linalg.inv(mid)
+    inv_abs = jnp.abs(inv_mid)
+    delta = _box_rad_upper(a)
+    beta = jnp.linalg.norm(inv_abs @ delta, ord=jnp.inf, axis=(-2, -1))
+    residual = acb_core.acb_sub(b, _mul_box_matrix_rhs(a, mat_common.box_from_point(x_mid)))
+    residual_abs = _box_abs_upper(residual)
+    correction_abs = (
+        jnp.einsum("...ij,...j->...i", inv_abs, residual_abs)
+        if residual_abs.ndim == inv_abs.ndim - 1
+        else jnp.matmul(inv_abs, residual_abs)
+    )
+    denom = jnp.maximum(1.0 - beta, 64.0 * jnp.finfo(jnp.real(mid).dtype).eps)
+    width = di._above(correction_abs / denom[(...,) + (None,) * (correction_abs.ndim - beta.ndim)])
+    re = di.interval(di._below(jnp.real(x_mid) - width), di._above(jnp.real(x_mid) + width))
+    im = di.interval(di._below(jnp.imag(x_mid) - width), di._above(jnp.imag(x_mid) + width))
+    out = acb_core.acb_box(re, im)
+    finite = jnp.all(mat_common.complex_is_finite(inv_mid), axis=(-2, -1))
+    safe = finite & (beta < 1.0)
+    return jnp.where(safe[(...,) + (None,) * (out.ndim - safe.ndim)], out, mat_common.full_box_like(out))
+
+
+def _det_lipschitz_radius(a: jax.Array, det_mid: jax.Array) -> jax.Array:
+    mid = _mid_matrix(a)
+    delta = jnp.linalg.norm(_box_rad_upper(a), ord=jnp.inf, axis=(-2, -1))
+    growth = jnp.maximum(
+        jnp.linalg.norm(mid, ord=1, axis=(-2, -1)),
+        jnp.linalg.norm(mid, ord=jnp.inf, axis=(-2, -1)),
+    )
+    n = jnp.asarray(float(mid.shape[-1]), dtype=jnp.real(mid).dtype)
+    return di._above(n * jnp.power(growth + delta, jnp.maximum(n - 1.0, 0.0)) * delta)
+
+
+def _det_cofactor_lipschitz_radius(a: jax.Array) -> jax.Array:
+    mags = _box_abs_upper(acb_mat_as_matrix(a))
+    row_norms = di._above(jnp.sqrt(jnp.sum(mags * mags, axis=-1)))
+    col_norms = di._above(jnp.sqrt(jnp.sum(mags * mags, axis=-2)))
+    if mags.shape[-1] == 1:
+        cofactor_bound = jnp.ones_like(row_norms[..., 0])
+    else:
+        row_bound = di._above(jnp.prod(jnp.sort(row_norms, axis=-1)[..., 1:], axis=-1))
+        col_bound = di._above(jnp.prod(jnp.sort(col_norms, axis=-1)[..., 1:], axis=-1))
+        cofactor_bound = jnp.minimum(row_bound, col_bound)
+    delta = di._above(jnp.linalg.norm(_box_rad_upper(a), ord="fro", axis=(-2, -1)))
+    n = jnp.asarray(float(mags.shape[-1]), dtype=delta.dtype)
+    return di._above(n * cofactor_bound * delta)
+
+
+def _basic_det_enclosure(a: jax.Array) -> jax.Array:
+    a = acb_mat_as_matrix(a)
+    mid = _mid_matrix(a)
+    det_mid = jnp.linalg.det(mid)
+    inv_mid = jnp.linalg.inv(mid)
+    delta = jnp.linalg.norm(_box_rad_upper(a), ord=jnp.inf, axis=(-2, -1))
+    inv_norm = jnp.linalg.norm(jnp.abs(inv_mid), ord=jnp.inf, axis=(-2, -1))
+    beta = inv_norm * delta
+    rel = jnp.expm1(jnp.asarray(float(mid.shape[-1]), dtype=jnp.real(mid).dtype) * jnp.log1p(beta))
+    tightened = di._above(jnp.abs(det_mid) * rel)
+    lipschitz = _det_lipschitz_radius(a, det_mid)
+    cofactor = _det_cofactor_lipschitz_radius(a)
+    fallback = di._above(jnp.abs(det_mid) + _hadamard_abs_det_bound(a))
+    radius = jnp.where(
+        jnp.isfinite(beta) & (beta < 1.0) & jnp.isfinite(tightened),
+        jnp.minimum(
+            jnp.minimum(tightened, jnp.where(jnp.isfinite(lipschitz), lipschitz, tightened)),
+            jnp.where(jnp.isfinite(cofactor), cofactor, tightened),
+        ),
+        jnp.minimum(
+            jnp.where(jnp.isfinite(lipschitz), lipschitz, fallback),
+            jnp.where(jnp.isfinite(cofactor), cofactor, fallback),
+        ),
+    )
+    real_iv = di.interval(di._below(jnp.real(det_mid) - radius), di._above(jnp.real(det_mid) + radius))
+    imag_iv = di.interval(di._below(jnp.imag(det_mid) - radius), di._above(jnp.imag(det_mid) + radius))
+    out = acb_core.acb_box(real_iv, imag_iv)
+    finite = mat_common.box_is_finite(out)
+    return jnp.where(finite[..., None], out, mat_common.full_box_like(out))
+
+
+def _rigorous_det_enclosure(a: jax.Array) -> jax.Array:
+    a = acb_mat_as_matrix(a)
+    basic = _basic_det_enclosure(a)
+    mid = _mid_matrix(a)
+    det_mid = jnp.linalg.det(mid)
+    fallback = jnp.minimum(
+        di._above(jnp.abs(det_mid) + _hadamard_abs_det_bound(a)),
+        jnp.where(jnp.isfinite(_det_cofactor_lipschitz_radius(a)), _det_cofactor_lipschitz_radius(a), di._above(jnp.abs(det_mid) + _hadamard_abs_det_bound(a))),
+    )
+    basic_radius = 0.5 * (acb_core.acb_real(basic)[..., 1] - acb_core.acb_real(basic)[..., 0])
+    radius = jnp.maximum(basic_radius, fallback)
+    real_iv = di.interval(di._below(jnp.real(det_mid) - radius), di._above(jnp.real(det_mid) + radius))
+    imag_iv = di.interval(di._below(jnp.imag(det_mid) - radius), di._above(jnp.imag(det_mid) + radius))
+    out = acb_core.acb_box(real_iv, imag_iv)
+    finite = mat_common.box_is_finite(out)
+    return jnp.where(finite[..., None], out, mat_common.full_box_like(out))
+
+
+def _widen_factor_box(mid: jax.Array, radius: jax.Array) -> jax.Array:
+    width = di._above(radius[..., None, None] * jnp.maximum(jnp.abs(mid), 1.0))
+    re = di.interval(di._below(jnp.real(mid) - width), di._above(jnp.real(mid) + width))
+    im = di.interval(di._below(jnp.imag(mid) - width), di._above(jnp.imag(mid) + width))
+    out = acb_core.acb_box(re, im)
+    finite = mat_common.box_is_finite(out)
+    return jnp.where(finite[..., None], out, mat_common.full_box_like(out))
+
+
+def _widen_triangular_box(mid: jax.Array, radius: jax.Array, *, lower: bool, unit_diagonal: bool = False) -> jax.Array:
+    out = _widen_factor_box(mid, radius)
+    rows, cols = mid.shape[-2], mid.shape[-1]
+    mask = _band_mask(rows, cols, rows - 1 if lower else 0, 0 if lower else cols - 1)
+    zero = mat_common.box_from_point(jnp.zeros_like(mid))
+    out = jnp.where(mask[..., None], out, zero)
+    if unit_diagonal:
+        diag_mask = jnp.eye(rows, cols, dtype=bool)
+        diag = mat_common.box_from_point(jnp.ones_like(mid))
+        out = jnp.where(diag_mask[..., None], diag, out)
+    finite = mat_common.box_is_finite(out)
+    return jnp.where(finite[..., None], out, mat_common.full_box_like(out))
+
+
+def _dense_factor_radius(a: jax.Array, recon_mid: jax.Array) -> jax.Array:
+    mid = _mid_matrix(a)
+    scale = jnp.maximum(jnp.linalg.norm(mid, ord=jnp.inf, axis=(-2, -1)), 1.0)
+    residual = di._above(jnp.linalg.norm(mid - recon_mid, ord=jnp.inf, axis=(-2, -1)))
+    delta = di._above(jnp.linalg.norm(_box_rad_upper(a), ord=jnp.inf, axis=(-2, -1)))
+    return di._above((delta + residual + 64.0 * jnp.finfo(jnp.real(mid).dtype).eps) / scale)
 
 
 def acb_mat_matmul(a: jax.Array, b: jax.Array) -> jax.Array:
@@ -884,7 +1045,7 @@ def acb_mat_det_basic(a: jax.Array) -> jax.Array:
     elif n == 3:
         out = mat_common.box_det_3x3(a)
     else:
-        out = acb_mat_det(a)
+        out = _basic_det_enclosure(a)
     finite = mat_common.box_is_finite(out)
     return jnp.where(finite[..., None], out, mat_common.full_box_like(out))
 
@@ -958,7 +1119,11 @@ def acb_mat_norm_inf_basic(a: jax.Array) -> jax.Array:
 
 
 def acb_mat_det_rigorous(a: jax.Array) -> jax.Array:
-    return acb_mat_det_basic(a)
+    a = acb_mat_as_matrix(a)
+    n = a.shape[-2]
+    if n <= 3:
+        return acb_mat_det_basic(a)
+    return _rigorous_det_enclosure(a)
 
 
 def acb_mat_trace_rigorous(a: jax.Array) -> jax.Array:
@@ -1024,9 +1189,33 @@ def acb_mat_lu_basic(a: jax.Array) -> tuple[jax.Array, jax.Array, jax.Array]:
     return acb_mat_lu(a)
 
 
+def acb_mat_lu_rigorous(a: jax.Array) -> tuple[jax.Array, jax.Array, jax.Array]:
+    a = acb_mat_as_matrix(a)
+    mid = _mid_matrix(a)
+    lu, _, perm = lax.linalg.lu(mid)
+    n = mid.shape[-1]
+    eye = jnp.eye(n, dtype=mid.dtype)
+    p_mid = eye[perm]
+    l_mid = jnp.tril(lu, k=-1) + eye
+    u_mid = jnp.triu(lu)
+    recon = jnp.swapaxes(p_mid, -2, -1) @ (l_mid @ u_mid)
+    radius = _dense_factor_radius(a, recon)
+    p_out = mat_common.box_from_point(p_mid)
+    u_scale = jnp.maximum(jnp.linalg.norm(u_mid, ord=jnp.inf, axis=(-2, -1)), 1.0)
+    l_scale = jnp.maximum(jnp.linalg.norm(l_mid, ord=jnp.inf, axis=(-2, -1)), 1.0)
+    l_out = _widen_triangular_box(l_mid, di._above(radius / u_scale), lower=True, unit_diagonal=True)
+    u_out = _widen_triangular_box(u_mid, di._above(radius / l_scale), lower=False)
+    return p_out, l_out, u_out
+
+
 def acb_mat_dense_lu_solve_plan_prepare(a: jax.Array) -> mat_common.DenseLUSolvePlan:
     p, l, u = acb_mat_lu(a)
     return mat_common.dense_lu_solve_plan_from_factors(p, l, u, algebra="acb", label="acb_mat.dense_lu_solve_plan_prepare")
+
+
+def acb_mat_dense_lu_solve_plan_prepare_rigorous(a: jax.Array) -> mat_common.DenseLUSolvePlan:
+    p, l, u = acb_mat_lu_rigorous(a)
+    return mat_common.dense_lu_solve_plan_from_factors(p, l, u, algebra="acb", label="acb_mat.dense_lu_solve_plan_prepare_rigorous")
 
 
 def acb_mat_dense_lu_solve_plan_prepare_prec(
@@ -1077,6 +1266,18 @@ def acb_mat_qr_basic(a: jax.Array) -> tuple[jax.Array, jax.Array]:
     return acb_mat_qr(a)
 
 
+def acb_mat_qr_rigorous(a: jax.Array) -> tuple[jax.Array, jax.Array]:
+    a = acb_mat_as_matrix(a)
+    q_mid, r_mid = jnp.linalg.qr(_mid_matrix(a))
+    recon = q_mid @ r_mid
+    orth = jnp.conj(jnp.swapaxes(q_mid, -2, -1)) @ q_mid - jnp.eye(q_mid.shape[-1], dtype=q_mid.dtype)
+    radius = _dense_factor_radius(a, recon) + di._above(jnp.linalg.norm(orth, ord=jnp.inf, axis=(-2, -1)))
+    q_out = _widen_factor_box(q_mid, radius)
+    r_scale = jnp.maximum(jnp.linalg.norm(r_mid, ord=jnp.inf, axis=(-2, -1)), 1.0)
+    r_out = _widen_triangular_box(r_mid, di._above(radius / r_scale), lower=False)
+    return q_out, r_out
+
+
 def acb_mat_permutation_matrix_rigorous(perm: jax.Array, *, dtype: jnp.dtype = jnp.float64) -> jax.Array:
     return acb_mat_permutation_matrix(perm, dtype=dtype)
 
@@ -1114,11 +1315,35 @@ def acb_mat_is_hpd_rigorous(a: jax.Array) -> jax.Array:
 
 
 def acb_mat_cho_rigorous(a: jax.Array) -> jax.Array:
-    return acb_mat_cho(a)
+    a = acb_mat_as_matrix(a)
+    chol, ok = _mid_cholesky(a)
+    recon = chol @ jnp.conj(jnp.swapaxes(chol, -2, -1))
+    radius = _dense_factor_radius(a, recon)
+    chol_scale = jnp.maximum(jnp.linalg.norm(chol, ord=jnp.inf, axis=(-2, -1)), 1.0)
+    out = _widen_triangular_box(chol, di._above(radius / chol_scale), lower=True)
+    lam_min = jnp.min(jnp.linalg.eigvalsh(_mid_hermitian_part(a)), axis=-1)
+    ok = ok & (lam_min > _herm_perturbation_bound(a))
+    return jnp.where(ok[..., None, None, None], out, mat_common.full_box_like(out))
 
 
 def acb_mat_ldl_rigorous(a: jax.Array) -> tuple[jax.Array, jax.Array]:
-    return acb_mat_ldl(a)
+    a = acb_mat_as_matrix(a)
+    chol, ok = _mid_cholesky(a)
+    diag = jnp.diagonal(chol, axis1=-2, axis2=-1)
+    l_mid = chol / diag[..., None, :]
+    d_mid = jnp.real(diag * jnp.conj(diag))
+    recon = l_mid @ (d_mid[..., None, :] * jnp.conj(jnp.swapaxes(l_mid, -2, -1)))
+    radius = _dense_factor_radius(a, recon)
+    l_scale = jnp.maximum(jnp.linalg.norm(l_mid, ord=jnp.inf, axis=(-2, -1)), 1.0)
+    l_out = _widen_triangular_box(l_mid, di._above(radius / l_scale), lower=True, unit_diagonal=True)
+    d_width = di._above(radius[..., None] * jnp.maximum(jnp.abs(d_mid), 1.0))
+    d_out = acb_core.acb_box(
+        di.interval(di._below(d_mid - d_width), di._above(d_mid + d_width)),
+        di.interval(jnp.zeros_like(d_width), jnp.zeros_like(d_width)),
+    )
+    mask_l = ok[..., None, None, None]
+    mask_d = ok[..., None, None]
+    return jnp.where(mask_l, l_out, mat_common.full_box_like(l_out)), jnp.where(mask_d, d_out, mat_common.full_box_like(d_out))
 
 
 def acb_mat_eigvalsh_rigorous(a: jax.Array) -> jax.Array:
@@ -1142,11 +1367,36 @@ def acb_mat_exp_rigorous(a: jax.Array) -> jax.Array:
 
 
 def acb_mat_hpd_solve_rigorous(a_or_plan: mat_common.DenseCholeskySolvePlan | jax.Array, b: jax.Array) -> jax.Array:
-    return acb_mat_hpd_solve(a_or_plan, b)
+    solved = acb_mat_hpd_solve(a_or_plan, b)
+    x_mid = _mid_rhs(solved)
+    if isinstance(a_or_plan, mat_common.DenseCholeskySolvePlan):
+        plan = mat_common.as_dense_cholesky_solve_plan(
+            a_or_plan,
+            algebra="acb",
+            structure="hermitian",
+            label="acb_mat.hpd_solve_rigorous",
+        )
+        factor = acb_mat_as_matrix(plan.factor)
+        a_recon = acb_mat_matmul_basic(factor, acb_mat_conjugate_transpose(factor))
+        return _rigorous_linear_solve_enclosure(a_recon, b, x_mid)
+    return _rigorous_linear_solve_enclosure(a_or_plan, b, x_mid)
 
 
 def acb_mat_hpd_inv_rigorous(a_or_plan: mat_common.DenseCholeskySolvePlan | jax.Array) -> jax.Array:
-    return acb_mat_hpd_inv(a_or_plan)
+    inv = acb_mat_hpd_inv(a_or_plan)
+    x_mid = _mid_matrix(inv)
+    if isinstance(a_or_plan, mat_common.DenseCholeskySolvePlan):
+        plan = mat_common.as_dense_cholesky_solve_plan(
+            a_or_plan,
+            algebra="acb",
+            structure="hermitian",
+            label="acb_mat.hpd_inv_rigorous",
+        )
+        factor = acb_mat_as_matrix(plan.factor)
+        a_recon = acb_mat_matmul_basic(factor, acb_mat_conjugate_transpose(factor))
+        return _rigorous_linear_solve_enclosure(a_recon, acb_mat_identity(plan.rows, dtype=jnp.real(factor).dtype), x_mid)
+    a = acb_mat_as_matrix(a_or_plan)
+    return _rigorous_linear_solve_enclosure(a, acb_mat_identity(a.shape[-2], dtype=jnp.real(a).dtype), x_mid)
 
 
 def acb_mat_solve_tril_rigorous(a: jax.Array, b: jax.Array, *, unit_diagonal: bool = False) -> jax.Array:
@@ -1158,7 +1408,25 @@ def acb_mat_solve_triu_rigorous(a: jax.Array, b: jax.Array, *, unit_diagonal: bo
 
 
 def acb_mat_solve_lu_rigorous(a_or_plan, b: jax.Array) -> jax.Array:
-    return acb_mat_solve_lu(a_or_plan, b)
+    solved = acb_mat_solve_lu(a_or_plan, b)
+    x_mid = _mid_rhs(solved)
+    if isinstance(a_or_plan, (mat_common.DenseLUSolvePlan, tuple)):
+        plan = mat_common.as_dense_lu_solve_plan(a_or_plan, algebra="acb", label="acb_mat.solve_lu_rigorous")
+        lu = acb_mat_matmul_basic(plan.l, plan.u)
+        a_recon = acb_mat_matmul_basic(acb_mat_transpose(plan.p), lu)
+        return _rigorous_linear_solve_enclosure(a_recon, b, x_mid)
+    return _rigorous_linear_solve_enclosure(a_or_plan, b, x_mid)
+
+
+def acb_mat_solve_rigorous(a: jax.Array, b: jax.Array) -> jax.Array:
+    solved = acb_mat_solve(a, b)
+    return _rigorous_linear_solve_enclosure(a, b, _mid_rhs(solved))
+
+
+def acb_mat_inv_rigorous(a: jax.Array) -> jax.Array:
+    inv = acb_mat_inv(a)
+    a = acb_mat_as_matrix(a)
+    return _rigorous_linear_solve_enclosure(a, acb_mat_identity(a.shape[-2], dtype=jnp.real(a).dtype), _mid_matrix(inv))
 
 
 def acb_mat_solve_transpose_rigorous(a_or_plan, b: jax.Array) -> jax.Array:
@@ -1174,7 +1442,12 @@ def acb_mat_solve_transpose_add_rigorous(a_or_plan, b: jax.Array, y: jax.Array) 
 
 
 def acb_mat_mat_solve_rigorous(a_or_plan, b: jax.Array) -> jax.Array:
-    return acb_mat_mat_solve(a_or_plan, b)
+    if isinstance(a_or_plan, mat_common.DenseCholeskySolvePlan):
+        return acb_mat_hpd_solve_rigorous(a_or_plan, b)
+    if isinstance(a_or_plan, (mat_common.DenseLUSolvePlan, tuple)):
+        return acb_mat_solve_lu_rigorous(a_or_plan, b)
+    solved = acb_mat_mat_solve(a_or_plan, b)
+    return _rigorous_linear_solve_enclosure(a_or_plan, b, _mid_rhs(solved))
 
 
 def acb_mat_mat_solve_transpose_rigorous(a_or_plan, b: jax.Array) -> jax.Array:
@@ -2816,12 +3089,17 @@ __all__ = [
     "acb_mat_norm_fro_rigorous",
     "acb_mat_norm_1_rigorous",
     "acb_mat_norm_inf_rigorous",
+    "acb_mat_solve_rigorous",
+    "acb_mat_inv_rigorous",
     "acb_mat_triangular_solve",
     "acb_mat_triangular_solve_basic",
     "acb_mat_lu",
     "acb_mat_lu_basic",
+    "acb_mat_lu_rigorous",
+    "acb_mat_dense_lu_solve_plan_prepare_rigorous",
     "acb_mat_qr",
     "acb_mat_qr_basic",
+    "acb_mat_qr_rigorous",
     "acb_mat_matmul_prec",
     "acb_mat_matvec_prec",
     "acb_mat_rmatvec_prec",

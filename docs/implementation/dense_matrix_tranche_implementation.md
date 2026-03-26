@@ -1,4 +1,4 @@
-Last updated: 2026-03-18T00:00:00Z
+Last updated: 2026-03-25T00:00:00Z
 
 # Dense Matrix Tranche
 
@@ -142,7 +142,16 @@ The main reason for pushing these pieces into the common layer is to keep:
   - `det`
   - `trace`
   - norm helpers
-- many solve/factorization families still route through midpoint-plus-enclosure rather than a distinct tightened rigorous algorithm
+- large-`n` determinant `basic` and `rigorous` now use local midpoint-perturbation
+  plus cofactor-Lipschitz enclosure logic instead of collapsing to the midpoint
+  determinant on the larger dense cases
+- SPD / HPD, LU-plan, and generic dense solve/inverse rigorous paths now use
+  residual-based enclosure inflation when the midpoint inverse is stable
+- direct factor outputs now have explicit rigorous widened surfaces for `cho`,
+  `ldl`, `lu`, and `qr`; the midpoint factorization remains the center, but the
+  rigorous surface no longer returns only exact midpoint factors
+- rigorous factor outputs now preserve triangular zero structure and unit
+  diagonals instead of widening every entry uniformly
 
 `adaptive`
 
@@ -201,12 +210,15 @@ Current dense tranche validation includes:
 
 Most recent dense tranche run:
 
-- `55 passed in 82.23s`
+- `42 passed in 91.72s` on the targeted dense chassis slice
 
-The latest pass also fixed:
+The latest dense hardening pass also fixed:
 
-- block helper support for rectangular dense subblocks
-- ambiguous boolean conversion in dense containment-mode tests
+- shape selection in the rigorous real/complex inverse enclosure path for
+  matrix right-hand sides
+- radius-vs-absolute-magnitude handling in the complex dense rigorous kernels
+- structural-zero and unit-diagonal preservation in widened rigorous factor
+  outputs
 
 ## Benchmark Entry Points
 
@@ -216,7 +228,8 @@ Primary dense benchmark:
 
 Current benchmark report:
 
-- [dense_matrix_surface_benchmark.md](/docs/status/reports/dense_matrix_surface_benchmark.md)
+- [dense_matrix_surface_benchmark.md](/docs/reports/dense_matrix_surface_benchmark.md)
+- [dense_matrix_engineering_status.md](/docs/reports/dense_matrix_engineering_status.md)
 
 ## Example Entry Points
 
@@ -229,7 +242,7 @@ This tranche is broad, but not literal full Arb/FLINT dense parity.
 
 Main remaining boundaries:
 
-- many `basic` / `rigorous` solve-family paths are still midpoint-first rather than true enclosure-native algorithms
+- direct factor outputs remain midpoint-first even though solve/inverse rigor is deeper than before
 - high-end general spectral work remains limited compared with a full external linear algebra stack
 - padded batch helpers still trade latency for compile stability; they are not the fastest path for small one-off calls
 
