@@ -576,11 +576,12 @@ def srb_mat_is_spd_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.
 
 
 def srb_mat_cho_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
-    return arb_mat.arb_mat_cho_basic(_dense_interval_matrix(x, "srb_mat.cho_basic"))
+    return mat_common.interval_from_point(srb_mat_to_dense(srb_mat_cho(x)))
 
 
 def srb_mat_ldl_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> tuple[jax.Array, jax.Array]:
-    return arb_mat.arb_mat_ldl_basic(_dense_interval_matrix(x, "srb_mat.ldl_basic"))
+    l, d = srb_mat_ldl(x)
+    return mat_common.interval_from_point(srb_mat_to_dense(l)), mat_common.interval_from_point(d)
 
 
 def srb_mat_charpoly(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
@@ -816,11 +817,13 @@ def srb_mat_triangular_solve_basic(
     lower: bool,
     unit_diagonal: bool = False,
 ) -> jax.Array:
-    return arb_mat.arb_mat_triangular_solve_basic(
-        _dense_interval_matrix(x, "srb_mat.triangular_solve_basic"),
-        _dense_interval_rhs(b, "srb_mat.triangular_solve_basic"),
-        lower=lower,
-        unit_diagonal=unit_diagonal,
+    return mat_common.interval_from_point(
+        srb_mat_triangular_solve(
+            x,
+            _as_real_rhs(b, "srb_mat.triangular_solve_basic"),
+            lower=lower,
+            unit_diagonal=unit_diagonal,
+        )
     )
 
 
@@ -869,8 +872,7 @@ def srb_mat_solve_basic(
     b: jax.Array,
     **kwargs,
 ) -> jax.Array:
-    del kwargs
-    return arb_mat.arb_mat_solve_basic(_dense_interval_matrix(x, "srb_mat.solve_basic"), _dense_interval_rhs(b, "srb_mat.solve_basic"))
+    return mat_common.interval_from_point(srb_mat_solve(x, _as_real_rhs(b, "srb_mat.solve_basic"), **kwargs))
 
 
 def srb_mat_lu_solve_plan_prepare(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> sc.SparseLUSolvePlan:
@@ -879,7 +881,7 @@ def srb_mat_lu_solve_plan_prepare(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO
 
 
 def srb_mat_lu_solve_plan_prepare_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO):
-    return srb_mat_lu_solve_plan_prepare(x)
+    return arb_mat.arb_mat_dense_lu_solve_plan_prepare(_dense_interval_matrix(x, "srb_mat.lu_solve_plan_prepare_basic"))
 
 
 def srb_mat_lu_solve_plan_apply(plan: sc.SparseLUSolvePlan | tuple, b: jax.Array) -> jax.Array:
@@ -898,7 +900,7 @@ def srb_mat_spd_solve_plan_prepare(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCO
 
 
 def srb_mat_spd_solve_plan_prepare_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO):
-    return srb_mat_spd_solve_plan_prepare(x)
+    return arb_mat.arb_mat_dense_spd_solve_plan_prepare(_dense_interval_matrix(x, "srb_mat.spd_solve_plan_prepare_basic"))
 
 
 def srb_mat_spd_solve_plan_apply(plan: sc.SparseCholeskySolvePlan | sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, b: jax.Array) -> jax.Array:
@@ -1376,7 +1378,7 @@ def srb_mat_det(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
 
 
 def srb_mat_det_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
-    return arb_mat.arb_mat_det_basic(_dense_interval_matrix(x, "srb_mat.det_basic"))
+    return mat_common.interval_from_point(srb_mat_det(x))
 
 
 def srb_mat_inv(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
@@ -1390,7 +1392,7 @@ def srb_mat_inv(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
 
 
 def srb_mat_inv_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
-    return arb_mat.arb_mat_inv_basic(_dense_interval_matrix(x, "srb_mat.inv_basic"))
+    return mat_common.interval_from_point(srb_mat_inv(x))
 
 
 def srb_mat_sqr(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO:
@@ -1398,7 +1400,7 @@ def srb_mat_sqr(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> sc.SparseCOO 
 
 
 def srb_mat_sqr_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO:
-    return arb_mat.arb_mat_sqr_basic(_dense_interval_matrix(x, "srb_mat.sqr_basic"))
+    return mat_common.interval_from_point(srb_mat_to_dense(srb_mat_sqr(x)))
 
 
 def srb_mat_solve_with_diagnostics(

@@ -9,7 +9,16 @@ The sparse matrix layer now has a dense-style public wrapper surface for the cor
 - `srb_mat` for real sparse matrices
 - `scb_mat` for complex sparse matrices
 
-This tranche does not claim interval enclosure parity with dense. The sparse kernels are still point implementations underneath, but the public mode-dispatch surface is now aligned enough that callers can use the same `impl="point|basic|rigorous|adaptive"` shape without a separate sparse-only calling convention.
+This tranche now has broader native enclosure parity for the main sparse core
+surface as well as block/vblock `basic` paths. Direct sparse `basic`
+determinant, inverse, square, Cholesky/LDL, triangular-solve, and solve
+entrypoints now route through sparse-native point/factor paths and then lift the
+result into interval/box form, while the main sparse `basic` LU and SPD/HPD
+solve-plan prepare surfaces continue to lift into dense interval/box solve
+plans instead of reusing sparse point plans. The broader sparse stack is still
+not at dense-style interval coverage, but callers no longer rely only on
+wrapper-level midpoint alignment for those block/vblock surfaces or on dense
+bridges for the direct sparse `basic` core entrypoints listed above.
 
 ## Shared Common Layer
 
@@ -56,7 +65,16 @@ Batch mode wrappers are exposed for the sparse operations that already have fixe
 
 Sparse still differs from dense in important ways:
 
-- sparse `basic` / `rigorous` / `adaptive` currently reuse point kernels rather than producing interval/box enclosures
+- sparse `basic` / `rigorous` / `adaptive` still reuse point kernels across much
+  of the core sparse stack, even though main-stack sparse direct `basic`
+  determinant, inverse, square, Cholesky/LDL, triangular-solve, and solve
+  entrypoints now compute in-family sparse-native midpoint results before
+  interval/box lifting, and the main sparse `basic` LU / SPD / HPD plan-prepare
+  surfaces now return dense interval/box solve plans
 - sparse matrix-function coverage is narrower than dense
 - sparse eigenspectrum and broader structured spectral surfaces are still incomplete
 - there is still duplication between dense and sparse algorithm families at the numerical-kernel level; this tranche centralizes shared wrapper/helper plumbing, not the dense and sparse linear algebra kernels themselves
+- benchmark reports now separate storage-format preparation, cached-plan
+  preparation, and factor-plan preparation from solver-quality kernels for
+  block/vblock and the main sparse surface; the remaining work is to extend that
+  separation more broadly across additional sparse benchmark families

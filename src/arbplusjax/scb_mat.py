@@ -588,11 +588,12 @@ def scb_mat_is_hpd_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.
 
 
 def scb_mat_cho_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
-    return acb_mat.acb_mat_cho_basic(_dense_box_matrix(x, "scb_mat.cho_basic"))
+    return mat_common.box_from_point(scb_mat_to_dense(scb_mat_cho(x)))
 
 
 def scb_mat_ldl_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> tuple[jax.Array, jax.Array]:
-    return acb_mat.acb_mat_ldl_basic(_dense_box_matrix(x, "scb_mat.ldl_basic"))
+    l, d = scb_mat_ldl(x)
+    return mat_common.box_from_point(scb_mat_to_dense(l)), mat_common.box_from_point(d)
 
 
 def scb_mat_charpoly(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
@@ -832,11 +833,13 @@ def scb_mat_triangular_solve_basic(
     lower: bool,
     unit_diagonal: bool = False,
 ) -> jax.Array:
-    return acb_mat.acb_mat_triangular_solve_basic(
-        _dense_box_matrix(x, "scb_mat.triangular_solve_basic"),
-        _dense_box_rhs(b, "scb_mat.triangular_solve_basic"),
-        lower=lower,
-        unit_diagonal=unit_diagonal,
+    return mat_common.box_from_point(
+        scb_mat_triangular_solve(
+            x,
+            _as_complex_rhs(b, "scb_mat.triangular_solve_basic"),
+            lower=lower,
+            unit_diagonal=unit_diagonal,
+        )
     )
 
 
@@ -885,8 +888,7 @@ def scb_mat_solve_basic(
     b: jax.Array,
     **kwargs,
 ) -> jax.Array:
-    del kwargs
-    return acb_mat.acb_mat_solve_basic(_dense_box_matrix(x, "scb_mat.solve_basic"), _dense_box_rhs(b, "scb_mat.solve_basic"))
+    return mat_common.box_from_point(scb_mat_solve(x, _as_complex_rhs(b, "scb_mat.solve_basic"), **kwargs))
 
 
 def scb_mat_lu_solve_plan_prepare(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> sc.SparseLUSolvePlan:
@@ -895,7 +897,7 @@ def scb_mat_lu_solve_plan_prepare(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO
 
 
 def scb_mat_lu_solve_plan_prepare_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO):
-    return scb_mat_lu_solve_plan_prepare(x)
+    return acb_mat.acb_mat_dense_lu_solve_plan_prepare(_dense_box_matrix(x, "scb_mat.lu_solve_plan_prepare_basic"))
 
 
 def scb_mat_lu_solve_plan_apply(plan: sc.SparseLUSolvePlan | tuple, b: jax.Array) -> jax.Array:
@@ -914,7 +916,7 @@ def scb_mat_hpd_solve_plan_prepare(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCO
 
 
 def scb_mat_hpd_solve_plan_prepare_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO):
-    return scb_mat_hpd_solve_plan_prepare(x)
+    return acb_mat.acb_mat_dense_hpd_solve_plan_prepare(_dense_box_matrix(x, "scb_mat.hpd_solve_plan_prepare_basic"))
 
 
 def scb_mat_hpd_solve_plan_apply(plan: sc.SparseCholeskySolvePlan | sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, b: jax.Array) -> jax.Array:
@@ -1514,7 +1516,7 @@ def scb_mat_det(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
 
 
 def scb_mat_det_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
-    return acb_mat.acb_mat_det_basic(_dense_box_matrix(x, "scb_mat.det_basic"))
+    return mat_common.box_from_point(scb_mat_det(x))
 
 
 def scb_mat_inv(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
@@ -1528,7 +1530,7 @@ def scb_mat_inv(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
 
 
 def scb_mat_inv_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
-    return acb_mat.acb_mat_inv_basic(_dense_box_matrix(x, "scb_mat.inv_basic"))
+    return mat_common.box_from_point(scb_mat_inv(x))
 
 
 def scb_mat_sqr(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO:
@@ -1536,7 +1538,7 @@ def scb_mat_sqr(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> sc.SparseCOO 
 
 
 def scb_mat_sqr_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO:
-    return acb_mat.acb_mat_sqr_basic(_dense_box_matrix(x, "scb_mat.sqr_basic"))
+    return mat_common.box_from_point(scb_mat_to_dense(scb_mat_sqr(x)))
 
 
 __all__ = [

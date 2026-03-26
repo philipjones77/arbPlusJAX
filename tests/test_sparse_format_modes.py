@@ -3,6 +3,7 @@ import jax.numpy as jnp
 from arbplusjax import acb_core
 from arbplusjax import api
 from arbplusjax import double_interval as di
+from arbplusjax import mat_common
 from arbplusjax import mat_wrappers
 from arbplusjax import scb_mat
 from arbplusjax import srb_mat
@@ -80,6 +81,8 @@ def test_srb_all_formats_point_and_basic_modes():
         rcache_basic = mat_wrappers.srb_mat_rmatvec_cached_prepare_mode(sparse, impl="basic")
         spd_plan = mat_wrappers.srb_mat_spd_solve_plan_prepare_mode(sparse, impl="basic")
         lu_plan = mat_wrappers.srb_mat_lu_solve_plan_prepare_mode(sparse, impl="basic")
+        _check(isinstance(spd_plan, mat_common.DenseCholeskySolvePlan))
+        _check(isinstance(lu_plan, mat_common.DenseLUSolvePlan))
         chol = mat_wrappers.srb_mat_cho_mode(sparse, impl="basic")
         ldl_l, ldl_d = mat_wrappers.srb_mat_ldl_mode(sparse, impl="basic")
 
@@ -157,6 +160,8 @@ def test_scb_all_formats_point_and_basic_modes():
         rcache_basic = mat_wrappers.scb_mat_rmatvec_cached_prepare_mode(sparse, impl="basic")
         hpd_plan = mat_wrappers.scb_mat_hpd_solve_plan_prepare_mode(sparse, impl="basic")
         lu_plan = mat_wrappers.scb_mat_lu_solve_plan_prepare_mode(sparse, impl="basic")
+        _check(isinstance(hpd_plan, mat_common.DenseCholeskySolvePlan))
+        _check(isinstance(lu_plan, mat_common.DenseLUSolvePlan))
         chol = mat_wrappers.scb_mat_cho_mode(sparse, impl="basic")
         ldl_l, ldl_d = mat_wrappers.scb_mat_ldl_mode(sparse, impl="basic")
 
@@ -258,3 +263,68 @@ def test_sparse_eigsh_uses_matrix_free_operator_surface_without_dense_bridge(mon
         _check(bool(jnp.allclose(residual, jnp.zeros_like(residual), rtol=1e-8, atol=1e-8)))
         _check(bool(jnp.allclose(acb_core.acb_midpoint(vals_basic), vals, rtol=1e-8, atol=1e-8)))
         _check(acb_core.acb_midpoint(vecs_basic).shape == vecs.shape)
+
+
+def test_sparse_basic_core_entrypoints_avoid_dense_bridge(monkeypatch):
+    real_dense = jnp.array(
+        [
+            [5.0, 1.0, 0.0],
+            [1.0, 4.0, 0.5],
+            [0.0, 0.5, 3.0],
+        ],
+        dtype=jnp.float64,
+    )
+    complex_base = jnp.array(
+        [
+            [2.0 + 0.0j, 1.0 - 0.25j, 0.0 + 0.0j],
+            [0.5 + 0.25j, 1.75 + 0.0j, 0.2 - 0.1j],
+            [0.0 + 0.0j, 0.2 + 0.1j, 1.5 + 0.0j],
+        ],
+        dtype=jnp.complex128,
+    )
+    complex_dense = jnp.conj(complex_base.T) @ complex_base + jnp.eye(3, dtype=jnp.complex128)
+    rhs_real = jnp.array([1.0, 2.0, 3.0], dtype=jnp.float64)
+    rhs_complex = jnp.array([1.0 + 0.0j, 2.0 - 0.5j, 3.0 + 0.25j], dtype=jnp.complex128)
+
+    def _fail_real(*args, **kwargs):
+        raise AssertionError("srb_mat basic sparse core entrypoints should not rebuild a dense interval matrix")
+
+    def _fail_complex(*args, **kwargs):
+        raise AssertionError("scb_mat basic sparse core entrypoints should not rebuild a dense box matrix")
+
+    monkeypatch.setattr(srb_mat, "_dense_interval_matrix", _fail_real)
+    monkeypatch.setattr(scb_mat, "_dense_box_matrix", _fail_complex)
+
+    for sparse in _real_formats(real_dense).values():
+        chol = mat_wrappers.srb_mat_cho_mode(sparse, impl="basic")
+        ldl_l, ldl_d = mat_wrappers.srb_mat_ldl_mode(sparse, impl="basic")
+        tri = srb_mat.srb_mat_triangular_solve_basic(srb_mat.srb_mat_cho(sparse), rhs_real, lower=True)
+        solve = mat_wrappers.srb_mat_solve_mode(sparse, rhs_real, impl="basic")
+        det = mat_wrappers.srb_mat_det_mode(sparse, impl="basic")
+        inv = mat_wrappers.srb_mat_inv_mode(sparse, impl="basic")
+        sqr = mat_wrappers.srb_mat_sqr_mode(sparse, impl="basic")
+
+        _check(bool(jnp.allclose(di.midpoint(chol) @ di.midpoint(chol).T, real_dense, rtol=1e-8, atol=1e-8)))
+        _check(bool(jnp.allclose(di.midpoint(ldl_l) @ jnp.diag(di.midpoint(ldl_d)) @ di.midpoint(ldl_l).T, real_dense, rtol=1e-8, atol=1e-8)))
+        _check(bool(jnp.allclose(di.midpoint(tri), jnp.linalg.solve(jnp.linalg.cholesky(real_dense), rhs_real), rtol=1e-8, atol=1e-8)))
+        _check(bool(jnp.allclose(di.midpoint(solve), jnp.linalg.solve(real_dense, rhs_real), rtol=1e-8, atol=1e-8)))
+        _check(bool(jnp.allclose(di.midpoint(det), jnp.linalg.det(real_dense), rtol=1e-8, atol=1e-8)))
+        _check(bool(jnp.allclose(di.midpoint(inv), jnp.linalg.inv(real_dense), rtol=1e-6, atol=1e-6)))
+        _check(bool(jnp.allclose(di.midpoint(sqr), real_dense @ real_dense, rtol=1e-8, atol=1e-8)))
+
+    for sparse in _complex_formats(complex_dense).values():
+        chol = mat_wrappers.scb_mat_cho_mode(sparse, impl="basic")
+        ldl_l, ldl_d = mat_wrappers.scb_mat_ldl_mode(sparse, impl="basic")
+        tri = scb_mat.scb_mat_triangular_solve_basic(scb_mat.scb_mat_cho(sparse), rhs_complex, lower=True)
+        solve = mat_wrappers.scb_mat_solve_mode(sparse, rhs_complex, impl="basic")
+        det = mat_wrappers.scb_mat_det_mode(sparse, impl="basic")
+        inv = mat_wrappers.scb_mat_inv_mode(sparse, impl="basic")
+        sqr = mat_wrappers.scb_mat_sqr_mode(sparse, impl="basic")
+
+        _check(bool(jnp.allclose(acb_core.acb_midpoint(chol) @ jnp.conj(acb_core.acb_midpoint(chol).T), complex_dense, rtol=1e-8, atol=1e-8)))
+        _check(bool(jnp.allclose(acb_core.acb_midpoint(ldl_l) @ jnp.diag(acb_core.acb_midpoint(ldl_d)) @ jnp.conj(acb_core.acb_midpoint(ldl_l).T), complex_dense, rtol=1e-8, atol=1e-8)))
+        _check(bool(jnp.allclose(acb_core.acb_midpoint(tri), jnp.linalg.solve(jnp.linalg.cholesky(complex_dense), rhs_complex), rtol=1e-8, atol=1e-8)))
+        _check(bool(jnp.allclose(acb_core.acb_midpoint(solve), jnp.linalg.solve(complex_dense, rhs_complex), rtol=1e-8, atol=1e-8)))
+        _check(bool(jnp.allclose(acb_core.acb_midpoint(det), jnp.linalg.det(complex_dense), rtol=1e-8, atol=1e-8)))
+        _check(bool(jnp.allclose(acb_core.acb_midpoint(inv), jnp.linalg.inv(complex_dense), rtol=1e-6, atol=1e-6)))
+        _check(bool(jnp.allclose(acb_core.acb_midpoint(sqr), complex_dense @ complex_dense, rtol=1e-8, atol=1e-8)))

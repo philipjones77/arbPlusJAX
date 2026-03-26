@@ -309,14 +309,16 @@ Status: `in_progress`
 - `in_progress`
   - direct owner tests now exist for `sparse_common`
 - `planned`
-  - extend native interval/box sparse coverage beyond block/vblock `basic`
-    determinant, inverse, and square into more of the core sparse surface;
-    main-stack sparse `basic` LU/Cholesky plan preparation should stay on dense
-    interval/box plans rather than reusing sparse point plans
+  - extend native interval/box sparse coverage beyond the now-landed direct core
+    `basic` determinant, inverse, square, factor, and solve entrypoints into
+    more of the remaining sparse algorithm surface; main-stack sparse `basic`
+    LU/Cholesky plan preparation should stay on dense interval/box plans rather
+    than reusing sparse point plans
   - extend the storage-format preparation versus solver-quality benchmark split
-    beyond the current block/vblock reports; the main sparse surface should
-    track `storage_prepare` and `cached_prepare` separately from solve and
-    apply timings
+    beyond the main sparse and current block/vblock reports into additional
+    sparse benchmark families; the main sparse surface now tracks
+    `storage_prepare`, `cached_prepare`, and LU / SPD / HPD factor-plan
+    preparation separately from solve and apply timings
 
 ## 5. Matrix-Free / Operator Functionality
 
@@ -371,6 +373,8 @@ Status: `in_progress`
     `jrb_mat` / `jcb_mat`
   - public contour-integral `sinh` / `cosh` / `tanh` action wrappers now also
     exist on `jrb_mat` / `jcb_mat`
+  - public contour-integral `exp` / `tan` action wrappers now also exist on
+    `jrb_mat` / `jcb_mat`
   - shared eigensolver convergence accounting now lives in
     `matrix_free_core.eig_convergence_summary` instead of duplicated
     real/complex residual-threshold bookkeeping
@@ -380,6 +384,14 @@ Status: `in_progress`
   - cached rational Hutch++ metadata now exists for the real/complex Jones
     wrappers, so rational trace and rational-logdet approximants can reuse the
     same compact deflation state instead of rebuilding it on every pass
+  - cached rational Hutch++ metadata now also records cached-adjoint support
+    and transpose-preconditioner reuse when the chosen structure/policy can
+    support that path
+  - shared probe-budget helpers now expose probe deficit and next total probe
+    count contracts in addition to the existing target-met / should-stop tests
+  - Davidson and Jacobi-Davidson now share restart target-column policy through
+    `matrix_free_core`, and locked residual corrections are filtered before
+    basis expansion
   - operator-first solve surfaces on `jrb_mat` / `jcb_mat` now route through
     `matrix_free_core.implicit_krylov_solve_midpoint` using
     `jax.lax.custom_linear_solve` where the current transpose/adjoint policy
@@ -400,11 +412,13 @@ Status: `in_progress`
   - deepen the new `basic` semantics for operator-first surfaces
   - keep extending flexible-preconditioner policy beyond the newly landed
     transpose-aware shell-preconditioner contract
-  - harden locking, restart, and correction-equation policy for the landed
-    Davidson/Jacobi-Davidson/shift-invert/contour eigensolver tranche
+  - keep hardening locking, restart, and correction-equation policy for the
+    landed Davidson/Jacobi-Davidson/shift-invert/contour eigensolver tranche,
+    especially in the heavier shift-invert and contour eigensolver paths
   - keep extending the new contour-integral/spectral-transform/operator-first
-    helper substrate beyond the now-landed `log` / `sqrt` / `root` / `sign`
-    wrappers into more public `jrb_mat` / `jcb_mat` matrix-function surfaces
+    helper substrate beyond the now-landed `log` / `sqrt` / `root` / `sign`,
+    `sin` / `cos` / `sinh` / `cosh` / `tanh`, and `exp` / `tan` wrappers into
+    more public `jrb_mat` / `jcb_mat` matrix-function surfaces
 
 ### Estimators And Approximation Paths
 
@@ -421,7 +435,7 @@ Status: `in_progress`
 ### AD-Safe Caching And Adjoint Design
 
 - `in_progress`
-  - add an AD-safe cached rational-Krylov trace/logdet path in the operator
+  - deepen the AD-safe cached rational-Krylov trace/logdet path in the operator
     stack:
     - forward surface should be an operator-plan-first JAX API, not an
       arbitrary callable closure

@@ -77,7 +77,11 @@ sparse factorization path is already a first-class rigorous sparse kernel.
 Current production interpretation:
 
 - point sparse execution is the primary substrate
-- interval/box sparse support exists in selected places
+- interval/box sparse support exists in selected places, including block/vblock
+  `basic` determinant/inverse/square paths, main sparse direct `basic`
+  determinant/inverse/square and core factor/solve entrypoints, and the main
+  sparse `basic` LU / SPD / HPD plan-prepare lift into dense interval/box solve
+  plans
 - status and benchmarks should distinguish structural sparse execution from
   enclosure-quality claims
 
@@ -111,5 +115,8 @@ Canonical sparse examples and benchmarks should teach:
   substrate
 - variable-block factorization assumptions still need to be tightened in some
   paths
-- sparse benchmark normalization is in progress rather than uniformly complete
+- sparse benchmark normalization now separates storage preparation and cached
+  plan preparation, plus main sparse LU and SPD/HPD factor-plan preparation, on
+  the main sparse and block/vblock benchmark surfaces, but broader sparse
+  benchmark families still need the same split
 - GPU validation is deferred to a later tranche

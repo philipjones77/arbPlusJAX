@@ -37,6 +37,10 @@ def test_sparse_matrix_benchmark_writes_shared_schema_report() -> None:
     assert payload["category"] == "matrix_sparse"
     assert payload["records"]
     assert any(row["operation"] == "matvec" for row in payload["records"])
+    assert any(row["operation"] == "storage_prepare" for row in payload["records"])
+    assert any(row["operation"] == "cached_prepare" for row in payload["records"])
+    assert any(row["operation"] == "lu_prepare" for row in payload["records"])
+    assert any(row["operation"] == "spd_prepare" for row in payload["records"])
     assert {"float32", "complex64"} == {row["dtype"] for row in payload["records"]}
     assert payload["environment"]["jax"]["requested_mode"] == "cpu"
 
@@ -90,6 +94,8 @@ def test_block_sparse_benchmark_writes_shared_schema_report() -> None:
     assert payload["category"] == "matrix_block_sparse"
     assert payload["records"]
     assert any(row["operation"] == "matvec" for row in payload["records"])
+    assert any(row["operation"] == "storage_prepare" for row in payload["records"])
+    assert any(row["operation"] == "cached_prepare" for row in payload["records"])
     assert {"float32", "complex64"} == {row["dtype"] for row in payload["records"]}
     assert payload["environment"]["jax"]["requested_mode"] == "cpu"
 
@@ -114,6 +120,8 @@ def test_vblock_sparse_benchmark_writes_shared_schema_report() -> None:
     assert payload["category"] == "matrix_vblock_sparse"
     assert payload["records"]
     assert any(row["operation"] == "matvec" for row in payload["records"])
+    assert any(row["operation"] == "storage_prepare" for row in payload["records"])
+    assert any(row["operation"] == "cached_prepare" for row in payload["records"])
     assert {"float32", "complex64"} == {row["dtype"] for row in payload["records"]}
     assert payload["environment"]["jax"]["requested_mode"] == "cpu"
 
@@ -208,6 +216,20 @@ def test_hypgeom_extra_benchmark_writes_shared_schema_report() -> None:
     assert payload["environment"]["jax"]["requested_mode"] == "cpu"
 
 
+def test_incomplete_bessel_benchmark_writes_shared_schema_report() -> None:
+    payload = _run_and_load(
+        ["benchmarks/benchmark_incomplete_bessel.py", "--iters", "2", "--dtype", "float32", "--jax-mode", "cpu", "--smoke"],
+        "benchmark_incomplete_bessel.json",
+    )
+    assert payload["benchmark_name"] == "benchmark_incomplete_bessel.py"
+    assert payload["category"] == "special"
+    assert payload["records"]
+    assert any(row["implementation"] == "incomplete_bessel_k" for row in payload["records"])
+    assert any(row["operation"] == "quadrature_point" for row in payload["records"])
+    assert payload["records"][0]["dtype"] == "float32"
+    assert payload["environment"]["jax"]["requested_mode"] == "cpu"
+
+
 def test_normalized_benchmark_help_shows_dtype_portability_controls() -> None:
     for script in (
         "benchmarks/benchmark_fft_nufft.py",
@@ -222,6 +244,7 @@ def test_normalized_benchmark_help_shows_dtype_portability_controls() -> None:
         "benchmarks/benchmark_dirichlet.py",
         "benchmarks/benchmark_acb_dirichlet.py",
         "benchmarks/benchmark_hypgeom_extra.py",
+        "benchmarks/benchmark_incomplete_bessel.py",
     ):
         result = subprocess.run(
             [sys.executable, script, "--help"],

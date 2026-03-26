@@ -66,16 +66,64 @@ def _scb_case(n: int, real_dtype, complex_dtype):
     return dense, sparse, rhs, rhs_batch, rhs_cols
 
 
+def _srb_storage_prepare(dense: jax.Array, storage: str):
+    if storage == "coo":
+        return srb_mat.srb_mat_from_dense_coo(dense)
+    if storage == "csr":
+        return srb_mat.srb_mat_from_dense_csr(dense)
+    if storage == "bcoo":
+        return srb_mat.srb_mat_from_dense_bcoo(dense)
+    raise ValueError(f"unsupported storage kind: {storage}")
+
+
+def _scb_storage_prepare(dense: jax.Array, storage: str):
+    if storage == "coo":
+        return scb_mat.scb_mat_from_dense_coo(dense)
+    if storage == "csr":
+        return scb_mat.scb_mat_from_dense_csr(dense)
+    if storage == "bcoo":
+        return scb_mat.scb_mat_from_dense_bcoo(dense)
+    raise ValueError(f"unsupported storage kind: {storage}")
+
+
 def run_srb_case(n: int, warmup: int, runs: int, real_dtype, *, smoke: bool) -> dict[str, float]:
-    _, sparse_by_format, rhs, rhs_batch, rhs_cols = _srb_case(n, real_dtype)
+    dense, sparse_by_format, rhs, rhs_batch, rhs_cols = _srb_case(n, real_dtype)
     results: dict[str, float] = {}
-    for storage, sparse in sparse_by_format.items():
+    items = sparse_by_format.items()
+    if smoke:
+        items = (("csr", sparse_by_format["csr"]),)
+    for storage, sparse in items:
         for impl in ("point", "basic"):
+            prefix = f"srb_{storage}_{impl}"
+            results[f"{prefix}_storage_prepare_s"] = _time_call(
+                _srb_storage_prepare,
+                dense,
+                storage,
+                warmup=warmup,
+                runs=runs,
+            )
             cache = mat_wrappers.srb_mat_matvec_cached_prepare_mode(sparse, impl=impl)
             rcache = mat_wrappers.srb_mat_rmatvec_cached_prepare_mode(sparse, impl=impl)
             lu_plan = mat_wrappers.srb_mat_lu_solve_plan_prepare_mode(sparse, impl=impl)
             spd_plan = mat_wrappers.srb_mat_spd_solve_plan_prepare_mode(sparse, impl=impl)
-            prefix = f"srb_{storage}_{impl}"
+            results[f"{prefix}_cached_prepare_s"] = _time_call(
+                lambda a: mat_wrappers.srb_mat_matvec_cached_prepare_mode(a, impl=impl),
+                sparse,
+                warmup=warmup,
+                runs=runs,
+            )
+            results[f"{prefix}_lu_prepare_s"] = _time_call(
+                lambda a: mat_wrappers.srb_mat_lu_solve_plan_prepare_mode(a, impl=impl),
+                sparse,
+                warmup=warmup,
+                runs=runs,
+            )
+            results[f"{prefix}_spd_prepare_s"] = _time_call(
+                lambda a: mat_wrappers.srb_mat_spd_solve_plan_prepare_mode(a, impl=impl),
+                sparse,
+                warmup=warmup,
+                runs=runs,
+            )
             if smoke:
                 results[f"{prefix}_matvec_s"] = _time_call(
                     lambda a, v: mat_wrappers.srb_mat_matvec_mode(a, v, impl=impl),
@@ -190,15 +238,43 @@ def run_srb_case(n: int, warmup: int, runs: int, real_dtype, *, smoke: bool) -> 
 
 
 def run_scb_case(n: int, warmup: int, runs: int, real_dtype, complex_dtype, *, smoke: bool) -> dict[str, float]:
-    _, sparse_by_format, rhs, rhs_batch, rhs_cols = _scb_case(n, real_dtype, complex_dtype)
+    dense, sparse_by_format, rhs, rhs_batch, rhs_cols = _scb_case(n, real_dtype, complex_dtype)
     results: dict[str, float] = {}
-    for storage, sparse in sparse_by_format.items():
+    items = sparse_by_format.items()
+    if smoke:
+        items = (("csr", sparse_by_format["csr"]),)
+    for storage, sparse in items:
         for impl in ("point", "basic"):
+            prefix = f"scb_{storage}_{impl}"
+            results[f"{prefix}_storage_prepare_s"] = _time_call(
+                _scb_storage_prepare,
+                dense,
+                storage,
+                warmup=warmup,
+                runs=runs,
+            )
             cache = mat_wrappers.scb_mat_matvec_cached_prepare_mode(sparse, impl=impl)
             rcache = mat_wrappers.scb_mat_rmatvec_cached_prepare_mode(sparse, impl=impl)
             lu_plan = mat_wrappers.scb_mat_lu_solve_plan_prepare_mode(sparse, impl=impl)
             hpd_plan = mat_wrappers.scb_mat_hpd_solve_plan_prepare_mode(sparse, impl=impl)
-            prefix = f"scb_{storage}_{impl}"
+            results[f"{prefix}_cached_prepare_s"] = _time_call(
+                lambda a: mat_wrappers.scb_mat_matvec_cached_prepare_mode(a, impl=impl),
+                sparse,
+                warmup=warmup,
+                runs=runs,
+            )
+            results[f"{prefix}_lu_prepare_s"] = _time_call(
+                lambda a: mat_wrappers.scb_mat_lu_solve_plan_prepare_mode(a, impl=impl),
+                sparse,
+                warmup=warmup,
+                runs=runs,
+            )
+            results[f"{prefix}_hpd_prepare_s"] = _time_call(
+                lambda a: mat_wrappers.scb_mat_hpd_solve_plan_prepare_mode(a, impl=impl),
+                sparse,
+                warmup=warmup,
+                runs=runs,
+            )
             if smoke:
                 results[f"{prefix}_matvec_s"] = _time_call(
                     lambda a, v: mat_wrappers.scb_mat_matvec_mode(a, v, impl=impl),
