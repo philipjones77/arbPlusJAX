@@ -21,6 +21,7 @@ import jax.numpy as jnp
 
 from . import acb_core
 from . import double_interval as di
+from .lazy_jit import lazy_jit
 
 
 PROVENANCE = {
@@ -110,13 +111,13 @@ def acb_dirichlet_eta_batch_prec(
     return acb_core.acb_box_round_prec(acb_dirichlet_eta_batch(s, n_terms), prec_bits)
 
 
-acb_dirichlet_zeta_batch_jit = jax.jit(acb_dirichlet_zeta_batch, static_argnames=("n_terms",))
-acb_dirichlet_eta_batch_jit = jax.jit(acb_dirichlet_eta_batch, static_argnames=("n_terms",))
-acb_dirichlet_zeta_batch_prec_jit = jax.jit(
-    acb_dirichlet_zeta_batch_prec, static_argnames=("n_terms", "prec_bits")
+acb_dirichlet_zeta_batch_jit = lazy_jit(lambda: jax.jit(acb_dirichlet_zeta_batch, static_argnames=("n_terms",)))
+acb_dirichlet_eta_batch_jit = lazy_jit(lambda: jax.jit(acb_dirichlet_eta_batch, static_argnames=("n_terms",)))
+acb_dirichlet_zeta_batch_prec_jit = lazy_jit(
+    lambda: jax.jit(acb_dirichlet_zeta_batch_prec, static_argnames=("n_terms", "prec_bits"))
 )
-acb_dirichlet_eta_batch_prec_jit = jax.jit(
-    acb_dirichlet_eta_batch_prec, static_argnames=("n_terms", "prec_bits")
+acb_dirichlet_eta_batch_prec_jit = lazy_jit(
+    lambda: jax.jit(acb_dirichlet_eta_batch_prec, static_argnames=("n_terms", "prec_bits"))
 )
 
 
@@ -136,11 +137,17 @@ __all__ = [
 ]
 
 
-from . import series_missing_impl as _smi
-for _name in dir(_smi):
-    if _name in globals():
-        continue
-    if any(_name.startswith(p) for p in ['acb_dirichlet_', '_acb_dirichlet_']):
-        globals()[_name] = getattr(_smi, _name)
-        if '__all__' in globals():
-            __all__.append(_name)
+def __getattr__(name: str):
+    if any(name.startswith(prefix) for prefix in ("acb_dirichlet_", "_acb_dirichlet_")):
+        from . import series_missing_impl as _smi
+
+        value = getattr(_smi, name)
+        globals()[name] = value
+        if name not in __all__:
+            __all__.append(name)
+        return value
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+def __dir__() -> list[str]:
+    return sorted(set(globals()) | set(__all__))

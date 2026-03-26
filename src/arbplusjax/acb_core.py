@@ -1,19 +1,39 @@
 from __future__ import annotations
 
-from functools import partial
-
 import jax
 import jax.numpy as jnp
 from jax import lax
 
 from . import double_interval as di
 from . import arb_core
-from . import acb_dirichlet
-from . import barnesg
 from . import elementary as el
-from . import hypgeom
 from . import checks
+from .lazy_jit import lazy_jit
 
+
+def lazy_jit_decorator(*jit_args, **jit_kwargs):
+    def decorate(fn):
+        return lazy_jit(lambda: jax.jit(fn, *jit_args, **jit_kwargs))
+
+    return decorate
+
+
+def _hypgeom():
+    from . import hypgeom
+
+    return hypgeom
+
+
+def _barnesg():
+    from . import barnesg
+
+    return barnesg
+
+
+def _acb_dirichlet():
+    from . import acb_dirichlet
+
+    return acb_dirichlet
 
 
 def as_acb_box(x: jax.Array) -> jax.Array:
@@ -459,142 +479,142 @@ def acb_trim(x: jax.Array) -> jax.Array:
     return as_acb_box(x)
 
 
-@jax.jit
+@lazy_jit_decorator()
 def acb_exp(x: jax.Array) -> jax.Array:
     return _acb_unary_from_midpoint(x, jnp.exp)
 
 
-@jax.jit
+@lazy_jit_decorator()
 def acb_log(x: jax.Array) -> jax.Array:
     return _acb_unary_from_midpoint(x, jnp.log)
 
 
-@jax.jit
+@lazy_jit_decorator()
 def acb_log1p(x: jax.Array) -> jax.Array:
     return _acb_unary_from_midpoint(x, jnp.log1p)
 
 
-@jax.jit
+@lazy_jit_decorator()
 def acb_sqrt(x: jax.Array) -> jax.Array:
     return _acb_unary_from_midpoint(x, jnp.sqrt)
 
 
-@jax.jit
+@lazy_jit_decorator()
 def acb_rsqrt(x: jax.Array) -> jax.Array:
     return _acb_unary_from_midpoint(x, lambda z: 1.0 / jnp.sqrt(z))
 
 
-@jax.jit
+@lazy_jit_decorator()
 def acb_sin(x: jax.Array) -> jax.Array:
     return _acb_unary_from_midpoint(x, jnp.sin)
 
 
-@jax.jit
+@lazy_jit_decorator()
 def acb_cos(x: jax.Array) -> jax.Array:
     return _acb_unary_from_midpoint(x, jnp.cos)
 
 
-@jax.jit
+@lazy_jit_decorator()
 def acb_sin_cos(x: jax.Array) -> tuple[jax.Array, jax.Array]:
     return _acb_unary_pair_from_midpoint(x, lambda z: (jnp.sin(z), jnp.cos(z)))
 
 
-@jax.jit
+@lazy_jit_decorator()
 def acb_tan(x: jax.Array) -> jax.Array:
     return _acb_unary_from_midpoint(x, jnp.tan)
 
 
-@jax.jit
+@lazy_jit_decorator()
 def acb_cot(x: jax.Array) -> jax.Array:
     return _acb_unary_from_midpoint(x, lambda z: 1.0 / jnp.tan(z))
 
 
-@jax.jit
+@lazy_jit_decorator()
 def acb_sinh(x: jax.Array) -> jax.Array:
     return _acb_unary_from_midpoint(x, jnp.sinh)
 
 
-@jax.jit
+@lazy_jit_decorator()
 def acb_cosh(x: jax.Array) -> jax.Array:
     return _acb_unary_from_midpoint(x, jnp.cosh)
 
 
-@jax.jit
+@lazy_jit_decorator()
 def acb_tanh(x: jax.Array) -> jax.Array:
     return _acb_unary_from_midpoint(x, jnp.tanh)
 
 
-@jax.jit
+@lazy_jit_decorator()
 def acb_asin(x: jax.Array) -> jax.Array:
     return _acb_unary_from_midpoint(x, jnp.arcsin)
 
 
-@jax.jit
+@lazy_jit_decorator()
 def acb_acos(x: jax.Array) -> jax.Array:
     return _acb_unary_from_midpoint(x, jnp.arccos)
 
 
-@jax.jit
+@lazy_jit_decorator()
 def acb_atan(x: jax.Array) -> jax.Array:
     return _acb_unary_from_midpoint(x, jnp.arctan)
 
 
-@jax.jit
+@lazy_jit_decorator()
 def acb_asinh(x: jax.Array) -> jax.Array:
     return _acb_unary_from_midpoint(x, jnp.arcsinh)
 
 
-@jax.jit
+@lazy_jit_decorator()
 def acb_acosh(x: jax.Array) -> jax.Array:
     return _acb_unary_from_midpoint(x, jnp.arccosh)
 
 
-@jax.jit
+@lazy_jit_decorator()
 def acb_atanh(x: jax.Array) -> jax.Array:
     return _acb_unary_from_midpoint(x, jnp.arctanh)
 
 
-@jax.jit
+@lazy_jit_decorator()
 def acb_sech(x: jax.Array) -> jax.Array:
     return _acb_unary_from_midpoint(x, lambda z: 1.0 / jnp.cosh(z))
 
 
-@jax.jit
+@lazy_jit_decorator()
 def acb_csch(x: jax.Array) -> jax.Array:
     return _acb_unary_from_midpoint(x, lambda z: 1.0 / jnp.sinh(z))
 
 
-@jax.jit
+@lazy_jit_decorator()
 def acb_sin_pi(x: jax.Array) -> jax.Array:
     return _acb_unary_from_midpoint(x, lambda z: jnp.sin(el.PI * z))
 
 
-@jax.jit
+@lazy_jit_decorator()
 def acb_cos_pi(x: jax.Array) -> jax.Array:
     return _acb_unary_from_midpoint(x, lambda z: jnp.cos(el.PI * z))
 
 
-@jax.jit
+@lazy_jit_decorator()
 def acb_sin_cos_pi(x: jax.Array) -> tuple[jax.Array, jax.Array]:
     return _acb_unary_pair_from_midpoint(x, lambda z: (jnp.sin(el.PI * z), jnp.cos(el.PI * z)))
 
 
-@jax.jit
+@lazy_jit_decorator()
 def acb_tan_pi(x: jax.Array) -> jax.Array:
     return _acb_unary_from_midpoint(x, lambda z: jnp.tan(el.PI * z))
 
 
-@jax.jit
+@lazy_jit_decorator()
 def acb_cot_pi(x: jax.Array) -> jax.Array:
     return _acb_unary_from_midpoint(x, lambda z: 1.0 / jnp.tan(el.PI * z))
 
 
-@jax.jit
+@lazy_jit_decorator()
 def acb_csc_pi(x: jax.Array) -> jax.Array:
     return _acb_unary_from_midpoint(x, lambda z: 1.0 / jnp.sin(el.PI * z))
 
 
-@jax.jit
+@lazy_jit_decorator()
 def acb_sinc(x: jax.Array) -> jax.Array:
     def fn(z):
         return jnp.where(jnp.abs(z) < 1e-12, 1.0 + 0.0j, jnp.sin(z) / z)
@@ -602,7 +622,7 @@ def acb_sinc(x: jax.Array) -> jax.Array:
     return _acb_unary_from_midpoint(x, fn)
 
 
-@jax.jit
+@lazy_jit_decorator()
 def acb_sinc_pi(x: jax.Array) -> jax.Array:
     def fn(z):
         t = el.PI * z
@@ -611,17 +631,17 @@ def acb_sinc_pi(x: jax.Array) -> jax.Array:
     return _acb_unary_from_midpoint(x, fn)
 
 
-@jax.jit
+@lazy_jit_decorator()
 def acb_exp_pi_i(x: jax.Array) -> jax.Array:
     return _acb_unary_from_midpoint(x, lambda z: jnp.exp(1j * el.PI * z))
 
 
-@jax.jit
+@lazy_jit_decorator()
 def acb_expm1(x: jax.Array) -> jax.Array:
     return _acb_unary_from_midpoint(x, jnp.expm1)
 
 
-@jax.jit
+@lazy_jit_decorator()
 def acb_exp_invexp(x: jax.Array) -> tuple[jax.Array, jax.Array]:
     return _acb_unary_pair_from_midpoint(x, lambda z: (jnp.exp(z), jnp.exp(-z)))
 
@@ -634,7 +654,7 @@ def acb_submul(z: jax.Array, x: jax.Array, y: jax.Array) -> jax.Array:
     return acb_sub(as_acb_box(z), acb_mul(x, y))
 
 
-@jax.jit
+@lazy_jit_decorator()
 def acb_pow(x: jax.Array, y: jax.Array) -> jax.Array:
     xb = as_acb_box(x)
     yb = as_acb_box(y)
@@ -646,7 +666,7 @@ def acb_pow(x: jax.Array, y: jax.Array) -> jax.Array:
     return jnp.where(finite[..., None], out, _full_box_like(xb))
 
 
-@jax.jit
+@lazy_jit_decorator()
 def acb_pow_arb(x: jax.Array, y: jax.Array) -> jax.Array:
     yb = di.as_interval(y)
     m = di.midpoint(yb)
@@ -654,53 +674,53 @@ def acb_pow_arb(x: jax.Array, y: jax.Array) -> jax.Array:
     return acb_pow(x, acb_box(di.interval(m, m), di.interval(zero, zero)))
 
 
-@jax.jit
+@lazy_jit_decorator()
 def acb_pow_ui(x: jax.Array, n: int) -> jax.Array:
     return _acb_unary_from_midpoint(x, lambda z: jnp.power(z, n))
 
 
-@jax.jit
+@lazy_jit_decorator()
 def acb_pow_si(x: jax.Array, n: int) -> jax.Array:
     return _acb_unary_from_midpoint(x, lambda z: jnp.power(z, n))
 
 
-@jax.jit
+@lazy_jit_decorator()
 def acb_pow_fmpz(x: jax.Array, n: jax.Array) -> jax.Array:
     n_val = jnp.asarray(n, dtype=jnp.int64)
     return _acb_unary_from_midpoint(x, lambda z: jnp.power(z, n_val))
 
 
-@jax.jit
+@lazy_jit_decorator()
 def acb_sqr(x: jax.Array) -> jax.Array:
     return acb_mul(x, x)
 
 
-@jax.jit
+@lazy_jit_decorator()
 def acb_root_ui(x: jax.Array, k: int) -> jax.Array:
     return _acb_unary_from_midpoint(x, lambda z: jnp.power(z, jnp.asarray(1.0, dtype=jnp.real(z).dtype) / jnp.asarray(k, dtype=jnp.real(z).dtype)))
 
 
-@jax.jit
+@lazy_jit_decorator()
 def acb_gamma(x: jax.Array) -> jax.Array:
-    return hypgeom.acb_hypgeom_gamma(as_acb_box(x))
+    return _hypgeom().acb_hypgeom_gamma(as_acb_box(x))
 
 
-@jax.jit
+@lazy_jit_decorator()
 def acb_rgamma(x: jax.Array) -> jax.Array:
-    return hypgeom.acb_hypgeom_rgamma(as_acb_box(x))
+    return _hypgeom().acb_hypgeom_rgamma(as_acb_box(x))
 
 
-@jax.jit
+@lazy_jit_decorator()
 def acb_lgamma(x: jax.Array) -> jax.Array:
-    return hypgeom.acb_hypgeom_lgamma(as_acb_box(x))
+    return _hypgeom().acb_hypgeom_lgamma(as_acb_box(x))
 
 
-@jax.jit
+@lazy_jit_decorator()
 def acb_log_sin_pi(x: jax.Array) -> jax.Array:
     return _acb_unary_from_midpoint(x, lambda z: jnp.log(jnp.sin(el.PI * z)))
 
 
-@jax.jit
+@lazy_jit_decorator()
 def acb_digamma(x: jax.Array) -> jax.Array:
     box = as_acb_box(x)
     z = acb_midpoint(box)
@@ -712,7 +732,7 @@ def acb_digamma(x: jax.Array) -> jax.Array:
     return jnp.where(finite[..., None], out, _full_box_like(box))
 
 
-@jax.jit
+@lazy_jit_decorator()
 def acb_barnes_g(x: jax.Array) -> jax.Array:
     box = as_acb_box(x)
     re = acb_real(box)
@@ -731,7 +751,7 @@ def acb_barnes_g(x: jax.Array) -> jax.Array:
         ],
         dtype=_complex_dtype_for_box(box),
     )
-    vals = jax.vmap(barnesg.barnesg_complex)(corners)
+    vals = jax.vmap(_barnesg().barnesg_complex)(corners)
     finite = jnp.all(jnp.isfinite(jnp.real(vals))) & jnp.all(jnp.isfinite(jnp.imag(vals)))
     out = acb_box(
         di.interval(di._below(jnp.min(jnp.real(vals))), di._above(jnp.max(jnp.real(vals)))),
@@ -740,7 +760,7 @@ def acb_barnes_g(x: jax.Array) -> jax.Array:
     return jnp.where(cross_pole | (~finite), _full_box_like(box), out)
 
 
-@jax.jit
+@lazy_jit_decorator()
 def acb_log_barnes_g(x: jax.Array) -> jax.Array:
     box = as_acb_box(x)
     re = acb_real(box)
@@ -759,7 +779,7 @@ def acb_log_barnes_g(x: jax.Array) -> jax.Array:
         ],
         dtype=_complex_dtype_for_box(box),
     )
-    vals = jax.vmap(barnesg.log_barnesg)(corners)
+    vals = jax.vmap(_barnesg().log_barnesg)(corners)
     finite = jnp.all(jnp.isfinite(jnp.real(vals))) & jnp.all(jnp.isfinite(jnp.imag(vals)))
     out = acb_box(
         di.interval(di._below(jnp.min(jnp.real(vals))), di._above(jnp.max(jnp.real(vals)))),
@@ -768,12 +788,12 @@ def acb_log_barnes_g(x: jax.Array) -> jax.Array:
     return jnp.where(cross_pole | (~finite), _full_box_like(box), out)
 
 
-@jax.jit
+@lazy_jit_decorator()
 def acb_zeta(x: jax.Array) -> jax.Array:
-    return acb_dirichlet.acb_dirichlet_zeta(as_acb_box(x))
+    return _acb_dirichlet().acb_dirichlet_zeta(as_acb_box(x))
 
 
-@partial(jax.jit, static_argnames=("terms", "max_terms", "min_terms"))
+@lazy_jit_decorator(static_argnames=("terms", "max_terms", "min_terms"))
 def acb_hurwitz_zeta(
     s: jax.Array,
     a: jax.Array,
@@ -801,7 +821,7 @@ def acb_hurwitz_zeta(
     return jnp.where(finite[..., None], out, _full_box_like(sb))
 
 
-@partial(jax.jit, static_argnames=("m", "terms", "max_terms", "min_terms"))
+@lazy_jit_decorator(static_argnames=("m", "terms", "max_terms", "min_terms"))
 def acb_polygamma(
     m: int,
     z: jax.Array,
@@ -832,7 +852,7 @@ def acb_polygamma(
     return jnp.where(finite[..., None], out, _full_box_like(zb))
 
 
-@partial(jax.jit, static_argnames=("n",))
+@lazy_jit_decorator(static_argnames=("n",))
 def acb_bernoulli_poly_ui(n: int, x: jax.Array) -> jax.Array:
     xb = as_acb_box(x)
     z = acb_midpoint(xb)
@@ -860,7 +880,7 @@ def acb_bernoulli_poly_ui(n: int, x: jax.Array) -> jax.Array:
     return jnp.where(finite[..., None], out, _full_box_like(xb))
 
 
-@partial(jax.jit, static_argnames=("terms", "max_terms", "min_terms"))
+@lazy_jit_decorator(static_argnames=("terms", "max_terms", "min_terms"))
 def acb_polylog(
     s: jax.Array,
     z: jax.Array,
@@ -886,7 +906,7 @@ def acb_polylog(
     return jnp.where(finite[..., None], out, _full_box_like(zb))
 
 
-@partial(jax.jit, static_argnames=("s", "terms", "max_terms", "min_terms"))
+@lazy_jit_decorator(static_argnames=("s", "terms", "max_terms", "min_terms"))
 def acb_polylog_si(
     s: int,
     z: jax.Array,
@@ -904,7 +924,7 @@ def acb_polylog_si(
     return acb_polylog(s_box, z, terms=terms, max_terms=max_terms, min_terms=min_terms)
 
 
-@partial(jax.jit, static_argnames=("iters",))
+@lazy_jit_decorator(static_argnames=("iters",))
 def acb_agm(a: jax.Array, b: jax.Array, iters: int = 10) -> jax.Array:
     abox = as_acb_box(a)
     bbox = as_acb_box(b)
@@ -923,12 +943,12 @@ def acb_agm(a: jax.Array, b: jax.Array, iters: int = 10) -> jax.Array:
     return jnp.where(finite[..., None], out, _full_box_like(abox))
 
 
-@partial(jax.jit, static_argnames=("iters",))
+@lazy_jit_decorator(static_argnames=("iters",))
 def acb_agm1(x: jax.Array, iters: int = 10) -> jax.Array:
     return acb_agm(acb_one(), x, iters=iters)
 
 
-@partial(jax.jit, static_argnames=("iters",))
+@lazy_jit_decorator(static_argnames=("iters",))
 def acb_agm1_cpx(x: jax.Array, iters: int = 10) -> jax.Array:
     return acb_agm1(x, iters=iters)
 
@@ -941,112 +961,112 @@ def acb_box_round_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> j
     )
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
+@lazy_jit_decorator(static_argnames=("prec_bits",))
 def acb_exp_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return acb_box_round_prec(acb_exp(x), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
+@lazy_jit_decorator(static_argnames=("prec_bits",))
 def acb_log_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return acb_box_round_prec(acb_log(x), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
+@lazy_jit_decorator(static_argnames=("prec_bits",))
 def acb_sqrt_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return acb_box_round_prec(acb_sqrt(x), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
+@lazy_jit_decorator(static_argnames=("prec_bits",))
 def acb_sin_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return acb_box_round_prec(acb_sin(x), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
+@lazy_jit_decorator(static_argnames=("prec_bits",))
 def acb_cos_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return acb_box_round_prec(acb_cos(x), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
+@lazy_jit_decorator(static_argnames=("prec_bits",))
 def acb_tan_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return acb_box_round_prec(acb_tan(x), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
+@lazy_jit_decorator(static_argnames=("prec_bits",))
 def acb_sinh_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return acb_box_round_prec(acb_sinh(x), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
+@lazy_jit_decorator(static_argnames=("prec_bits",))
 def acb_cosh_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return acb_box_round_prec(acb_cosh(x), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
+@lazy_jit_decorator(static_argnames=("prec_bits",))
 def acb_tanh_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return acb_box_round_prec(acb_tanh(x), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
+@lazy_jit_decorator(static_argnames=("prec_bits",))
 def acb_asin_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return _acb_round_output(acb_asin(x), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
+@lazy_jit_decorator(static_argnames=("prec_bits",))
 def acb_acos_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return _acb_round_output(acb_acos(x), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
+@lazy_jit_decorator(static_argnames=("prec_bits",))
 def acb_atan_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return _acb_round_output(acb_atan(x), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
+@lazy_jit_decorator(static_argnames=("prec_bits",))
 def acb_asinh_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return _acb_round_output(acb_asinh(x), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
+@lazy_jit_decorator(static_argnames=("prec_bits",))
 def acb_acosh_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return _acb_round_output(acb_acosh(x), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
+@lazy_jit_decorator(static_argnames=("prec_bits",))
 def acb_atanh_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return _acb_round_output(acb_atanh(x), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
+@lazy_jit_decorator(static_argnames=("prec_bits",))
 def acb_abs_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return di.round_interval_outward(acb_abs(x), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
+@lazy_jit_decorator(static_argnames=("prec_bits",))
 def acb_add_prec(x: jax.Array, y: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return _acb_round_output(acb_add(x, y), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
+@lazy_jit_decorator(static_argnames=("prec_bits",))
 def acb_sub_prec(x: jax.Array, y: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return _acb_round_output(acb_sub(x, y), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
+@lazy_jit_decorator(static_argnames=("prec_bits",))
 def acb_mul_prec(x: jax.Array, y: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return _acb_round_output(acb_mul(x, y), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
+@lazy_jit_decorator(static_argnames=("prec_bits",))
 def acb_div_prec(x: jax.Array, y: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return _acb_round_output(acb_div(x, y), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
+@lazy_jit_decorator(static_argnames=("prec_bits",))
 def acb_inv_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return _acb_round_output(acb_inv(x), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
+@lazy_jit_decorator(static_argnames=("prec_bits",))
 def acb_fma_prec(x: jax.Array, y: jax.Array, z: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return _acb_round_output(acb_add(acb_mul(x, y), z), prec_bits)
 
@@ -1063,177 +1083,177 @@ def _acb_round_output(out, prec_bits: int):
     return out
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
+@lazy_jit_decorator(static_argnames=("prec_bits",))
 def acb_log1p_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return _acb_round_output(acb_log1p(x), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
+@lazy_jit_decorator(static_argnames=("prec_bits",))
 def acb_rsqrt_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return _acb_round_output(acb_rsqrt(x), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
+@lazy_jit_decorator(static_argnames=("prec_bits",))
 def acb_sin_cos_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS):
     return _acb_round_output(acb_sin_cos(x), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
+@lazy_jit_decorator(static_argnames=("prec_bits",))
 def acb_cot_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return _acb_round_output(acb_cot(x), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
+@lazy_jit_decorator(static_argnames=("prec_bits",))
 def acb_sech_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return _acb_round_output(acb_sech(x), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
+@lazy_jit_decorator(static_argnames=("prec_bits",))
 def acb_csch_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return _acb_round_output(acb_csch(x), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
+@lazy_jit_decorator(static_argnames=("prec_bits",))
 def acb_sin_pi_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return _acb_round_output(acb_sin_pi(x), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
+@lazy_jit_decorator(static_argnames=("prec_bits",))
 def acb_cos_pi_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return _acb_round_output(acb_cos_pi(x), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
+@lazy_jit_decorator(static_argnames=("prec_bits",))
 def acb_sin_cos_pi_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS):
     return _acb_round_output(acb_sin_cos_pi(x), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
+@lazy_jit_decorator(static_argnames=("prec_bits",))
 def acb_tan_pi_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return _acb_round_output(acb_tan_pi(x), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
+@lazy_jit_decorator(static_argnames=("prec_bits",))
 def acb_cot_pi_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return _acb_round_output(acb_cot_pi(x), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
+@lazy_jit_decorator(static_argnames=("prec_bits",))
 def acb_csc_pi_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return _acb_round_output(acb_csc_pi(x), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
+@lazy_jit_decorator(static_argnames=("prec_bits",))
 def acb_sinc_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return _acb_round_output(acb_sinc(x), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
+@lazy_jit_decorator(static_argnames=("prec_bits",))
 def acb_sinc_pi_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return _acb_round_output(acb_sinc_pi(x), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
+@lazy_jit_decorator(static_argnames=("prec_bits",))
 def acb_exp_pi_i_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return _acb_round_output(acb_exp_pi_i(x), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
+@lazy_jit_decorator(static_argnames=("prec_bits",))
 def acb_expm1_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return _acb_round_output(acb_expm1(x), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
+@lazy_jit_decorator(static_argnames=("prec_bits",))
 def acb_exp_invexp_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS):
     return _acb_round_output(acb_exp_invexp(x), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
+@lazy_jit_decorator(static_argnames=("prec_bits",))
 def acb_addmul_prec(z: jax.Array, x: jax.Array, y: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return _acb_round_output(acb_addmul(z, x, y), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
+@lazy_jit_decorator(static_argnames=("prec_bits",))
 def acb_submul_prec(z: jax.Array, x: jax.Array, y: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return _acb_round_output(acb_submul(z, x, y), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
+@lazy_jit_decorator(static_argnames=("prec_bits",))
 def acb_pow_prec(x: jax.Array, y: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return _acb_round_output(acb_pow(x, y), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
+@lazy_jit_decorator(static_argnames=("prec_bits",))
 def acb_pow_arb_prec(x: jax.Array, y: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return _acb_round_output(acb_pow_arb(x, y), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("n", "prec_bits"))
+@lazy_jit_decorator(static_argnames=("n", "prec_bits"))
 def acb_pow_ui_prec(x: jax.Array, n: int, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return _acb_round_output(acb_pow_ui(x, n), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("n", "prec_bits"))
+@lazy_jit_decorator(static_argnames=("n", "prec_bits"))
 def acb_pow_si_prec(x: jax.Array, n: int, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return _acb_round_output(acb_pow_si(x, n), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
+@lazy_jit_decorator(static_argnames=("prec_bits",))
 def acb_pow_fmpz_prec(x: jax.Array, n: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return _acb_round_output(acb_pow_fmpz(x, n), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
+@lazy_jit_decorator(static_argnames=("prec_bits",))
 def acb_sqr_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return _acb_round_output(acb_sqr(x), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("k", "prec_bits"))
+@lazy_jit_decorator(static_argnames=("k", "prec_bits"))
 def acb_root_ui_prec(x: jax.Array, k: int, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return _acb_round_output(acb_root_ui(x, k), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
+@lazy_jit_decorator(static_argnames=("prec_bits",))
 def acb_gamma_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return _acb_round_output(acb_gamma(x), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
+@lazy_jit_decorator(static_argnames=("prec_bits",))
 def acb_rgamma_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return _acb_round_output(acb_rgamma(x), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
+@lazy_jit_decorator(static_argnames=("prec_bits",))
 def acb_lgamma_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return _acb_round_output(acb_lgamma(x), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
+@lazy_jit_decorator(static_argnames=("prec_bits",))
 def acb_log_sin_pi_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return _acb_round_output(acb_log_sin_pi(x), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
+@lazy_jit_decorator(static_argnames=("prec_bits",))
 def acb_digamma_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return _acb_round_output(acb_digamma(x), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
+@lazy_jit_decorator(static_argnames=("prec_bits",))
 def acb_barnes_g_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return _acb_round_output(acb_barnes_g(x), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
+@lazy_jit_decorator(static_argnames=("prec_bits",))
 def acb_log_barnes_g_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return _acb_round_output(acb_log_barnes_g(x), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("prec_bits",))
+@lazy_jit_decorator(static_argnames=("prec_bits",))
 def acb_zeta_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return _acb_round_output(acb_zeta(x), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("terms", "max_terms", "min_terms", "prec_bits"))
+@lazy_jit_decorator(static_argnames=("terms", "max_terms", "min_terms", "prec_bits"))
 def acb_hurwitz_zeta_prec(
     s: jax.Array,
     a: jax.Array,
@@ -1245,7 +1265,7 @@ def acb_hurwitz_zeta_prec(
     return _acb_round_output(acb_hurwitz_zeta(s, a, terms, max_terms, min_terms), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("m", "terms", "max_terms", "min_terms", "prec_bits"))
+@lazy_jit_decorator(static_argnames=("m", "terms", "max_terms", "min_terms", "prec_bits"))
 def acb_polygamma_prec(
     m: int,
     z: jax.Array,
@@ -1257,12 +1277,12 @@ def acb_polygamma_prec(
     return _acb_round_output(acb_polygamma(m, z, terms, max_terms, min_terms), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("n", "prec_bits"))
+@lazy_jit_decorator(static_argnames=("n", "prec_bits"))
 def acb_bernoulli_poly_ui_prec(n: int, x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return _acb_round_output(acb_bernoulli_poly_ui(n, x), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("terms", "max_terms", "min_terms", "prec_bits"))
+@lazy_jit_decorator(static_argnames=("terms", "max_terms", "min_terms", "prec_bits"))
 def acb_polylog_prec(
     s: jax.Array,
     z: jax.Array,
@@ -1274,7 +1294,7 @@ def acb_polylog_prec(
     return _acb_round_output(acb_polylog(s, z, terms, max_terms, min_terms), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("terms", "max_terms", "min_terms", "prec_bits"))
+@lazy_jit_decorator(static_argnames=("terms", "max_terms", "min_terms", "prec_bits"))
 def acb_polylog_si_prec(
     s: int,
     z: jax.Array,
@@ -1286,17 +1306,17 @@ def acb_polylog_si_prec(
     return _acb_round_output(acb_polylog_si(s, z, terms, max_terms, min_terms), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("iters", "prec_bits"))
+@lazy_jit_decorator(static_argnames=("iters", "prec_bits"))
 def acb_agm_prec(a: jax.Array, b: jax.Array, iters: int = 10, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return _acb_round_output(acb_agm(a, b, iters), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("iters", "prec_bits"))
+@lazy_jit_decorator(static_argnames=("iters", "prec_bits"))
 def acb_agm1_prec(x: jax.Array, iters: int = 10, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return _acb_round_output(acb_agm1(x, iters), prec_bits)
 
 
-@partial(jax.jit, static_argnames=("iters", "prec_bits"))
+@lazy_jit_decorator(static_argnames=("iters", "prec_bits"))
 def acb_agm1_cpx_prec(x: jax.Array, iters: int = 10, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return _acb_round_output(acb_agm1_cpx(x, iters), prec_bits)
 
@@ -1501,57 +1521,57 @@ def acb_sin_cos_batch_prec(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS):
     return _acb_round_output(acb_sin_cos_batch(x), prec_bits)
 
 
-acb_exp_batch_jit = jax.jit(acb_exp_batch)
-acb_log_batch_jit = jax.jit(acb_log_batch)
-acb_sqrt_batch_jit = jax.jit(acb_sqrt_batch)
-acb_sin_batch_jit = jax.jit(acb_sin_batch)
-acb_cos_batch_jit = jax.jit(acb_cos_batch)
-acb_tan_batch_jit = jax.jit(acb_tan_batch)
-acb_sinh_batch_jit = jax.jit(acb_sinh_batch)
-acb_cosh_batch_jit = jax.jit(acb_cosh_batch)
-acb_tanh_batch_jit = jax.jit(acb_tanh_batch)
-acb_asin_batch_jit = jax.jit(acb_asin_batch)
-acb_acos_batch_jit = jax.jit(acb_acos_batch)
-acb_atan_batch_jit = jax.jit(acb_atan_batch)
-acb_asinh_batch_jit = jax.jit(acb_asinh_batch)
-acb_acosh_batch_jit = jax.jit(acb_acosh_batch)
-acb_atanh_batch_jit = jax.jit(acb_atanh_batch)
-acb_abs_batch_jit = jax.jit(acb_abs_batch)
-acb_add_batch_jit = jax.jit(acb_add_batch)
-acb_sub_batch_jit = jax.jit(acb_sub_batch)
-acb_mul_batch_jit = jax.jit(acb_mul_batch)
-acb_div_batch_jit = jax.jit(acb_div_batch)
-acb_inv_batch_jit = jax.jit(acb_inv_batch)
-acb_fma_batch_jit = jax.jit(acb_fma_batch)
-acb_log1p_batch_jit = jax.jit(acb_log1p_batch)
-acb_expm1_batch_jit = jax.jit(acb_expm1_batch)
-acb_sin_cos_batch_jit = jax.jit(acb_sin_cos_batch)
+acb_exp_batch_jit = lazy_jit(lambda: jax.jit(acb_exp_batch))
+acb_log_batch_jit = lazy_jit(lambda: jax.jit(acb_log_batch))
+acb_sqrt_batch_jit = lazy_jit(lambda: jax.jit(acb_sqrt_batch))
+acb_sin_batch_jit = lazy_jit(lambda: jax.jit(acb_sin_batch))
+acb_cos_batch_jit = lazy_jit(lambda: jax.jit(acb_cos_batch))
+acb_tan_batch_jit = lazy_jit(lambda: jax.jit(acb_tan_batch))
+acb_sinh_batch_jit = lazy_jit(lambda: jax.jit(acb_sinh_batch))
+acb_cosh_batch_jit = lazy_jit(lambda: jax.jit(acb_cosh_batch))
+acb_tanh_batch_jit = lazy_jit(lambda: jax.jit(acb_tanh_batch))
+acb_asin_batch_jit = lazy_jit(lambda: jax.jit(acb_asin_batch))
+acb_acos_batch_jit = lazy_jit(lambda: jax.jit(acb_acos_batch))
+acb_atan_batch_jit = lazy_jit(lambda: jax.jit(acb_atan_batch))
+acb_asinh_batch_jit = lazy_jit(lambda: jax.jit(acb_asinh_batch))
+acb_acosh_batch_jit = lazy_jit(lambda: jax.jit(acb_acosh_batch))
+acb_atanh_batch_jit = lazy_jit(lambda: jax.jit(acb_atanh_batch))
+acb_abs_batch_jit = lazy_jit(lambda: jax.jit(acb_abs_batch))
+acb_add_batch_jit = lazy_jit(lambda: jax.jit(acb_add_batch))
+acb_sub_batch_jit = lazy_jit(lambda: jax.jit(acb_sub_batch))
+acb_mul_batch_jit = lazy_jit(lambda: jax.jit(acb_mul_batch))
+acb_div_batch_jit = lazy_jit(lambda: jax.jit(acb_div_batch))
+acb_inv_batch_jit = lazy_jit(lambda: jax.jit(acb_inv_batch))
+acb_fma_batch_jit = lazy_jit(lambda: jax.jit(acb_fma_batch))
+acb_log1p_batch_jit = lazy_jit(lambda: jax.jit(acb_log1p_batch))
+acb_expm1_batch_jit = lazy_jit(lambda: jax.jit(acb_expm1_batch))
+acb_sin_cos_batch_jit = lazy_jit(lambda: jax.jit(acb_sin_cos_batch))
 
-acb_exp_batch_prec_jit = jax.jit(acb_exp_batch_prec, static_argnames=("prec_bits",))
-acb_log_batch_prec_jit = jax.jit(acb_log_batch_prec, static_argnames=("prec_bits",))
-acb_sqrt_batch_prec_jit = jax.jit(acb_sqrt_batch_prec, static_argnames=("prec_bits",))
-acb_sin_batch_prec_jit = jax.jit(acb_sin_batch_prec, static_argnames=("prec_bits",))
-acb_cos_batch_prec_jit = jax.jit(acb_cos_batch_prec, static_argnames=("prec_bits",))
-acb_tan_batch_prec_jit = jax.jit(acb_tan_batch_prec, static_argnames=("prec_bits",))
-acb_sinh_batch_prec_jit = jax.jit(acb_sinh_batch_prec, static_argnames=("prec_bits",))
-acb_cosh_batch_prec_jit = jax.jit(acb_cosh_batch_prec, static_argnames=("prec_bits",))
-acb_tanh_batch_prec_jit = jax.jit(acb_tanh_batch_prec, static_argnames=("prec_bits",))
-acb_asin_batch_prec_jit = jax.jit(acb_asin_batch_prec, static_argnames=("prec_bits",))
-acb_acos_batch_prec_jit = jax.jit(acb_acos_batch_prec, static_argnames=("prec_bits",))
-acb_atan_batch_prec_jit = jax.jit(acb_atan_batch_prec, static_argnames=("prec_bits",))
-acb_asinh_batch_prec_jit = jax.jit(acb_asinh_batch_prec, static_argnames=("prec_bits",))
-acb_acosh_batch_prec_jit = jax.jit(acb_acosh_batch_prec, static_argnames=("prec_bits",))
-acb_atanh_batch_prec_jit = jax.jit(acb_atanh_batch_prec, static_argnames=("prec_bits",))
-acb_abs_batch_prec_jit = jax.jit(acb_abs_batch_prec, static_argnames=("prec_bits",))
-acb_add_batch_prec_jit = jax.jit(acb_add_batch_prec, static_argnames=("prec_bits",))
-acb_sub_batch_prec_jit = jax.jit(acb_sub_batch_prec, static_argnames=("prec_bits",))
-acb_mul_batch_prec_jit = jax.jit(acb_mul_batch_prec, static_argnames=("prec_bits",))
-acb_div_batch_prec_jit = jax.jit(acb_div_batch_prec, static_argnames=("prec_bits",))
-acb_inv_batch_prec_jit = jax.jit(acb_inv_batch_prec, static_argnames=("prec_bits",))
-acb_fma_batch_prec_jit = jax.jit(acb_fma_batch_prec, static_argnames=("prec_bits",))
-acb_log1p_batch_prec_jit = jax.jit(acb_log1p_batch_prec, static_argnames=("prec_bits",))
-acb_expm1_batch_prec_jit = jax.jit(acb_expm1_batch_prec, static_argnames=("prec_bits",))
-acb_sin_cos_batch_prec_jit = jax.jit(acb_sin_cos_batch_prec, static_argnames=("prec_bits",))
+acb_exp_batch_prec_jit = lazy_jit(lambda: jax.jit(acb_exp_batch_prec, static_argnames=("prec_bits",)))
+acb_log_batch_prec_jit = lazy_jit(lambda: jax.jit(acb_log_batch_prec, static_argnames=("prec_bits",)))
+acb_sqrt_batch_prec_jit = lazy_jit(lambda: jax.jit(acb_sqrt_batch_prec, static_argnames=("prec_bits",)))
+acb_sin_batch_prec_jit = lazy_jit(lambda: jax.jit(acb_sin_batch_prec, static_argnames=("prec_bits",)))
+acb_cos_batch_prec_jit = lazy_jit(lambda: jax.jit(acb_cos_batch_prec, static_argnames=("prec_bits",)))
+acb_tan_batch_prec_jit = lazy_jit(lambda: jax.jit(acb_tan_batch_prec, static_argnames=("prec_bits",)))
+acb_sinh_batch_prec_jit = lazy_jit(lambda: jax.jit(acb_sinh_batch_prec, static_argnames=("prec_bits",)))
+acb_cosh_batch_prec_jit = lazy_jit(lambda: jax.jit(acb_cosh_batch_prec, static_argnames=("prec_bits",)))
+acb_tanh_batch_prec_jit = lazy_jit(lambda: jax.jit(acb_tanh_batch_prec, static_argnames=("prec_bits",)))
+acb_asin_batch_prec_jit = lazy_jit(lambda: jax.jit(acb_asin_batch_prec, static_argnames=("prec_bits",)))
+acb_acos_batch_prec_jit = lazy_jit(lambda: jax.jit(acb_acos_batch_prec, static_argnames=("prec_bits",)))
+acb_atan_batch_prec_jit = lazy_jit(lambda: jax.jit(acb_atan_batch_prec, static_argnames=("prec_bits",)))
+acb_asinh_batch_prec_jit = lazy_jit(lambda: jax.jit(acb_asinh_batch_prec, static_argnames=("prec_bits",)))
+acb_acosh_batch_prec_jit = lazy_jit(lambda: jax.jit(acb_acosh_batch_prec, static_argnames=("prec_bits",)))
+acb_atanh_batch_prec_jit = lazy_jit(lambda: jax.jit(acb_atanh_batch_prec, static_argnames=("prec_bits",)))
+acb_abs_batch_prec_jit = lazy_jit(lambda: jax.jit(acb_abs_batch_prec, static_argnames=("prec_bits",)))
+acb_add_batch_prec_jit = lazy_jit(lambda: jax.jit(acb_add_batch_prec, static_argnames=("prec_bits",)))
+acb_sub_batch_prec_jit = lazy_jit(lambda: jax.jit(acb_sub_batch_prec, static_argnames=("prec_bits",)))
+acb_mul_batch_prec_jit = lazy_jit(lambda: jax.jit(acb_mul_batch_prec, static_argnames=("prec_bits",)))
+acb_div_batch_prec_jit = lazy_jit(lambda: jax.jit(acb_div_batch_prec, static_argnames=("prec_bits",)))
+acb_inv_batch_prec_jit = lazy_jit(lambda: jax.jit(acb_inv_batch_prec, static_argnames=("prec_bits",)))
+acb_fma_batch_prec_jit = lazy_jit(lambda: jax.jit(acb_fma_batch_prec, static_argnames=("prec_bits",)))
+acb_log1p_batch_prec_jit = lazy_jit(lambda: jax.jit(acb_log1p_batch_prec, static_argnames=("prec_bits",)))
+acb_expm1_batch_prec_jit = lazy_jit(lambda: jax.jit(acb_expm1_batch_prec, static_argnames=("prec_bits",)))
+acb_sin_cos_batch_prec_jit = lazy_jit(lambda: jax.jit(acb_sin_cos_batch_prec, static_argnames=("prec_bits",)))
 
 
 __all__ = [

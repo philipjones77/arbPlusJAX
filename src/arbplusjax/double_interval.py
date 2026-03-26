@@ -6,6 +6,7 @@ import jax
 import jax.numpy as jnp
 
 from . import checks
+from .lazy_jit import lazy_jit
 
 
 DEFAULT_PREC_BITS = 53
@@ -255,19 +256,19 @@ def fast_log_nonnegative_prec(x: jax.Array, prec_bits: int = DEFAULT_PREC_BITS) 
     return round_interval_outward(fast_log_nonnegative(x), prec_bits)
 
 
-fast_add_jit = jax.jit(fast_add)
-fast_sub_jit = jax.jit(fast_sub)
-fast_mul_jit = jax.jit(fast_mul)
-fast_div_jit = jax.jit(fast_div)
-fast_sqr_jit = jax.jit(fast_sqr)
-fast_log_nonnegative_jit = jax.jit(fast_log_nonnegative)
+fast_add_jit = lazy_jit(lambda: jax.jit(fast_add))
+fast_sub_jit = lazy_jit(lambda: jax.jit(fast_sub))
+fast_mul_jit = lazy_jit(lambda: jax.jit(fast_mul))
+fast_div_jit = lazy_jit(lambda: jax.jit(fast_div))
+fast_sqr_jit = lazy_jit(lambda: jax.jit(fast_sqr))
+fast_log_nonnegative_jit = lazy_jit(lambda: jax.jit(fast_log_nonnegative))
 
-batch_fast_add = jax.jit(jax.vmap(fast_add, in_axes=(0, 0)))
-batch_fast_sub = jax.jit(jax.vmap(fast_sub, in_axes=(0, 0)))
-batch_fast_mul = jax.jit(jax.vmap(fast_mul, in_axes=(0, 0)))
-batch_fast_div = jax.jit(jax.vmap(fast_div, in_axes=(0, 0)))
-batch_fast_sqr = jax.jit(jax.vmap(fast_sqr, in_axes=0))
-batch_fast_log_nonnegative = jax.jit(jax.vmap(fast_log_nonnegative, in_axes=0))
+batch_fast_add = lazy_jit(lambda: jax.jit(jax.vmap(fast_add, in_axes=(0, 0))))
+batch_fast_sub = lazy_jit(lambda: jax.jit(jax.vmap(fast_sub, in_axes=(0, 0))))
+batch_fast_mul = lazy_jit(lambda: jax.jit(jax.vmap(fast_mul, in_axes=(0, 0))))
+batch_fast_div = lazy_jit(lambda: jax.jit(jax.vmap(fast_div, in_axes=(0, 0))))
+batch_fast_sqr = lazy_jit(lambda: jax.jit(jax.vmap(fast_sqr, in_axes=0)))
+batch_fast_log_nonnegative = lazy_jit(lambda: jax.jit(jax.vmap(fast_log_nonnegative, in_axes=0)))
 
 
 def batch_fast_add_prec(x: jax.Array, y: jax.Array, prec_bits: int = DEFAULT_PREC_BITS) -> jax.Array:
@@ -294,9 +295,9 @@ def batch_fast_log_nonnegative_prec(x: jax.Array, prec_bits: int = DEFAULT_PREC_
     return jax.vmap(lambda a: fast_log_nonnegative_prec(a, prec_bits), in_axes=0)(x)
 
 
-batch_fast_add_prec_jit = jax.jit(batch_fast_add_prec, static_argnames=("prec_bits",))
-batch_fast_sub_prec_jit = jax.jit(batch_fast_sub_prec, static_argnames=("prec_bits",))
-batch_fast_mul_prec_jit = jax.jit(batch_fast_mul_prec, static_argnames=("prec_bits",))
-batch_fast_div_prec_jit = jax.jit(batch_fast_div_prec, static_argnames=("prec_bits",))
-batch_fast_sqr_prec_jit = jax.jit(batch_fast_sqr_prec, static_argnames=("prec_bits",))
-batch_fast_log_nonnegative_prec_jit = jax.jit(batch_fast_log_nonnegative_prec, static_argnames=("prec_bits",))
+batch_fast_add_prec_jit = lazy_jit(lambda: jax.jit(batch_fast_add_prec, static_argnames=("prec_bits",)))
+batch_fast_sub_prec_jit = lazy_jit(lambda: jax.jit(batch_fast_sub_prec, static_argnames=("prec_bits",)))
+batch_fast_mul_prec_jit = lazy_jit(lambda: jax.jit(batch_fast_mul_prec, static_argnames=("prec_bits",)))
+batch_fast_div_prec_jit = lazy_jit(lambda: jax.jit(batch_fast_div_prec, static_argnames=("prec_bits",)))
+batch_fast_sqr_prec_jit = lazy_jit(lambda: jax.jit(batch_fast_sqr_prec, static_argnames=("prec_bits",)))
+batch_fast_log_nonnegative_prec_jit = lazy_jit(lambda: jax.jit(batch_fast_log_nonnegative_prec, static_argnames=("prec_bits",)))

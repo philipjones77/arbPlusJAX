@@ -327,6 +327,20 @@ Status: `in_progress`
 ### Current Landed Surface
 
 - `done`
+  - the earlier matrix-free import/startup stall has been fixed structurally:
+    eager module-level JIT alias blocks in `jrb_mat` / `jcb_mat` were replaced
+    by lazy wrappers, and the same shared lazy-JIT helper now also covers
+    `arb_core`, `nufft`, `dirichlet`, and `acb_dirichlet`
+  - `acb_core` no longer imports `hypgeom`, `barnesg`, or the Dirichlet family
+    at module import time; those heavy dependencies are now deferred to the
+    specific call sites that need them
+  - `acb_core` now uses a lazy decorator pattern for its JIT-decorated public
+    functions instead of paying decorator-time wrapper construction during
+    import
+  - `acb_dirichlet` now defers `series_missing_impl` fallback loading behind
+    `__getattr__` rather than importing that fallback namespace eagerly
+  - startup-compile regression coverage now exists in
+    [test_startup_compile_policy.py](/tests/test_startup_compile_policy.py)
   - `jrb_mat` and `jcb_mat` now provide matrix-free Krylov action, trace
     estimator, and SLQ-style logdet scaffolding with targeted tests and
     benchmark coverage

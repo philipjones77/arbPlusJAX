@@ -7,6 +7,7 @@ import jax.numpy as jnp
 
 from . import arb_core
 from . import double_interval as di
+from .lazy_jit import lazy_jit
 
 
 
@@ -151,13 +152,13 @@ def dirichlet_eta_batch_prec(
     return di.round_interval_outward(dirichlet_eta_batch(s, n_terms), prec_bits)
 
 
-dirichlet_zeta_batch_jit = jax.jit(dirichlet_zeta_batch, static_argnames=("n_terms",))
-dirichlet_eta_batch_jit = jax.jit(dirichlet_eta_batch, static_argnames=("n_terms",))
-dirichlet_zeta_batch_prec_jit = jax.jit(
-    dirichlet_zeta_batch_prec, static_argnames=("n_terms", "prec_bits")
+dirichlet_zeta_batch_jit = lazy_jit(lambda: jax.jit(dirichlet_zeta_batch, static_argnames=("n_terms",)))
+dirichlet_eta_batch_jit = lazy_jit(lambda: jax.jit(dirichlet_eta_batch, static_argnames=("n_terms",)))
+dirichlet_zeta_batch_prec_jit = lazy_jit(
+    lambda: jax.jit(dirichlet_zeta_batch_prec, static_argnames=("n_terms", "prec_bits"))
 )
-dirichlet_eta_batch_prec_jit = jax.jit(
-    dirichlet_eta_batch_prec, static_argnames=("n_terms", "prec_bits")
+dirichlet_eta_batch_prec_jit = lazy_jit(
+    lambda: jax.jit(dirichlet_eta_batch_prec, static_argnames=("n_terms", "prec_bits"))
 )
 
 

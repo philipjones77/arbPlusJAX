@@ -11,6 +11,7 @@ from . import dft
 from . import elementary as el
 from . import kernel_helpers as kh
 from . import transform_common as tc
+from .lazy_jit import lazy_jit
 
 
 def _as_unit_points_matrix(x: jax.Array, ndim: int) -> jax.Array:
@@ -654,14 +655,14 @@ def nufft_type2_3d(
     return nufft_type2_nd(points, _as_complex_modes_grid(modes, ndim=3), method=method, oversamp=oversamp, kernel_width=kernel_width)
 
 
-nufft_type1_jit = jax.jit(nufft_type1, static_argnames=("n_modes", "method", "oversamp", "kernel_width"))
-nufft_type2_jit = jax.jit(nufft_type2, static_argnames=("method", "oversamp", "kernel_width"))
-nufft_type1_nd_jit = jax.jit(nufft_type1_nd, static_argnames=("mode_shape", "method", "oversamp", "kernel_width"))
-nufft_type2_nd_jit = jax.jit(nufft_type2_nd, static_argnames=("method", "oversamp", "kernel_width"))
-nufft_type1_cached_apply_jit = jax.jit(nufft_type1_cached_apply)
-nufft_type2_cached_apply_jit = jax.jit(nufft_type2_cached_apply)
-nufft_type1_cached_apply_batch_fixed_jit = jax.jit(nufft_type1_cached_apply_batch_fixed)
-nufft_type2_cached_apply_batch_fixed_jit = jax.jit(nufft_type2_cached_apply_batch_fixed)
+nufft_type1_jit = lazy_jit(lambda: jax.jit(nufft_type1, static_argnames=("n_modes", "method", "oversamp", "kernel_width")))
+nufft_type2_jit = lazy_jit(lambda: jax.jit(nufft_type2, static_argnames=("method", "oversamp", "kernel_width")))
+nufft_type1_nd_jit = lazy_jit(lambda: jax.jit(nufft_type1_nd, static_argnames=("mode_shape", "method", "oversamp", "kernel_width")))
+nufft_type2_nd_jit = lazy_jit(lambda: jax.jit(nufft_type2_nd, static_argnames=("method", "oversamp", "kernel_width")))
+nufft_type1_cached_apply_jit = lazy_jit(lambda: jax.jit(nufft_type1_cached_apply))
+nufft_type2_cached_apply_jit = lazy_jit(lambda: jax.jit(nufft_type2_cached_apply))
+nufft_type1_cached_apply_batch_fixed_jit = lazy_jit(lambda: jax.jit(nufft_type1_cached_apply_batch_fixed))
+nufft_type2_cached_apply_batch_fixed_jit = lazy_jit(lambda: jax.jit(nufft_type2_cached_apply_batch_fixed))
 
 
 __all__ = [

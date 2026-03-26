@@ -45,6 +45,7 @@ from . import scb_block_mat
 from . import scb_vblock_mat
 from . import sparse_common
 from . import matrix_free_core
+from .lazy_jit import lazy_jit
 
 
 PROVENANCE = {
@@ -2209,7 +2210,12 @@ def jcb_mat_eigsh_davidson_point(
             lock_tol=lock_tol,
             refill_basis=basis,
         )
-        target_cols = min(size, basis_seed.shape[1] + min(actual_block, residuals.shape[1]))
+        target_cols = matrix_free_core.eig_target_subspace_cols(
+            size=size,
+            seed_cols=basis_seed.shape[1],
+            residual_cols=residuals.shape[1],
+            block_size=actual_block,
+        )
         basis = _jcb_expand_subspace_with_corrections(
             basis_seed,
             vecs,
@@ -2247,7 +2253,16 @@ def jcb_mat_eigsh_davidson_with_diagnostics_point(
         v0=v0,
         tol=tol,
     )
-    diag = _jcb_eig_diagnostics(matvec, vals, vecs, algorithm_code=12, steps=subspace_iters, basis_dim=int(k if block_size is None else block_size), tol=tol)
+    diag = _jcb_eig_diagnostics(
+        matvec,
+        vals,
+        vecs,
+        algorithm_code=12,
+        steps=subspace_iters,
+        basis_dim=int(k if block_size is None else block_size),
+        restart_count=subspace_iters,
+        tol=tol,
+    )
     return vals, vecs, diag
 
 
@@ -2285,7 +2300,12 @@ def jcb_mat_eigsh_jacobi_davidson_point(
             lock_tol=lock_tol,
             refill_basis=basis,
         )
-        target_cols = min(size, basis_seed.shape[1] + min(actual_block, residuals.shape[1]))
+        target_cols = matrix_free_core.eig_target_subspace_cols(
+            size=size,
+            seed_cols=basis_seed.shape[1],
+            residual_cols=residuals.shape[1],
+            block_size=actual_block,
+        )
         basis = _jcb_expand_subspace_with_corrections(
             basis_seed,
             vecs,
@@ -2323,7 +2343,16 @@ def jcb_mat_eigsh_jacobi_davidson_with_diagnostics_point(
         v0=v0,
         tol=tol,
     )
-    diag = _jcb_eig_diagnostics(matvec, vals, vecs, algorithm_code=13, steps=subspace_iters, basis_dim=int(k if block_size is None else block_size), tol=tol)
+    diag = _jcb_eig_diagnostics(
+        matvec,
+        vals,
+        vecs,
+        algorithm_code=13,
+        steps=subspace_iters,
+        basis_dim=int(k if block_size is None else block_size),
+        restart_count=subspace_iters,
+        tol=tol,
+    )
     return vals, vecs, diag
 
 
@@ -3838,6 +3867,10 @@ def jcb_mat_rational_trace_hutchpp_prepare_point(
     maxiter: int | None = None,
     hermitian: bool = False,
     preconditioner=None,
+    target_stderr: float | None = None,
+    min_probes: int | None = None,
+    max_probes: int | None = None,
+    block_size: int = 1,
 ) -> matrix_free_core.RationalHutchppMetadata:
     del adjoint_matvec
 
@@ -3866,6 +3899,12 @@ def jcb_mat_rational_trace_hutchpp_prepare_point(
         preconditioner=preconditioner,
         tol=tol,
         atol=atol,
+        target_stderr=target_stderr,
+        min_probes=min_probes,
+        max_probes=max_probes,
+        block_size=block_size,
+        gradient_supported=True,
+        implicit_adjoint=bool(hermitian),
         structured="hermitian" if hermitian else "general",
         algebra="jcb",
         maxiter=maxiter,
@@ -3890,7 +3929,15 @@ def jcb_mat_rational_trace_hutchpp_from_metadata_point(
             preconditioner=metadata.preconditioner,
         )
 
-    return jcb_mat_trace_estimate_deflated_point(action_fn, metadata.deflation, residual_probes)
+    return jcb_mat_trace_estimate_deflated_point(
+        action_fn,
+        metadata.deflation,
+        residual_probes,
+        target_stderr=None if metadata.target_stderr is None else float(jnp.asarray(metadata.target_stderr)),
+        min_probes=None if metadata.min_probes is None else int(jnp.asarray(metadata.min_probes)),
+        max_probes=None if metadata.max_probes is None else int(jnp.asarray(metadata.max_probes)),
+        block_size=int(jnp.asarray(metadata.block_size)),
+    )
 
 
 def jcb_mat_rational_trace_hutchpp_point(
@@ -3908,6 +3955,10 @@ def jcb_mat_rational_trace_hutchpp_point(
     maxiter: int | None = None,
     hermitian: bool = False,
     preconditioner=None,
+    target_stderr: float | None = None,
+    min_probes: int | None = None,
+    max_probes: int | None = None,
+    block_size: int = 1,
 ) -> jax.Array:
     metadata = jcb_mat_rational_trace_hutchpp_prepare_point(
         matvec,
@@ -3922,6 +3973,10 @@ def jcb_mat_rational_trace_hutchpp_point(
         maxiter=maxiter,
         hermitian=hermitian,
         preconditioner=preconditioner,
+        target_stderr=target_stderr,
+        min_probes=min_probes,
+        max_probes=max_probes,
+        block_size=block_size,
     )
     estimate = jcb_mat_rational_trace_hutchpp_from_metadata_point(metadata, residual_probes)
     return jnp.asarray(matrix_free_core.hutchpp_trace_from_metadata(estimate), dtype=jnp.complex128)
@@ -3943,6 +3998,10 @@ def jcb_mat_rational_trace_hutchpp_basic(
     hermitian: bool = False,
     preconditioner=None,
     prec_bits: int = di.DEFAULT_PREC_BITS,
+    target_stderr: float | None = None,
+    min_probes: int | None = None,
+    max_probes: int | None = None,
+    block_size: int = 1,
 ) -> jax.Array:
     return matrix_free_basic.scalar_functional_basic(
         jcb_mat_rational_trace_hutchpp_point,
@@ -3959,6 +4018,10 @@ def jcb_mat_rational_trace_hutchpp_basic(
         maxiter=maxiter,
         hermitian=hermitian,
         preconditioner=preconditioner,
+        target_stderr=target_stderr,
+        min_probes=min_probes,
+        max_probes=max_probes,
+        block_size=block_size,
         lift_scalar=_jcb_point_box,
         round_output=_jcb_round_basic,
         prec_bits=prec_bits,
@@ -4470,6 +4533,54 @@ def jcb_mat_tanh_action_contour_point(
             radius=radius,
             quadrature_order=quadrature_order,
             node_weight_fn=lambda node: jnp.tanh(node) / (2.0j * jnp.pi),
+        )
+    )
+
+
+def jcb_mat_exp_action_contour_point(
+    matvec,
+    x: jax.Array,
+    *,
+    center,
+    radius,
+    quadrature_order: int = 16,
+    preconditioner=None,
+    tol: float = 1e-8,
+    atol: float = 0.0,
+    maxiter: int | None = None,
+) -> jax.Array:
+    return _jcb_point_box(
+        matrix_free_core.contour_integral_action_point(
+            lambda shift, v: _jcb_shifted_solve_mid(matvec, v, shift=shift, preconditioner=preconditioner, tol=tol, atol=atol, maxiter=maxiter),
+            acb_core.acb_midpoint(jcb_mat_as_box_vector(x)),
+            center=center,
+            radius=radius,
+            quadrature_order=quadrature_order,
+            node_weight_fn=lambda node: jnp.exp(node) / (2.0j * jnp.pi),
+        )
+    )
+
+
+def jcb_mat_tan_action_contour_point(
+    matvec,
+    x: jax.Array,
+    *,
+    center,
+    radius,
+    quadrature_order: int = 16,
+    preconditioner=None,
+    tol: float = 1e-8,
+    atol: float = 0.0,
+    maxiter: int | None = None,
+) -> jax.Array:
+    return _jcb_point_box(
+        matrix_free_core.contour_integral_action_point(
+            lambda shift, v: _jcb_shifted_solve_mid(matvec, v, shift=shift, preconditioner=preconditioner, tol=tol, atol=atol, maxiter=maxiter),
+            acb_core.acb_midpoint(jcb_mat_as_box_vector(x)),
+            center=center,
+            radius=radius,
+            quadrature_order=quadrature_order,
+            node_weight_fn=lambda node: jnp.tan(node) / (2.0j * jnp.pi),
         )
     )
 
@@ -5528,13 +5639,17 @@ def jcb_mat_lu_basic_prec(a: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -
     )
 
 
-jcb_mat_matmul_basic_jit = jax.jit(jcb_mat_matmul_basic)
-jcb_mat_matvec_basic_jit = jax.jit(jcb_mat_matvec_basic)
-jcb_mat_solve_basic_jit = jax.jit(jcb_mat_solve_basic)
-jcb_mat_triangular_solve_basic_jit = jax.jit(jcb_mat_triangular_solve_basic, static_argnames=("lower", "unit_diagonal"))
-jcb_mat_lu_basic_jit = jax.jit(jcb_mat_lu_basic)
-_jcb_mat_operator_apply_point_jit_callable = jax.jit(jcb_mat_operator_apply_point, static_argnames=("matvec",))
-_jcb_mat_operator_apply_point_jit_plan = jax.jit(jcb_mat_operator_apply_point)
+jcb_mat_matmul_basic_jit = lazy_jit(lambda: jax.jit(jcb_mat_matmul_basic))
+jcb_mat_matvec_basic_jit = lazy_jit(lambda: jax.jit(jcb_mat_matvec_basic))
+jcb_mat_solve_basic_jit = lazy_jit(lambda: jax.jit(jcb_mat_solve_basic))
+jcb_mat_triangular_solve_basic_jit = lazy_jit(
+    lambda: jax.jit(jcb_mat_triangular_solve_basic, static_argnames=("lower", "unit_diagonal"))
+)
+jcb_mat_lu_basic_jit = lazy_jit(lambda: jax.jit(jcb_mat_lu_basic))
+_jcb_mat_operator_apply_point_jit_callable = lazy_jit(
+    lambda: jax.jit(jcb_mat_operator_apply_point, static_argnames=("matvec",))
+)
+_jcb_mat_operator_apply_point_jit_plan = lazy_jit(lambda: jax.jit(jcb_mat_operator_apply_point))
 
 
 def jcb_mat_operator_apply_point_jit(matvec, x: jax.Array) -> jax.Array:
@@ -5543,10 +5658,14 @@ def jcb_mat_operator_apply_point_jit(matvec, x: jax.Array) -> jax.Array:
     return _jcb_mat_operator_apply_point_jit_callable(matvec, x)
 
 
-jcb_mat_rmatvec_point_jit = jax.jit(jcb_mat_rmatvec_point)
+jcb_mat_rmatvec_point_jit = lazy_jit(lambda: jax.jit(jcb_mat_rmatvec_point))
 
-_jcb_mat_expm_action_basic_jit_callable = jax.jit(jcb_mat_expm_action_basic, static_argnames=("matvec", "terms"))
-_jcb_mat_expm_action_basic_jit_plan = jax.jit(jcb_mat_expm_action_basic, static_argnames=("terms",))
+_jcb_mat_expm_action_basic_jit_callable = lazy_jit(
+    lambda: jax.jit(jcb_mat_expm_action_basic, static_argnames=("matvec", "terms"))
+)
+_jcb_mat_expm_action_basic_jit_plan = lazy_jit(
+    lambda: jax.jit(jcb_mat_expm_action_basic, static_argnames=("terms",))
+)
 
 
 def jcb_mat_expm_action_basic_jit(matvec, x: jax.Array, terms: int = 16) -> jax.Array:
@@ -5555,13 +5674,17 @@ def jcb_mat_expm_action_basic_jit(matvec, x: jax.Array, terms: int = 16) -> jax.
     return _jcb_mat_expm_action_basic_jit_callable(matvec, x, terms=terms)
 
 
-_jcb_mat_solve_action_point_jit_callable = jax.jit(
-    jcb_mat_solve_action_point,
-    static_argnames=("matvec", "tol", "atol", "maxiter", "hermitian", "preconditioner"),
+_jcb_mat_solve_action_point_jit_callable = lazy_jit(
+    lambda: jax.jit(
+        jcb_mat_solve_action_point,
+        static_argnames=("matvec", "tol", "atol", "maxiter", "hermitian", "preconditioner"),
+    )
 )
-_jcb_mat_solve_action_point_jit_plan = jax.jit(
-    jcb_mat_solve_action_point,
-    static_argnames=("tol", "atol", "maxiter", "hermitian"),
+_jcb_mat_solve_action_point_jit_plan = lazy_jit(
+    lambda: jax.jit(
+        jcb_mat_solve_action_point,
+        static_argnames=("tol", "atol", "maxiter", "hermitian"),
+    )
 )
 
 
@@ -5571,13 +5694,17 @@ def jcb_mat_solve_action_point_jit(matvec, b: jax.Array, **kwargs) -> jax.Array:
     return _jcb_mat_solve_action_point_jit_callable(matvec, b, **kwargs)
 
 
-_jcb_mat_minres_solve_action_point_jit_callable = jax.jit(
-    jcb_mat_minres_solve_action_point,
-    static_argnames=("matvec", "tol", "atol", "maxiter", "preconditioner"),
+_jcb_mat_minres_solve_action_point_jit_callable = lazy_jit(
+    lambda: jax.jit(
+        jcb_mat_minres_solve_action_point,
+        static_argnames=("matvec", "tol", "atol", "maxiter", "preconditioner"),
+    )
 )
-_jcb_mat_minres_solve_action_point_jit_plan = jax.jit(
-    jcb_mat_minres_solve_action_point,
-    static_argnames=("tol", "atol", "maxiter"),
+_jcb_mat_minres_solve_action_point_jit_plan = lazy_jit(
+    lambda: jax.jit(
+        jcb_mat_minres_solve_action_point,
+        static_argnames=("tol", "atol", "maxiter"),
+    )
 )
 
 
@@ -5587,13 +5714,17 @@ def jcb_mat_minres_solve_action_point_jit(matvec, b: jax.Array, **kwargs) -> jax
     return _jcb_mat_minres_solve_action_point_jit_callable(matvec, b, **kwargs)
 
 
-_jcb_mat_inverse_action_point_jit_callable = jax.jit(
-    jcb_mat_inverse_action_point,
-    static_argnames=("matvec", "tol", "atol", "maxiter", "hermitian", "preconditioner"),
+_jcb_mat_inverse_action_point_jit_callable = lazy_jit(
+    lambda: jax.jit(
+        jcb_mat_inverse_action_point,
+        static_argnames=("matvec", "tol", "atol", "maxiter", "hermitian", "preconditioner"),
+    )
 )
-_jcb_mat_inverse_action_point_jit_plan = jax.jit(
-    jcb_mat_inverse_action_point,
-    static_argnames=("tol", "atol", "maxiter", "hermitian"),
+_jcb_mat_inverse_action_point_jit_plan = lazy_jit(
+    lambda: jax.jit(
+        jcb_mat_inverse_action_point,
+        static_argnames=("tol", "atol", "maxiter", "hermitian"),
+    )
 )
 
 
@@ -5603,13 +5734,17 @@ def jcb_mat_inverse_action_point_jit(matvec, x: jax.Array, **kwargs) -> jax.Arra
     return _jcb_mat_inverse_action_point_jit_callable(matvec, x, **kwargs)
 
 
-_jcb_mat_minres_inverse_action_point_jit_callable = jax.jit(
-    jcb_mat_minres_inverse_action_point,
-    static_argnames=("matvec", "tol", "atol", "maxiter", "preconditioner"),
+_jcb_mat_minres_inverse_action_point_jit_callable = lazy_jit(
+    lambda: jax.jit(
+        jcb_mat_minres_inverse_action_point,
+        static_argnames=("matvec", "tol", "atol", "maxiter", "preconditioner"),
+    )
 )
-_jcb_mat_minres_inverse_action_point_jit_plan = jax.jit(
-    jcb_mat_minres_inverse_action_point,
-    static_argnames=("tol", "atol", "maxiter"),
+_jcb_mat_minres_inverse_action_point_jit_plan = lazy_jit(
+    lambda: jax.jit(
+        jcb_mat_minres_inverse_action_point,
+        static_argnames=("tol", "atol", "maxiter"),
+    )
 )
 
 
@@ -5619,11 +5754,17 @@ def jcb_mat_minres_inverse_action_point_jit(matvec, x: jax.Array, **kwargs) -> j
     return _jcb_mat_minres_inverse_action_point_jit_callable(matvec, x, **kwargs)
 
 
-_jcb_mat_logdet_slq_point_jit_callable = jax.jit(jcb_mat_logdet_slq_point, static_argnames=("matvec", "steps", "adjoint_matvec"))
-_jcb_mat_logdet_slq_point_jit_plan = jax.jit(_jcb_mat_logdet_slq_point_plan_kernel, static_argnames=("steps",))
-_jcb_mat_logdet_slq_point_jit_plan_bucketed = jax.jit(
-    _jcb_mat_logdet_slq_point_plan_kernel_bucketed,
-    static_argnames=("max_steps",),
+_jcb_mat_logdet_slq_point_jit_callable = lazy_jit(
+    lambda: jax.jit(jcb_mat_logdet_slq_point, static_argnames=("matvec", "steps", "adjoint_matvec"))
+)
+_jcb_mat_logdet_slq_point_jit_plan = lazy_jit(
+    lambda: jax.jit(_jcb_mat_logdet_slq_point_plan_kernel, static_argnames=("steps",))
+)
+_jcb_mat_logdet_slq_point_jit_plan_bucketed = lazy_jit(
+    lambda: jax.jit(
+        _jcb_mat_logdet_slq_point_plan_kernel_bucketed,
+        static_argnames=("max_steps",),
+    )
 )
 
 
@@ -5633,11 +5774,17 @@ def jcb_mat_logdet_slq_point_jit(matvec, probes: jax.Array, steps: int, adjoint_
     return _jcb_mat_logdet_slq_point_jit_callable(matvec, probes, steps=steps, adjoint_matvec=adjoint_matvec)
 
 
-_jcb_mat_det_slq_point_jit_callable = jax.jit(jcb_mat_det_slq_point, static_argnames=("matvec", "steps", "adjoint_matvec"))
-_jcb_mat_det_slq_point_jit_plan = jax.jit(_jcb_mat_det_slq_point_plan_kernel, static_argnames=("steps",))
-_jcb_mat_det_slq_point_jit_plan_bucketed = jax.jit(
-    _jcb_mat_det_slq_point_plan_kernel_bucketed,
-    static_argnames=("max_steps",),
+_jcb_mat_det_slq_point_jit_callable = lazy_jit(
+    lambda: jax.jit(jcb_mat_det_slq_point, static_argnames=("matvec", "steps", "adjoint_matvec"))
+)
+_jcb_mat_det_slq_point_jit_plan = lazy_jit(
+    lambda: jax.jit(_jcb_mat_det_slq_point_plan_kernel, static_argnames=("steps",))
+)
+_jcb_mat_det_slq_point_jit_plan_bucketed = lazy_jit(
+    lambda: jax.jit(
+        _jcb_mat_det_slq_point_plan_kernel_bucketed,
+        static_argnames=("max_steps",),
+    )
 )
 
 
@@ -5647,17 +5794,21 @@ def jcb_mat_det_slq_point_jit(matvec, probes: jax.Array, steps: int, adjoint_mat
     return _jcb_mat_det_slq_point_jit_callable(matvec, probes, steps=steps, adjoint_matvec=adjoint_matvec)
 
 
-_jcb_mat_log_action_arnoldi_point_jit_callable = jax.jit(
-    jcb_mat_log_action_arnoldi_point,
-    static_argnames=("matvec", "steps", "adjoint_matvec"),
+_jcb_mat_log_action_arnoldi_point_jit_callable = lazy_jit(
+    lambda: jax.jit(
+        jcb_mat_log_action_arnoldi_point,
+        static_argnames=("matvec", "steps", "adjoint_matvec"),
+    )
 )
 def _jcb_mat_log_action_arnoldi_point_plan_kernel(matvec, x: jax.Array, *, steps: int, adjoint_matvec=None) -> jax.Array:
     del adjoint_matvec
     return _jcb_mat_funm_action_arnoldi_point_base(matvec, x, jcb_mat_dense_funm_general_eig_point(jnp.log), steps)
 
-_jcb_mat_log_action_arnoldi_point_jit_plan = jax.jit(
-    _jcb_mat_log_action_arnoldi_point_plan_kernel,
-    static_argnames=("steps",),
+_jcb_mat_log_action_arnoldi_point_jit_plan = lazy_jit(
+    lambda: jax.jit(
+        _jcb_mat_log_action_arnoldi_point_plan_kernel,
+        static_argnames=("steps",),
+    )
 )
 
 
@@ -5667,17 +5818,21 @@ def jcb_mat_log_action_arnoldi_point_jit(matvec, x: jax.Array, steps: int, adjoi
     return _jcb_mat_log_action_arnoldi_point_jit_callable(matvec, x, steps=steps, adjoint_matvec=adjoint_matvec)
 
 
-_jcb_mat_log_action_hermitian_point_jit_callable = jax.jit(
-    jcb_mat_log_action_hermitian_point,
-    static_argnames=("matvec", "steps", "adjoint_matvec"),
+_jcb_mat_log_action_hermitian_point_jit_callable = lazy_jit(
+    lambda: jax.jit(
+        jcb_mat_log_action_hermitian_point,
+        static_argnames=("matvec", "steps", "adjoint_matvec"),
+    )
 )
 def _jcb_mat_log_action_hermitian_point_plan_kernel(matvec, x: jax.Array, *, steps: int, adjoint_matvec=None) -> jax.Array:
     del adjoint_matvec
     return _jcb_mat_funm_action_hermitian_point_base(matvec, x, jcb_mat_dense_funm_hermitian_eigh_point(jnp.log), steps)
 
-_jcb_mat_log_action_hermitian_point_jit_plan = jax.jit(
-    _jcb_mat_log_action_hermitian_point_plan_kernel,
-    static_argnames=("steps",),
+_jcb_mat_log_action_hermitian_point_jit_plan = lazy_jit(
+    lambda: jax.jit(
+        _jcb_mat_log_action_hermitian_point_plan_kernel,
+        static_argnames=("steps",),
+    )
 )
 
 
@@ -5687,17 +5842,21 @@ def jcb_mat_log_action_hermitian_point_jit(matvec, x: jax.Array, steps: int, adj
     return _jcb_mat_log_action_hermitian_point_jit_callable(matvec, x, steps=steps, adjoint_matvec=adjoint_matvec)
 
 
-_jcb_mat_sign_action_arnoldi_point_jit_callable = jax.jit(
-    jcb_mat_sign_action_arnoldi_point,
-    static_argnames=("matvec", "steps", "adjoint_matvec"),
+_jcb_mat_sign_action_arnoldi_point_jit_callable = lazy_jit(
+    lambda: jax.jit(
+        jcb_mat_sign_action_arnoldi_point,
+        static_argnames=("matvec", "steps", "adjoint_matvec"),
+    )
 )
 def _jcb_mat_sign_action_arnoldi_point_plan_kernel(matvec, x: jax.Array, *, steps: int, adjoint_matvec=None) -> jax.Array:
     del adjoint_matvec
     return _jcb_mat_funm_action_arnoldi_point_base(matvec, x, jcb_mat_dense_funm_general_eig_point(jnp.sign), steps)
 
-_jcb_mat_sign_action_arnoldi_point_jit_plan = jax.jit(
-    _jcb_mat_sign_action_arnoldi_point_plan_kernel,
-    static_argnames=("steps",),
+_jcb_mat_sign_action_arnoldi_point_jit_plan = lazy_jit(
+    lambda: jax.jit(
+        _jcb_mat_sign_action_arnoldi_point_plan_kernel,
+        static_argnames=("steps",),
+    )
 )
 
 
@@ -5707,9 +5866,11 @@ def jcb_mat_sign_action_arnoldi_point_jit(matvec, x: jax.Array, steps: int, adjo
     return _jcb_mat_sign_action_arnoldi_point_jit_callable(matvec, x, steps=steps, adjoint_matvec=adjoint_matvec)
 
 
-_jcb_mat_pow_action_arnoldi_point_jit_callable = jax.jit(
-    jcb_mat_pow_action_arnoldi_point,
-    static_argnames=("matvec", "exponent", "steps", "adjoint_matvec"),
+_jcb_mat_pow_action_arnoldi_point_jit_callable = lazy_jit(
+    lambda: jax.jit(
+        jcb_mat_pow_action_arnoldi_point,
+        static_argnames=("matvec", "exponent", "steps", "adjoint_matvec"),
+    )
 )
 def _jcb_mat_pow_action_arnoldi_point_plan_kernel(matvec, x: jax.Array, *, exponent: int, steps: int, adjoint_matvec=None) -> jax.Array:
     del adjoint_matvec
@@ -5720,9 +5881,11 @@ def _jcb_mat_pow_action_arnoldi_point_plan_kernel(matvec, x: jax.Array, *, expon
         steps,
     )
 
-_jcb_mat_pow_action_arnoldi_point_jit_plan = jax.jit(
-    _jcb_mat_pow_action_arnoldi_point_plan_kernel,
-    static_argnames=("exponent", "steps"),
+_jcb_mat_pow_action_arnoldi_point_jit_plan = lazy_jit(
+    lambda: jax.jit(
+        _jcb_mat_pow_action_arnoldi_point_plan_kernel,
+        static_argnames=("exponent", "steps"),
+    )
 )
 
 
@@ -5732,13 +5895,17 @@ def jcb_mat_pow_action_arnoldi_point_jit(matvec, x: jax.Array, *, exponent: int,
     return _jcb_mat_pow_action_arnoldi_point_jit_callable(matvec, x, exponent=exponent, steps=steps, adjoint_matvec=adjoint_matvec)
 
 
-_jcb_mat_eigsh_point_jit_callable = jax.jit(
-    jcb_mat_eigsh_point,
-    static_argnames=("matvec", "size", "k", "which", "steps"),
+_jcb_mat_eigsh_point_jit_callable = lazy_jit(
+    lambda: jax.jit(
+        jcb_mat_eigsh_point,
+        static_argnames=("matvec", "size", "k", "which", "steps"),
+    )
 )
-_jcb_mat_eigsh_point_jit_plan = jax.jit(
-    jcb_mat_eigsh_point,
-    static_argnames=("size", "k", "which", "steps"),
+_jcb_mat_eigsh_point_jit_plan = lazy_jit(
+    lambda: jax.jit(
+        jcb_mat_eigsh_point,
+        static_argnames=("size", "k", "which", "steps"),
+    )
 )
 
 
@@ -5756,13 +5923,17 @@ def jcb_mat_eigsh_point_jit(
     return _jcb_mat_eigsh_point_jit_callable(matvec, size=size, k=k, which=which, steps=steps, v0=v0)
 
 
-_jcb_mat_multi_shift_solve_point_jit_callable = jax.jit(
-    jcb_mat_multi_shift_solve_point,
-    static_argnames=("matvec", "tol", "atol", "maxiter", "hermitian", "preconditioner"),
+_jcb_mat_multi_shift_solve_point_jit_callable = lazy_jit(
+    lambda: jax.jit(
+        jcb_mat_multi_shift_solve_point,
+        static_argnames=("matvec", "tol", "atol", "maxiter", "hermitian", "preconditioner"),
+    )
 )
-_jcb_mat_multi_shift_solve_point_jit_plan = jax.jit(
-    jcb_mat_multi_shift_solve_point,
-    static_argnames=("tol", "atol", "maxiter", "hermitian"),
+_jcb_mat_multi_shift_solve_point_jit_plan = lazy_jit(
+    lambda: jax.jit(
+        jcb_mat_multi_shift_solve_point,
+        static_argnames=("tol", "atol", "maxiter", "hermitian"),
+    )
 )
 
 
@@ -5772,13 +5943,17 @@ def jcb_mat_multi_shift_solve_point_jit(matvec, rhs: jax.Array, shifts: jax.Arra
     return _jcb_mat_multi_shift_solve_point_jit_callable(matvec, rhs, shifts, **kwargs)
 
 
-_jcb_mat_eigsh_block_point_jit_callable = jax.jit(
-    jcb_mat_eigsh_block_point,
-    static_argnames=("matvec", "size", "k", "which", "block_size", "subspace_iters"),
+_jcb_mat_eigsh_block_point_jit_callable = lazy_jit(
+    lambda: jax.jit(
+        jcb_mat_eigsh_block_point,
+        static_argnames=("matvec", "size", "k", "which", "block_size", "subspace_iters"),
+    )
 )
-_jcb_mat_eigsh_block_point_jit_plan = jax.jit(
-    jcb_mat_eigsh_block_point,
-    static_argnames=("size", "k", "which", "block_size", "subspace_iters"),
+_jcb_mat_eigsh_block_point_jit_plan = lazy_jit(
+    lambda: jax.jit(
+        jcb_mat_eigsh_block_point,
+        static_argnames=("size", "k", "which", "block_size", "subspace_iters"),
+    )
 )
 
 
@@ -5797,13 +5972,17 @@ def jcb_mat_eigsh_block_point_jit(
     return _jcb_mat_eigsh_block_point_jit_callable(matvec, size=size, k=k, which=which, block_size=block_size, subspace_iters=subspace_iters, v0=v0)
 
 
-_jcb_mat_eigsh_restarted_point_jit_callable = jax.jit(
-    jcb_mat_eigsh_restarted_point,
-    static_argnames=("matvec", "size", "k", "which", "steps", "restarts", "block_size"),
+_jcb_mat_eigsh_restarted_point_jit_callable = lazy_jit(
+    lambda: jax.jit(
+        jcb_mat_eigsh_restarted_point,
+        static_argnames=("matvec", "size", "k", "which", "steps", "restarts", "block_size"),
+    )
 )
-_jcb_mat_eigsh_restarted_point_jit_plan = jax.jit(
-    jcb_mat_eigsh_restarted_point,
-    static_argnames=("size", "k", "which", "steps", "restarts", "block_size"),
+_jcb_mat_eigsh_restarted_point_jit_plan = lazy_jit(
+    lambda: jax.jit(
+        jcb_mat_eigsh_restarted_point,
+        static_argnames=("size", "k", "which", "steps", "restarts", "block_size"),
+    )
 )
 
 
@@ -5923,6 +6102,8 @@ __all__ = [
     "jcb_mat_sinh_action_contour_point",
     "jcb_mat_cosh_action_contour_point",
     "jcb_mat_tanh_action_contour_point",
+    "jcb_mat_exp_action_contour_point",
+    "jcb_mat_tan_action_contour_point",
     "jcb_mat_expm_action_point",
     "jcb_mat_expm_action_basic",
     "jcb_mat_arnoldi_hessenberg_point",
