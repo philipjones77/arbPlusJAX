@@ -70,7 +70,16 @@ def incomplete_bessel_k_derivative(
     raise ValueError("respect_to must be one of: z, lower_limit")
 
 
-def incomplete_bessel_i_upper_limit_derivative(nu, z, upper_limit):
+def incomplete_bessel_i_upper_limit_derivative(
+    nu,
+    z,
+    upper_limit,
+    *,
+    method: str = "quadrature",
+    panel_count: int = 128,
+    samples_per_panel: int = 16,
+):
+    del method, panel_count, samples_per_panel
     integrand = incomplete_bessel_i_angular_integrand(nu, z)
     return integrand(upper_limit)
 
@@ -80,9 +89,11 @@ def incomplete_bessel_i_argument_derivative(
     z,
     upper_limit,
     *,
+    method: str = "quadrature",
     panel_count: int = 128,
     samples_per_panel: int = 16,
 ):
+    del method
     upper = jnp.asarray(upper_limit, dtype=jnp.float64)
     if panel_count <= 0:
         raise ValueError("panel_count must be > 0")
@@ -124,5 +135,12 @@ def incomplete_bessel_i_derivative(
             samples_per_panel=samples_per_panel,
         )
     if respect_to == "upper_limit":
-        return incomplete_bessel_i_upper_limit_derivative(nu, z, upper_limit)
+        return incomplete_bessel_i_upper_limit_derivative(
+            nu,
+            z,
+            upper_limit,
+            method=method,
+            panel_count=panel_count,
+            samples_per_panel=samples_per_panel,
+        )
     raise ValueError("respect_to must be one of: z, upper_limit")

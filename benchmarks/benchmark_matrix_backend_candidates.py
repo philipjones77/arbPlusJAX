@@ -17,10 +17,24 @@ import jax.scipy.linalg as jsp_linalg
 import jax.scipy.sparse.linalg as jsp_sparse_linalg
 import numpy as np
 
-from arbplusjax import double_interval as di
-from arbplusjax import jrb_mat
-from arbplusjax import mat_wrappers
-from arbplusjax import srb_mat
+di = None
+jrb_mat = None
+mat_wrappers = None
+srb_mat = None
+
+
+def _load_matrix_backend_modules() -> None:
+    global di, jrb_mat, mat_wrappers, srb_mat
+    if di is None:
+        from arbplusjax import double_interval as _di
+        from arbplusjax import jrb_mat as _jrb_mat
+        from arbplusjax import mat_wrappers as _mat_wrappers
+        from arbplusjax import srb_mat as _srb_mat
+
+        di = _di
+        jrb_mat = _jrb_mat
+        mat_wrappers = _mat_wrappers
+        srb_mat = _srb_mat
 
 try:
     import scipy.linalg as scipy_linalg
@@ -69,6 +83,7 @@ def _time_call(fn, *args, warmup: int, runs: int) -> float:
 
 
 def _spd_dense_case(n: int) -> tuple[jax.Array, jax.Array, jax.Array]:
+    _load_matrix_backend_modules()
     base = jnp.reshape(jnp.linspace(0.2, 1.2, n * n, dtype=jnp.float64), (n, n))
     dense = base.T @ base + jnp.eye(n, dtype=jnp.float64) * (n + 1.0)
     rhs = jnp.linspace(-0.5, 0.75, n, dtype=jnp.float64)
@@ -77,6 +92,7 @@ def _spd_dense_case(n: int) -> tuple[jax.Array, jax.Array, jax.Array]:
 
 
 def _sparse_case(n: int, density: float) -> tuple[jax.Array, Any, Any, Any, jax.Array]:
+    _load_matrix_backend_modules()
     dense, rhs, probes = _spd_dense_case(n)
     dense_np = np.asarray(dense)
     mask = np.zeros((n, n), dtype=bool)

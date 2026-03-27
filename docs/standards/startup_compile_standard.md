@@ -16,8 +16,9 @@ This document is a companion to:
 
 - [jax_api_runtime_standard.md](/docs/standards/jax_api_runtime_standard.md)
 - [caching_recompilation_standard.md](/docs/standards/caching_recompilation_standard.md)
-- [lazy_import_standard.md](/docs/standards/lazy_import_standard.md)
+- [lazy_loading_standard.md](/docs/standards/lazy_loading_standard.md)
 - [point_fast_jax_standard.md](/docs/standards/point_fast_jax_standard.md)
+- [startup_compile_playbook_standard.md](/docs/standards/startup_compile_playbook_standard.md)
 
 ## Scope
 
@@ -58,6 +59,9 @@ Apply this standard to:
 - Public docs should make the intended compiled entrypoint explicit.
 - For public point-mode families, the default compiled entrypoint should normally be the point-fast JAX service surface rather than a precise-mode wrapper.
 
+This rule is not optional. If compile ownership is scattered across many leaf
+modules, the repo no longer has one governed startup-compile policy.
+
 ### 3. Stable compile-relevant controls
 
 - Dtype, mode, backend selection, precision policy, and static kwargs should remain stable across repeated calls whenever practical.
@@ -71,6 +75,8 @@ Apply this standard to:
 - A repo may choose its own cache location, but the policy must set:
   - `JAX_ENABLE_COMPILATION_CACHE=1`
   - `JAX_COMPILATION_CACHE_DIR=<repo-owned or user-configured path>`
+- In practice, this should be centralized in one canonical bootstrap/helper
+  path so CLIs, services, benchmarks, and local developer flows do not drift.
 
 ### 5. Warmup policy
 
@@ -94,6 +100,21 @@ Apply this standard to:
   - compile-event count where available
 - Startup compile regressions should be treated like runtime regressions.
 
+### 8. Shared playbook and template
+
+- The repo should publish one shared startup-compile playbook and one rollout
+  template suitable for sibling repos.
+- The shared playbook should cover:
+  - stable-shape contract choices
+  - JIT ownership model
+  - persistent-cache environment policy
+  - warmup policy
+  - startup-probe structure
+  - CI budget policy
+  - process-reuse expectations
+- A repo should not make each subsystem invent its own startup policy from
+  scratch.
+
 ## Anti-patterns
 
 - JIT compiling directly on arbitrary user-sized arrays in the canonical path
@@ -111,6 +132,8 @@ Repos that adopt this standard should provide:
 - at least one public example or contract test showing the stable-shape calling path
 - for point-mode families, at least one public compiled point-batch surface that satisfies the fast-JAX contract where the family is intended for repeated bulk evaluation
 - implementation-facing rollout notes that identify the main entrypoints and invalidation boundaries
+- one shared startup-compile playbook/template pair for reuse across sibling
+  repos
 
 ## Required Structural Fixes
 
@@ -140,6 +163,7 @@ Required patterns:
 - Add intentional warmup for the top hot-path kernels.
 - Add cold/warm/recompile probes and CI thresholds.
 - Update examples and docs so the stable-shape path is the default teaching path.
+- Publish the shared playbook and repo-template documents.
 
 ## Repo Mapping In arbPlusJAX
 

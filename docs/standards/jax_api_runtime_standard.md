@@ -2,7 +2,7 @@
 
 Status: active
 Version: v1.1
-Date: 2026-03-21
+Date: 2026-03-25
 
 ## Purpose
 
@@ -154,6 +154,17 @@ Examples of usually compile-relevant inputs:
 - Callers should be able to see ordinary cache invalidation boundaries such as dtype change, shape change, method change, backend change, or structural object change.
 - The companion cache/recompile policy is defined in [caching_recompilation_standard.md](/docs/standards/caching_recompilation_standard.md).
 
+### Implicit-adjoint operator solve rule
+
+- Matrix-free solve surfaces that claim production AD support should use implicit-adjoint solve boundaries rather than tracing backward through iterative solver loops.
+- The canonical JAX primitive for this is `jax.lax.custom_linear_solve`.
+- Public operator-first solve surfaces should expose or internally construct:
+  - forward operator apply
+  - transpose or adjoint solve policy when the operator is not structurally symmetric/Hermitian
+  - compact cached operator metadata that is pytree-safe and reusable by solve/logdet/Laplace layers
+- Restart policy, rank selection, adaptive probe counts, and similar heuristics should stay outside the differentiated linear-solve boundary.
+- The detailed policy is defined in [implicit_adjoint_operator_solve_standard.md](/docs/standards/implicit_adjoint_operator_solve_standard.md).
+
 ## Diagnostics Standard
 
 ### Numerical diagnostics
@@ -223,13 +234,14 @@ Recommended fields include:
 - Do not scatter lazy indirection unpredictably across runtime kernels.
 - Favor lazy package-root exports and lazy unified facades.
 - Keep package-root eager imports to the minimum needed for shared runtime defaults and lazy dispatch setup.
-- The companion repo-level import policy is defined in [lazy_import_standard.md](/docs/standards/lazy_import_standard.md).
+- The companion repo-level import policy is defined in [lazy_loading_standard.md](/docs/standards/lazy_loading_standard.md).
 
 ## Optional Dependency Standard
 
 - Optional integrations may exist, but they should not define the default runtime contract.
 - Reference backends and validation stacks belong outside the hot path.
 - Optional exports may resolve to `None` only when that behavior is documented and tested.
+- Optional comparison/reference backends should be declared in checked-in config, not only mentioned in prose.
 
 Examples:
 
@@ -238,10 +250,15 @@ Examples:
 - reference precision backends
 - external numerical engines
 
+For this repo, the checked-in optional-backend policy lives in:
+
+- [optional_comparison_backends.json](/configs/optional_comparison_backends.json)
+
 ## Tests, Benchmarks, and Software Comparison Standard
 
 - Tests, benchmarks, and external-software comparisons are required validation layers, but they are not part of the default numerical execution path.
 - Validation against reference backends such as `mpmath`, Mathematica, Boost, or other external software must be explicit and opt-in where it is expensive.
+- `jax.scipy` and experimental JAX-side implementations should be treated as optional comparison/fallback layers unless and until they are explicitly promoted into the canonical runtime contract.
 - Benchmark harnesses, guardrails, and comparison runners should live in dedicated test, benchmark, or experiment surfaces rather than inside production kernels.
 - Production APIs may expose explicit validation or comparison flags only when the extra cost is obvious to callers.
 - External comparison code must not silently run during ordinary numerical evaluation.
@@ -249,6 +266,16 @@ Examples:
 - The success criterion is two-layered:
   - production calls stay fast and focused on numerical evaluation;
   - validation layers remain reproducible and strong enough to catch regressions against trusted references.
+
+## Submission Validation Standard
+
+- GitHub submission should validate the portable source-tree runtime contract rather than only a narrow package-install path.
+- Submission automation should cover the primary supported platform surfaces for this repo:
+  - Ubuntu
+  - Windows
+  - Colab-compatible bootstrap on Ubuntu
+- Submission automation may validate optional comparison/reference stack installability, but should not require licensed or native external software such as Mathematica or C Arb reference builds to exist on every runner.
+- Generated docs/report refresh checks belong in submission validation when the repo contract depends on checked-in generated artifacts.
 
 ## Diagnostics and Logging Naming
 

@@ -61,13 +61,19 @@ def test_recent_real_matrix_free_contour_and_cached_rational_surfaces():
     sinh_val = di.midpoint(jrb_mat.jrb_mat_sinh_action_contour_point(op, x, center=center, radius=radius, quadrature_order=32))
     cosh_val = di.midpoint(jrb_mat.jrb_mat_cosh_action_contour_point(op, x, center=center, radius=radius, quadrature_order=32))
     tanh_val = di.midpoint(jrb_mat.jrb_mat_tanh_action_contour_point(op, x, center=center, radius=radius, quadrature_order=32))
+    exp_val = di.midpoint(jrb_mat.jrb_mat_exp_action_contour_point(op, x, center=center, radius=radius, quadrature_order=32))
+    tan_val = di.midpoint(jrb_mat.jrb_mat_tan_action_contour_point(op, x, center=center, radius=radius, quadrature_order=32))
 
     assert sinh_val.shape == (2,)
     assert cosh_val.shape == (2,)
     assert tanh_val.shape == (2,)
+    assert exp_val.shape == (2,)
+    assert tan_val.shape == (2,)
     assert bool(jnp.all(jnp.isfinite(sinh_val)))
     assert bool(jnp.all(jnp.isfinite(cosh_val)))
     assert bool(jnp.all(jnp.isfinite(tanh_val)))
+    assert bool(jnp.all(jnp.isfinite(exp_val)))
+    assert bool(jnp.all(jnp.isfinite(tan_val)))
 
     log2 = jnp.log(jnp.asarray(2.0, dtype=jnp.float64))
     slope = jnp.log(jnp.asarray(3.0 / 2.0, dtype=jnp.float64))
@@ -92,8 +98,11 @@ def test_recent_real_matrix_free_contour_and_cached_rational_surfaces():
         polynomial_coefficients=coeffs,
     )
     exact_logdet = jnp.log(2.0) + jnp.log(3.0)
+    assert bool(metadata.cached_adjoint_supported)
     assert jnp.allclose(matrix_free_core.hutchpp_trace_from_metadata(cached), exact_logdet, rtol=1e-6, atol=1e-6)
     assert jnp.allclose(direct, exact_logdet, rtol=1e-6, atol=1e-6)
+    assert int(matrix_free_core.rational_hutchpp_next_probe_count(metadata, cached)) >= int(cached.statistics.probe_count)
+    assert bool(matrix_free_core.rational_hutchpp_should_stop(metadata, cached))
 
 
 def test_recent_complex_matrix_free_contour_and_cached_rational_surfaces():
@@ -106,16 +115,24 @@ def test_recent_complex_matrix_free_contour_and_cached_rational_surfaces():
     sinh_val = acb_core.acb_midpoint(jcb_mat.jcb_mat_sinh_action_contour_point(op, x, center=center, radius=radius, quadrature_order=32))
     cosh_val = acb_core.acb_midpoint(jcb_mat.jcb_mat_cosh_action_contour_point(op, x, center=center, radius=radius, quadrature_order=32))
     tanh_val = acb_core.acb_midpoint(jcb_mat.jcb_mat_tanh_action_contour_point(op, x, center=center, radius=radius, quadrature_order=32))
+    exp_val = acb_core.acb_midpoint(jcb_mat.jcb_mat_exp_action_contour_point(op, x, center=center, radius=radius, quadrature_order=32))
+    tan_val = acb_core.acb_midpoint(jcb_mat.jcb_mat_tan_action_contour_point(op, x, center=center, radius=radius, quadrature_order=32))
 
     assert sinh_val.shape == (2,)
     assert cosh_val.shape == (2,)
     assert tanh_val.shape == (2,)
+    assert exp_val.shape == (2,)
+    assert tan_val.shape == (2,)
     assert bool(jnp.all(jnp.isfinite(jnp.real(sinh_val))))
     assert bool(jnp.all(jnp.isfinite(jnp.imag(sinh_val))))
     assert bool(jnp.all(jnp.isfinite(jnp.real(cosh_val))))
     assert bool(jnp.all(jnp.isfinite(jnp.imag(cosh_val))))
     assert bool(jnp.all(jnp.isfinite(jnp.real(tanh_val))))
     assert bool(jnp.all(jnp.isfinite(jnp.imag(tanh_val))))
+    assert bool(jnp.all(jnp.isfinite(jnp.real(exp_val))))
+    assert bool(jnp.all(jnp.isfinite(jnp.imag(exp_val))))
+    assert bool(jnp.all(jnp.isfinite(jnp.real(tan_val))))
+    assert bool(jnp.all(jnp.isfinite(jnp.imag(tan_val))))
 
     log2 = jnp.log(jnp.asarray(2.0, dtype=jnp.float64))
     slope = jnp.log(jnp.asarray(3.0 / 2.0, dtype=jnp.float64))
@@ -142,8 +159,11 @@ def test_recent_complex_matrix_free_contour_and_cached_rational_surfaces():
         hermitian=True,
     )
     exact_logdet = jnp.log(2.0 + 0.0j) + jnp.log(3.0 + 0.0j)
+    assert bool(metadata.cached_adjoint_supported)
     assert jnp.allclose(matrix_free_core.hutchpp_trace_from_metadata(cached), exact_logdet, rtol=1e-6, atol=1e-6)
     assert jnp.allclose(direct, exact_logdet, rtol=1e-6, atol=1e-6)
+    assert int(matrix_free_core.rational_hutchpp_next_probe_count(metadata, cached)) >= int(cached.statistics.probe_count)
+    assert bool(matrix_free_core.rational_hutchpp_should_stop(metadata, cached))
 
 
 def test_recent_probe_statistics_and_restart_policy_helpers():
@@ -156,16 +176,21 @@ def test_recent_probe_statistics_and_restart_policy_helpers():
     )
     assert int(stats.recommended_probe_count) % 2 == 0
     assert bool(matrix_free_core.probe_statistics_should_stop(stats, target_stderr=1.0, max_probes=8))
+    assert int(matrix_free_core.probe_statistics_probe_deficit(stats)) >= 0
+    assert int(matrix_free_core.probe_statistics_next_probe_count(stats, block_size=2, max_probes=8)) >= int(stats.probe_count)
 
     evals = jnp.asarray([5.0, 4.0, 3.0], dtype=jnp.float64)
     residuals = jnp.asarray([[1e-12, 1e-4, 1e-2]], dtype=jnp.float64)
     order = matrix_free_core.eig_restart_column_order(evals, residuals, which="largest", lock_tol=1e-6)
+    filtered = matrix_free_core.eig_filter_residual_corrections(residuals, lock_tol=1e-6)
     converged_count, locked_count, deflated_count, converged = matrix_free_core.eig_convergence_summary(
         residuals,
         requested=1,
         tol=1e-6,
     )
     assert order.shape == (3,)
+    assert float(filtered[0, 0]) == 0.0
+    assert int(matrix_free_core.eig_target_subspace_cols(size=6, seed_cols=2, residual_cols=3, block_size=2)) == 4
     assert int(converged_count) == 1
     assert int(locked_count) == 1
     assert int(deflated_count) == 1

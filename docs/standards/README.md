@@ -1,4 +1,4 @@
-Last updated: 2026-03-23T00:00:00Z
+Last updated: 2026-03-25T00:00:00Z
 
 # Standards
 
@@ -16,18 +16,22 @@ Primary owner:
 Specialized companion documents:
 - [engineering_standard.md](/docs/standards/engineering_standard.md)
 - [caching_recompilation_standard.md](/docs/standards/caching_recompilation_standard.md)
+- [implicit_adjoint_operator_solve_standard.md](/docs/standards/implicit_adjoint_operator_solve_standard.md)
 - [jax_surface_policy_standard.md](/docs/standards/jax_surface_policy_standard.md)
-- [lazy_import_standard.md](/docs/standards/lazy_import_standard.md)
+- [lazy_loading_standard.md](/docs/standards/lazy_loading_standard.md)
 - [precision_standard.md](/docs/standards/precision_standard.md)
+- [configuration_standard.md](/docs/standards/configuration_standard.md)
 - [core_scalar_service_calling_standard.md](/docs/standards/core_scalar_service_calling_standard.md)
 
 Consolidation note:
 - treat `jax_api_runtime_standard.md` as the canonical runtime/API contract
 - treat `engineering_standard.md` as the hardening and status-interpretation overlay
 - treat `caching_recompilation_standard.md` as the explicit cache, binder-reuse, prepared-plan, and recompilation-discipline companion
-- treat `lazy_import_standard.md` as the import-time load and public lazy-boundary companion
+- treat `implicit_adjoint_operator_solve_standard.md` as the operator-first solve, transpose-solve, and implicit-adjoint differentiation companion
+- treat `lazy_loading_standard.md` as the canonical import-time load and public lazy-boundary companion
+- treat `configuration_standard.md` as the checked-in runtime/optional-backend configuration companion
 - treat `core_scalar_service_calling_standard.md` as a tranche-specific specialization, not a second general runtime policy
-- API calling shape, binder reuse, diagnostics payloads, logging hooks, and the rule that diagnostics/profiling stay outside the mandatory numeric hot path all belong to this runtime concept
+- API calling shape, binder reuse, diagnostics payloads, logging hooks, optional backend declaration, and the rule that diagnostics/profiling stay outside the mandatory numeric hot path all belong to this runtime concept
 
 ### 2. Validation, Benchmarking, and Executable Examples
 
@@ -52,6 +56,7 @@ Primary owners:
 
 Consolidation note:
 - these documents jointly own where things run and where artifacts live
+- GitHub submission, Windows, Linux/WSL, and Colab portability expectations belong here rather than in ad hoc runbook notes
 
 ### 4. Contracts And Provider Boundary
 
@@ -101,16 +106,25 @@ Consolidation note:
 - [experiment_layout_standard.md](/docs/standards/experiment_layout_standard.md)
 - [function_naming_standard.md](/docs/standards/function_naming_standard.md)
 - [generated_documentation_standard.md](/docs/standards/generated_documentation_standard.md)
+- [implicit_adjoint_operator_solve_standard.md](/docs/standards/implicit_adjoint_operator_solve_standard.md)
 - [jax_api_runtime_standard.md](/docs/standards/jax_api_runtime_standard.md)
 - [jax_surface_policy_standard.md](/docs/standards/jax_surface_policy_standard.md)
-- [lazy_import_standard.md](/docs/standards/lazy_import_standard.md)
+- [lazy_loading_standard.md](/docs/standards/lazy_loading_standard.md)
+- [metadata_registry_standard.md](/docs/standards/metadata_registry_standard.md)
 - [point_fast_jax_standard.md](/docs/standards/point_fast_jax_standard.md)
+- [point_surface_standard.md](/docs/standards/point_surface_standard.md)
 - [precision_standard.md](/docs/standards/precision_standard.md)
 - [pytest_test_naming_standard.md](/docs/standards/pytest_test_naming_standard.md)
 - [repo_standards.md](/docs/standards/repo_standards.md)
 - [report_standard.md](/docs/standards/report_standard.md)
+- [special_function_ad_standard.md](/docs/standards/special_function_ad_standard.md)
+- [startup_compile_playbook_standard.md](/docs/standards/startup_compile_playbook_standard.md)
+- [startup_compile_standard.md](/docs/standards/startup_compile_standard.md)
+- [startup_import_boundary_standard.md](/docs/standards/startup_import_boundary_standard.md)
+- [startup_probe_standard.md](/docs/standards/startup_probe_standard.md)
 - [status_standard.md](/docs/standards/status_standard.md)
 - [theory_notation_standard.md](/docs/standards/theory_notation_standard.md)
+- [update_standard.md](/docs/standards/update_standard.md)
 
 Generated reports that describe the current repo state belong in `docs/reports/`.
 Current implementation progress and active TODOs belong in `docs/status/`.

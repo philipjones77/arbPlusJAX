@@ -21,11 +21,14 @@ def action_with_diagnostics_basic(
     *args,
     round_output,
     prec_bits: int,
+    inflate_output=None,
     invalidate_output=None,
     **kwargs,
 ):
     value, diagnostics = point_action_with_diagnostics_fn(operator, x, *args, **kwargs)
     value = round_output(value, prec_bits)
+    if inflate_output is not None:
+        value = inflate_output(value, diagnostics)
     value = _invalidate_action_if_unsafe(value, diagnostics, invalidate_output=invalidate_output)
     return value, diagnostics
 
@@ -86,17 +89,24 @@ def scalar_functional_basic(point_scalar_fn, *args, lift_scalar, round_output, p
     return round_output(lift_scalar(point_scalar_fn(*args, **kwargs)), prec_bits)
 
 
+def vector_functional_basic(point_vector_fn, *args, round_output, prec_bits: int, **kwargs):
+    return round_output(point_vector_fn(*args, **kwargs), prec_bits)
+
+
 def scalar_functional_with_diagnostics_basic(
     point_scalar_with_diagnostics_fn,
     *args,
     lift_scalar,
     round_output,
     prec_bits: int,
+    inflate_output=None,
     invalidate_output=None,
     **kwargs,
 ):
     value, diagnostics = point_scalar_with_diagnostics_fn(*args, **kwargs)
     value = round_output(lift_scalar(value), prec_bits)
+    if inflate_output is not None:
+        value = inflate_output(value, diagnostics)
     value = _invalidate_scalar_if_unsafe(value, diagnostics, invalidate_output=invalidate_output)
     return value, diagnostics
 
@@ -104,6 +114,18 @@ def scalar_functional_with_diagnostics_basic(
 def det_basic_from_logdet(point_logdet_fn, *args, lift_scalar, round_output, prec_bits: int, **kwargs):
     logdet = point_logdet_fn(*args, **kwargs)
     return round_output(lift_scalar(matrix_free_core.det_from_logdet(logdet)), prec_bits)
+
+
+def scalar_uncertainty_radius(diagnostics):
+    tail_norm = jnp.asarray(getattr(diagnostics, "tail_norm", 0.0), dtype=jnp.float64)
+    primal_residual = jnp.asarray(getattr(diagnostics, "primal_residual", 0.0), dtype=jnp.float64)
+    metric = jnp.asarray(getattr(diagnostics, "convergence_metric", tail_norm), dtype=jnp.float64)
+    stderr = jnp.asarray(getattr(diagnostics, "stderr", 0.0), dtype=jnp.float64)
+    radius = jnp.maximum(
+        jnp.maximum(jnp.maximum(jnp.abs(tail_norm), jnp.abs(primal_residual)), jnp.abs(metric)),
+        jnp.abs(stderr),
+    )
+    return jnp.where(jnp.isfinite(radius), radius, 0.0)
 
 
 def _residual_limit(diag, *, tol: float, atol: float):
@@ -160,6 +182,8 @@ __all__ = [
     "inverse_action_basic",
     "inverse_action_with_diagnostics_basic",
     "scalar_functional_basic",
+    "vector_functional_basic",
     "scalar_functional_with_diagnostics_basic",
+    "scalar_uncertainty_radius",
     "det_basic_from_logdet",
 ]

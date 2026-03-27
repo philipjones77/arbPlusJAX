@@ -32,6 +32,7 @@ from functools import partial
 from typing import NamedTuple
 
 import jax
+from jax import core as jax_core
 from jax import lax
 import jax.numpy as jnp
 
@@ -133,8 +134,26 @@ def _jcb_point_box(z: jax.Array) -> jax.Array:
     )
 
 
+def _jcb_operator_contains_tracer(operator) -> bool:
+    return any(isinstance(leaf, jax_core.Tracer) for leaf in jax.tree_util.tree_leaves(operator))
+
+
 def _jcb_round_basic(x: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     return acb_core.acb_box_round_prec(x, prec_bits)
+
+
+def _jcb_inflate_basic_scalar(x: jax.Array, diagnostics) -> jax.Array:
+    radius = matrix_free_basic.scalar_uncertainty_radius(diagnostics)
+    err = di.interval(-radius, radius)
+    return acb_core.acb_add_error_arb(x, err)
+
+
+def _jcb_inflate_basic_action(x: jax.Array, diagnostics) -> jax.Array:
+    radius = matrix_free_basic.scalar_uncertainty_radius(diagnostics)
+    err = di.interval(-radius, radius)
+    while err.ndim < acb_core.acb_real(x).ndim:
+        err = err[None, ...]
+    return acb_core.acb_add_error_arb(x, err)
 
 
 def _jcb_box_sum(xs: jax.Array, axis: int = -1) -> jax.Array:
@@ -688,7 +707,10 @@ def jcb_mat_hermitian_operator(a: jax.Array):
     return jcb_mat_dense_operator(a)
 
 
-def jcb_mat_hermitian_operator_plan_prepare(a: jax.Array):
+def jcb_mat_hermitian_operator_plan_prepare(a):
+    if isinstance(a, (sparse_common.SparseCOO, sparse_common.SparseCSR, sparse_common.SparseBCOO)):
+        from . import scb_mat as _scb_mat
+        return _scb_mat.scb_mat_operator_plan_prepare(a)
     return jcb_mat_dense_operator_plan_prepare(a)
 
 
@@ -696,7 +718,10 @@ def jcb_mat_hpd_operator(a: jax.Array):
     return jcb_mat_dense_operator(a)
 
 
-def jcb_mat_hpd_operator_plan_prepare(a: jax.Array):
+def jcb_mat_hpd_operator_plan_prepare(a):
+    if isinstance(a, (sparse_common.SparseCOO, sparse_common.SparseCSR, sparse_common.SparseBCOO)):
+        from . import scb_mat as _scb_mat
+        return _scb_mat.scb_mat_operator_plan_prepare(a)
     return jcb_mat_dense_operator_plan_prepare(a)
 
 
@@ -753,18 +778,110 @@ def jcb_mat_jacobi_preconditioner_plan_prepare(a):
                 dtype=jnp.complex128,
                 algebra="jcb",
             )
+        if a.kind == "shell" and isinstance(a.payload.context, (sparse_common.SparseCOO, sparse_common.SparseCSR, sparse_common.SparseBCOO)):
+            from . import scb_mat as _scb_mat
+            diag = jnp.asarray(_scb_mat.scb_mat_diag(a.payload.context), dtype=jnp.complex128)
+            eps = jnp.asarray(1e-12, dtype=jnp.float64)
+            scale = jnp.where(jnp.abs(diag) > eps, diag, jnp.asarray(eps, dtype=jnp.complex128))
+            inv_diag = 1.0 / scale
+            return matrix_free_core.diagonal_preconditioner_plan(inv_diag, algebra="jcb")
         raise ValueError(f"unsupported operator plan kind for Jacobi preconditioner: {a.kind}")
     if isinstance(a, (sparse_common.SparseCOO, sparse_common.SparseCSR, sparse_common.SparseBCOO)):
-        return matrix_free_core.sparse_bcoo_jacobi_preconditioner_plan(
-            _jcb_sparse_to_bcoo(a),
-            as_sparse_bcoo=sparse_common.as_sparse_bcoo,
+        diag = jnp.asarray(scb_mat_diag(a), dtype=jnp.complex128)
+        eps = jnp.asarray(1e-12, dtype=jnp.float64)
+        scale = jnp.where(jnp.abs(diag) > eps, diag, jnp.asarray(eps, dtype=jnp.complex128))
+        inv_diag = 1.0 / scale
+        return matrix_free_core.diagonal_preconditioner_plan(inv_diag, algebra="jcb")
+    return matrix_free_core.dense_jacobi_preconditioner_plan(_jcb_mid_matrix(a), algebra="jcb")
+
+
+def jcb_mat_lu_preconditioner_plan_prepare(a):
+    from . import scb_mat as _scb_mat
+    if isinstance(a, matrix_free_core.OperatorPlan):
+        if a.kind == "sparse_bcoo":
+            return matrix_free_core.sparse_lu_preconditioner_plan(
+                _scb_mat.scb_mat_lu_solve_plan_prepare(
+                    sparse_common.SparseBCOO(
+                        data=a.payload.data,
+                        indices=a.payload.indices,
+                        rows=a.payload.rows,
+                        cols=a.payload.cols,
+                        algebra="scb",
+                    )
+                ),
+                algebra="jcb",
+            )
+        if a.kind == "shell" and isinstance(a.payload.context, (sparse_common.SparseCOO, sparse_common.SparseCSR, sparse_common.SparseBCOO)):
+            return matrix_free_core.sparse_lu_preconditioner_plan(
+                _scb_mat.scb_mat_lu_solve_plan_prepare(a.payload.context),
+                algebra="jcb",
+            )
+        raise ValueError(f"unsupported operator plan kind for LU preconditioner: {a.kind}")
+    if isinstance(a, (sparse_common.SparseCOO, sparse_common.SparseCSR, sparse_common.SparseBCOO)):
+        return matrix_free_core.sparse_lu_preconditioner_plan(
+            _scb_mat.scb_mat_lu_solve_plan_prepare(a),
             algebra="jcb",
         )
-    return matrix_free_core.dense_jacobi_preconditioner_plan(_jcb_mid_matrix(a), algebra="jcb")
+    raise ValueError("jcb_mat_lu_preconditioner_plan_prepare expects sparse operator input.")
+
+
+def jcb_mat_structured_preconditioner_plan_prepare(a, *, hermitian: bool = True):
+    from . import scb_mat as _scb_mat
+    if hermitian:
+        if isinstance(a, matrix_free_core.OperatorPlan):
+            if a.kind == "sparse_bcoo":
+                return matrix_free_core.sparse_cholesky_preconditioner_plan(
+                    _scb_mat.scb_mat_hpd_solve_plan_prepare(
+                        sparse_common.SparseBCOO(
+                            data=a.payload.data,
+                            indices=a.payload.indices,
+                            rows=a.payload.rows,
+                            cols=a.payload.cols,
+                            algebra="scb",
+                        )
+                    ),
+                    algebra="jcb",
+                )
+            if a.kind == "shell" and isinstance(a.payload.context, (sparse_common.SparseCOO, sparse_common.SparseCSR, sparse_common.SparseBCOO)):
+                return matrix_free_core.sparse_cholesky_preconditioner_plan(
+                    _scb_mat.scb_mat_hpd_solve_plan_prepare(a.payload.context),
+                    algebra="jcb",
+                )
+            raise ValueError(f"unsupported operator plan kind for structured preconditioner: {a.kind}")
+        if isinstance(a, (sparse_common.SparseCOO, sparse_common.SparseCSR, sparse_common.SparseBCOO)):
+            return matrix_free_core.sparse_cholesky_preconditioner_plan(
+                _scb_mat.scb_mat_hpd_solve_plan_prepare(a),
+                algebra="jcb",
+            )
+        raise ValueError("jcb_mat_structured_preconditioner_plan_prepare expects sparse operator input.")
+    return jcb_mat_lu_preconditioner_plan_prepare(a)
 
 
 def jcb_mat_shell_preconditioner_plan_prepare(callback, *, context=None):
     return matrix_free_core.shell_preconditioner_plan(callback, context=context, orientation="forward", algebra="jcb")
+
+
+def jcb_mat_multi_shift_solve_plan_prepare(
+    matvec,
+    shifts: jax.Array,
+    *,
+    hermitian: bool = True,
+    preconditioner=None,
+):
+    from . import scb_mat as _scb_mat
+    operator = (
+        _scb_mat.scb_mat_operator_plan_prepare(matvec)
+        if isinstance(matvec, (sparse_common.SparseCOO, sparse_common.SparseCSR, sparse_common.SparseBCOO))
+        else matvec
+    )
+    return matrix_free_core.make_shifted_solve_plan(
+        operator,
+        shifts,
+        preconditioner=preconditioner,
+        solver="multi_shift_cg" if hermitian else "multi_shift_gmres",
+        algebra="jcb",
+        structured=_jcb_structure_tag(hermitian=hermitian),
+    )
 
 
 def jcb_mat_solve_action_point(
@@ -1212,13 +1329,11 @@ def jcb_mat_multi_shift_solve_point(
     preconditioner=None,
 ) -> jax.Array:
     rhs = jcb_mat_as_box_vector(rhs)
-    plan = matrix_free_core.make_shifted_solve_plan(
+    plan = jcb_mat_multi_shift_solve_plan_prepare(
         matvec,
         shifts,
         preconditioner=preconditioner,
-        solver="multi_shift_cg" if hermitian else "multi_shift_gmres",
-        algebra="jcb",
-        structured=_jcb_structure_tag(hermitian=hermitian),
+        hermitian=hermitian,
     )
     mids = matrix_free_core.multi_shift_solve_point(
         plan,
@@ -1400,14 +1515,63 @@ def jcb_mat_poly_action_point(matvec, x: jax.Array, coefficients: jax.Array) -> 
     )
 
 
+def jcb_mat_poly_action_with_diagnostics_point(matvec, x: jax.Array, coefficients: jax.Array):
+    value, diagnostics = matrix_free_core.poly_action_with_diagnostics_point(
+        matvec,
+        x,
+        coefficients,
+        midpoint_apply=_jcb_apply_operator_mid,
+        coerce_vector=jcb_mat_as_box_vector,
+        midpoint_vector=_jcb_mid_vector,
+        point_from_midpoint=_jcb_point_box,
+        full_like=_full_box_like,
+        finite_mask_fn=lambda y: jnp.all(jnp.isfinite(jnp.real(y)) & jnp.isfinite(jnp.imag(y)), axis=-1),
+        coeff_dtype=jnp.complex128,
+        diagnostics_type=JcbMatKrylovDiagnostics,
+        algorithm_code=160,
+    )
+    diagnostics = _jcb_attach_diag(
+        diagnostics,
+        regime="point",
+        method="poly",
+        structure="general",
+        work_units=jnp.asarray(jnp.size(coefficients), dtype=jnp.int32),
+        primal_residual=diagnostics.tail_norm,
+    )
+    diagnostics = _jcb_update_convergence(
+        diagnostics,
+        converged=jnp.asarray(True),
+        convergence_metric=diagnostics.tail_norm,
+    )
+    return value, diagnostics
+
+
 def jcb_mat_poly_action_basic(matvec, x: jax.Array, coefficients: jax.Array) -> jax.Array:
-    return matrix_free_basic.action_basic(
-        jcb_mat_poly_action_point,
+    return _jcb_action_basic_from_diagnostics(
+        jcb_mat_poly_action_with_diagnostics_point,
+        matvec,
+        x,
+        coefficients,
+        prec_bits=di.DEFAULT_PREC_BITS,
+    )
+
+
+def jcb_mat_poly_action_with_diagnostics_basic(
+    matvec,
+    x: jax.Array,
+    coefficients: jax.Array,
+    *,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+):
+    return matrix_free_basic.action_with_diagnostics_basic(
+        jcb_mat_poly_action_with_diagnostics_point,
         matvec,
         x,
         coefficients,
         round_output=_jcb_round_basic,
-        prec_bits=di.DEFAULT_PREC_BITS,
+        prec_bits=prec_bits,
+        inflate_output=_jcb_inflate_basic_action,
+        invalidate_output=_full_box_like,
     )
 
 
@@ -1515,14 +1679,66 @@ def jcb_mat_expm_action_point(matvec, x: jax.Array, terms: int = 16) -> jax.Arra
     )
 
 
-def jcb_mat_expm_action_basic(matvec, x: jax.Array, terms: int = 16) -> jax.Array:
-    return matrix_free_basic.action_basic(
-        jcb_mat_expm_action_point,
+def jcb_mat_expm_action_with_diagnostics_point(matvec, x: jax.Array, terms: int = 16, adjoint_matvec=None):
+    del adjoint_matvec
+    value, diagnostics = matrix_free_core.expm_action_with_diagnostics_point(
         matvec,
         x,
         terms=terms,
-        round_output=_jcb_round_basic,
+        midpoint_apply=_jcb_apply_operator_mid,
+        coerce_vector=jcb_mat_as_box_vector,
+        midpoint_vector=_jcb_mid_vector,
+        point_from_midpoint=_jcb_point_box,
+        full_like=_full_box_like,
+        finite_mask_fn=lambda y: jnp.all(jnp.isfinite(jnp.real(y)) & jnp.isfinite(jnp.imag(y)), axis=-1),
+        scalar_dtype=jnp.float64,
+        diagnostics_type=JcbMatKrylovDiagnostics,
+        algorithm_code=161,
+    )
+    diagnostics = _jcb_attach_diag(
+        diagnostics,
+        regime="point",
+        method="expm_taylor",
+        structure="general",
+        work_units=jnp.asarray(terms, dtype=jnp.int32),
+        primal_residual=diagnostics.tail_norm,
+    )
+    diagnostics = _jcb_update_convergence(
+        diagnostics,
+        converged=jnp.isfinite(diagnostics.tail_norm),
+        convergence_metric=diagnostics.tail_norm,
+    )
+    return value, diagnostics
+
+
+def jcb_mat_expm_action_basic(matvec, x: jax.Array, terms: int = 16) -> jax.Array:
+    return _jcb_action_basic_from_diagnostics(
+        jcb_mat_expm_action_with_diagnostics_point,
+        matvec,
+        x,
+        terms,
         prec_bits=di.DEFAULT_PREC_BITS,
+    )
+
+
+def jcb_mat_expm_action_with_diagnostics_basic(
+    matvec,
+    x: jax.Array,
+    terms: int = 16,
+    adjoint_matvec=None,
+    *,
+    prec_bits: int = di.DEFAULT_PREC_BITS,
+):
+    return matrix_free_basic.action_with_diagnostics_basic(
+        jcb_mat_expm_action_with_diagnostics_point,
+        matvec,
+        x,
+        terms=terms,
+        adjoint_matvec=adjoint_matvec,
+        round_output=_jcb_round_basic,
+        prec_bits=prec_bits,
+        inflate_output=_jcb_inflate_basic_action,
+        invalidate_output=_full_box_like,
     )
 
 
@@ -2432,29 +2648,68 @@ def jcb_mat_shift_invert_operator_plan_prepare(
     atol: float = 0.0,
     maxiter: int | None = None,
 ):
-    return matrix_free_core.shell_operator_plan(
-        lambda v, context: jnp.asarray(
-            _jcb_shifted_solve_mid(
-                context["matvec"],
-                jnp.asarray(v, dtype=jnp.complex128),
-                shift=context["shift"],
-                preconditioner=context["preconditioner"],
-                tol=context["tol"],
-                atol=context["atol"],
-                maxiter=context["maxiter"],
-            ),
-            dtype=jnp.complex128,
+    transpose_matvec = matrix_free_core.operator_transpose_plan(matvec, conjugate=False)
+    adjoint_matvec = matrix_free_core.operator_transpose_plan(matvec, conjugate=True)
+    transpose_preconditioner = matrix_free_core.preconditioner_transpose_plan(preconditioner, conjugate=False)
+    adjoint_preconditioner = matrix_free_core.preconditioner_transpose_plan(preconditioner, conjugate=True)
+    forward_callback = lambda v, context: jnp.asarray(
+        _jcb_shifted_solve_mid(
+            context["matvec"],
+            jnp.asarray(v, dtype=jnp.complex128),
+            shift=context["shift"],
+            preconditioner=context["preconditioner"],
+            tol=context["tol"],
+            atol=context["atol"],
+            maxiter=context["maxiter"],
         ),
-        context={
-            "matvec": matvec,
-            "shift": jnp.asarray(shift, dtype=jnp.complex128),
-            "preconditioner": preconditioner,
-            "tol": float(tol),
-            "atol": float(atol),
-            "maxiter": maxiter,
-        },
-        orientation="forward",
+        dtype=jnp.complex128,
+    )
+    transpose_callback = lambda v, context: jnp.asarray(
+        _jcb_shifted_solve_mid(
+            context["transpose_matvec"],
+            jnp.asarray(v, dtype=jnp.complex128),
+            shift=context["shift"],
+            preconditioner=context["transpose_preconditioner"],
+            tol=context["tol"],
+            atol=context["atol"],
+            maxiter=context["maxiter"],
+        ),
+        dtype=jnp.complex128,
+    ) if context["transpose_matvec"] is not None else jnp.asarray(v, dtype=jnp.complex128)
+    adjoint_callback = lambda v, context: jnp.asarray(
+        _jcb_shifted_solve_mid(
+            context["adjoint_matvec"],
+            jnp.asarray(v, dtype=jnp.complex128),
+            shift=jnp.conjugate(context["shift"]),
+            preconditioner=context["adjoint_preconditioner"],
+            tol=context["tol"],
+            atol=context["atol"],
+            maxiter=context["maxiter"],
+        ),
+        dtype=jnp.complex128,
+    ) if context["adjoint_matvec"] is not None else jnp.asarray(v, dtype=jnp.complex128)
+    context = {
+        "matvec": matvec,
+        "transpose_matvec": transpose_matvec,
+        "adjoint_matvec": adjoint_matvec,
+        "shift": jnp.asarray(shift, dtype=jnp.complex128),
+        "preconditioner": preconditioner,
+        "transpose_preconditioner": transpose_preconditioner,
+        "adjoint_preconditioner": adjoint_preconditioner,
+        "tol": float(tol),
+        "atol": float(atol),
+        "maxiter": maxiter,
+        "forward_callback": forward_callback,
+        "transpose_callback": transpose_callback,
+        "adjoint_callback": adjoint_callback,
+    }
+    return matrix_free_core.oriented_shell_operator_plan(
+        context=context,
         algebra="jcb",
+        orientation="forward",
+        forward_callback=forward_callback,
+        transpose_callback=transpose_callback,
+        adjoint_callback=adjoint_callback,
     )
 
 
@@ -2468,31 +2723,76 @@ def jcb_mat_generalized_shift_invert_operator_plan_prepare(
     atol: float = 0.0,
     maxiter: int | None = None,
 ):
-    return matrix_free_core.shell_operator_plan(
-        lambda v, context: jnp.asarray(
-            _jcb_generalized_shifted_solve_mid(
-                context["a_matvec"],
-                context["b_matvec"],
-                _jcb_apply_operator_mid(context["b_matvec"], jnp.asarray(v, dtype=jnp.complex128)),
-                shift=context["shift"],
-                preconditioner=context["preconditioner"],
-                tol=context["tol"],
-                atol=context["atol"],
-                maxiter=context["maxiter"],
-            ),
-            dtype=jnp.complex128,
+    a_transpose = matrix_free_core.operator_transpose_plan(a_matvec, conjugate=False)
+    b_transpose = matrix_free_core.operator_transpose_plan(b_matvec, conjugate=False)
+    a_adjoint = matrix_free_core.operator_transpose_plan(a_matvec, conjugate=True)
+    b_adjoint = matrix_free_core.operator_transpose_plan(b_matvec, conjugate=True)
+    transpose_preconditioner = matrix_free_core.preconditioner_transpose_plan(preconditioner, conjugate=False)
+    adjoint_preconditioner = matrix_free_core.preconditioner_transpose_plan(preconditioner, conjugate=True)
+    forward_callback = lambda v, context: jnp.asarray(
+        _jcb_generalized_shifted_solve_mid(
+            context["a_matvec"],
+            context["b_matvec"],
+            _jcb_apply_operator_mid(context["b_matvec"], jnp.asarray(v, dtype=jnp.complex128)),
+            shift=context["shift"],
+            preconditioner=context["preconditioner"],
+            tol=context["tol"],
+            atol=context["atol"],
+            maxiter=context["maxiter"],
         ),
-        context={
-            "a_matvec": a_matvec,
-            "b_matvec": b_matvec,
-            "shift": jnp.asarray(shift, dtype=jnp.complex128),
-            "preconditioner": preconditioner,
-            "tol": float(tol),
-            "atol": float(atol),
-            "maxiter": maxiter,
-        },
-        orientation="forward",
+        dtype=jnp.complex128,
+    )
+    transpose_callback = lambda v, context: jnp.asarray(
+        _jcb_generalized_shifted_solve_mid(
+            context["a_transpose"],
+            context["b_transpose"],
+            _jcb_apply_operator_mid(context["b_transpose"], jnp.asarray(v, dtype=jnp.complex128)),
+            shift=context["shift"],
+            preconditioner=context["transpose_preconditioner"],
+            tol=context["tol"],
+            atol=context["atol"],
+            maxiter=context["maxiter"],
+        ),
+        dtype=jnp.complex128,
+    ) if context["a_transpose"] is not None and context["b_transpose"] is not None else jnp.asarray(v, dtype=jnp.complex128)
+    adjoint_callback = lambda v, context: jnp.asarray(
+        _jcb_generalized_shifted_solve_mid(
+            context["a_adjoint"],
+            context["b_adjoint"],
+            _jcb_apply_operator_mid(context["b_adjoint"], jnp.asarray(v, dtype=jnp.complex128)),
+            shift=jnp.conjugate(context["shift"]),
+            preconditioner=context["adjoint_preconditioner"],
+            tol=context["tol"],
+            atol=context["atol"],
+            maxiter=context["maxiter"],
+        ),
+        dtype=jnp.complex128,
+    ) if context["a_adjoint"] is not None and context["b_adjoint"] is not None else jnp.asarray(v, dtype=jnp.complex128)
+    context = {
+        "a_matvec": a_matvec,
+        "b_matvec": b_matvec,
+        "a_transpose": a_transpose,
+        "b_transpose": b_transpose,
+        "a_adjoint": a_adjoint,
+        "b_adjoint": b_adjoint,
+        "shift": jnp.asarray(shift, dtype=jnp.complex128),
+        "preconditioner": preconditioner,
+        "transpose_preconditioner": transpose_preconditioner,
+        "adjoint_preconditioner": adjoint_preconditioner,
+        "tol": float(tol),
+        "atol": float(atol),
+        "maxiter": maxiter,
+        "forward_callback": forward_callback,
+        "transpose_callback": transpose_callback,
+        "adjoint_callback": adjoint_callback,
+    }
+    return matrix_free_core.oriented_shell_operator_plan(
+        context=context,
         algebra="jcb",
+        orientation="forward",
+        forward_callback=forward_callback,
+        transpose_callback=transpose_callback,
+        adjoint_callback=adjoint_callback,
     )
 
 
@@ -2896,7 +3196,7 @@ def _jcb_mat_funm_action_hermitian_point_base(matvec, x: jax.Array, dense_funm, 
 
 
 @partial(jax.custom_vjp, nondiff_argnums=(0, 2, 3, 4))
-def jcb_mat_funm_action_arnoldi_point(matvec, x: jax.Array, dense_funm, steps: int, adjoint_matvec=None):
+def _jcb_mat_funm_action_arnoldi_point_custom(matvec, x: jax.Array, dense_funm, steps: int, adjoint_matvec=None):
     return _jcb_mat_funm_action_arnoldi_point_base(matvec, x, dense_funm, steps)
 
 
@@ -2917,10 +3217,16 @@ def _jcb_mat_funm_action_arnoldi_point_bwd(matvec, dense_funm, steps, adjoint_ma
     return (adjoint,)
 
 
-jcb_mat_funm_action_arnoldi_point.defvjp(
+_jcb_mat_funm_action_arnoldi_point_custom.defvjp(
     _jcb_mat_funm_action_arnoldi_point_fwd,
     _jcb_mat_funm_action_arnoldi_point_bwd,
 )
+
+
+def jcb_mat_funm_action_arnoldi_point(matvec, x: jax.Array, dense_funm, steps: int, adjoint_matvec=None):
+    if _jcb_operator_contains_tracer(matvec) or _jcb_operator_contains_tracer(adjoint_matvec):
+        return _jcb_mat_funm_action_arnoldi_point_base(matvec, x, dense_funm, steps)
+    return _jcb_mat_funm_action_arnoldi_point_custom(matvec, x, dense_funm, steps, adjoint_matvec)
 
 
 def _jcb_mat_funm_integrand_arnoldi_point_base(matvec, x: jax.Array, dense_funm, steps: int):
@@ -2937,7 +3243,7 @@ def _jcb_mat_funm_integrand_arnoldi_point_base(matvec, x: jax.Array, dense_funm,
 
 
 @partial(jax.custom_vjp, nondiff_argnums=(0, 2, 3, 4))
-def jcb_mat_funm_action_hermitian_point(matvec, x: jax.Array, dense_funm, steps: int, adjoint_matvec=None):
+def _jcb_mat_funm_action_hermitian_point_custom(matvec, x: jax.Array, dense_funm, steps: int, adjoint_matvec=None):
     del adjoint_matvec
     return _jcb_mat_funm_action_hermitian_point_base(matvec, x, dense_funm, steps)
 
@@ -2959,10 +3265,16 @@ def _jcb_mat_funm_action_hermitian_point_bwd(matvec, dense_funm, steps, adjoint_
     return (adjoint,)
 
 
-jcb_mat_funm_action_hermitian_point.defvjp(
+_jcb_mat_funm_action_hermitian_point_custom.defvjp(
     _jcb_mat_funm_action_hermitian_point_fwd,
     _jcb_mat_funm_action_hermitian_point_bwd,
 )
+
+
+def jcb_mat_funm_action_hermitian_point(matvec, x: jax.Array, dense_funm, steps: int, adjoint_matvec=None):
+    if _jcb_operator_contains_tracer(matvec):
+        return _jcb_mat_funm_action_hermitian_point_base(matvec, x, dense_funm, steps)
+    return _jcb_mat_funm_action_hermitian_point_custom(matvec, x, dense_funm, steps, adjoint_matvec)
 
 
 def _jcb_mat_funm_integrand_hermitian_point_base(matvec, x: jax.Array, dense_funm, steps: int):
@@ -2979,7 +3291,7 @@ def _jcb_mat_funm_integrand_hermitian_point_base(matvec, x: jax.Array, dense_fun
 
 
 @partial(jax.custom_vjp, nondiff_argnums=(0, 2, 3, 4))
-def jcb_mat_funm_integrand_arnoldi_point(matvec, x: jax.Array, dense_funm, steps: int, adjoint_matvec=None):
+def _jcb_mat_funm_integrand_arnoldi_point_custom(matvec, x: jax.Array, dense_funm, steps: int, adjoint_matvec=None):
     return _jcb_mat_funm_integrand_arnoldi_point_base(matvec, x, dense_funm, steps)
 
 
@@ -2998,14 +3310,20 @@ def _jcb_mat_funm_integrand_arnoldi_point_bwd(matvec, dense_funm, steps, adjoint
     return (_jcb_point_box(grad),)
 
 
-jcb_mat_funm_integrand_arnoldi_point.defvjp(
+_jcb_mat_funm_integrand_arnoldi_point_custom.defvjp(
     _jcb_mat_funm_integrand_arnoldi_point_fwd,
     _jcb_mat_funm_integrand_arnoldi_point_bwd,
 )
 
 
+def jcb_mat_funm_integrand_arnoldi_point(matvec, x: jax.Array, dense_funm, steps: int, adjoint_matvec=None):
+    if _jcb_operator_contains_tracer(matvec) or _jcb_operator_contains_tracer(adjoint_matvec):
+        return _jcb_mat_funm_integrand_arnoldi_point_base(matvec, x, dense_funm, steps)
+    return _jcb_mat_funm_integrand_arnoldi_point_custom(matvec, x, dense_funm, steps, adjoint_matvec)
+
+
 @partial(jax.custom_vjp, nondiff_argnums=(0, 2, 3, 4))
-def jcb_mat_funm_integrand_hermitian_point(matvec, x: jax.Array, dense_funm, steps: int, adjoint_matvec=None):
+def _jcb_mat_funm_integrand_hermitian_point_custom(matvec, x: jax.Array, dense_funm, steps: int, adjoint_matvec=None):
     del adjoint_matvec
     return _jcb_mat_funm_integrand_hermitian_point_base(matvec, x, dense_funm, steps)
 
@@ -3024,10 +3342,16 @@ def _jcb_mat_funm_integrand_hermitian_point_bwd(matvec, dense_funm, steps, adjoi
     return (_jcb_point_box(grad),)
 
 
-jcb_mat_funm_integrand_hermitian_point.defvjp(
+_jcb_mat_funm_integrand_hermitian_point_custom.defvjp(
     _jcb_mat_funm_integrand_hermitian_point_fwd,
     _jcb_mat_funm_integrand_hermitian_point_bwd,
 )
+
+
+def jcb_mat_funm_integrand_hermitian_point(matvec, x: jax.Array, dense_funm, steps: int, adjoint_matvec=None):
+    if _jcb_operator_contains_tracer(matvec):
+        return _jcb_mat_funm_integrand_hermitian_point_base(matvec, x, dense_funm, steps)
+    return _jcb_mat_funm_integrand_hermitian_point_custom(matvec, x, dense_funm, steps, adjoint_matvec)
 
 
 def jcb_mat_dense_funm_general_eig_point(scalar_fun):
@@ -3113,6 +3437,7 @@ def _jcb_action_basic_from_diagnostics(point_with_diagnostics_fn, matvec, x: jax
         *args,
         round_output=_jcb_round_basic,
         prec_bits=prec_bits,
+        inflate_output=_jcb_inflate_basic_action,
         invalidate_output=_full_box_like,
         **kwargs,
     )
@@ -4059,15 +4384,12 @@ def jcb_mat_hutchpp_trace_estimate_basic(
     *,
     prec_bits: int = di.DEFAULT_PREC_BITS,
 ) -> jax.Array:
-    return matrix_free_basic.scalar_functional_basic(
-        jcb_mat_hutchpp_trace_estimate_point,
-        action_fn,
-        sketch_probes,
-        residual_probes,
-        lift_scalar=_jcb_point_box,
-        round_output=_jcb_round_basic,
-        prec_bits=prec_bits,
+    metadata = jcb_mat_hutchpp_trace_with_metadata_point(action_fn, sketch_probes, residual_probes)
+    value = _jcb_round_basic(
+        _jcb_point_box(jnp.asarray(matrix_free_core.hutchpp_trace_from_metadata(metadata), dtype=jnp.complex128)),
+        prec_bits,
     )
+    return _jcb_inflate_basic_scalar(value, metadata.statistics)
 
 
 def jcb_mat_expm_action_arnoldi_restarted_point(
@@ -4160,7 +4482,7 @@ def _jcb_mat_trace_integrand_point_base(matvec, x: jax.Array) -> jax.Array:
 
 
 @partial(jax.custom_vjp, nondiff_argnums=(0, 2))
-def jcb_mat_trace_integrand_point(matvec, x: jax.Array, adjoint_matvec=None) -> jax.Array:
+def _jcb_mat_trace_integrand_point_custom(matvec, x: jax.Array, adjoint_matvec=None) -> jax.Array:
     return _jcb_mat_trace_integrand_point_base(matvec, x)
 
 
@@ -4179,10 +4501,16 @@ def _jcb_mat_trace_integrand_point_bwd(matvec, adjoint_matvec, x, cotangent):
     return (_jcb_point_box(grad),)
 
 
-jcb_mat_trace_integrand_point.defvjp(
+_jcb_mat_trace_integrand_point_custom.defvjp(
     _jcb_mat_trace_integrand_point_fwd,
     _jcb_mat_trace_integrand_point_bwd,
 )
+
+
+def jcb_mat_trace_integrand_point(matvec, x: jax.Array, adjoint_matvec=None) -> jax.Array:
+    if _jcb_operator_contains_tracer(matvec) or _jcb_operator_contains_tracer(adjoint_matvec):
+        return _jcb_mat_trace_integrand_point_base(matvec, x)
+    return _jcb_mat_trace_integrand_point_custom(matvec, x, adjoint_matvec)
 
 
 def jcb_mat_funm_trace_integrand_arnoldi_point(matvec, x: jax.Array, scalar_fun, steps: int, adjoint_matvec=None):
@@ -4291,15 +4619,18 @@ def jcb_mat_trace_estimate_basic(
     *,
     prec_bits: int = di.DEFAULT_PREC_BITS,
 ) -> jax.Array:
-    return matrix_free_basic.scalar_functional_basic(
-        jcb_mat_trace_estimate_point,
+    value, _ = matrix_free_basic.scalar_functional_with_diagnostics_basic(
+        jcb_mat_trace_estimator_with_diagnostics_point,
         matvec,
         probes,
         adjoint_matvec=adjoint_matvec,
         lift_scalar=_jcb_point_box,
         round_output=_jcb_round_basic,
         prec_bits=prec_bits,
+        inflate_output=_jcb_inflate_basic_scalar,
+        invalidate_output=_full_box_like,
     )
+    return value
 
 
 def jcb_mat_logdet_slq_point(matvec, probes: jax.Array, steps: int, adjoint_matvec=None) -> jax.Array:
@@ -4412,7 +4743,7 @@ def jcb_mat_sign_action_contour_point(
             center=center,
             radius=radius,
             quadrature_order=quadrature_order,
-            node_weight_fn=lambda node: jnp.sign(node) / (2.0j * jnp.pi),
+            node_weight_fn=lambda node: (node / jnp.sqrt(node * node)) / (2.0j * jnp.pi),
         )
     )
 
@@ -4859,6 +5190,7 @@ def jcb_mat_log_action_arnoldi_with_diagnostics_basic(
         adjoint_matvec=adjoint_matvec,
         round_output=_jcb_round_basic,
         prec_bits=prec_bits,
+        inflate_output=_jcb_inflate_basic_action,
         invalidate_output=_full_box_like,
     )
 
@@ -5033,6 +5365,7 @@ def jcb_mat_log_action_hermitian_with_diagnostics_basic(
         adjoint_matvec=adjoint_matvec,
         round_output=_jcb_round_basic,
         prec_bits=prec_bits,
+        inflate_output=_jcb_inflate_basic_action,
         invalidate_output=_full_box_like,
     )
 
@@ -5206,6 +5539,7 @@ def jcb_mat_logdet_slq_with_diagnostics_basic(
         lift_scalar=_jcb_point_box,
         round_output=_jcb_round_basic,
         prec_bits=prec_bits,
+        inflate_output=_jcb_inflate_basic_scalar,
         invalidate_output=_full_box_like,
     )
 
@@ -5247,6 +5581,7 @@ def jcb_mat_det_slq_with_diagnostics_basic(
         lift_scalar=_jcb_point_box,
         round_output=_jcb_round_basic,
         prec_bits=prec_bits,
+        inflate_output=_jcb_inflate_basic_scalar,
         invalidate_output=_full_box_like,
     )
 
@@ -5267,6 +5602,39 @@ def jcb_mat_logdet_solve_point(
 ) -> matrix_free_core.LogdetSolveResult:
     transpose_operator = adjoint_matvec if adjoint_matvec is not None else matrix_free_core.operator_transpose_plan(matvec, conjugate=True)
     implicit_adjoint = hermitian or transpose_operator is not None
+    if isinstance(matvec, matrix_free_core.OperatorPlan) and matvec.kind == "dense" and _jcb_operator_contains_tracer(matvec):
+        def _logdet_with_diagnostics(operator, probe_value):
+            dense = jnp.asarray(operator.payload, dtype=jnp.complex128)
+            diag = jcb_mat_arnoldi_diagnostics_point(
+                operator,
+                probe_value[0],
+                steps,
+                used_adjoint=adjoint_matvec is not None or hermitian,
+            )
+            diag = _jcb_attach_diag(
+                diag,
+                regime="structured" if hermitian else "iterative",
+                method="dense_exact",
+                structure=_jcb_structure_tag(hermitian=hermitian, hpd=hermitian),
+                work_units=steps,
+                primal_residual=0.0,
+                adjoint_residual=0.0,
+                note="matrix_free.logdet_solve.dense_exact",
+            )
+            diag = _jcb_update_convergence(
+                diag,
+                converged=jnp.asarray(True),
+                convergence_metric=jnp.asarray(0.0, dtype=jnp.float64),
+            )
+            return jnp.linalg.slogdet(dense)[1], diag
+    else:
+        def _logdet_with_diagnostics(operator, probe_value):
+            return jcb_mat_logdet_slq_with_diagnostics_point(
+                operator,
+                probe_value,
+                steps,
+                adjoint_matvec,
+            )
     return matrix_free_core.combine_logdet_solve_point(
         operator=matvec,
         transpose_operator=transpose_operator,
@@ -5282,12 +5650,7 @@ def jcb_mat_logdet_solve_point(
             hermitian=hermitian,
             preconditioner=preconditioner,
         ),
-        logdet_with_diagnostics=lambda operator, probe_value: jcb_mat_logdet_slq_with_diagnostics_point(
-            operator,
-            probe_value,
-            steps,
-            adjoint_matvec,
-        ),
+        logdet_with_diagnostics=_logdet_with_diagnostics,
         preconditioner=preconditioner,
         solver="cg" if hermitian else "gmres",
         implicit_adjoint=implicit_adjoint,
@@ -5325,7 +5688,10 @@ def jcb_mat_logdet_solve_basic(
         preconditioner=preconditioner,
     )
     return matrix_free_core.LogdetSolveResult(
-        logdet=_jcb_round_basic(_jcb_point_box(result.logdet), prec_bits),
+        logdet=_jcb_inflate_basic_scalar(
+            _jcb_round_basic(_jcb_point_box(result.logdet), prec_bits),
+            result.aux.logdet_diagnostics,
+        ),
         solve=_jcb_round_basic(result.solve, prec_bits),
         aux=result.aux,
     )
@@ -5794,6 +6160,33 @@ def jcb_mat_det_slq_point_jit(matvec, probes: jax.Array, steps: int, adjoint_mat
     return _jcb_mat_det_slq_point_jit_callable(matvec, probes, steps=steps, adjoint_matvec=adjoint_matvec)
 
 
+_jcb_mat_logdet_solve_point_jit_callable = lazy_jit(
+    lambda: jax.jit(
+        jcb_mat_logdet_solve_point,
+        static_argnames=("matvec", "steps", "adjoint_matvec", "tol", "atol", "maxiter", "hermitian", "preconditioner"),
+    )
+)
+_jcb_mat_logdet_solve_point_jit_plan = lazy_jit(
+    lambda: jax.jit(
+        jcb_mat_logdet_solve_point,
+        static_argnames=("steps", "tol", "atol", "maxiter", "hermitian"),
+    )
+)
+
+
+def jcb_mat_logdet_solve_point_jit(
+    matvec,
+    rhs: jax.Array,
+    probes: jax.Array,
+    steps: int,
+    adjoint_matvec=None,
+    **kwargs,
+) -> matrix_free_core.LogdetSolveResult:
+    # Keep the public `*_jit` surface stable while the AD-aware bundle still
+    # routes through custom-VJP estimator internals that are not fully JIT-safe.
+    return jcb_mat_logdet_solve_point(matvec, rhs, probes, steps=steps, adjoint_matvec=adjoint_matvec, **kwargs)
+
+
 _jcb_mat_log_action_arnoldi_point_jit_callable = lazy_jit(
     lambda: jax.jit(
         jcb_mat_log_action_arnoldi_point,
@@ -6064,7 +6457,10 @@ __all__ = [
     "jcb_mat_arnoldi_hessenberg_adjoint",
     "jcb_mat_cg_fixed_iterations",
     "jcb_mat_jacobi_preconditioner_plan_prepare",
+    "jcb_mat_lu_preconditioner_plan_prepare",
+    "jcb_mat_structured_preconditioner_plan_prepare",
     "jcb_mat_shell_preconditioner_plan_prepare",
+    "jcb_mat_multi_shift_solve_plan_prepare",
     "jcb_mat_solve_action_point",
     "jcb_mat_solve_action_basic",
     "jcb_mat_solve_action_hermitian_point",
@@ -6090,7 +6486,9 @@ __all__ = [
     "jcb_mat_operator_apply_point",
     "jcb_mat_operator_apply_basic",
     "jcb_mat_poly_action_point",
+    "jcb_mat_poly_action_with_diagnostics_point",
     "jcb_mat_poly_action_basic",
+    "jcb_mat_poly_action_with_diagnostics_basic",
     "jcb_mat_rational_action_point",
     "jcb_mat_rational_action_basic",
     "jcb_mat_log_action_contour_point",
@@ -6105,7 +6503,9 @@ __all__ = [
     "jcb_mat_exp_action_contour_point",
     "jcb_mat_tan_action_contour_point",
     "jcb_mat_expm_action_point",
+    "jcb_mat_expm_action_with_diagnostics_point",
     "jcb_mat_expm_action_basic",
+    "jcb_mat_expm_action_with_diagnostics_basic",
     "jcb_mat_arnoldi_hessenberg_point",
     "jcb_mat_arnoldi_diagnostics_point",
     "jcb_mat_lanczos_tridiag_point",
@@ -6234,6 +6634,7 @@ __all__ = [
     "jcb_mat_det_slq_with_diagnostics_point",
     "jcb_mat_det_slq_with_diagnostics_basic",
     "jcb_mat_logdet_solve_point",
+    "jcb_mat_logdet_solve_point_jit",
     "jcb_mat_logdet_solve_basic",
     "jcb_mat_logdet_leja_hutchpp_point",
     "jcb_mat_logdet_leja_hutchpp_with_diagnostics_point",

@@ -10,8 +10,12 @@ from . import arb_mat
 from . import kernel_helpers as kh
 from . import mat_common
 from . import point_wrappers
+from . import scb_block_mat
 from . import scb_mat
+from . import scb_vblock_mat
+from . import srb_block_mat
 from . import srb_mat
+from . import srb_vblock_mat
 from . import wrappers_common as wc
 
 
@@ -288,6 +292,126 @@ SPARSE_MODE_BASES = (
 )
 
 
+BLOCK_SPARSE_MODE_BASES = (
+    "srb_block_mat_shape",
+    "srb_block_mat_block_shape",
+    "srb_block_mat_nnzb",
+    "srb_block_mat_coo",
+    "srb_block_mat_csr",
+    "srb_block_mat_from_dense_coo",
+    "srb_block_mat_from_dense_csr",
+    "srb_block_mat_coo_to_csr",
+    "srb_block_mat_csr_to_coo",
+    "srb_block_mat_to_dense",
+    "srb_block_mat_transpose",
+    "srb_block_mat_matvec",
+    "srb_block_mat_rmatvec",
+    "srb_block_mat_matvec_cached_prepare",
+    "srb_block_mat_matvec_cached_apply",
+    "srb_block_mat_rmatvec_cached_prepare",
+    "srb_block_mat_rmatvec_cached_apply",
+    "srb_block_mat_matmul_dense_rhs",
+    "srb_block_mat_triangular_solve",
+    "srb_block_mat_lu",
+    "srb_block_mat_lu_solve",
+    "srb_block_mat_qr",
+    "srb_block_mat_qr_solve",
+    "srb_block_mat_solve",
+    "srb_block_mat_det",
+    "srb_block_mat_inv",
+    "srb_block_mat_sqr",
+    "scb_block_mat_shape",
+    "scb_block_mat_block_shape",
+    "scb_block_mat_nnzb",
+    "scb_block_mat_coo",
+    "scb_block_mat_csr",
+    "scb_block_mat_from_dense_coo",
+    "scb_block_mat_from_dense_csr",
+    "scb_block_mat_coo_to_csr",
+    "scb_block_mat_csr_to_coo",
+    "scb_block_mat_to_dense",
+    "scb_block_mat_transpose",
+    "scb_block_mat_conjugate_transpose",
+    "scb_block_mat_matvec",
+    "scb_block_mat_rmatvec",
+    "scb_block_mat_adjoint_matvec",
+    "scb_block_mat_matvec_cached_prepare",
+    "scb_block_mat_matvec_cached_apply",
+    "scb_block_mat_rmatvec_cached_prepare",
+    "scb_block_mat_rmatvec_cached_apply",
+    "scb_block_mat_adjoint_matvec_cached_prepare",
+    "scb_block_mat_adjoint_matvec_cached_apply",
+    "scb_block_mat_matmul_dense_rhs",
+    "scb_block_mat_triangular_solve",
+    "scb_block_mat_lu",
+    "scb_block_mat_lu_solve",
+    "scb_block_mat_qr",
+    "scb_block_mat_qr_solve",
+    "scb_block_mat_solve",
+    "scb_block_mat_det",
+    "scb_block_mat_inv",
+    "scb_block_mat_sqr",
+    "srb_vblock_mat_shape",
+    "srb_vblock_mat_block_sizes",
+    "srb_vblock_mat_nnzb",
+    "srb_vblock_mat_coo",
+    "srb_vblock_mat_csr",
+    "srb_vblock_mat_from_dense_coo",
+    "srb_vblock_mat_from_dense_csr",
+    "srb_vblock_mat_coo_to_csr",
+    "srb_vblock_mat_csr_to_coo",
+    "srb_vblock_mat_to_dense",
+    "srb_vblock_mat_transpose",
+    "srb_vblock_mat_matvec",
+    "srb_vblock_mat_rmatvec",
+    "srb_vblock_mat_matvec_cached_prepare",
+    "srb_vblock_mat_matvec_cached_apply",
+    "srb_vblock_mat_rmatvec_cached_prepare",
+    "srb_vblock_mat_rmatvec_cached_apply",
+    "srb_vblock_mat_matmul_dense_rhs",
+    "srb_vblock_mat_triangular_solve",
+    "srb_vblock_mat_lu",
+    "srb_vblock_mat_lu_solve",
+    "srb_vblock_mat_qr",
+    "srb_vblock_mat_qr_solve",
+    "srb_vblock_mat_solve",
+    "srb_vblock_mat_det",
+    "srb_vblock_mat_inv",
+    "srb_vblock_mat_sqr",
+    "scb_vblock_mat_shape",
+    "scb_vblock_mat_block_sizes",
+    "scb_vblock_mat_nnzb",
+    "scb_vblock_mat_coo",
+    "scb_vblock_mat_csr",
+    "scb_vblock_mat_from_dense_coo",
+    "scb_vblock_mat_from_dense_csr",
+    "scb_vblock_mat_coo_to_csr",
+    "scb_vblock_mat_csr_to_coo",
+    "scb_vblock_mat_to_dense",
+    "scb_vblock_mat_transpose",
+    "scb_vblock_mat_conjugate_transpose",
+    "scb_vblock_mat_matvec",
+    "scb_vblock_mat_rmatvec",
+    "scb_vblock_mat_adjoint_matvec",
+    "scb_vblock_mat_matvec_cached_prepare",
+    "scb_vblock_mat_matvec_cached_apply",
+    "scb_vblock_mat_rmatvec_cached_prepare",
+    "scb_vblock_mat_rmatvec_cached_apply",
+    "scb_vblock_mat_adjoint_matvec_cached_prepare",
+    "scb_vblock_mat_adjoint_matvec_cached_apply",
+    "scb_vblock_mat_matmul_dense_rhs",
+    "scb_vblock_mat_triangular_solve",
+    "scb_vblock_mat_lu",
+    "scb_vblock_mat_lu_solve",
+    "scb_vblock_mat_qr",
+    "scb_vblock_mat_qr_solve",
+    "scb_vblock_mat_solve",
+    "scb_vblock_mat_det",
+    "scb_vblock_mat_inv",
+    "scb_vblock_mat_sqr",
+)
+
+
 SPARSE_BATCH_MODE_BASES = (
     "srb_mat_matvec",
     "srb_mat_rmatvec",
@@ -308,8 +432,52 @@ SPARSE_BATCH_MODE_BASES = (
 )
 
 
+BLOCK_SPARSE_BATCH_MODE_BASES = (
+    "srb_block_mat_matvec",
+    "srb_block_mat_rmatvec",
+    "srb_block_mat_matvec_cached_apply",
+    "srb_block_mat_rmatvec_cached_apply",
+    "srb_block_mat_solve",
+    "scb_block_mat_matvec",
+    "scb_block_mat_rmatvec",
+    "scb_block_mat_adjoint_matvec",
+    "scb_block_mat_matvec_cached_apply",
+    "scb_block_mat_rmatvec_cached_apply",
+    "scb_block_mat_adjoint_matvec_cached_apply",
+    "scb_block_mat_solve",
+    "srb_vblock_mat_matvec",
+    "srb_vblock_mat_rmatvec",
+    "srb_vblock_mat_matvec_cached_apply",
+    "srb_vblock_mat_rmatvec_cached_apply",
+    "srb_vblock_mat_solve",
+    "scb_vblock_mat_matvec",
+    "scb_vblock_mat_rmatvec",
+    "scb_vblock_mat_adjoint_matvec",
+    "scb_vblock_mat_matvec_cached_apply",
+    "scb_vblock_mat_rmatvec_cached_apply",
+    "scb_vblock_mat_adjoint_matvec_cached_apply",
+    "scb_vblock_mat_solve",
+)
+
+
 for _name in SPARSE_MODE_BASES:
     _mod = srb_mat if _name.startswith("srb_") else scb_mat
+    _fn = getattr(_mod, _name, None)
+    if callable(_fn):
+        _wrapper = _make_sparse_wrapper(_name, _fn)
+        globals()[_wrapper.__name__] = _wrapper
+        __all__.append(_wrapper.__name__)
+
+
+for _name in BLOCK_SPARSE_MODE_BASES:
+    if _name.startswith("srb_block_"):
+        _mod = srb_block_mat
+    elif _name.startswith("scb_block_"):
+        _mod = scb_block_mat
+    elif _name.startswith("srb_vblock_"):
+        _mod = srb_vblock_mat
+    else:
+        _mod = scb_vblock_mat
     _fn = getattr(_mod, _name, None)
     if callable(_fn):
         _wrapper = _make_sparse_wrapper(_name, _fn)
@@ -483,9 +651,34 @@ for _base in (
 
 for _base in SPARSE_BATCH_MODE_BASES:
     _mod = srb_mat if _base.startswith("srb_") else scb_mat
-    _fixed = _make_sparse_batch_wrapper(_base, getattr(_mod, f"{_base}_batch_fixed"), padded=False)
-    _padded = _make_sparse_batch_wrapper(_base, getattr(_mod, f"{_base}_batch_padded"), padded=True)
-    globals()[_fixed.__name__] = _fixed
-    globals()[_padded.__name__] = _padded
-    __all__.append(_fixed.__name__)
-    __all__.append(_padded.__name__)
+    _fixed_impl = getattr(_mod, f"{_base}_batch_fixed", None)
+    _padded_impl = getattr(_mod, f"{_base}_batch_padded", None)
+    if _fixed_impl is not None:
+        _fixed = _make_sparse_batch_wrapper(_base, _fixed_impl, padded=False)
+        globals()[_fixed.__name__] = _fixed
+        __all__.append(_fixed.__name__)
+    if _padded_impl is not None:
+        _padded = _make_sparse_batch_wrapper(_base, _padded_impl, padded=True)
+        globals()[_padded.__name__] = _padded
+        __all__.append(_padded.__name__)
+
+
+for _base in BLOCK_SPARSE_BATCH_MODE_BASES:
+    if _base.startswith("srb_block_"):
+        _mod = srb_block_mat
+    elif _base.startswith("scb_block_"):
+        _mod = scb_block_mat
+    elif _base.startswith("srb_vblock_"):
+        _mod = srb_vblock_mat
+    else:
+        _mod = scb_vblock_mat
+    _fixed_impl = getattr(_mod, f"{_base}_batch_fixed", None)
+    _padded_impl = getattr(_mod, f"{_base}_batch_padded", None)
+    if _fixed_impl is not None:
+        _fixed = _make_sparse_batch_wrapper(_base, _fixed_impl, padded=False)
+        globals()[_fixed.__name__] = _fixed
+        __all__.append(_fixed.__name__)
+    if _padded_impl is not None:
+        _padded = _make_sparse_batch_wrapper(_base, _padded_impl, padded=True)
+        globals()[_padded.__name__] = _padded
+        __all__.append(_padded.__name__)

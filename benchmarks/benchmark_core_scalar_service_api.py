@@ -14,12 +14,22 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from arbplusjax import api
 from benchmarks.schema import BenchmarkMeasurement
 from benchmarks.schema import BenchmarkRecord
 from benchmarks.schema import BenchmarkReport
 from benchmarks.schema import write_benchmark_report
 from tools.runtime_manifest import collect_runtime_manifest
+
+
+api = None
+
+
+def _load_api():
+    global api
+    if api is None:
+        from arbplusjax import api as _api
+
+        api = _api
 
 
 def _block(x):
@@ -100,6 +110,7 @@ def main() -> int:
         default=Path("experiments/benchmarks/outputs/scalar/benchmark_core_scalar_service_api.json"),
     )
     args = parser.parse_args()
+    _load_api()
 
     pad_to = _next_multiple(args.samples, args.pad_multiple)
     alt_n = max(8, args.samples // 2 + 3)

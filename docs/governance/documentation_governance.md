@@ -43,7 +43,6 @@ The current repo mapping should be maintained as a separate report under `docs/r
 Landing pages and section indexes should also be generated rather than hand-maintained:
 
 - `README.md`
-- `docs/index.md`
 - `docs/project_overview.md`
 - `docs/governance/README.md`
 - `docs/implementation/README.md`
@@ -130,7 +129,9 @@ cross-subsystem standards such as documentation placement, naming conventions,
 runtime policy, public API shape, dtype policy, diagnostics policy, and logging
 discipline.
 
-High-level governance entry documents should live under `docs/governance/`. Cross-tree landing pages may stay at the docs root when they serve the whole documentation tree. The current entry documents are:
+High-level governance entry documents should live under `docs/governance/`. The
+docs-root landing page for the whole documentation tree is
+`docs/project_overview.md`. The current entry documents are:
 
 - `docs/governance/architecture.md`
 - `docs/governance/documentation_governance.md`

@@ -5,6 +5,7 @@ from functools import lru_cache
 import math
 
 import jax
+from jax import core as jax_core
 from jax import lax
 import jax.numpy as jnp
 
@@ -34,12 +35,16 @@ def _tau_real(tau: jax.Array) -> jax.Array:
     if tau_arr.ndim != 0:
         raise ValueError("tau must be a scalar positive real for the IFJ Barnes provider")
     if jnp.issubdtype(tau_arr.dtype, jnp.complexfloating):
-        imag = float(jnp.imag(tau_arr))
-        if abs(imag) > 0.0:
+        imag_arr = jnp.imag(tau_arr)
+        if not isinstance(imag_arr, jax_core.Tracer):
+            imag = float(imag_arr)
+            if abs(imag) > 0.0:
+                raise ValueError("tau must be strictly positive real for the IFJ Barnes provider")
+        elif tau_arr.dtype in {jnp.complex64, jnp.complex128}:
             raise ValueError("tau must be strictly positive real for the IFJ Barnes provider")
         tau_arr = jnp.real(tau_arr)
     tau_real = jnp.asarray(tau_arr, dtype=jnp.float64)
-    if float(tau_real) <= 0.0:
+    if not isinstance(tau_real, jax_core.Tracer) and float(tau_real) <= 0.0:
         raise ValueError("tau must be strictly positive real for the IFJ Barnes provider")
     return tau_real
 
@@ -145,7 +150,7 @@ def _log_double_gamma_scalar_fixed(z: jax.Array, tau: jax.Array, m1: int, m2: in
 def _normalization_log_at_one_cached(tau: float, m1: int, m2: int, m3: int) -> complex:
     one = jnp.asarray(1.0 + 0.0j, dtype=_complex_dtype())
     value, _ = _log_double_gamma_scalar_fixed(one, jnp.asarray(tau, dtype=jnp.float64), m1, m2, m3)
-    return complex(value)
+    return complex(jax.device_get(value))
 
 
 def log_barnesdoublegamma_ifj(
@@ -157,14 +162,21 @@ def log_barnesdoublegamma_ifj(
     return_diagnostics: bool = False,
 ) -> jax.Array | tuple[jax.Array, IFJBarnesDoubleGammaDiagnostics]:
     tau_real = _tau_real(tau)
-    m_base_i = _choose_m_base(float(tau_real), int(dps))
+    if isinstance(tau_real, jax_core.Tracer):
+        m_base_i = _choose_m_base(1.0, int(dps))
+    else:
+        m_base_i = _choose_m_base(float(tau_real), int(dps))
     max_cap_i = int(max_m_cap)
     m1 = min(m_base_i, max_cap_i)
     m2 = min(2 * m_base_i, max_cap_i)
     m3 = min(4 * m_base_i, max_cap_i)
     m_capped = (m1 != m_base_i) or (m2 != 2 * m_base_i) or (m3 != 4 * m_base_i)
-    norm_log = jnp.asarray(_normalization_log_at_one_cached(float(tau_real), m1, m2, m3), dtype=_complex_dtype())
     z_arr = jnp.asarray(z, dtype=_complex_dtype())
+    traced_context = isinstance(tau_real, jax_core.Tracer) or isinstance(z_arr, jax_core.Tracer)
+    if traced_context:
+        norm_log = _log_double_gamma_scalar_fixed(jnp.asarray(1.0 + 0.0j, dtype=_complex_dtype()), tau_real, m1, m2, m3)[0]
+    else:
+        norm_log = jnp.asarray(_normalization_log_at_one_cached(float(tau_real), m1, m2, m3), dtype=_complex_dtype())
     if z_arr.ndim == 0:
         value, n_shift = _log_double_gamma_scalar_fixed(z_arr, tau_real, m1, m2, m3)
         value = value - norm_log

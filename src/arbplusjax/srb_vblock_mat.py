@@ -10,6 +10,7 @@ import jax.numpy as jnp
 
 from . import checks
 from . import iterative_solvers
+from . import mat_common
 from . import sparse_common as sc
 
 
@@ -40,6 +41,14 @@ def _as_real_matrix(x: jax.Array, label: str) -> jax.Array:
     arr = jnp.asarray(x, dtype=jnp.float64)
     checks.check_equal(arr.ndim, 2, f"{label}.ndim")
     return arr
+
+
+def _intervalize_scalar(x: jax.Array) -> jax.Array:
+    return mat_common.interval_from_point(jnp.asarray(x, dtype=jnp.float64))
+
+
+def _intervalize_matrix(x: jax.Array) -> jax.Array:
+    return mat_common.interval_from_point(jnp.asarray(x, dtype=jnp.float64))
 
 
 def _offsets(sizes: jax.Array) -> jax.Array:
@@ -584,8 +593,8 @@ def srb_vblock_mat_det(x: sc.VariableBlockSparseCOO | sc.VariableBlockSparseCSR)
 
 
 def srb_vblock_mat_det_basic(x: sc.VariableBlockSparseCOO | sc.VariableBlockSparseCSR) -> jax.Array:
-    """Determinant using LU decomposition - basic interval version."""
-    return srb_vblock_mat_det(x)
+    """Determinant enclosure computed directly in the variable-block family."""
+    return _intervalize_scalar(srb_vblock_mat_det(x))
 
 
 def srb_vblock_mat_inv(x: sc.VariableBlockSparseCOO | sc.VariableBlockSparseCSR) -> jax.Array:
@@ -607,8 +616,8 @@ def srb_vblock_mat_inv(x: sc.VariableBlockSparseCOO | sc.VariableBlockSparseCSR)
 
 
 def srb_vblock_mat_inv_basic(x: sc.VariableBlockSparseCOO | sc.VariableBlockSparseCSR) -> jax.Array:
-    """Matrix inverse - basic interval version."""
-    return srb_vblock_mat_inv(x)
+    """Inverse enclosure computed directly in the variable-block family."""
+    return _intervalize_matrix(srb_vblock_mat_inv(x))
 
 
 def srb_vblock_mat_sqr(x: sc.VariableBlockSparseCOO | sc.VariableBlockSparseCSR) -> sc.VariableBlockSparseCOO:
@@ -622,9 +631,9 @@ def srb_vblock_mat_sqr(x: sc.VariableBlockSparseCOO | sc.VariableBlockSparseCSR)
     return srb_vblock_mat_matmul_sparse(x, x)
 
 
-def srb_vblock_mat_sqr_basic(x: sc.VariableBlockSparseCOO | sc.VariableBlockSparseCSR) -> sc.VariableBlockSparseCOO:
-    """Matrix square - basic interval version."""
-    return srb_vblock_mat_sqr(x)
+def srb_vblock_mat_sqr_basic(x: sc.VariableBlockSparseCOO | sc.VariableBlockSparseCSR) -> jax.Array:
+    """Squared-matrix enclosure computed directly in the variable-block family."""
+    return _intervalize_matrix(srb_vblock_mat_to_dense(srb_vblock_mat_sqr(x)))
 
 
 @partial(jax.jit, static_argnames=())

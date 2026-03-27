@@ -14,12 +14,22 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from arbplusjax import api
 from benchmarks.schema import BenchmarkMeasurement
 from benchmarks.schema import BenchmarkRecord
 from benchmarks.schema import BenchmarkReport
 from benchmarks.schema import write_benchmark_report
 from tools.runtime_manifest import collect_runtime_manifest
+
+api = None
+
+
+def _load_special_api():
+    global api
+    if api is not None:
+        return
+    from arbplusjax import api as _api
+
+    api = _api
 
 
 def _block(x):
@@ -85,6 +95,7 @@ def main() -> int:
         default=Path("experiments/benchmarks/outputs/special/benchmark_special_function_service_api.json"),
     )
     args = parser.parse_args()
+    _load_special_api()
 
     pad_to = _next_multiple(args.samples, args.pad_multiple)
     alt_n = max(8, args.samples // 2 + 3)

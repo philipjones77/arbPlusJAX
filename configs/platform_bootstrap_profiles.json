@@ -7,6 +7,14 @@
     "bootstrap_command": "python -m pip install -e .",
     "validation_command": "python tools/run_test_harness.py --profile chassis --jax-mode cpu"
   },
+  "wsl": {
+    "purpose": "Ubuntu-in-WSL source-tree bootstrap using the same Linux entrypoints and CPU-first validation.",
+    "owner": "pyproject.toml + tools/run_test_harness.py",
+    "execution_surface": "Ubuntu on WSL shell",
+    "backend_scope": "CPU/GPU portable",
+    "bootstrap_command": "python -m pip install -e .",
+    "validation_command": "python tools/run_test_harness.py --profile chassis --jax-mode cpu"
+  },
   "windows": {
     "purpose": "Native Windows source-tree bootstrap and CPU-first validation.",
     "owner": "pyproject.toml + tools/run_test_harness.py",
@@ -14,6 +22,14 @@
     "backend_scope": "CPU/GPU portable",
     "bootstrap_command": "python -m pip install -e .",
     "validation_command": "python .\\tools\\run_test_harness.py --profile chassis --jax-mode cpu"
+  },
+  "github_submission": {
+    "purpose": "GitHub submission validation path for portable source-tree install, chassis tests, report refresh, and Colab-compatible bootstrap checks.",
+    "owner": ".github/workflows/tests.yml + .github/workflows/docs-indexes.yml",
+    "execution_surface": "GitHub Actions ubuntu/windows runners",
+    "backend_scope": "CPU/GPU portable",
+    "bootstrap_command": "python -m pip install -e . && python -m pip install -r requirements-compare.txt",
+    "validation_command": "python tools/run_test_harness.py --profile chassis --jax-mode cpu && python tools/check_generated_reports.py"
   },
   "colab": {
     "purpose": "Google Colab source-tree bootstrap using a CPU-safe default and optional GPU upgrade.",

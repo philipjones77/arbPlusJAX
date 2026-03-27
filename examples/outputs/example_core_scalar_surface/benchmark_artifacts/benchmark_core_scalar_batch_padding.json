@@ -1,0 +1,464 @@
+{
+  "benchmark_name": "benchmark_core_scalar_batch_padding.py",
+  "category": "scalar",
+  "concern": "batch_padding_speed",
+  "environment": {
+    "env": {
+      "ARB_C_REF_DIR": "",
+      "JAX_PLATFORMS": "cpu",
+      "PYTHONPATH": "/home/phili/projects/arbplusJAX/src:/home/phili/projects/arbplusJAX/src:",
+      "XLA_PYTHON_CLIENT_MEM_FRACTION": "",
+      "XLA_PYTHON_CLIENT_PREALLOCATE": ""
+    },
+    "environment_kind": "wsl",
+    "git": {
+      "commit": "591217612238e41941ea34b9b29762473bb1e147"
+    },
+    "jax": {
+      "available": true,
+      "backend": "cpu",
+      "devices": [
+        "TFRT_CPU_0"
+      ],
+      "jax_enable_x64": true,
+      "requested_mode": "auto"
+    },
+    "os": {
+      "machine": "x86_64",
+      "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+      "release": "6.6.87.2-microsoft-standard-WSL2",
+      "system": "Linux",
+      "version": "#1 SMP PREEMPT_DYNAMIC Thu Jun  5 18:30:46 UTC 2025"
+    },
+    "python": {
+      "executable": "/home/phili/miniforge3/envs/jax/bin/python",
+      "version": "3.12.12"
+    },
+    "repo_root": "/home/phili/projects/arbplusJAX",
+    "timestamp_utc": "2026-03-26T21:28:24Z"
+  },
+  "notes": "Batch/padding speed split for the canonical core numeric scalar helper families.",
+  "records": [
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_core_scalar_batch_padding.py",
+      "category": "scalar",
+      "cold_time_s": 0.21582643800002188,
+      "concern": "batch_padding_speed",
+      "device": "cpu",
+      "dtype": "float32",
+      "implementation": "api_batch_unpadded",
+      "measurements": [
+        {
+          "name": "samples",
+          "notes": "",
+          "unit": "rows",
+          "value": 4099
+        },
+        {
+          "name": "pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 4224
+        },
+        {
+          "name": "alt_samples",
+          "notes": "",
+          "unit": "rows",
+          "value": 2052
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Compares api.eval_point_batch without padding vs explicit caller padding.",
+      "operation": "arf_add",
+      "python_overhead_s": null,
+      "recompile_time_s": 0.02674239199996009,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 8.443033330725787e-05
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_core_scalar_batch_padding.py",
+      "category": "scalar",
+      "cold_time_s": 0.029040132000091035,
+      "concern": "batch_padding_speed",
+      "device": "cpu",
+      "dtype": "float32",
+      "implementation": "api_batch_padded",
+      "measurements": [
+        {
+          "name": "samples",
+          "notes": "",
+          "unit": "rows",
+          "value": 4099
+        },
+        {
+          "name": "pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 4224
+        },
+        {
+          "name": "alt_samples",
+          "notes": "",
+          "unit": "rows",
+          "value": 2052
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Compares api.eval_point_batch without padding vs explicit caller padding.",
+      "operation": "arf_add",
+      "python_overhead_s": null,
+      "recompile_time_s": 0.04147069099997225,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 2.233633332101211e-05
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_core_scalar_batch_padding.py",
+      "category": "scalar",
+      "cold_time_s": 0.036553841999989345,
+      "concern": "batch_padding_speed",
+      "device": "cpu",
+      "dtype": "complex64",
+      "implementation": "api_batch_unpadded",
+      "measurements": [
+        {
+          "name": "samples",
+          "notes": "",
+          "unit": "rows",
+          "value": 4099
+        },
+        {
+          "name": "pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 4224
+        },
+        {
+          "name": "alt_samples",
+          "notes": "",
+          "unit": "rows",
+          "value": 2052
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Compares api.eval_point_batch without padding vs explicit caller padding.",
+      "operation": "acf_mul",
+      "python_overhead_s": null,
+      "recompile_time_s": 0.028194109999958528,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 3.30216666573809e-05
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_core_scalar_batch_padding.py",
+      "category": "scalar",
+      "cold_time_s": 0.04717354799993245,
+      "concern": "batch_padding_speed",
+      "device": "cpu",
+      "dtype": "complex64",
+      "implementation": "api_batch_padded",
+      "measurements": [
+        {
+          "name": "samples",
+          "notes": "",
+          "unit": "rows",
+          "value": 4099
+        },
+        {
+          "name": "pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 4224
+        },
+        {
+          "name": "alt_samples",
+          "notes": "",
+          "unit": "rows",
+          "value": 2052
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Compares api.eval_point_batch without padding vs explicit caller padding.",
+      "operation": "acf_mul",
+      "python_overhead_s": null,
+      "recompile_time_s": 0.03520972100000108,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.00013410366667206594
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_core_scalar_batch_padding.py",
+      "category": "scalar",
+      "cold_time_s": 0.03829446800000369,
+      "concern": "batch_padding_speed",
+      "device": "cpu",
+      "dtype": "float32",
+      "implementation": "api_batch_unpadded",
+      "measurements": [
+        {
+          "name": "samples",
+          "notes": "",
+          "unit": "rows",
+          "value": 4099
+        },
+        {
+          "name": "pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 4224
+        },
+        {
+          "name": "alt_samples",
+          "notes": "",
+          "unit": "rows",
+          "value": 2052
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Compares api.eval_point_batch without padding vs explicit caller padding.",
+      "operation": "fmpr_mul",
+      "python_overhead_s": null,
+      "recompile_time_s": 0.025126615999965907,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 3.071500001775954e-05
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_core_scalar_batch_padding.py",
+      "category": "scalar",
+      "cold_time_s": 0.035321090000024924,
+      "concern": "batch_padding_speed",
+      "device": "cpu",
+      "dtype": "float32",
+      "implementation": "api_batch_padded",
+      "measurements": [
+        {
+          "name": "samples",
+          "notes": "",
+          "unit": "rows",
+          "value": 4099
+        },
+        {
+          "name": "pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 4224
+        },
+        {
+          "name": "alt_samples",
+          "notes": "",
+          "unit": "rows",
+          "value": 2052
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Compares api.eval_point_batch without padding vs explicit caller padding.",
+      "operation": "fmpr_mul",
+      "python_overhead_s": null,
+      "recompile_time_s": 0.0345944050000071,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 5.1329999981438355e-05
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_core_scalar_batch_padding.py",
+      "category": "scalar",
+      "cold_time_s": 0.05900391499994839,
+      "concern": "batch_padding_speed",
+      "device": "cpu",
+      "dtype": "int64",
+      "implementation": "api_batch_unpadded",
+      "measurements": [
+        {
+          "name": "samples",
+          "notes": "",
+          "unit": "rows",
+          "value": 4099
+        },
+        {
+          "name": "pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 4224
+        },
+        {
+          "name": "alt_samples",
+          "notes": "",
+          "unit": "rows",
+          "value": 2052
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Compares api.eval_point_batch without padding vs explicit caller padding.",
+      "operation": "fmpzi_add",
+      "python_overhead_s": null,
+      "recompile_time_s": 0.052659142999914366,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 9.697266663503494e-05
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_core_scalar_batch_padding.py",
+      "category": "scalar",
+      "cold_time_s": 0.04946568200000456,
+      "concern": "batch_padding_speed",
+      "device": "cpu",
+      "dtype": "int64",
+      "implementation": "api_batch_padded",
+      "measurements": [
+        {
+          "name": "samples",
+          "notes": "",
+          "unit": "rows",
+          "value": 4099
+        },
+        {
+          "name": "pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 4224
+        },
+        {
+          "name": "alt_samples",
+          "notes": "",
+          "unit": "rows",
+          "value": 2052
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Compares api.eval_point_batch without padding vs explicit caller padding.",
+      "operation": "fmpzi_add",
+      "python_overhead_s": null,
+      "recompile_time_s": 0.04641183000001092,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 9.778699999666667e-05
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_core_scalar_batch_padding.py",
+      "category": "scalar",
+      "cold_time_s": 0.03676517100007004,
+      "concern": "batch_padding_speed",
+      "device": "cpu",
+      "dtype": "float32",
+      "implementation": "api_batch_unpadded",
+      "measurements": [
+        {
+          "name": "samples",
+          "notes": "",
+          "unit": "rows",
+          "value": 4099
+        },
+        {
+          "name": "pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 4224
+        },
+        {
+          "name": "alt_samples",
+          "notes": "",
+          "unit": "rows",
+          "value": 2052
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Compares api.eval_point_batch without padding vs explicit caller padding.",
+      "operation": "arb_fpwrap_double_exp",
+      "python_overhead_s": null,
+      "recompile_time_s": 0.03685578500005704,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 1.7732666644102817e-05
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_core_scalar_batch_padding.py",
+      "category": "scalar",
+      "cold_time_s": 0.030423043999917354,
+      "concern": "batch_padding_speed",
+      "device": "cpu",
+      "dtype": "float32",
+      "implementation": "api_batch_padded",
+      "measurements": [
+        {
+          "name": "samples",
+          "notes": "",
+          "unit": "rows",
+          "value": 4099
+        },
+        {
+          "name": "pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 4224
+        },
+        {
+          "name": "alt_samples",
+          "notes": "",
+          "unit": "rows",
+          "value": 2052
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Compares api.eval_point_batch without padding vs explicit caller padding.",
+      "operation": "arb_fpwrap_double_exp",
+      "python_overhead_s": null,
+      "recompile_time_s": 0.031669642999986536,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 2.176699998320449e-05
+    }
+  ],
+  "schema_version": "v1"
+}

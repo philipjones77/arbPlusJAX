@@ -14,14 +14,25 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from arbplusjax import acb_core
-from arbplusjax import api
-from arbplusjax import double_interval as di
 from benchmarks.schema import BenchmarkMeasurement
 from benchmarks.schema import BenchmarkRecord
 from benchmarks.schema import BenchmarkReport
 from benchmarks.schema import write_benchmark_report
 from tools.runtime_manifest import collect_runtime_manifest
+
+api = None
+di = None
+
+
+def _load_matrix_service_modules():
+    global api, di
+    if api is not None:
+        return
+    from arbplusjax import api as _api
+    from arbplusjax import double_interval as _di
+
+    api = _api
+    di = _di
 
 
 def _block(x):
@@ -58,12 +69,16 @@ def _next_multiple(n: int, multiple: int) -> int:
 
 
 def _interval_batch(values: np.ndarray, dtype: str) -> jax.Array:
+    _load_matrix_service_modules()
     dt = jnp.float32 if dtype == "float32" else jnp.float64
     arr = jnp.asarray(values, dtype=dt)
     return di.interval(arr, arr)
 
 
 def _acb_batch(real: np.ndarray, imag: np.ndarray, dtype: str) -> jax.Array:
+    _load_matrix_service_modules()
+    from arbplusjax import acb_core
+
     dt = jnp.float32 if dtype == "float32" else jnp.float64
     re = jnp.asarray(real, dtype=dt)
     im = jnp.asarray(imag, dtype=dt)
@@ -102,6 +117,7 @@ def main() -> int:
         default=Path("experiments/benchmarks/outputs/matrix/benchmark_matrix_service_api.json"),
     )
     args = parser.parse_args()
+    _load_matrix_service_modules()
 
     pad_to = _next_multiple(args.samples, args.pad_multiple)
     alt_n = max(8, args.samples // 2 + 3)

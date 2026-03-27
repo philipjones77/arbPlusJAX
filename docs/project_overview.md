@@ -1,4 +1,4 @@
-Last updated: 2026-03-23T00:00:00Z
+Last updated: 2026-03-25T00:00:00Z
 
 # Project Overview
 
@@ -19,6 +19,10 @@ arbPlusJAX is the active hardened JAX numerical-kernel workspace. The repository
 
 ## Docs Map
 
+Use the docs tree by intent.
+
+- repo architecture: [docs/governance/architecture.md](/docs/governance/architecture.md)
+- governance and placement rules: [docs/governance/documentation_governance.md](/docs/governance/documentation_governance.md)
 - governance: [docs/governance/README.md](/docs/governance/README.md)
 - standards: [docs/standards/README.md](/docs/standards/README.md)
 - notation: [docs/notation/README.md](/docs/notation/README.md)

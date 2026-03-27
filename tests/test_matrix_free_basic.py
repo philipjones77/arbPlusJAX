@@ -4,6 +4,7 @@ from arbplusjax import acb_core
 from arbplusjax import double_interval as di
 from arbplusjax import jcb_mat
 from arbplusjax import jrb_mat
+from arbplusjax import matrix_free_basic
 
 from tests._test_checks import _check
 
@@ -88,17 +89,35 @@ def test_real_matrix_free_basic_contracts():
     _check(bool(jnp.isfinite(minres_diag.primal_residual)))
 
     logdet_point = jrb_mat.jrb_mat_logdet_slq_point(plan, probes, 2)
+    logdet_est_basic = jrb_mat.jrb_mat_logdet_estimate_basic(plan, probes, 2)
     logdet_basic = jrb_mat.jrb_mat_logdet_slq_basic(plan, probes, 2)
     logdet_basic_diag, logdet_diag = jrb_mat.jrb_mat_logdet_slq_with_diagnostics_basic(plan, probes, 2)
     det_point = jrb_mat.jrb_mat_det_slq_point(plan, probes, 2)
     det_basic = jrb_mat.jrb_mat_det_slq_basic(plan, probes, 2)
     det_basic_diag, det_diag = jrb_mat.jrb_mat_det_slq_with_diagnostics_basic(plan, probes, 2)
+    heat_point = jrb_mat.jrb_mat_heat_trace_slq_point(plan, probes, 2, time=0.5)
+    heat_basic = jrb_mat.jrb_mat_heat_trace_slq_basic(plan, probes, 2, time=0.5)
+    hutch_point = jrb_mat.jrb_mat_hutchpp_trace_estimate_point(
+        lambda v: jrb_mat.jrb_mat_log_action_lanczos_point(plan, v, 2),
+        probes[:1],
+        probes[1:],
+    )
+    hutch_basic = jrb_mat.jrb_mat_hutchpp_trace_estimate_basic(
+        lambda v: jrb_mat.jrb_mat_log_action_lanczos_point(plan, v, 2),
+        probes[:1],
+        probes[1:],
+    )
     _check(logdet_basic.shape == (2,))
     _check(det_basic.shape == (2,))
+    _check(heat_basic.shape == (2,))
+    _check(hutch_basic.shape == (2,))
+    _check(bool(di.contains(logdet_est_basic, di.interval(logdet_point, logdet_point))))
     _check(bool(di.contains(logdet_basic, di.interval(logdet_point, logdet_point))))
     _check(bool(di.contains(det_basic, di.interval(det_point, det_point))))
     _check(bool(di.contains(logdet_basic_diag, di.interval(logdet_point, logdet_point))))
     _check(bool(di.contains(det_basic_diag, di.interval(det_point, det_point))))
+    _check(bool(di.contains(heat_basic, di.interval(heat_point, heat_point))))
+    _check(bool(di.contains(hutch_basic, di.interval(hutch_point, hutch_point))))
     _check(bool(jnp.isfinite(logdet_diag.primal_residual)))
     _check(bool(jnp.isfinite(det_diag.primal_residual)))
 
@@ -158,15 +177,41 @@ def test_complex_matrix_free_basic_contracts():
     _check(bool(jnp.isfinite(minres_diag.primal_residual)))
 
     logdet_point = jcb_mat.jcb_mat_logdet_slq_point(plan, probes, 2, adj_plan)
+    trace_point = jcb_mat.jcb_mat_trace_estimate_point(plan, probes, adj_plan)
+    trace_basic = jcb_mat.jcb_mat_trace_estimate_basic(plan, probes, adj_plan)
+    logdet_est_basic = jcb_mat.jcb_mat_logdet_estimate_basic(plan, probes, 2, adj_plan)
     logdet_basic = jcb_mat.jcb_mat_logdet_slq_basic(plan, probes, 2, adj_plan)
     logdet_basic_diag, logdet_diag = jcb_mat.jcb_mat_logdet_slq_with_diagnostics_basic(plan, probes, 2, adj_plan)
     det_point = jcb_mat.jcb_mat_det_slq_point(plan, probes, 2, adj_plan)
     det_basic = jcb_mat.jcb_mat_det_slq_basic(plan, probes, 2, adj_plan)
     det_basic_diag, det_diag = jcb_mat.jcb_mat_det_slq_with_diagnostics_basic(plan, probes, 2, adj_plan)
+    heat_point = jcb_mat.jcb_mat_heat_trace_slq_hermitian_point(plan, probes, 2, time=0.5)
+    heat_basic = jcb_mat.jcb_mat_heat_trace_slq_hermitian_basic(plan, probes, 2, time=0.5)
+    hutch_point = jcb_mat.jcb_mat_hutchpp_trace_estimate_point(
+        lambda v: jcb_mat.jcb_mat_log_action_hermitian_point(plan, v, 2),
+        probes[:1],
+        probes[1:],
+    )
+    hutch_basic = jcb_mat.jcb_mat_hutchpp_trace_estimate_basic(
+        lambda v: jcb_mat.jcb_mat_log_action_hermitian_point(plan, v, 2),
+        probes[:1],
+        probes[1:],
+    )
     _check(logdet_basic.shape == (4,))
     _check(det_basic.shape == (4,))
+    _check(trace_basic.shape == (4,))
+    _check(logdet_est_basic.shape == (4,))
+    _check(heat_basic.shape == (4,))
+    _check(hutch_basic.shape == (4,))
+    point_trace_box = _cbox(trace_point)
     point_logdet_box = _cbox(logdet_point)
     point_det_box = _cbox(det_point)
+    point_heat_box = _cbox(heat_point)
+    point_hutch_box = _cbox(hutch_point)
+    _check(bool(di.contains(acb_core.acb_real(trace_basic), acb_core.acb_real(point_trace_box))))
+    _check(bool(di.contains(acb_core.acb_imag(trace_basic), acb_core.acb_imag(point_trace_box))))
+    _check(bool(di.contains(acb_core.acb_real(logdet_est_basic), acb_core.acb_real(point_logdet_box))))
+    _check(bool(di.contains(acb_core.acb_imag(logdet_est_basic), acb_core.acb_imag(point_logdet_box))))
     _check(bool(di.contains(acb_core.acb_real(logdet_basic), acb_core.acb_real(point_logdet_box))))
     _check(bool(di.contains(acb_core.acb_imag(logdet_basic), acb_core.acb_imag(point_logdet_box))))
     _check(bool(di.contains(acb_core.acb_real(det_basic), acb_core.acb_real(point_det_box))))
@@ -175,6 +220,10 @@ def test_complex_matrix_free_basic_contracts():
     _check(bool(di.contains(acb_core.acb_imag(logdet_basic_diag), acb_core.acb_imag(point_logdet_box))))
     _check(bool(di.contains(acb_core.acb_real(det_basic_diag), acb_core.acb_real(point_det_box))))
     _check(bool(di.contains(acb_core.acb_imag(det_basic_diag), acb_core.acb_imag(point_det_box))))
+    _check(bool(di.contains(acb_core.acb_real(heat_basic), acb_core.acb_real(point_heat_box))))
+    _check(bool(di.contains(acb_core.acb_imag(heat_basic), acb_core.acb_imag(point_heat_box))))
+    _check(bool(di.contains(acb_core.acb_real(hutch_basic), acb_core.acb_real(point_hutch_box))))
+    _check(bool(di.contains(acb_core.acb_imag(hutch_basic), acb_core.acb_imag(point_hutch_box))))
     _check(bool(jnp.isfinite(logdet_diag.primal_residual)))
     _check(bool(jnp.isfinite(det_diag.primal_residual)))
 
@@ -210,7 +259,150 @@ def test_real_basic_log_action_invalidates_when_diagnostics_are_non_converged():
     )
 
     _check(bool(diag.converged))
-    _check(bool(jnp.all(di.contains(value, jrb_mat.jrb_mat_log_action_lanczos_point(plan, x, steps=2)))))
+
+
+def test_real_basic_log_action_inflates_by_reported_krylov_uncertainty():
+    a = _rmat2(2.0, 0.0, 0.0, 5.0)
+    x = _rvec2(1.0, -2.0)
+    plan = jrb_mat.jrb_mat_dense_operator_plan_prepare(a)
+
+    value, diag = jrb_mat.jrb_mat_log_action_lanczos_with_diagnostics_basic(
+        plan,
+        x,
+        steps=2,
+        prec_bits=di.DEFAULT_PREC_BITS,
+    )
+
+    rad = matrix_free_basic.scalar_uncertainty_radius(diag)
+    _check(bool(jnp.all(di.ubound_radius(value) >= rad)))
+
+
+def test_real_basic_sqrt_action_inflates_by_reported_krylov_uncertainty():
+    a = _rmat2(2.0, 0.0, 0.0, 5.0)
+    x = _rvec2(1.0, -2.0)
+    plan = jrb_mat.jrb_mat_dense_operator_plan_prepare(a)
+
+    value = jrb_mat.jrb_mat_sqrt_action_lanczos_basic(
+        plan,
+        x,
+        steps=2,
+        prec_bits=di.DEFAULT_PREC_BITS,
+    )
+    _, diag = jrb_mat.jrb_mat_sqrt_action_lanczos_with_diagnostics_point(
+        plan,
+        x,
+        steps=2,
+    )
+
+    rad = matrix_free_basic.scalar_uncertainty_radius(diag)
+    _check(bool(jnp.all(di.ubound_radius(value) >= rad)))
+
+
+def test_real_basic_poly_and_expm_actions_inflate_by_reported_uncertainty():
+    a = _rmat2(2.0, 0.0, 0.0, 5.0)
+    x = _rvec2(1.0, -2.0)
+    plan = jrb_mat.jrb_mat_dense_operator_plan_prepare(a)
+    coeffs = jnp.asarray([1.0, -0.5, 0.25], dtype=jnp.float64)
+
+    poly_value, poly_diag = jrb_mat.jrb_mat_poly_action_with_diagnostics_basic(
+        plan,
+        x,
+        coeffs,
+        prec_bits=di.DEFAULT_PREC_BITS,
+    )
+    expm_value, expm_diag = jrb_mat.jrb_mat_expm_action_with_diagnostics_basic(
+        plan,
+        x,
+        terms=8,
+        prec_bits=di.DEFAULT_PREC_BITS,
+    )
+
+    _check(bool(jnp.all(di.ubound_radius(poly_value) >= matrix_free_basic.scalar_uncertainty_radius(poly_diag))))
+    _check(bool(jnp.all(di.ubound_radius(expm_value) >= matrix_free_basic.scalar_uncertainty_radius(expm_diag))))
+
+
+def test_real_basic_logdet_surfaces_inflate_by_reported_scalar_uncertainty():
+    a = _rmat2(2.0, 0.0, 0.0, 5.0)
+    x = _rvec2(1.0, -2.0)
+    plan = jrb_mat.jrb_mat_dense_operator_plan_prepare(a)
+    probes = jnp.stack([x, _rvec2(1.0, 1.0)], axis=0)
+
+    logdet_basic, logdet_diag = jrb_mat.jrb_mat_logdet_slq_with_diagnostics_basic(plan, probes, 2)
+    bundle = jrb_mat.jrb_mat_logdet_solve_basic(plan, x, probes, 2, symmetric=True, maxiter=8)
+    rad = matrix_free_basic.scalar_uncertainty_radius(logdet_diag)
+    bundle_rad = matrix_free_basic.scalar_uncertainty_radius(bundle.aux.logdet_diagnostics)
+
+    _check(bool(di.ubound_radius(logdet_basic) >= rad))
+    _check(bool(di.ubound_radius(bundle.logdet) >= bundle_rad))
+
+
+def test_real_basic_trace_and_hutchpp_surfaces_inflate_by_estimator_uncertainty():
+    a = _rmat2(2.0, 0.0, 0.0, 5.0)
+    x = _rvec2(1.0, -2.0)
+    plan = jrb_mat.jrb_mat_dense_operator_plan_prepare(a)
+    probes = jnp.stack([x, _rvec2(1.0, 1.0)], axis=0)
+
+    trace_basic = jrb_mat.jrb_mat_trace_estimate_basic(plan, probes)
+    _, trace_diag = jrb_mat.jrb_mat_trace_estimator_with_diagnostics_point(plan, probes)
+    hutch_basic = jrb_mat.jrb_mat_hutchpp_trace_estimate_basic(
+        lambda v: jrb_mat.jrb_mat_log_action_lanczos_point(plan, v, 2),
+        probes[:1],
+        probes[1:],
+    )
+    hutch_meta = jrb_mat.jrb_mat_hutchpp_trace_with_metadata_point(
+        lambda v: jrb_mat.jrb_mat_log_action_lanczos_point(plan, v, 2),
+        probes[:1],
+        probes[1:],
+    )
+
+    _check(bool(di.ubound_radius(trace_basic) >= matrix_free_basic.scalar_uncertainty_radius(trace_diag)))
+    _check(bool(di.ubound_radius(hutch_basic) >= matrix_free_basic.scalar_uncertainty_radius(hutch_meta.statistics)))
+
+
+def test_complex_basic_logdet_surfaces_inflate_by_reported_scalar_uncertainty():
+    a = _cmat2(2.0 + 0.0j, 0.0 + 0.0j, 0.0 + 0.0j, 3.0 + 1.0j)
+    x = _cvec2(1.0 + 1.0j, -2.0 + 0.5j)
+    plan = jcb_mat.jcb_mat_dense_operator_plan_prepare(a)
+    adj_plan = jcb_mat.jcb_mat_dense_operator_adjoint_plan_prepare(a)
+    probes = jnp.stack([x, _cvec2(1.0 + 0.0j, 1.0 + 0.0j)], axis=0)
+
+    logdet_basic, logdet_diag = jcb_mat.jcb_mat_logdet_slq_with_diagnostics_basic(plan, probes, 2, adj_plan)
+    bundle = jcb_mat.jcb_mat_logdet_solve_basic(plan, x, probes, 2, adj_plan, hermitian=False, maxiter=8)
+    rad = matrix_free_basic.scalar_uncertainty_radius(logdet_diag)
+    bundle_rad = matrix_free_basic.scalar_uncertainty_radius(bundle.aux.logdet_diagnostics)
+
+    _check(bool(di.ubound_radius(acb_core.acb_real(logdet_basic)) >= rad))
+    _check(bool(di.ubound_radius(acb_core.acb_imag(logdet_basic)) >= rad))
+    _check(bool(di.ubound_radius(acb_core.acb_real(bundle.logdet)) >= bundle_rad))
+    _check(bool(di.ubound_radius(acb_core.acb_imag(bundle.logdet)) >= bundle_rad))
+
+
+def test_complex_basic_trace_and_hutchpp_surfaces_inflate_by_estimator_uncertainty():
+    a = _cmat2(2.0 + 0.0j, 0.0 + 0.0j, 0.0 + 0.0j, 3.0 + 1.0j)
+    x = _cvec2(1.0 + 1.0j, -2.0 + 0.5j)
+    plan = jcb_mat.jcb_mat_dense_operator_plan_prepare(a)
+    adj_plan = jcb_mat.jcb_mat_dense_operator_adjoint_plan_prepare(a)
+    probes = jnp.stack([x, _cvec2(1.0 + 0.0j, 1.0 + 0.0j)], axis=0)
+
+    trace_basic = jcb_mat.jcb_mat_trace_estimate_basic(plan, probes, adj_plan)
+    _, trace_diag = jcb_mat.jcb_mat_trace_estimator_with_diagnostics_point(plan, probes, adj_plan)
+    hutch_basic = jcb_mat.jcb_mat_hutchpp_trace_estimate_basic(
+        lambda v: jcb_mat.jcb_mat_log_action_hermitian_point(plan, v, 2),
+        probes[:1],
+        probes[1:],
+    )
+    hutch_meta = jcb_mat.jcb_mat_hutchpp_trace_with_metadata_point(
+        lambda v: jcb_mat.jcb_mat_log_action_hermitian_point(plan, v, 2),
+        probes[:1],
+        probes[1:],
+    )
+
+    trace_rad = matrix_free_basic.scalar_uncertainty_radius(trace_diag)
+    hutch_rad = matrix_free_basic.scalar_uncertainty_radius(hutch_meta.statistics)
+    _check(bool(di.ubound_radius(acb_core.acb_real(trace_basic)) >= trace_rad))
+    _check(bool(di.ubound_radius(acb_core.acb_imag(trace_basic)) >= trace_rad))
+    _check(bool(di.ubound_radius(acb_core.acb_real(hutch_basic)) >= hutch_rad))
+    _check(bool(di.ubound_radius(acb_core.acb_imag(hutch_basic)) >= hutch_rad))
 
 
 def test_complex_basic_solve_invalidates_when_krylov_residual_is_too_large():
@@ -251,3 +443,100 @@ def test_complex_basic_log_action_hermitian_with_diagnostics_round_trips():
     _check(bool(diag.converged))
     _check(bool(jnp.all(di.contains(acb_core.acb_real(value), acb_core.acb_real(point)))))
     _check(bool(jnp.all(di.contains(acb_core.acb_imag(value), acb_core.acb_imag(point)))))
+
+
+def test_complex_basic_log_actions_inflate_by_reported_krylov_uncertainty():
+    a = _cmat2(2.0 + 0.0j, 0.0 + 0.0j, 0.0 + 0.0j, 5.0 + 0.0j)
+    x = _cvec2(1.0 + 1.0j, -2.0 + 0.5j)
+    plan = jcb_mat.jcb_mat_dense_operator_plan_prepare(a)
+    adj = jcb_mat.jcb_mat_dense_operator_adjoint_plan_prepare(a)
+
+    arnoldi_value, arnoldi_diag = jcb_mat.jcb_mat_log_action_arnoldi_with_diagnostics_basic(
+        plan,
+        x,
+        steps=2,
+        adjoint_matvec=adj,
+        prec_bits=di.DEFAULT_PREC_BITS,
+    )
+    herm_value, herm_diag = jcb_mat.jcb_mat_log_action_hermitian_with_diagnostics_basic(
+        plan,
+        x,
+        steps=2,
+        adjoint_matvec=adj,
+        prec_bits=di.DEFAULT_PREC_BITS,
+    )
+
+    arnoldi_rad = matrix_free_basic.scalar_uncertainty_radius(arnoldi_diag)
+    herm_rad = matrix_free_basic.scalar_uncertainty_radius(herm_diag)
+    _check(bool(jnp.all(di.ubound_radius(acb_core.acb_real(arnoldi_value)) >= arnoldi_rad)))
+    _check(bool(jnp.all(di.ubound_radius(acb_core.acb_imag(arnoldi_value)) >= arnoldi_rad)))
+    _check(bool(jnp.all(di.ubound_radius(acb_core.acb_real(herm_value)) >= herm_rad)))
+    _check(bool(jnp.all(di.ubound_radius(acb_core.acb_imag(herm_value)) >= herm_rad)))
+
+
+def test_complex_basic_sqrt_actions_inflate_by_reported_krylov_uncertainty():
+    a = _cmat2(2.0 + 0.0j, 0.0 + 0.0j, 0.0 + 0.0j, 5.0 + 0.0j)
+    x = _cvec2(1.0 + 1.0j, -2.0 + 0.5j)
+    plan = jcb_mat.jcb_mat_dense_operator_plan_prepare(a)
+    adj = jcb_mat.jcb_mat_dense_operator_adjoint_plan_prepare(a)
+
+    arnoldi_value = jcb_mat.jcb_mat_sqrt_action_arnoldi_basic(
+        plan,
+        x,
+        steps=2,
+        adjoint_matvec=adj,
+        prec_bits=di.DEFAULT_PREC_BITS,
+    )
+    _, arnoldi_diag = jcb_mat.jcb_mat_sqrt_action_arnoldi_with_diagnostics_point(
+        plan,
+        x,
+        steps=2,
+        adjoint_matvec=adj,
+    )
+    herm_value = jcb_mat.jcb_mat_sqrt_action_hermitian_basic(
+        plan,
+        x,
+        steps=2,
+        adjoint_matvec=adj,
+        prec_bits=di.DEFAULT_PREC_BITS,
+    )
+    _, herm_diag = jcb_mat.jcb_mat_sqrt_action_hermitian_with_diagnostics_point(
+        plan,
+        x,
+        steps=2,
+        adjoint_matvec=adj,
+    )
+
+    arnoldi_rad = matrix_free_basic.scalar_uncertainty_radius(arnoldi_diag)
+    herm_rad = matrix_free_basic.scalar_uncertainty_radius(herm_diag)
+    _check(bool(jnp.all(di.ubound_radius(acb_core.acb_real(arnoldi_value)) >= arnoldi_rad)))
+    _check(bool(jnp.all(di.ubound_radius(acb_core.acb_imag(arnoldi_value)) >= arnoldi_rad)))
+    _check(bool(jnp.all(di.ubound_radius(acb_core.acb_real(herm_value)) >= herm_rad)))
+    _check(bool(jnp.all(di.ubound_radius(acb_core.acb_imag(herm_value)) >= herm_rad)))
+
+
+def test_complex_basic_poly_and_expm_actions_inflate_by_reported_uncertainty():
+    a = _cmat2(2.0 + 0.0j, 0.0 + 0.0j, 0.0 + 0.0j, 5.0 + 0.0j)
+    x = _cvec2(1.0 + 1.0j, -2.0 + 0.5j)
+    plan = jcb_mat.jcb_mat_dense_operator_plan_prepare(a)
+    coeffs = jnp.asarray([1.0 + 0.0j, -0.5 + 0.25j, 0.25 - 0.1j], dtype=jnp.complex128)
+
+    poly_value, poly_diag = jcb_mat.jcb_mat_poly_action_with_diagnostics_basic(
+        plan,
+        x,
+        coeffs,
+        prec_bits=di.DEFAULT_PREC_BITS,
+    )
+    expm_value, expm_diag = jcb_mat.jcb_mat_expm_action_with_diagnostics_basic(
+        plan,
+        x,
+        terms=8,
+        prec_bits=di.DEFAULT_PREC_BITS,
+    )
+
+    poly_rad = matrix_free_basic.scalar_uncertainty_radius(poly_diag)
+    expm_rad = matrix_free_basic.scalar_uncertainty_radius(expm_diag)
+    _check(bool(jnp.all(di.ubound_radius(acb_core.acb_real(poly_value)) >= poly_rad)))
+    _check(bool(jnp.all(di.ubound_radius(acb_core.acb_imag(poly_value)) >= poly_rad)))
+    _check(bool(jnp.all(di.ubound_radius(acb_core.acb_real(expm_value)) >= expm_rad)))
+    _check(bool(jnp.all(di.ubound_radius(acb_core.acb_imag(expm_value)) >= expm_rad)))

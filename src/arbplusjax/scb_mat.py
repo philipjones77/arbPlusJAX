@@ -633,6 +633,18 @@ def scb_mat_pow_ui_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, n: int)
     return mat_common.box_from_point(scb_mat_pow_ui(x, n))
 
 
+def scb_mat_pow_ui_with_diagnostics(
+    x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO,
+    n: int,
+) -> tuple[jax.Array, sparse_core.SparseNativePolicyDiagnostics]:
+    return scb_mat_pow_ui(x, n), sparse_core.sparse_native_policy_diagnostics(
+        x,
+        sparse_native=True,
+        dense_lift_used=False,
+        preserves_sparse_output=False,
+    )
+
+
 def scb_mat_exp(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
     return sparse_core.sparse_dense_exp_taylor(
         x,
@@ -652,21 +664,57 @@ def scb_mat_exp_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Arr
     return mat_common.box_from_point(scb_mat_exp(x))
 
 
+def scb_mat_exp_with_diagnostics(
+    x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO,
+) -> tuple[jax.Array, sparse_core.SparseNativePolicyDiagnostics]:
+    return scb_mat_exp(x), sparse_core.sparse_native_policy_diagnostics(
+        x,
+        sparse_native=True,
+        dense_lift_used=False,
+        preserves_sparse_output=False,
+    )
+
+
 def scb_mat_eigvalsh(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
-    return acb_core.acb_midpoint(acb_mat.acb_mat_eigvalsh(_dense_box_matrix(x, "scb_mat.eigvalsh")))
+    values, _ = scb_mat_eigsh(x, k=int(x.rows), which="largest", steps=int(x.rows))
+    return values
 
 
 def scb_mat_eigvalsh_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> jax.Array:
-    return acb_mat.acb_mat_eigvalsh(_dense_box_matrix(x, "scb_mat.eigvalsh_basic"))
+    return mat_common.box_from_point(scb_mat_eigvalsh(x))
+
+
+def scb_mat_eigvalsh_with_diagnostics(
+    x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO,
+) -> tuple[jax.Array, sparse_core.SparseNativePolicyDiagnostics]:
+    return scb_mat_eigvalsh(x), sparse_core.sparse_native_policy_diagnostics(
+        x,
+        sparse_native=True,
+        dense_lift_used=False,
+        preserves_sparse_output=False,
+        structured_input_required=True,
+    )
 
 
 def scb_mat_eigh(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> tuple[jax.Array, jax.Array]:
-    values, vectors = acb_mat.acb_mat_eigh(_dense_box_matrix(x, "scb_mat.eigh"))
-    return acb_core.acb_midpoint(values), acb_core.acb_midpoint(vectors)
+    return scb_mat_eigsh(x, k=int(x.rows), which="largest", steps=int(x.rows))
 
 
 def scb_mat_eigh_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> tuple[jax.Array, jax.Array]:
-    return acb_mat.acb_mat_eigh(_dense_box_matrix(x, "scb_mat.eigh_basic"))
+    values, vectors = scb_mat_eigh(x)
+    return mat_common.box_from_point(values), mat_common.box_from_point(vectors)
+
+
+def scb_mat_eigh_with_diagnostics(
+    x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO,
+) -> tuple[tuple[jax.Array, jax.Array], sparse_core.SparseNativePolicyDiagnostics]:
+    return scb_mat_eigh(x), sparse_core.sparse_native_policy_diagnostics(
+        x,
+        sparse_native=True,
+        dense_lift_used=False,
+        preserves_sparse_output=False,
+        structured_input_required=True,
+    )
 
 
 def scb_mat_eigsh(
@@ -693,16 +741,60 @@ def scb_mat_eigsh_basic(
     return mat_common.box_from_point(values), mat_common.box_from_point(vectors)
 
 
+def scb_mat_eigsh_with_diagnostics(
+    x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO,
+    *,
+    k: int = 6,
+    which: str = "largest",
+    steps: int | None = None,
+    v0: jax.Array | None = None,
+) -> tuple[tuple[jax.Array, jax.Array], sparse_core.SparseNativePolicyDiagnostics]:
+    return scb_mat_eigsh(x, k=k, which=which, steps=steps, v0=v0), sparse_core.sparse_native_policy_diagnostics(
+        x,
+        sparse_native=True,
+        dense_lift_used=False,
+        preserves_sparse_output=False,
+        structured_input_required=True,
+    )
+
+
 def scb_mat_operator_plan_prepare(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO):
-    return jcb_mat.jcb_mat_sparse_operator_plan_prepare(_as_jcb_operator_sparse(x))
+    if isinstance(x, sc.SparseBCOO):
+        return jcb_mat.jcb_mat_sparse_operator_plan_prepare(_as_jcb_operator_sparse(x))
+    return jcb_mat.matrix_free_core.oriented_shell_operator_plan(
+        context=x,
+        algebra="jcb",
+        orientation="forward",
+        forward_callback=lambda v, mat: scb_mat_matvec(mat, v),
+        transpose_callback=lambda v, mat: scb_mat_rmatvec(mat, v),
+        adjoint_callback=lambda v, mat: scb_mat_adjoint_matvec(mat, v),
+    )
 
 
 def scb_mat_operator_rmatvec_plan_prepare(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO):
-    return jcb_mat.jcb_mat_sparse_operator_rmatvec_plan_prepare(_as_jcb_operator_sparse(x))
+    if isinstance(x, sc.SparseBCOO):
+        return jcb_mat.jcb_mat_sparse_operator_rmatvec_plan_prepare(_as_jcb_operator_sparse(x))
+    return jcb_mat.matrix_free_core.oriented_shell_operator_plan(
+        context=x,
+        algebra="jcb",
+        orientation="transpose",
+        forward_callback=lambda v, mat: scb_mat_matvec(mat, v),
+        transpose_callback=lambda v, mat: scb_mat_rmatvec(mat, v),
+        adjoint_callback=lambda v, mat: scb_mat_adjoint_matvec(mat, v),
+    )
 
 
 def scb_mat_operator_adjoint_plan_prepare(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO):
-    return jcb_mat.jcb_mat_sparse_operator_adjoint_plan_prepare(_as_jcb_operator_sparse(x))
+    if isinstance(x, sc.SparseBCOO):
+        return jcb_mat.jcb_mat_sparse_operator_adjoint_plan_prepare(_as_jcb_operator_sparse(x))
+    return jcb_mat.matrix_free_core.oriented_shell_operator_plan(
+        context=x,
+        algebra="jcb",
+        orientation="adjoint",
+        forward_callback=lambda v, mat: scb_mat_matvec(mat, v),
+        transpose_callback=lambda v, mat: scb_mat_rmatvec(mat, v),
+        adjoint_callback=lambda v, mat: scb_mat_adjoint_matvec(mat, v),
+    )
 
 
 def scb_mat_matvec(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, v: jax.Array) -> jax.Array:
@@ -1597,14 +1689,19 @@ __all__ = [
     "scb_mat_charpoly_basic",
     "scb_mat_pow_ui",
     "scb_mat_pow_ui_basic",
+    "scb_mat_pow_ui_with_diagnostics",
     "scb_mat_exp",
     "scb_mat_exp_basic",
+    "scb_mat_exp_with_diagnostics",
     "scb_mat_eigvalsh",
     "scb_mat_eigvalsh_basic",
+    "scb_mat_eigvalsh_with_diagnostics",
     "scb_mat_eigh",
     "scb_mat_eigh_basic",
+    "scb_mat_eigh_with_diagnostics",
     "scb_mat_eigsh",
     "scb_mat_eigsh_basic",
+    "scb_mat_eigsh_with_diagnostics",
     "scb_mat_operator_plan_prepare",
     "scb_mat_operator_rmatvec_plan_prepare",
     "scb_mat_operator_adjoint_plan_prepare",

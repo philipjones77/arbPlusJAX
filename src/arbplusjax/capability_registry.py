@@ -39,15 +39,35 @@ DOWNSTREAM_KERNELS: dict[str, dict[str, object]] = {
         "family": "bessel",
         "notes": "Supported downstream incomplete-Bessel-K kernel.",
     },
+    "provider_incomplete_bessel_i": {
+        "public_name": "incomplete_bessel_i",
+        "family": "bessel",
+        "notes": "Explicit downstream provider surface for incomplete-Bessel-I with diagnostics-aware method routing through the public API.",
+    },
+    "provider_incomplete_bessel_k": {
+        "public_name": "incomplete_bessel_k",
+        "family": "bessel",
+        "notes": "Explicit downstream provider surface for incomplete-Bessel-K with diagnostics-aware method routing through the public API.",
+    },
     "barnesdoublegamma": {
         "public_name": "ifj_barnesdoublegamma",
         "family": "barnes",
         "notes": "Supported downstream Barnes double-gamma kernel through the IFJ-compatible public provider surface.",
     },
+    "provider_barnesdoublegamma": {
+        "public_name": "ifj_barnesdoublegamma",
+        "family": "barnes",
+        "notes": "Explicit downstream provider surface for Barnes double-gamma with diagnostics-aware IFJ routing through the public API.",
+    },
     "log_barnesdoublegamma": {
         "public_name": "ifj_log_barnesdoublegamma",
         "family": "barnes",
         "notes": "Supported downstream log Barnes double-gamma kernel through the IFJ-compatible public provider surface.",
+    },
+    "provider_log_barnesdoublegamma": {
+        "public_name": "ifj_log_barnesdoublegamma",
+        "family": "barnes",
+        "notes": "Explicit downstream provider surface for log Barnes double-gamma with diagnostics-aware IFJ routing through the public API.",
     },
     "fragile_regime_promotion_gamma_upper": {
         "public_name": "incomplete_gamma_upper",

@@ -1,0 +1,183 @@
+from __future__ import annotations
+
+import argparse
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import time
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _base_env() -> dict[str, str]:
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(REPO_ROOT / "src") + os.pathsep + env.get("PYTHONPATH", "")
+    env.setdefault("JAX_PLATFORMS", "cpu")
+    return env
+
+
+def _run_import_probe(module_expr: str) -> dict[str, float]:
+    code = (
+        "import time\n"
+        "t0=time.perf_counter()\n"
+        f"{module_expr}\n"
+        "print(time.perf_counter()-t0)\n"
+    )
+    completed = subprocess.run(
+        [sys.executable, "-c", code],
+        cwd=REPO_ROOT,
+        env=_base_env(),
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    seconds = float(completed.stdout.strip().splitlines()[-1])
+    return {"seconds": round(seconds, 6)}
+
+
+def _run_worker(family: str, pad_to: int) -> dict[str, object]:
+    env = _base_env()
+    completed = subprocess.run(
+        [sys.executable, str(Path(__file__).resolve()), "--worker", "--family", family, "--pad-to", str(pad_to)],
+        cwd=REPO_ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return json.loads(completed.stdout)
+
+
+def _worker(family: str, pad_to: int) -> None:
+    import jax
+    import jax.numpy as jnp
+
+    from arbplusjax import api
+    from arbplusjax import sparse_common as sc
+
+    if family == "srb_mat_matvec_cached_apply":
+        sparse = sc.SparseCSR(
+            data=jnp.array([2.0, -1.0, 3.0], dtype=jnp.float64),
+            indices=jnp.array([0, 1, 1], dtype=jnp.int32),
+            indptr=jnp.array([0, 2, 3], dtype=jnp.int32),
+            rows=2,
+            cols=2,
+            algebra="srb",
+        )
+        rhs = jnp.array([[1.0, 2.0], [3.0, 4.0]], dtype=jnp.float64)
+        bind_kwargs = {"dtype": "float64", "pad_to": pad_to}
+        prepare_name = "srb_mat_matvec_cached_prepare"
+    elif family == "scb_mat_matvec_cached_apply":
+        sparse = sc.SparseCSR(
+            data=jnp.array([2.0 + 0.5j, -1.0 + 0.25j, 3.0 - 0.75j], dtype=jnp.complex64),
+            indices=jnp.array([0, 1, 1], dtype=jnp.int32),
+            indptr=jnp.array([0, 2, 3], dtype=jnp.int32),
+            rows=2,
+            cols=2,
+            algebra="scb",
+        )
+        rhs = jnp.array(
+            [[1.0 + 0.5j, 2.0 - 0.25j], [3.0 + 0.75j, 4.0 - 0.5j]],
+            dtype=jnp.complex64,
+        )
+        bind_kwargs = {"pad_to": pad_to}
+        prepare_name = "scb_mat_matvec_cached_prepare"
+    else:
+        raise ValueError(f"unsupported family {family!r}")
+
+    t0 = time.perf_counter()
+    _ = jax.devices()
+    t1 = time.perf_counter()
+
+    t2 = time.perf_counter()
+    plan = api.eval_point(prepare_name, sparse)
+    t3 = time.perf_counter()
+
+    bound = api.bind_point_batch_jit(family, **bind_kwargs)
+    t4 = time.perf_counter()
+    out = bound(plan, rhs)
+    jax.block_until_ready(out)
+    t5 = time.perf_counter()
+
+    t6 = time.perf_counter()
+    out = bound(plan, rhs)
+    jax.block_until_ready(out)
+    t7 = time.perf_counter()
+
+    payload = {
+        "family": family,
+        "pad_to": pad_to,
+        "backend_init_s": round(t1 - t0, 6),
+        "cached_prepare_s": round(t3 - t2, 6),
+        "compile_plus_first_cached_apply_s": round(t5 - t4, 6),
+        "steady_cached_apply_s": round(t7 - t6, 6),
+    }
+    print(json.dumps(payload, indent=2))
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--worker", action="store_true")
+    parser.add_argument(
+        "--family",
+        choices=("srb_mat_matvec_cached_apply", "scb_mat_matvec_cached_apply"),
+        default="srb_mat_matvec_cached_apply",
+    )
+    parser.add_argument("--pad-to", type=int, default=4)
+    parser.add_argument(
+        "--out-json",
+        default="benchmarks/results/sparse_cached_apply_startup_probe/sparse_cached_apply_startup_probe.json",
+    )
+    parser.add_argument(
+        "--out-md",
+        default="benchmarks/results/sparse_cached_apply_startup_probe/sparse_cached_apply_startup_probe.md",
+    )
+    args = parser.parse_args()
+
+    if args.worker:
+        _worker(args.family, args.pad_to)
+        return
+
+    payload = {
+        "import_arbplusjax_api": _run_import_probe("from arbplusjax import api"),
+        "srb_mat_matvec_cached_apply_point_path": _run_worker("srb_mat_matvec_cached_apply", args.pad_to),
+        "scb_mat_matvec_cached_apply_point_path": _run_worker("scb_mat_matvec_cached_apply", args.pad_to),
+    }
+
+    out_json = REPO_ROOT / args.out_json
+    out_md = REPO_ROOT / args.out_md
+    out_json.parent.mkdir(parents=True, exist_ok=True)
+    out_md.parent.mkdir(parents=True, exist_ok=True)
+    out_json.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+    lines = [
+        "Last updated: 2026-03-26T00:00:00Z",
+        "",
+        "# Sparse Cached Apply Startup Probe",
+        "",
+        "Generated by `benchmarks/sparse_cached_apply_startup_probe.py`.",
+        "",
+        f"- api import s: `{payload['import_arbplusjax_api']['seconds']}`",
+    ]
+    for key in ("srb_mat_matvec_cached_apply_point_path", "scb_mat_matvec_cached_apply_point_path"):
+        entry = payload[key]
+        lines.extend(
+            [
+                f"- family: `{entry['family']}`",
+                f"- pad_to: `{entry['pad_to']}`",
+                f"- backend init s: `{entry['backend_init_s']}`",
+                f"- cached prepare s: `{entry['cached_prepare_s']}`",
+                f"- compile plus first cached apply s: `{entry['compile_plus_first_cached_apply_s']}`",
+                f"- steady cached apply s: `{entry['steady_cached_apply_s']}`",
+            ]
+        )
+    lines.append("")
+    out_md.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print(f"Wrote: {out_json}")
+    print(f"Wrote: {out_md}")
+
+
+if __name__ == "__main__":
+    main()

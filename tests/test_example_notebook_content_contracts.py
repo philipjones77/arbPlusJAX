@@ -31,6 +31,7 @@ def test_canonical_notebooks_include_production_pattern_section() -> None:
         "example_dirichlet_surface.ipynb",
         "example_gamma_family_surface.ipynb",
         "example_barnes_double_gamma_surface.ipynb",
+        "example_hypgeom_family_surface.ipynb",
     )
     for name in names:
         text = _notebook_text(EXAMPLES_DIR / name)
@@ -51,6 +52,7 @@ def test_canonical_notebooks_show_production_controls_or_caching() -> None:
         "example_dirichlet_surface.ipynb": ("bind_point_batch_jit", "n_terms", "prec_bits"),
         "example_gamma_family_surface.ipynb": ("bind_point_batch", "bind_interval_batch"),
         "example_barnes_double_gamma_surface.ipynb": ("diagnostics", "prec_bits", "dps"),
+        "example_hypgeom_family_surface.ipynb": ("bind_point_batch_jit", "bind_interval_batch", "hypgeom_status", "special_function_hardening_benchmark"),
     }
     for name, keywords in keyword_sets.items():
         text = _notebook_text(EXAMPLES_DIR / name)
@@ -70,12 +72,39 @@ def test_canonical_notebooks_show_ad_validation_and_plotting() -> None:
         "example_dirichlet_surface.ipynb",
         "example_gamma_family_surface.ipynb",
         "example_barnes_double_gamma_surface.ipynb",
+        "example_hypgeom_family_surface.ipynb",
     )
     for name in names:
         text = _notebook_text(EXAMPLES_DIR / name)
-        assert "jax.grad" in text or "jax.jvp" in text
+        assert "jax.grad" in text or "jax.jvp" in text or "jax.jacfwd" in text or "jax.jacrev" in text
         assert "ad_validation_" in text
         assert "plot(" in text
+
+
+def test_special_function_notebooks_show_argument_and_parameter_ad() -> None:
+    for name in (
+        "example_gamma_family_surface.ipynb",
+        "example_barnes_double_gamma_surface.ipynb",
+        "example_hypgeom_family_surface.ipynb",
+    ):
+        text = _notebook_text(EXAMPLES_DIR / name)
+        assert "parameter direction" in text.lower()
+        assert "argument direction" in text.lower()
+        assert "grad_" in text
+
+
+def test_parameterized_surface_notebooks_show_argument_and_parameter_ad() -> None:
+    for name in (
+        "example_core_scalar_surface.ipynb",
+        "example_api_surface.ipynb",
+        "example_dense_matrix_surface.ipynb",
+        "example_sparse_matrix_surface.ipynb",
+        "example_matrix_free_operator_surface.ipynb",
+    ):
+        text = _notebook_text(EXAMPLES_DIR / name)
+        assert "parameter direction" in text.lower()
+        assert "argument direction" in text.lower()
+        assert "grad_" in text
 
 
 def test_canonical_notebooks_expose_runtime_portability_contracts() -> None:
@@ -89,6 +118,7 @@ def test_canonical_notebooks_expose_runtime_portability_contracts() -> None:
         "example_dirichlet_surface.ipynb",
         "example_gamma_family_surface.ipynb",
         "example_barnes_double_gamma_surface.ipynb",
+        "example_hypgeom_family_surface.ipynb",
     )
     for name in names:
         text = _notebook_text(EXAMPLES_DIR / name)

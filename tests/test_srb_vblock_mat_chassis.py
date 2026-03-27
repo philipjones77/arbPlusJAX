@@ -1,5 +1,6 @@
 import jax.numpy as jnp
 
+from arbplusjax import double_interval as di
 from arbplusjax import srb_vblock_mat
 
 from tests._test_checks import _check
@@ -93,9 +94,15 @@ def test_variable_block_real_basic_det_inv_and_square():
     inv_basic = srb_vblock_mat.srb_vblock_mat_inv_basic(csr)
     sqr_basic = srb_vblock_mat.srb_vblock_mat_sqr_basic(csr)
 
-    _check(bool(jnp.allclose(det_basic, jnp.linalg.det(dense), rtol=1e-8, atol=1e-8)))
-    _check(bool(jnp.allclose(inv_basic, jnp.linalg.inv(dense), rtol=1e-6, atol=1e-6)))
-    _check(bool(jnp.allclose(srb_vblock_mat.srb_vblock_mat_to_dense(sqr_basic), dense @ dense, rtol=1e-8, atol=1e-8)))
+    det_ref = jnp.linalg.det(dense)
+    inv_ref = jnp.linalg.inv(dense)
+    sqr_ref = dense @ dense
+
+    _check(bool(di.contains(det_basic, di.interval(det_ref, det_ref))))
+    _check(bool(jnp.allclose(di.midpoint(inv_basic), inv_ref, rtol=1e-6, atol=1e-6)))
+    _check(bool(jnp.all(di.contains(inv_basic, di.interval(inv_ref, inv_ref)))))
+    _check(bool(jnp.allclose(di.midpoint(sqr_basic), sqr_ref, rtol=1e-8, atol=1e-8)))
+    _check(bool(jnp.all(di.contains(sqr_basic, di.interval(sqr_ref, sqr_ref)))))
 
 
 def test_variable_block_real_non_square_partitions_support_lu_and_qr_solves():

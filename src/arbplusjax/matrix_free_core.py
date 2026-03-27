@@ -1,15 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import importlib
 
 import jax
 from jax import lax
 import jax.numpy as jnp
-
-from .autodiff import ad_rules
-from .autodiff import fingerprints
-from . import iterative_solvers
-from . import matfree_adjoints
 
 
 @jax.tree_util.register_pytree_node_class
@@ -416,8 +412,16 @@ class RationalHutchppMetadata:
     weights: object
     polynomial_coefficients: object | None
     preconditioner: object | None
+    transpose_preconditioner: object | None
     tol: object
     atol: object
+    target_stderr: object | None
+    min_probes: object | None
+    max_probes: object | None
+    block_size: object
+    gradient_supported: object
+    implicit_adjoint: object
+    cached_adjoint_supported: object
     structured: str
     algebra: str
     maxiter: int | None
@@ -430,8 +434,16 @@ class RationalHutchppMetadata:
             self.weights,
             self.polynomial_coefficients,
             self.preconditioner,
+            self.transpose_preconditioner,
             self.tol,
             self.atol,
+            self.target_stderr,
+            self.min_probes,
+            self.max_probes,
+            self.block_size,
+            self.gradient_supported,
+            self.implicit_adjoint,
+            self.cached_adjoint_supported,
         ), {
             "structured": self.structured,
             "algebra": self.algebra,
@@ -440,7 +452,24 @@ class RationalHutchppMetadata:
 
     @classmethod
     def tree_unflatten(cls, aux_data, children):
-        operator, deflation, shifts, weights, polynomial_coefficients, preconditioner, tol, atol = children
+        (
+            operator,
+            deflation,
+            shifts,
+            weights,
+            polynomial_coefficients,
+            preconditioner,
+            transpose_preconditioner,
+            tol,
+            atol,
+            target_stderr,
+            min_probes,
+            max_probes,
+            block_size,
+            gradient_supported,
+            implicit_adjoint,
+            cached_adjoint_supported,
+        ) = children
         return cls(
             operator=operator,
             deflation=deflation,
@@ -448,8 +477,16 @@ class RationalHutchppMetadata:
             weights=weights,
             polynomial_coefficients=polynomial_coefficients,
             preconditioner=preconditioner,
+            transpose_preconditioner=transpose_preconditioner,
             tol=tol,
             atol=atol,
+            target_stderr=target_stderr,
+            min_probes=min_probes,
+            max_probes=max_probes,
+            block_size=block_size,
+            gradient_supported=gradient_supported,
+            implicit_adjoint=implicit_adjoint,
+            cached_adjoint_supported=cached_adjoint_supported,
             structured=aux_data["structured"],
             algebra=aux_data["algebra"],
             maxiter=aux_data["maxiter"],
@@ -607,6 +644,24 @@ def diagonal_preconditioner_plan(diagonal: jax.Array, *, algebra: str) -> Precon
         kind="diagonal",
         payload=jnp.asarray(diagonal),
         orientation="forward",
+        algebra=algebra,
+    )
+
+
+def sparse_lu_preconditioner_plan(plan, *, orientation: str = "forward", algebra: str) -> PreconditionerPlan:
+    return PreconditionerPlan(
+        kind="sparse_lu_solve",
+        payload=plan,
+        orientation=orientation,
+        algebra=algebra,
+    )
+
+
+def sparse_cholesky_preconditioner_plan(plan, *, orientation: str = "forward", algebra: str) -> PreconditionerPlan:
+    return PreconditionerPlan(
+        kind="sparse_cholesky_solve",
+        payload=plan,
+        orientation=orientation,
         algebra=algebra,
     )
 
@@ -805,6 +860,48 @@ def _recover_sparse_bcoo_forward_payload(payload, *, orientation: str):
     raise ValueError(f"unsupported sparse orientation: {orientation}")
 
 
+def _conjugate_sparse_payload(payload):
+    sparse_cls = payload.__class__
+    if hasattr(payload, "row") and hasattr(payload, "col"):
+        return sparse_cls(
+            data=jnp.conjugate(payload.data),
+            row=payload.row,
+            col=payload.col,
+            rows=payload.rows,
+            cols=payload.cols,
+            algebra=payload.algebra,
+        )
+    if hasattr(payload, "indices") and hasattr(payload, "indptr"):
+        return sparse_cls(
+            data=jnp.conjugate(payload.data),
+            indices=payload.indices,
+            indptr=payload.indptr,
+            rows=payload.rows,
+            cols=payload.cols,
+            algebra=payload.algebra,
+        )
+    if hasattr(payload, "indices"):
+        return sparse_cls(
+            data=jnp.conjugate(payload.data),
+            indices=payload.indices,
+            rows=payload.rows,
+            cols=payload.cols,
+            algebra=payload.algebra,
+        )
+    raise TypeError(f"unsupported sparse payload type for conjugation: {type(payload)!r}")
+
+
+def _conjugate_sparse_lu_plan(plan):
+    sparse_common = importlib.import_module(".sparse_common", __package__)
+    return sparse_common.SparseLUSolvePlan(
+        p=_conjugate_sparse_payload(plan.p),
+        l=_conjugate_sparse_payload(plan.l),
+        u=_conjugate_sparse_payload(plan.u),
+        rows=plan.rows,
+        algebra=plan.algebra,
+    )
+
+
 def operator_transpose_plan(operator, *, algebra: str | None = None, conjugate: bool = False):
     target_orientation = "adjoint" if conjugate else "transpose"
     if isinstance(operator, ScaledOperator):
@@ -830,6 +927,19 @@ def operator_transpose_plan(operator, *, algebra: str | None = None, conjugate: 
                 orientation=target_orientation,
                 algebra=algebra or operator.algebra,
             )
+        if operator.kind == "shell":
+            payload = operator.payload
+            ctx = payload.context
+            if isinstance(ctx, dict) and "transpose_callback" in ctx:
+                return oriented_shell_operator_plan(
+                    context=ctx,
+                    algebra=algebra or operator.algebra,
+                    orientation=target_orientation,
+                    forward_callback=ctx.get("forward_callback", payload.callback),
+                    transpose_callback=ctx.get("transpose_callback"),
+                    adjoint_callback=ctx.get("adjoint_callback"),
+                )
+            return None
     return None
 
 
@@ -856,6 +966,21 @@ def preconditioner_transpose_plan(preconditioner, *, algebra: str | None = None,
             return PreconditionerPlan(
                 kind="sparse_bcoo",
                 payload=payload,
+                orientation=target_orientation,
+                algebra=algebra or preconditioner.algebra,
+            )
+        if preconditioner.kind == "sparse_lu_solve":
+            payload = preconditioner.payload
+            if conjugate:
+                payload = _conjugate_sparse_lu_plan(payload)
+            return sparse_lu_preconditioner_plan(
+                payload,
+                orientation=target_orientation,
+                algebra=algebra or preconditioner.algebra,
+            )
+        if preconditioner.kind == "sparse_cholesky_solve":
+            return sparse_cholesky_preconditioner_plan(
+                preconditioner.payload,
                 orientation=target_orientation,
                 algebra=algebra or preconditioner.algebra,
             )
@@ -935,6 +1060,30 @@ def preconditioner_plan_apply(plan: PreconditionerPlan, v: jax.Array, *, midpoin
             ),
             dtype=dtype,
         )
+    if plan.kind == "sparse_lu_solve":
+        if plan.algebra == "jrb":
+            module = importlib.import_module(".srb_mat", __package__)
+            if plan.orientation == "forward":
+                return jnp.asarray(module.srb_mat_lu_solve_plan_apply(plan.payload, vv), dtype=dtype)
+            return jnp.asarray(module.srb_mat_solve_transpose(plan.payload, vv), dtype=dtype)
+        if plan.algebra == "jcb":
+            module = importlib.import_module(".scb_mat", __package__)
+            if plan.orientation == "forward":
+                return jnp.asarray(module.scb_mat_lu_solve_plan_apply(plan.payload, vv), dtype=dtype)
+            if plan.orientation == "adjoint":
+                return jnp.asarray(module.scb_mat_solve_transpose(_conjugate_sparse_lu_plan(plan.payload), vv), dtype=dtype)
+            return jnp.asarray(module.scb_mat_solve_transpose(plan.payload, vv), dtype=dtype)
+        raise ValueError(f"unsupported algebra for sparse_lu_solve preconditioner: {plan.algebra}")
+    if plan.kind == "sparse_cholesky_solve":
+        if plan.algebra == "jrb":
+            module = importlib.import_module(".srb_mat", __package__)
+            return jnp.asarray(module.srb_mat_spd_solve_plan_apply(plan.payload, vv), dtype=dtype)
+        if plan.algebra == "jcb":
+            module = importlib.import_module(".scb_mat", __package__)
+            if plan.orientation == "transpose":
+                return jnp.asarray(module.scb_mat_solve_transpose(plan.payload, vv), dtype=dtype)
+            return jnp.asarray(module.scb_mat_hpd_solve_plan_apply(plan.payload, vv), dtype=dtype)
+        raise ValueError(f"unsupported algebra for sparse_cholesky_solve preconditioner: {plan.algebra}")
     raise ValueError(f"unsupported preconditioner plan kind: {plan.kind}")
 
 
@@ -1029,9 +1178,10 @@ def matrix_free_fingerprint(
     adjoint_residual=0.0,
     note: str = "",
 ):
-    return fingerprints.make_fingerprint(
-        regime_code_value=fingerprints.regime_code(regime),
-        method_code_value=solver_code(method),
+    from .matrix_free_krylov import matrix_free_fingerprint as impl
+    return impl(
+        regime=regime,
+        method=method,
         work_units=work_units,
         scale=scale,
         compensated_sum=compensated_sum,
@@ -1052,26 +1202,17 @@ def attach_krylov_metadata(
     compensated_sum=False,
     note: str = "",
 ):
-    attachment = ad_rules.attach_rule_artifacts(
-        matrix_free_fingerprint(
-            regime=regime,
-            method=method,
-            work_units=work_units,
-            compensated_sum=compensated_sum,
-            adjoint_residual=adjoint_residual,
-            note=note,
-        ),
+    from .matrix_free_krylov import attach_krylov_metadata as impl
+    return impl(
+        diag,
+        regime=regime,
+        method=method,
+        structure=structure,
+        work_units=work_units,
         primal_residual=primal_residual,
         adjoint_residual=adjoint_residual,
+        compensated_sum=compensated_sum,
         note=note,
-    )
-    return diag._replace(
-        primal_residual=jnp.asarray(attachment.residuals.primal_residual, dtype=jnp.float64),
-        adjoint_residual=jnp.asarray(attachment.residuals.adjoint_residual, dtype=jnp.float64),
-        regime_code=jnp.asarray(attachment.fingerprint.regime_code, dtype=jnp.int32),
-        method_code=jnp.asarray(attachment.fingerprint.method_code, dtype=jnp.int32),
-        solver_code=solver_code(method),
-        structure_code=structure_code(structure),
     )
 
 
@@ -1084,9 +1225,10 @@ def make_shifted_solve_plan(
     algebra: str,
     structured: str = "general",
 ) -> ShiftedSolvePlan:
-    return ShiftedSolvePlan(
-        operator=operator,
-        shifts=jnp.asarray(shifts),
+    from .matrix_free_krylov import make_shifted_solve_plan as impl
+    return impl(
+        operator,
+        shifts,
         preconditioner=preconditioner,
         solver=solver,
         algebra=algebra,
@@ -1104,7 +1246,8 @@ def make_recycled_krylov_state(
     algebra: str,
     structured: str = "general",
 ) -> RecycledKrylovState:
-    return RecycledKrylovState(
+    from .matrix_free_krylov import make_recycled_krylov_state as impl
+    return impl(
         basis=basis,
         projected=projected,
         residual=residual,
@@ -1129,20 +1272,19 @@ def make_logdet_solve_result(
     structured: str = "general",
     algebra: str,
 ) -> LogdetSolveResult:
-    return LogdetSolveResult(
+    from .matrix_free_krylov import make_logdet_solve_result as impl
+    return impl(
         logdet=logdet,
         solve=solve,
-        aux=LogdetSolveAux(
-            operator=operator,
-            transpose_operator=transpose_operator,
-            logdet_diagnostics=logdet_diagnostics,
-            solve_diagnostics=solve_diagnostics,
-            preconditioner=preconditioner,
-            solver=solver,
-            implicit_adjoint=implicit_adjoint,
-            structured=structured,
-            algebra=algebra,
-        ),
+        operator=operator,
+        transpose_operator=transpose_operator,
+        logdet_diagnostics=logdet_diagnostics,
+        solve_diagnostics=solve_diagnostics,
+        preconditioner=preconditioner,
+        solver=solver,
+        implicit_adjoint=implicit_adjoint,
+        structured=structured,
+        algebra=algebra,
     )
 
 
@@ -1160,15 +1302,14 @@ def combine_logdet_solve_point(
     structured: str = "general",
     algebra: str,
 ) -> LogdetSolveResult:
-    solve_value, solve_diag = solve_with_diagnostics(operator, rhs)
-    logdet_value, logdet_diag = logdet_with_diagnostics(operator, probes)
-    return make_logdet_solve_result(
-        logdet=logdet_value,
-        solve=solve_value,
+    from .matrix_free_krylov import combine_logdet_solve_point as impl
+    return impl(
         operator=operator,
         transpose_operator=transpose_operator,
-        logdet_diagnostics=logdet_diag,
-        solve_diagnostics=solve_diag,
+        rhs=rhs,
+        probes=probes,
+        solve_with_diagnostics=solve_with_diagnostics,
+        logdet_with_diagnostics=logdet_with_diagnostics,
         preconditioner=preconditioner,
         solver=solver,
         implicit_adjoint=implicit_adjoint,
@@ -1190,6 +1331,10 @@ def _operator_apply_linear_midpoint(operator, v_mid: jax.Array, *, midpoint_vect
     if isinstance(operator, OperatorPlan):
         if operator.kind == "dense":
             return jnp.asarray(jnp.einsum("...ij,...j->...i", operator.payload, jnp.asarray(v_mid, dtype=dtype)), dtype=dtype)
+        if operator.kind == "shell":
+            if operator.payload.context is None:
+                return jnp.asarray(operator.payload.callback(jnp.asarray(v_mid, dtype=dtype)), dtype=dtype)
+            return jnp.asarray(operator.payload.callback(jnp.asarray(v_mid, dtype=dtype), operator.payload.context), dtype=dtype)
         if operator.kind == "sparse_bcoo":
             return jnp.asarray(
                 sparse_bcoo_matvec(
@@ -1219,6 +1364,10 @@ def _preconditioner_apply_linear_midpoint(preconditioner, v_mid: jax.Array, *, m
             return jnp.asarray(jnp.asarray(preconditioner.payload, dtype=dtype) * jnp.asarray(v_mid, dtype=dtype), dtype=dtype)
         if preconditioner.kind == "dense":
             return jnp.asarray(jnp.einsum("...ij,...j->...i", preconditioner.payload, jnp.asarray(v_mid, dtype=dtype)), dtype=dtype)
+        if preconditioner.kind == "shell":
+            if preconditioner.payload.context is None:
+                return jnp.asarray(preconditioner.payload.callback(jnp.asarray(v_mid, dtype=dtype)), dtype=dtype)
+            return jnp.asarray(preconditioner.payload.callback(jnp.asarray(v_mid, dtype=dtype), preconditioner.payload.context), dtype=dtype)
         if preconditioner.kind == "sparse_bcoo":
             return jnp.asarray(
                 sparse_bcoo_matvec(
@@ -1250,38 +1399,18 @@ def multi_shift_solve_point(
     atol: float = 0.0,
     maxiter: int | None = None,
 ):
-    rhs_mid = midpoint_vector(rhs)
-
-    def solve_one(shift):
-        shift_arr = jnp.asarray(shift, dtype=dtype)
-
-        def shifted_matvec(v):
-            base = _operator_apply_linear_midpoint(
-                plan.operator,
-                v,
-                midpoint_vector=midpoint_vector,
-                sparse_bcoo_matvec=sparse_bcoo_matvec,
-                dtype=dtype,
-            )
-            return base + shift_arr * jnp.asarray(v, dtype=dtype)
-
-        precond = None
-        if plan.preconditioner is not None:
-            precond = lambda v: _preconditioner_apply_linear_midpoint(
-                plan.preconditioner,
-                v,
-                midpoint_vector=midpoint_vector,
-                sparse_bcoo_matvec=sparse_bcoo_matvec,
-                dtype=dtype,
-            )
-
-        if plan.solver in ("cg", "multi_shift_cg"):
-            x_mid, _ = apply_operator.cg(shifted_matvec, rhs_mid, tol=tol, atol=atol, maxiter=maxiter, M=precond)
-        else:
-            x_mid, _ = apply_operator.gmres(shifted_matvec, rhs_mid, tol=tol, atol=atol, maxiter=maxiter, M=precond)
-        return x_mid
-
-    return jax.vmap(solve_one)(jnp.asarray(plan.shifts))
+    from .matrix_free_krylov import multi_shift_solve_point as impl
+    return impl(
+        plan,
+        rhs,
+        apply_operator=apply_operator,
+        midpoint_vector=midpoint_vector,
+        sparse_bcoo_matvec=sparse_bcoo_matvec,
+        dtype=dtype,
+        tol=tol,
+        atol=atol,
+        maxiter=maxiter,
+    )
 
 
 def krylov_solve_midpoint(
@@ -1299,39 +1428,21 @@ def krylov_solve_midpoint(
     sparse_bcoo_matvec,
     dtype,
 ):
-    rhs_mid = midpoint_vector(rhs)
-    x0_mid = None if x0 is None else midpoint_vector(x0)
-
-    def mv(v):
-        return operator_apply_midpoint(
-            operator,
-            lift_vector(v),
-            midpoint_vector=midpoint_vector,
-            sparse_bcoo_matvec=sparse_bcoo_matvec,
-            dtype=dtype,
-        )
-
-    precond = None
-    if preconditioner is not None:
-        precond = lambda v: preconditioner_apply_midpoint(
-            preconditioner,
-            lift_vector(v),
-            midpoint_vector=midpoint_vector,
-            sparse_bcoo_matvec=sparse_bcoo_matvec,
-            dtype=dtype,
-        )
-
-    if solver == "cg":
-        x_mid, info = iterative_solvers.cg(mv, rhs_mid, x0=x0_mid, tol=tol, atol=atol, maxiter=maxiter, M=precond)
-    elif solver == "gmres":
-        x_mid, info = iterative_solvers.gmres(mv, rhs_mid, x0=x0_mid, tol=tol, atol=atol, maxiter=maxiter, M=precond)
-    elif solver == "minres":
-        x_mid, info = iterative_solvers.minres(mv, rhs_mid, x0=x0_mid, tol=tol, atol=atol, maxiter=maxiter, M=precond)
-    else:
-        raise ValueError(f"unsupported Krylov solver: {solver}")
-
-    residual = jnp.linalg.norm(mv(x_mid) - rhs_mid)
-    return x_mid, info, residual, jnp.linalg.norm(rhs_mid)
+    from .matrix_free_krylov import krylov_solve_midpoint as impl
+    return impl(
+        operator,
+        rhs,
+        x0=x0,
+        tol=tol,
+        atol=atol,
+        maxiter=maxiter,
+        preconditioner=preconditioner,
+        solver=solver,
+        midpoint_vector=midpoint_vector,
+        lift_vector=lift_vector,
+        sparse_bcoo_matvec=sparse_bcoo_matvec,
+        dtype=dtype,
+    )
 
 
 def implicit_krylov_solve_midpoint(
@@ -1353,86 +1464,25 @@ def implicit_krylov_solve_midpoint(
     transpose_preconditioner=None,
     use_implicit_adjoint: bool | None = None,
 ):
-    rhs_mid = midpoint_vector(rhs)
-    x0_mid = None if x0 is None else midpoint_vector(x0)
-    conjugate = jnp.issubdtype(jnp.asarray(rhs_mid).dtype, jnp.complexfloating)
-    if transpose_operator is None:
-        transpose_operator = operator_transpose_plan(operator, conjugate=conjugate)
-    if transpose_preconditioner is None:
-        transpose_preconditioner = preconditioner_transpose_plan(preconditioner, conjugate=conjugate)
-    if use_implicit_adjoint is None:
-        use_implicit_adjoint = structured in {"symmetric", "spd", "hermitian", "hpd"} or transpose_operator is not None
-
-    def mv(v):
-        return operator_apply_midpoint(
-            operator,
-            lift_vector(v),
-            midpoint_vector=midpoint_vector,
-            sparse_bcoo_matvec=sparse_bcoo_matvec,
-            dtype=dtype,
-        )
-
-    def build_preconditioner(plan):
-        if plan is None:
-            return None
-        return lambda v: preconditioner_apply_midpoint(
-            plan,
-            lift_vector(v),
-            midpoint_vector=midpoint_vector,
-            sparse_bcoo_matvec=sparse_bcoo_matvec,
-            dtype=dtype,
-        )
-
-    def solve_impl(matvec_fn, rhs_value, *, preconditioner_plan):
-        precond = build_preconditioner(preconditioner_plan)
-        if solver == "cg":
-            return iterative_solvers.cg(matvec_fn, rhs_value, x0=x0_mid, tol=tol, atol=atol, maxiter=maxiter, M=precond)
-        if solver == "gmres":
-            return iterative_solvers.gmres(matvec_fn, rhs_value, x0=x0_mid, tol=tol, atol=atol, maxiter=maxiter, M=precond)
-        if solver == "minres":
-            return iterative_solvers.minres(matvec_fn, rhs_value, x0=x0_mid, tol=tol, atol=atol, maxiter=maxiter, M=precond)
-        raise ValueError(f"unsupported Krylov solver: {solver}")
-
-    transpose_structured = structured in {"symmetric", "spd", "hermitian", "hpd"}
-
-    def transpose_mv(v):
-        if transpose_operator is None:
-            raise ValueError("transpose solve requested without a transpose/adjoint operator.")
-        return operator_apply_midpoint(
-            transpose_operator,
-            lift_vector(v),
-            midpoint_vector=midpoint_vector,
-            sparse_bcoo_matvec=sparse_bcoo_matvec,
-            dtype=dtype,
-        )
-
-    if use_implicit_adjoint:
-        transpose_solve = None if transpose_structured else (
-            lambda matvec_fn, rhs_value: solve_impl(transpose_mv, rhs_value, preconditioner_plan=transpose_preconditioner)
-        )
-        x_mid, info = lax.custom_linear_solve(
-            mv,
-            rhs_mid,
-            lambda matvec_fn, rhs_value: solve_impl(matvec_fn, rhs_value, preconditioner_plan=preconditioner),
-            transpose_solve=transpose_solve,
-            symmetric=transpose_structured,
-            has_aux=True,
-        )
-    else:
-        x_mid, info = solve_impl(mv, rhs_mid, preconditioner_plan=preconditioner)
-
-    residual = jnp.linalg.norm(mv(x_mid) - rhs_mid)
-    metadata = ImplicitAdjointSolveMetadata(
-        operator=operator,
-        transpose_operator=transpose_operator,
+    from .matrix_free_adjoint import implicit_krylov_solve_midpoint as impl
+    return impl(
+        operator,
+        rhs,
+        x0=x0,
+        tol=tol,
+        atol=atol,
+        maxiter=maxiter,
         preconditioner=preconditioner,
-        transpose_preconditioner=transpose_preconditioner,
         solver=solver,
         structured=structured,
-        algebra=getattr(operator, "algebra", "matrix_free"),
-        implicit_adjoint=bool(use_implicit_adjoint),
+        midpoint_vector=midpoint_vector,
+        lift_vector=lift_vector,
+        sparse_bcoo_matvec=sparse_bcoo_matvec,
+        dtype=dtype,
+        transpose_operator=transpose_operator,
+        transpose_preconditioner=transpose_preconditioner,
+        use_implicit_adjoint=use_implicit_adjoint,
     )
-    return x_mid, info, residual, jnp.linalg.norm(rhs_mid), metadata
 
 
 def krylov_diagnostics(
@@ -1457,27 +1507,27 @@ def krylov_diagnostics(
     residual_history=None,
     deflated_count: int | jax.Array = 0,
 ):
-    if residual_history is None:
-        residual_history = jnp.asarray([tail_norm], dtype=jnp.float64)
-    return diagnostics_type(
-        algorithm_code=jnp.asarray(algorithm_code, dtype=jnp.int32),
-        steps=jnp.asarray(steps, dtype=jnp.int32),
-        basis_dim=jnp.asarray(basis_dim, dtype=jnp.int32),
-        restart_count=jnp.asarray(restart_count, dtype=jnp.int32),
-        beta0=jnp.asarray(beta0, dtype=jnp.float64),
-        tail_norm=jnp.asarray(tail_norm, dtype=jnp.float64),
-        breakdown=jnp.asarray(breakdown),
-        used_adjoint=jnp.asarray(used_adjoint),
-        gradient_supported=jnp.asarray(gradient_supported),
-        probe_count=jnp.asarray(probe_count, dtype=jnp.int32),
-        primal_residual=jnp.asarray(primal_residual, dtype=jnp.float64),
-        adjoint_residual=jnp.asarray(adjoint_residual, dtype=jnp.float64),
-        regime_code=jnp.asarray(regime_code_value, dtype=jnp.int32),
-        method_code=jnp.asarray(method_code_value, dtype=jnp.int32),
-        solver_code=jnp.asarray(solver_code_value, dtype=jnp.int32),
-        structure_code=jnp.asarray(structure_code_value, dtype=jnp.int32),
-        residual_history=jnp.asarray(residual_history, dtype=jnp.float64),
-        deflated_count=jnp.asarray(deflated_count, dtype=jnp.int32),
+    from .matrix_free_krylov import krylov_diagnostics as impl
+    return impl(
+        diagnostics_type,
+        algorithm_code=algorithm_code,
+        steps=steps,
+        basis_dim=basis_dim,
+        beta0=beta0,
+        tail_norm=tail_norm,
+        breakdown=breakdown,
+        used_adjoint=used_adjoint,
+        gradient_supported=gradient_supported,
+        probe_count=probe_count,
+        restart_count=restart_count,
+        primal_residual=primal_residual,
+        adjoint_residual=adjoint_residual,
+        regime_code_value=regime_code_value,
+        method_code_value=method_code_value,
+        solver_code_value=solver_code_value,
+        structure_code_value=structure_code_value,
+        residual_history=residual_history,
+        deflated_count=deflated_count,
     )
 
 
@@ -1654,6 +1704,22 @@ def eig_convergence_summary(
     return converged_count, locked_count, deflated_count, jnp.asarray(converged_count >= requested_arr)
 
 
+def eig_filter_residual_corrections(residuals: jax.Array, *, lock_tol: float) -> jax.Array:
+    locked_mask = eig_locked_mask_from_residuals(residuals, tol=lock_tol)
+    return jnp.where(locked_mask[None, :], jnp.zeros_like(residuals), residuals)
+
+
+def eig_target_subspace_cols(
+    *,
+    size: int,
+    seed_cols: int,
+    residual_cols: int,
+    block_size: int,
+) -> int:
+    max_expand = min(int(block_size), int(residual_cols))
+    return min(int(size), int(seed_cols) + max_expand)
+
+
 def ritz_pairs_from_basis(apply_block, basis: jax.Array, *, k: int, which: str, hermitian: bool = True):
     basis = orthonormalize_columns(basis)
     applied = apply_block(basis)
@@ -1717,7 +1783,11 @@ def contour_quadrature_nodes(center, radius, *, quadrature_order: int):
     center_arr = jnp.asarray(center, dtype=jnp.complex128)
     radius_arr = jnp.asarray(radius, dtype=jnp.complex128)
     nodes = center_arr + radius_arr * unit
-    weights = (radius_arr * unit) / jnp.asarray(quadrature_order, dtype=jnp.complex128)
+    # Trapezoidal rule on a circular contour: dz = i r e^{i theta} dtheta and
+    # dtheta = 2 pi / quadrature_order for the equally spaced nodes here.
+    weights = (
+        (2.0j * jnp.pi) * radius_arr * unit
+    ) / jnp.asarray(quadrature_order, dtype=jnp.complex128)
     return nodes, weights
 
 
@@ -1749,7 +1819,8 @@ def contour_integral_action_point(
     quadrature_order: int,
     node_weight_fn=None,
 ) -> jax.Array:
-    nodes, weights = contour_quadrature_nodes(center, radius, quadrature_order=quadrature_order)
+    effective_order = max(int(quadrature_order), 64)
+    nodes, weights = contour_quadrature_nodes(center, radius, quadrature_order=effective_order)
     vector = jnp.asarray(x)
     out_dtype = jnp.result_type(vector.dtype, jnp.complex128)
     init = jnp.zeros_like(vector, dtype=out_dtype)
@@ -1758,7 +1829,10 @@ def contour_integral_action_point(
         node, weight = nw
         kernel = jnp.asarray(1.0 if node_weight_fn is None else node_weight_fn(node), dtype=out_dtype)
         value = jnp.asarray(solve_shifted(node, vector), dtype=out_dtype)
-        return acc + jnp.asarray(weight, dtype=out_dtype) * kernel * value, None
+        # Public matrix-free action surfaces use solves of the form
+        # (A - z I)^{-1} v, while the contour formula is typically written with
+        # (z I - A)^{-1}. Account for that shared sign convention here.
+        return acc - jnp.asarray(weight, dtype=out_dtype) * kernel * value, None
 
     value, _ = lax.scan(body, init, (nodes, weights))
     return value
@@ -1972,6 +2046,57 @@ def poly_action_point(
     return jnp.where(finite[..., None, None], out, full_like(out))
 
 
+def poly_action_with_diagnostics_point(
+    operator,
+    x: jax.Array,
+    coefficients: jax.Array,
+    *,
+    midpoint_apply,
+    coerce_vector,
+    midpoint_vector,
+    point_from_midpoint,
+    full_like,
+    finite_mask_fn,
+    coeff_dtype,
+    diagnostics_type,
+    algorithm_code: int,
+):
+    value = poly_action_point(
+        operator,
+        x,
+        coefficients,
+        midpoint_apply=midpoint_apply,
+        coerce_vector=coerce_vector,
+        midpoint_vector=midpoint_vector,
+        point_from_midpoint=point_from_midpoint,
+        full_like=full_like,
+        finite_mask_fn=finite_mask_fn,
+        coeff_dtype=coeff_dtype,
+    )
+    x_checked = coerce_vector(x)
+    x_mid = midpoint_vector(x_checked)
+    coeffs = jnp.asarray(coefficients, dtype=coeff_dtype)
+    beta0 = jnp.linalg.norm(x_mid)
+    tail_norm = jnp.asarray(0.0, dtype=jnp.float64)
+    diag = krylov_diagnostics(
+        diagnostics_type,
+        algorithm_code=algorithm_code,
+        steps=jnp.maximum(coeffs.shape[0] - 1, 0),
+        basis_dim=x_mid.shape[-1],
+        beta0=beta0,
+        tail_norm=tail_norm,
+        breakdown=False,
+        used_adjoint=False,
+        gradient_supported=True,
+        probe_count=1,
+        restart_count=0,
+        primal_residual=tail_norm,
+        residual_history=jnp.asarray([tail_norm], dtype=jnp.float64),
+        deflated_count=0,
+    )
+    return value, diag
+
+
 def expm_action_point(
     operator,
     x: jax.Array,
@@ -2001,6 +2126,57 @@ def expm_action_point(
     out = point_from_midpoint(acc)
     finite = finite_mask_fn(acc)
     return jnp.where(finite[..., None, None], out, full_like(out))
+
+
+def expm_action_with_diagnostics_point(
+    operator,
+    x: jax.Array,
+    *,
+    terms: int,
+    midpoint_apply,
+    coerce_vector,
+    midpoint_vector,
+    point_from_midpoint,
+    full_like,
+    finite_mask_fn,
+    scalar_dtype,
+    diagnostics_type,
+    algorithm_code: int,
+):
+    x = coerce_vector(x)
+    if terms <= 0:
+        raise ValueError("terms must be > 0")
+    x_mid = midpoint_vector(x)
+
+    def step(carry, k):
+        term, acc = carry
+        next_term = midpoint_apply(operator, point_from_midpoint(term)) / jnp.asarray(k, dtype=scalar_dtype)
+        next_acc = acc + next_term
+        return (next_term, next_acc), None
+
+    init = (x_mid, x_mid)
+    (last_term, acc), _ = lax.scan(step, init, jnp.arange(1, terms, dtype=jnp.int32))
+    out = point_from_midpoint(acc)
+    finite = finite_mask_fn(acc)
+    value = jnp.where(finite[..., None, None], out, full_like(out))
+    tail_norm = jnp.asarray(jnp.linalg.norm(last_term), dtype=jnp.float64)
+    diag = krylov_diagnostics(
+        diagnostics_type,
+        algorithm_code=algorithm_code,
+        steps=jnp.asarray(terms, dtype=jnp.int32),
+        basis_dim=x_mid.shape[-1],
+        beta0=jnp.linalg.norm(x_mid),
+        tail_norm=tail_norm,
+        breakdown=False,
+        used_adjoint=False,
+        gradient_supported=True,
+        probe_count=1,
+        restart_count=0,
+        primal_residual=tail_norm,
+        residual_history=jnp.asarray([tail_norm], dtype=jnp.float64),
+        deflated_count=0,
+    )
+    return value, diag
 
 
 def restarted_action_point(apply_once, x: jax.Array, *, restarts: int):
@@ -2190,6 +2366,28 @@ def probe_statistics_should_stop(
     return jnp.asarray(met | (jnp.asarray(statistics.probe_count, dtype=jnp.int32) >= jnp.asarray(max_probes, dtype=jnp.int32)))
 
 
+def probe_statistics_probe_deficit(statistics: ProbeEstimateStatistics) -> jax.Array:
+    recommended = jnp.asarray(statistics.recommended_probe_count, dtype=jnp.int32)
+    current = jnp.asarray(statistics.probe_count, dtype=jnp.int32)
+    return jnp.maximum(recommended - current, jnp.asarray(0, dtype=jnp.int32))
+
+
+def probe_statistics_next_probe_count(
+    statistics: ProbeEstimateStatistics,
+    *,
+    block_size: int | None = None,
+    max_probes: int | None = None,
+) -> jax.Array:
+    current = jnp.asarray(statistics.probe_count, dtype=jnp.int32)
+    next_count = jnp.maximum(current, jnp.asarray(statistics.recommended_probe_count, dtype=jnp.int32))
+    if block_size is not None:
+        block = jnp.asarray(block_size, dtype=jnp.int32)
+        next_count = block * ((next_count + block - 1) // block)
+    if max_probes is not None:
+        next_count = jnp.minimum(next_count, jnp.asarray(max_probes, dtype=jnp.int32))
+    return next_count
+
+
 def expand_subspace_with_corrections(
     basis: jax.Array,
     vecs: jax.Array,
@@ -2205,6 +2403,7 @@ def expand_subspace_with_corrections(
     conjugate_inner: bool = False,
 ) -> jax.Array:
     max_new_cols = max(0, min(int(target_cols) - int(basis.shape[1]), int(residuals.shape[1])))
+    residuals = eig_filter_residual_corrections(residuals, lock_tol=lock_tol)
     if vals is not None and max_new_cols > 0:
         order = eig_expansion_column_order(vals, residuals, which=which, lock_tol=lock_tol)
         chosen = order[:max_new_cols]
@@ -2346,10 +2545,26 @@ def make_rational_hutchpp_metadata(
     preconditioner=None,
     tol: float = 1e-8,
     atol: float = 0.0,
+    target_stderr: float | None = None,
+    min_probes: int | None = None,
+    max_probes: int | None = None,
+    block_size: int = 1,
+    gradient_supported: bool = True,
+    implicit_adjoint: bool = False,
     structured: str,
     algebra: str,
     maxiter: int | None = None,
 ) -> RationalHutchppMetadata:
+    transpose_preconditioner = None
+    if implicit_adjoint:
+        transpose_preconditioner = preconditioner_transpose_plan(
+            preconditioner,
+            algebra=algebra,
+            conjugate=(structured == "hermitian"),
+        )
+    cached_adjoint_supported = bool(
+        gradient_supported and implicit_adjoint and (preconditioner is None or transpose_preconditioner is not None)
+    )
     return RationalHutchppMetadata(
         operator=operator,
         deflation=deflation,
@@ -2357,8 +2572,16 @@ def make_rational_hutchpp_metadata(
         weights=jnp.asarray(weights),
         polynomial_coefficients=None if polynomial_coefficients is None else jnp.asarray(polynomial_coefficients),
         preconditioner=preconditioner,
+        transpose_preconditioner=transpose_preconditioner,
         tol=jnp.asarray(tol),
         atol=jnp.asarray(atol),
+        target_stderr=None if target_stderr is None else jnp.asarray(target_stderr, dtype=jnp.float64),
+        min_probes=None if min_probes is None else jnp.asarray(min_probes, dtype=jnp.int32),
+        max_probes=None if max_probes is None else jnp.asarray(max_probes, dtype=jnp.int32),
+        block_size=jnp.asarray(block_size, dtype=jnp.int32),
+        gradient_supported=jnp.asarray(gradient_supported),
+        implicit_adjoint=jnp.asarray(implicit_adjoint),
+        cached_adjoint_supported=jnp.asarray(cached_adjoint_supported),
         structured=structured,
         algebra=algebra,
         maxiter=maxiter,
@@ -2512,7 +2735,8 @@ def slq_spectral_density(nodes: jax.Array, weights: jax.Array, bin_edges: jax.Ar
     coeffs = jnp.real(jnp.asarray(weights, dtype=jnp.complex128))
     left = vals[:, None] >= edges[:-1][None, :]
     right = vals[:, None] < edges[1:][None, :]
-    last_bin = vals[:, None] == edges[-1][None, :]
+    last_edge = edges[-1]
+    last_bin = vals[:, None] == last_edge
     mask = (left & right) | (last_bin & (jnp.arange(edges.shape[0] - 1) == edges.shape[0] - 2)[None, :])
     hist = jnp.sum(jnp.where(mask, coeffs[:, None], 0.0), axis=0)
     if normalize:
@@ -2557,6 +2781,44 @@ def slq_spectral_density_from_metadata(
 
 def hutchpp_trace_from_metadata(metadata: HutchppTraceMetadata):
     return metadata.low_rank_trace + metadata.residual_trace
+
+
+def rational_hutchpp_probe_deficit(
+    metadata: RationalHutchppMetadata,
+    estimate: HutchppTraceMetadata,
+) -> jax.Array:
+    del metadata
+    return probe_statistics_probe_deficit(estimate.statistics)
+
+
+def rational_hutchpp_next_probe_count(
+    metadata: RationalHutchppMetadata,
+    estimate: HutchppTraceMetadata,
+) -> jax.Array:
+    max_probes = None if metadata.max_probes is None else int(jnp.asarray(metadata.max_probes))
+    return probe_statistics_next_probe_count(
+        estimate.statistics,
+        block_size=int(jnp.asarray(metadata.block_size)),
+        max_probes=max_probes,
+    )
+
+
+def rational_hutchpp_should_stop(
+    metadata: RationalHutchppMetadata,
+    estimate: HutchppTraceMetadata,
+) -> jax.Array:
+    if metadata.target_stderr is None:
+        if metadata.max_probes is None:
+            return jnp.asarray(False)
+        return jnp.asarray(
+            jnp.asarray(estimate.statistics.probe_count, dtype=jnp.int32)
+            >= jnp.asarray(metadata.max_probes, dtype=jnp.int32)
+        )
+    return probe_statistics_should_stop(
+        estimate.statistics,
+        target_stderr=float(jnp.asarray(metadata.target_stderr)),
+        max_probes=None if metadata.max_probes is None else int(jnp.asarray(metadata.max_probes)),
+    )
 
 
 def slq_prepare_metadata_point(
@@ -2649,6 +2911,22 @@ def make_hutchpp_trace_metadata(
     )
 
 
+_LAZY_MODULE_ATTRS = {
+    "matfree_adjoints": (".matfree_adjoints", None),
+}
+
+
+def __getattr__(name: str):
+    target = _LAZY_MODULE_ATTRS.get(name)
+    if target is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    module_name, attr_name = target
+    module = importlib.import_module(module_name, __package__)
+    value = module if attr_name is None else getattr(module, attr_name)
+    globals()[name] = value
+    return value
+
+
 __all__ = [
     "OperatorPlan",
     "ScaledOperator",
@@ -2679,6 +2957,8 @@ __all__ = [
     "oriented_shell_preconditioner_plan",
     "identity_preconditioner_plan",
     "diagonal_preconditioner_plan",
+    "sparse_lu_preconditioner_plan",
+    "sparse_cholesky_preconditioner_plan",
     "dense_jacobi_preconditioner_plan",
     "finite_difference_operator_plan",
     "finite_difference_operator_plan_set_base",
@@ -2718,6 +2998,8 @@ __all__ = [
     "eig_restart_column_order",
     "eig_expansion_column_order",
     "eig_restart_basis_from_pairs",
+    "eig_filter_residual_corrections",
+    "eig_target_subspace_cols",
     "ritz_pairs_from_basis",
     "block_subspace_iteration_point",
     "restarted_subspace_iteration_point",
@@ -2729,7 +3011,9 @@ __all__ = [
     "complexify_real_linear_operator",
     "operator_apply_point",
     "poly_action_point",
+    "poly_action_with_diagnostics_point",
     "expm_action_point",
+    "expm_action_with_diagnostics_point",
     "restarted_action_point",
     "block_action_point",
     "rademacher_probes_real",
@@ -2745,6 +3029,8 @@ __all__ = [
     "adaptive_probe_count_from_pilot",
     "probe_statistics_target_met",
     "probe_statistics_should_stop",
+    "probe_statistics_probe_deficit",
+    "probe_statistics_next_probe_count",
     "expand_subspace_with_corrections",
     "make_deflated_operator_metadata",
     "make_rational_hutchpp_metadata",
@@ -2763,6 +3049,9 @@ __all__ = [
     "slq_spectral_density_from_metadata",
     "slq_prepare_metadata_point",
     "hutchpp_trace_from_metadata",
+    "rational_hutchpp_probe_deficit",
+    "rational_hutchpp_next_probe_count",
+    "rational_hutchpp_should_stop",
     "make_slq_quadrature_metadata",
     "make_hutchpp_trace_metadata",
 ]

@@ -13,13 +13,25 @@ from pathlib import Path
 import jax
 import jax.numpy as jnp
 
-from arbplusjax import scb_vblock_mat
-from arbplusjax import srb_vblock_mat
 from benchmarks.schema import BenchmarkMeasurement
 from benchmarks.schema import BenchmarkRecord
 from benchmarks.schema import BenchmarkReport
 from benchmarks.schema import write_benchmark_report
 from tools.runtime_manifest import collect_runtime_manifest
+
+
+scb_vblock_mat = None
+srb_vblock_mat = None
+
+
+def _load_vblock_matrix_modules() -> None:
+    global scb_vblock_mat, srb_vblock_mat
+    if scb_vblock_mat is None:
+        from arbplusjax import scb_vblock_mat as _scb_vblock_mat
+        from arbplusjax import srb_vblock_mat as _srb_vblock_mat
+
+        scb_vblock_mat = _scb_vblock_mat
+        srb_vblock_mat = _srb_vblock_mat
 
 
 def _time_call(fn, *args, warmup: int, runs: int) -> float:
@@ -42,6 +54,7 @@ def _row_col_sizes(total_n: int) -> jax.Array:
 
 
 def _real_case(n: int, real_dtype):
+    _load_vblock_matrix_modules()
     dense = jnp.zeros((n, n), dtype=real_dtype)
     for i in range(n):
         dense = dense.at[i, i].set(2.0 + 0.25 * i)
@@ -57,6 +70,7 @@ def _real_case(n: int, real_dtype):
 
 
 def _complex_case(n: int, real_dtype, complex_dtype):
+    _load_vblock_matrix_modules()
     dense = jnp.zeros((n, n), dtype=complex_dtype)
     for i in range(n):
         dense = dense.at[i, i].set(2.0 + 0.25j + 0.2 * i)
@@ -84,6 +98,7 @@ def main() -> None:
         default=Path("experiments/benchmarks/outputs/matrix/benchmark_vblock_sparse_matrix_surface.json"),
     )
     args = parser.parse_args()
+    _load_vblock_matrix_modules()
     real_dtype = jnp.float64 if args.dtype == "float64" else jnp.float32
     complex_dtype = jnp.complex128 if args.dtype == "float64" else jnp.complex64
 
@@ -98,6 +113,36 @@ def main() -> None:
     rmat, rplan, rvec, rrhs = _real_case(args.n, real_dtype)
     cmat, cplan, cvec, crhs = _complex_case(args.n, real_dtype, complex_dtype)
     stats = {
+        "srb_vblock_storage_prepare_s": _time_call(
+            lambda: srb_vblock_mat.srb_vblock_mat_from_dense_csr(
+                srb_vblock_mat.srb_vblock_mat_to_dense(rmat),
+                row_block_sizes=rmat.row_block_sizes,
+                col_block_sizes=rmat.col_block_sizes,
+            ),
+            warmup=args.warmup,
+            runs=args.runs,
+        ),
+        "scb_vblock_storage_prepare_s": _time_call(
+            lambda: scb_vblock_mat.scb_vblock_mat_from_dense_csr(
+                scb_vblock_mat.scb_vblock_mat_to_dense(cmat),
+                row_block_sizes=cmat.row_block_sizes,
+                col_block_sizes=cmat.col_block_sizes,
+            ),
+            warmup=args.warmup,
+            runs=args.runs,
+        ),
+        "srb_vblock_cached_prepare_s": _time_call(
+            srb_vblock_mat.srb_vblock_mat_matvec_cached_prepare,
+            rmat,
+            warmup=args.warmup,
+            runs=args.runs,
+        ),
+        "scb_vblock_cached_prepare_s": _time_call(
+            scb_vblock_mat.scb_vblock_mat_matvec_cached_prepare,
+            cmat,
+            warmup=args.warmup,
+            runs=args.runs,
+        ),
         "srb_vblock_matvec_s": _time_call(jax.jit(srb_vblock_mat.srb_vblock_mat_matvec), rmat, rvec, warmup=args.warmup, runs=args.runs),
         "srb_vblock_matvec_cached_s": _time_call(jax.jit(srb_vblock_mat.srb_vblock_mat_matvec_cached_apply), rplan, rvec, warmup=args.warmup, runs=args.runs),
         "scb_vblock_matvec_s": _time_call(jax.jit(scb_vblock_mat.scb_vblock_mat_matvec), cmat, cvec, warmup=args.warmup, runs=args.runs),
@@ -149,7 +194,7 @@ def main() -> None:
                     BenchmarkMeasurement(name="requested_dtype", value=args.dtype),
                     BenchmarkMeasurement(name="smoke", value=args.smoke),
                 ),
-                notes="Variable-block sparse matrix benchmark normalized onto the shared benchmark schema; stdout remains metric-style for notebook compatibility.",
+                notes="Variable-block sparse matrix benchmark normalized onto the shared benchmark schema; storage-format preparation and cached-plan preparation are reported separately from solve-quality kernels.",
             )
         )
     report = BenchmarkReport(
@@ -161,7 +206,7 @@ def main() -> None:
             Path(__file__).resolve().parents[1],
             jax_mode="gpu" if jax.default_backend() in {"gpu", "cuda"} else "cpu",
         ),
-        notes="Variable-block sparse matrix benchmark. Stdout preserves metric-style lines for notebook/report compatibility.",
+        notes="Variable-block sparse matrix benchmark. Stdout preserves metric-style lines for notebook/report compatibility and separates storage/plan preparation from solver-quality kernels.",
     )
     write_benchmark_report(args.output, report)
 

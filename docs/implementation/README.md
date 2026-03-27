@@ -1,4 +1,4 @@
-Last updated: 2026-03-23T00:00:00Z
+Last updated: 2026-03-25T00:00:00Z
 
 # Implementation
 
@@ -14,9 +14,11 @@ Implementation notes explain how the code is built and organized. Practical runb
 
 ## Direct Implementation Notes
 
+- [api_cold_path_audit.md](/docs/implementation/api_cold_path_audit.md)
 - [benchmark_process_implementation.md](/docs/implementation/benchmark_process_implementation.md)
 - [benchmarks_implementation.md](/docs/implementation/benchmarks_implementation.md)
 - [build_implementation.md](/docs/implementation/build_implementation.md)
+- [curvature_implementation.md](/docs/implementation/curvature_implementation.md)
 - [dense_matrix_tranche_implementation.md](/docs/implementation/dense_matrix_tranche_implementation.md)
 - [jax_setup_implementation.md](/docs/implementation/jax_setup_implementation.md)
 - [linux_gpu_colab_implementation.md](/docs/implementation/linux_gpu_colab_implementation.md)
@@ -29,4 +31,7 @@ Implementation notes explain how the code is built and organized. Practical runb
 - [soft_ops_optional_implementation.md](/docs/implementation/soft_ops_optional_implementation.md)
 - [sparse_matrix_tranche_implementation.md](/docs/implementation/sparse_matrix_tranche_implementation.md)
 - [stable_kernel_subset_implementation.md](/docs/implementation/stable_kernel_subset_implementation.md)
+- [startup_compile_repo_template.md](/docs/implementation/startup_compile_repo_template.md)
+- [startup_compile_rollout_implementation.md](/docs/implementation/startup_compile_rollout_implementation.md)
 - [testing_harness_implementation.md](/docs/implementation/testing_harness_implementation.md)
+- [update_implementation.md](/docs/implementation/update_implementation.md)

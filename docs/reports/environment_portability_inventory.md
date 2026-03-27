@@ -1,9 +1,9 @@
-Last updated: 2026-03-22T00:00:00Z
+Last updated: 2026-03-25T00:00:00Z
 
 # Environment Portability Inventory
 
-This report records the current portability surfaces for WSL and cloud notebook
-environments.
+This report records the current portability surfaces for GitHub submission,
+Windows, Linux/WSL, and cloud notebook environments.
 
 Policy lives in:
 
@@ -13,6 +13,7 @@ Checked-in configuration now also lives in:
 
 - [cpu_validation_profiles.json](/configs/cpu_validation_profiles.json)
 - [platform_bootstrap_profiles.json](/configs/platform_bootstrap_profiles.json)
+- [optional_comparison_backends.json](/configs/optional_comparison_backends.json)
 
 ## Current Portable Entry Points
 
@@ -55,6 +56,18 @@ Status:
 - CPU-safe default bootstrap present
 - optional GPU upgrade path present
 
+### GitHub submission
+
+- [.github/workflows/tests.yml](/.github/workflows/tests.yml)
+- [.github/workflows/docs-indexes.yml](/.github/workflows/docs-indexes.yml)
+
+Status:
+
+- Windows and Ubuntu are checked as source-tree platforms
+- a Colab-compatible bootstrap path is validated on Ubuntu
+- generated docs/reports are refreshed and checked for drift
+- optional compare-stack install is validated separately from the canonical runtime path
+
 ### Example notebooks
 
 - [README.md](/examples/README.md)
@@ -74,7 +87,7 @@ Status:
 
 - shared manifest schema already in use across test and benchmark harnesses
 
-## Current WSL / Colab Docs
+## Current Platform Docs
 
 - [run_platform_implementation.md](/docs/implementation/run_platform_implementation.md)
 - [linux_gpu_colab_implementation.md](/docs/implementation/linux_gpu_colab_implementation.md)
@@ -82,18 +95,19 @@ Status:
 
 ## Current Strengths
 
-- native Windows, Linux/WSL, and Colab now share the same source-tree install model
+- native Windows, Linux/WSL, GitHub runners, and Colab now share the same source-tree install model
 - WSL is already used in practice for local JAX runs
 - Google Colab is already mentioned in test/example run docs
 - runtime manifests already capture environment details
 - examples/tests/benchmarks already have explicit environment-aware harness entrypoints
 - the bounded CPU validation slice is now expressed as checked-in config under `configs/`
 - a checked-in platform bootstrap profile now records the intended install/validation entrypoints
+- a checked-in optional comparison/backend inventory now records `c_arb`, Mathematica, `mpmath`, `scipy`, `jax.scipy`, and experimental JAX paths
 
 ## Current Gaps
 
 - not every notebook or experiment currently summarizes portability assumptions explicitly
-- the third-party comparison software install matrix is still documented in prose rather than a single machine-readable inventory
+- licensed third-party backends such as Mathematica remain optional and cannot be fully proven on public GitHub runners
 
 ## Current Portability Conclusion
 

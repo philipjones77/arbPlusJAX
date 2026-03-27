@@ -13,10 +13,6 @@ from pathlib import Path
 import jax
 import jax.numpy as jnp
 
-from arbplusjax import acb_core
-from arbplusjax import acb_mat
-from arbplusjax import arb_mat
-from arbplusjax import double_interval as di
 from benchmarks.schema import BenchmarkMeasurement
 from benchmarks.schema import BenchmarkRecord
 from benchmarks.schema import BenchmarkReport
@@ -24,7 +20,28 @@ from benchmarks.schema import write_benchmark_report
 from tools.runtime_manifest import collect_runtime_manifest
 
 
+acb_core = None
+acb_mat = None
+arb_mat = None
+di = None
+
+
+def _load_dense_matrix_modules() -> None:
+    global acb_core, acb_mat, arb_mat, di
+    if acb_core is None:
+        from arbplusjax import acb_core as _acb_core
+        from arbplusjax import acb_mat as _acb_mat
+        from arbplusjax import arb_mat as _arb_mat
+        from arbplusjax import double_interval as _di
+
+        acb_core = _acb_core
+        acb_mat = _acb_mat
+        arb_mat = _arb_mat
+        di = _di
+
+
 def _interval_matrix_from_point(a: jax.Array) -> jax.Array:
+    _load_dense_matrix_modules()
     return di.interval(a, a)
 
 
@@ -246,6 +263,7 @@ def main() -> None:
         default=Path("experiments/benchmarks/outputs/matrix/benchmark_dense_matrix_surface.json"),
     )
     args = parser.parse_args()
+    _load_dense_matrix_modules()
     real_dtype = jnp.float64 if args.dtype == "float64" else jnp.float32
     complex_dtype = jnp.complex128 if args.dtype == "float64" else jnp.complex64
 

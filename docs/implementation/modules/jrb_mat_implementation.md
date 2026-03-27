@@ -177,6 +177,14 @@ Matrix-free layer:
 - polynomial and nonlinear Hermitian point surfaces now exist through Newton refinement on the smallest-magnitude shift-invert eigenpair, with polynomial operators built automatically from coefficient operator families
 - those eigensolver paths now also expose diagnostics surfaces and the current Davidson/Jacobi-Davidson block retains and expands the trial subspace instead of collapsing back to a fixed-width basis each iteration
 - `logdet` and solve can now be returned together through `jrb_mat_logdet_solve_*`, with shared auxiliary metadata packaged in `matrix_free_core`
+- solve and inverse-action point surfaces now route through `matrix_free_core.implicit_krylov_solve_midpoint`, which uses `jax.lax.custom_linear_solve` on the current operator-plan substrate for implicit-adjoint differentiation
+- solve/logdet bundles now retain compact cached operator metadata including transpose-operator policy so Laplace-style corrections and downstream operator workflows do not depend on replaying solver iterations in the backward pass
+- SLQ/Hutch++ metadata postprocessing is now centralized in `matrix_free_core`
+  so heat-trace, spectral-density, and Hutch++ reductions do not drift between
+  the real and complex Jones wrappers
+- `trace_estimate_basic`, `logdet_estimate_basic`, `heat_trace_slq_basic`, and
+  `hutchpp_trace_estimate_basic` now present a more uniform basic-surface story
+  on the real operator stack
 - operator plans now also cover shell callbacks, finite-difference Jacobian-vector products, block/vblock sparse adapters, and a parameter-differentiable sparse `BCOO` closure path
 - Backward support now exists for the input/probe vector pathways through custom VJPs on:
   - `jrb_mat_funm_action_lanczos_point`
@@ -196,7 +204,7 @@ Current correctness coverage:
 
 Current benchmark coverage:
 - [benchmark_matrix_free_krylov.py](/benchmarks/benchmark_matrix_free_krylov.py)
-- current report: [matrix_free_krylov_benchmark.md](/docs/status/reports/matrix_free_krylov_benchmark.md)
+- current report: [matrix_free_krylov_benchmark.md](/docs/reports/matrix_free_krylov_benchmark.md)
 - optional JSON sanity snapshot: `python tools/slq_logdet_contract_report.py`
 - broader method comparison note: [matrix_logdet_landscape_implementation.md](/docs/implementation/matrix_logdet_landscape_implementation.md)
 - theory note for the sparse SPD Leja path: [sparse_symmetric_leja_hutchpp_logdet.md](/docs/theory/sparse_symmetric_leja_hutchpp_logdet.md)

@@ -29,3 +29,9 @@ Current examples:
 
 - [cpu_validation_profiles.json](/configs/cpu_validation_profiles.json)
 - [platform_bootstrap_profiles.json](/configs/platform_bootstrap_profiles.json)
+- [optional_comparison_backends.json](/configs/optional_comparison_backends.json)
+
+The platform bootstrap profile inventory is the checked-in companion to:
+
+- [requirements-colab.txt](/requirements-colab.txt)
+- [colab_bootstrap.sh](/tools/colab_bootstrap.sh)

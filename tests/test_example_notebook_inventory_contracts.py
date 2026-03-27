@@ -16,6 +16,7 @@ def test_high_priority_example_notebooks_exist() -> None:
         "example_dirichlet_surface.ipynb",
         "example_gamma_family_surface.ipynb",
         "example_barnes_double_gamma_surface.ipynb",
+        "example_hypgeom_family_surface.ipynb",
     }
     existing = {path.name for path in EXAMPLES_DIR.glob("example_*.ipynb")}
     assert required.issubset(existing)

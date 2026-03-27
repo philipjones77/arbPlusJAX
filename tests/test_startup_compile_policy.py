@@ -40,6 +40,15 @@ def test_shared_lazy_jit_helper_exists():
     assert "def lazy_jit(" in text
 
 
+def test_shared_lazy_import_helper_exists():
+    text = _read("src/arbplusjax/lazy_imports.py")
+    assert "def lazy_attr(" in text
+    assert "def lazy_pair(" in text
+    assert "def resolve_lazy_callable(" in text
+    assert "def resolve_lazy_pair(" in text
+    assert "class LazyModuleProxy:" in text
+
+
 def test_acb_dirichlet_defers_series_missing_impl_import():
     text = _read("src/arbplusjax/acb_dirichlet.py")
     top_level = text.split("def __getattr__(name: str):", 1)[0]

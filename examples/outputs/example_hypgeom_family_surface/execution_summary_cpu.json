@@ -1,0 +1,8 @@
+{
+  "elapsed_s": 288.889243,
+  "executed_notebook": "examples/outputs/example_hypgeom_family_surface/example_hypgeom_family_surface_cpu_executed.ipynb",
+  "jax_dtype": "float64",
+  "jax_mode": "cpu",
+  "notebook": "example_hypgeom_family_surface.ipynb",
+  "output_root": "examples/outputs/example_hypgeom_family_surface"
+}

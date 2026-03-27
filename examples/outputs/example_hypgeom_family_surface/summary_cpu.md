@@ -1,0 +1,14 @@
+# Example Hypgeom Family Surface Summary (cpu)
+
+- backend: `cpu`
+- benchmark_rows: `6`
+- diagnostics_rows: `6`
+
+## Key Metrics
+
+- `onef1_point_batch_s`: `0.228154`
+- `gamma_lower_regularized_batch_s`: `2.296112`
+- `gamma_upper_regularized_batch_s`: `1.453976`
+- `startup_import_s`: `0.830366`
+- `startup_compile_plus_first_s`: `0.150424`
+- `startup_steady_s`: `8.7e-05`

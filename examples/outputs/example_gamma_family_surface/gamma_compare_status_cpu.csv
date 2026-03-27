@@ -1,0 +1,23 @@
+script,status,tail
+benchmark_gamma_compare.py,failed_or_unavailable,"
+Traceback (most recent call last):
+  File ""/home/phili/projects/arbplusJAX/benchmarks/benchmark_gamma_compare.py"", line 168, in <module>
+    main()
+  File ""/home/phili/projects/arbplusJAX/benchmarks/benchmark_gamma_compare.py"", line 79, in main
+    hyp = load_c_libs(Path(args.arb_repo))
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File ""/home/phili/projects/arbplusJAX/benchmarks/benchmark_gamma_compare.py"", line 41, in load_c_libs
+    raise RuntimeError(""C reference libraries not found in Arb workspace build."")
+RuntimeError: C reference libraries not found in Arb workspace build.
+"
+benchmark_loggamma_compare.py,failed_or_unavailable,"
+Traceback (most recent call last):
+  File ""/home/phili/projects/arbplusJAX/benchmarks/benchmark_loggamma_compare.py"", line 304, in <module>
+    main()
+  File ""/home/phili/projects/arbplusJAX/benchmarks/benchmark_loggamma_compare.py"", line 89, in main
+    hyp = load_c_libs(Path(args.arb_repo))
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File ""/home/phili/projects/arbplusJAX/benchmarks/benchmark_loggamma_compare.py"", line 44, in load_c_libs
+    raise RuntimeError(""C reference libraries not found in Arb workspace build."")
+RuntimeError: C reference libraries not found in Arb workspace build.
+"

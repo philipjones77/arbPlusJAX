@@ -24,7 +24,6 @@ defines the shared generation rule.
 The following surfaces should be generated rather than maintained by hand:
 
 - `README.md`
-- `docs/index.md`
 - `docs/project_overview.md`
 - `docs/governance/README.md`
 - `docs/implementation/README.md`

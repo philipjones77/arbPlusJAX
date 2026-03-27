@@ -16,7 +16,15 @@ import subprocess
 import jax.numpy as jnp
 import numpy as np
 
-from arbplusjax import acb_calc
+acb_calc = None
+
+
+def _load_acb_calc():
+    global acb_calc
+    if acb_calc is None:
+        from arbplusjax import acb_calc as _acb_calc
+
+        acb_calc = _acb_calc
 
 
 class DI(ctypes.Structure):
@@ -141,6 +149,7 @@ def main() -> int:
     a = random_boxes(rng, args.samples, 1.5)
     b = random_boxes(rng, args.samples, 1.5)
     n_steps = args.steps
+    _load_acb_calc()
 
     ok = True
     ok &= report(

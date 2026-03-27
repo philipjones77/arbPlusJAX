@@ -19,6 +19,7 @@ It owns:
 - what is allowed at the repo root as stable top-level governance material
 - the role and placement of repo-level checked-in configuration under `configs/`
 - the intended purpose of `AGENTS.md` when present
+- the target internal package decomposition beneath the stable package-root API
 
 This is the canonical repo-level communication and placement standard.
 
@@ -65,9 +66,39 @@ It should explain:
 - the intended system decomposition
 - major subsystem boundaries
 - how runtime, contracts, docs, reports, and status fit together
+- the target internal package decomposition when the repo is being refactored
+  without changing the package-root public API
 
 It belongs in `docs/governance/` because it is a structural governance
 document, not an implementation note.
+
+Current architectural direction for the runtime source tree:
+
+- keep the public package API stable at `arbplusjax/__init__.py`
+- organize internal runtime code toward six category packages:
+  - `core_scalar`
+  - `special`
+  - `dense_matrix`
+  - `sparse_matrix`
+  - `matrix_free`
+  - `transforms`
+- place reusable cross-category substrate in explicit helper layers such as
+  `runtime`, `diagnostics`, `validation`, `precision`, `curvature`, or other
+  clearly named helper modules
+- execute that structural refactor in tranches rather than mass-moving the
+  whole runtime tree at once
+
+Curvature-specific rule:
+
+- the repo should treat curvature as a shared helper layer rather than as a
+  seventh public runtime category
+- operator-first second-order structure such as Hessians, HVPs, GGN, Fisher,
+  posterior precision, low-rank/Lanczos approximations, inverse-diagonal
+  estimation, and implicit-adjoint curvature solves should converge under
+  `arbplusjax/curvature/`
+- dense, sparse, and matrix-free modules may expose category-specific public
+  surfaces, but the reusable curvature substrate should not be hidden inside
+  one matrix family
 
 ### `docs/governance/documentation_governance.md`
 
@@ -173,7 +204,6 @@ The following repo-level landing surfaces should be generated and refreshed
 automatically:
 
 - `README.md`
-- `docs/index.md`
 - `docs/project_overview.md`
 - docs section `README.md` files that are generated indexes
 - implementation subtree `README.md` files when those folders act as indexed

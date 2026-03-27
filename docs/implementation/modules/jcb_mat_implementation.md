@@ -154,6 +154,15 @@ Matrix-free layer:
 - polynomial and nonlinear Hermitian point surfaces now exist through Newton refinement on the smallest-magnitude shift-invert eigenpair, with polynomial operators built automatically from coefficient operator families
 - Hermitian projected action/integrand paths now have dedicated Lanczos-backed implementations, so the main Hermitian/HPD function-action wrappers no longer route through generic Arnoldi kernels by default
 - `logdet` and solve can now be returned together through `jcb_mat_logdet_solve_*`, with shared auxiliary metadata packaged in `matrix_free_core`
+- solve and inverse-action point surfaces now route through `matrix_free_core.implicit_krylov_solve_midpoint`, which uses `jax.lax.custom_linear_solve` on the current operator-plan substrate for implicit-adjoint differentiation
+- solve/logdet bundles now retain compact cached operator metadata including transpose/adjoint-operator policy so Laplace-style corrections and downstream operator workflows do not depend on replaying solver iterations in the backward pass
+- SLQ/Hutch++ metadata postprocessing is now centralized in `matrix_free_core`
+  so heat-trace, spectral-density, and Hutch++ reductions do not drift between
+  the real and complex Jones wrappers
+- `trace_estimate_basic`, `logdet_estimate_basic`,
+  `heat_trace_slq_hermitian_basic`, and `hutchpp_trace_estimate_basic` now
+  provide the same basic-estimator naming/consolidation pattern on the complex
+  operator stack
 - operator plans now also cover shell callbacks, finite-difference Jacobian-vector products, block/vblock sparse adapters, and a parameter-differentiable sparse `BCOO` closure path
 - Backward support now exists for the input/probe vector pathways through custom VJPs on:
   - `jcb_mat_funm_action_arnoldi_point`
@@ -170,7 +179,7 @@ Current correctness coverage:
 
 Current benchmark coverage:
 - [benchmark_matrix_free_krylov.py](/benchmarks/benchmark_matrix_free_krylov.py)
-- current report: [matrix_free_krylov_benchmark.md](/docs/status/reports/matrix_free_krylov_benchmark.md)
+- current report: [matrix_free_krylov_benchmark.md](/docs/reports/matrix_free_krylov_benchmark.md)
 
 Current diagnostic contract:
 - structured diagnostics now exist via `JcbMatKrylovDiagnostics`

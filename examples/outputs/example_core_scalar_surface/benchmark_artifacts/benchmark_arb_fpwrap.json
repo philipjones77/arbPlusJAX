@@ -6,13 +6,13 @@
     "env": {
       "ARB_C_REF_DIR": "",
       "JAX_PLATFORMS": "cpu",
-      "PYTHONPATH": "/home/phili/projects/arbplusJAX/src:",
+      "PYTHONPATH": "/home/phili/projects/arbplusJAX/src:/home/phili/projects/arbplusJAX/src:",
       "XLA_PYTHON_CLIENT_MEM_FRACTION": "",
       "XLA_PYTHON_CLIENT_PREALLOCATE": ""
     },
     "environment_kind": "wsl",
     "git": {
-      "commit": "0e77df8709cb9b787bf456257d5b7fe1d8468ed2"
+      "commit": "591217612238e41941ea34b9b29762473bb1e147"
     },
     "jax": {
       "available": true,
@@ -35,7 +35,7 @@
       "version": "3.12.12"
     },
     "repo_root": "/home/phili/projects/arbplusJAX",
-    "timestamp_utc": "2026-03-22T19:04:14Z"
+    "timestamp_utc": "2026-03-26T21:28:19Z"
   },
   "notes": "",
   "records": [
@@ -47,7 +47,7 @@
       "ad_residual": null,
       "benchmark_name": "benchmark_arb_fpwrap.py",
       "category": "scalar",
-      "cold_time_s": 0.04209478700022373,
+      "cold_time_s": 0.04499654800008557,
       "concern": "scalar_speed",
       "device": "cpu",
       "dtype": "float64",
@@ -57,10 +57,10 @@
       "notes": "",
       "operation": "arb_fpwrap_double_exp",
       "python_overhead_s": null,
-      "recompile_time_s": 0.032324597999831894,
+      "recompile_time_s": 0.02758626600007119,
       "residual": null,
       "tags": [],
-      "warm_time_s": 1.5595666506366495e-05
+      "warm_time_s": 2.156499999728112e-05
     }
   ],
   "schema_version": "v1"

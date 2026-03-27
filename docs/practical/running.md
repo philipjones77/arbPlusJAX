@@ -1,4 +1,4 @@
-Last updated: 2026-03-17T00:00:00Z
+Last updated: 2026-03-25T00:00:00Z
 
 # Running Guide
 
@@ -11,6 +11,7 @@ This page is for the practical question: how should someone actually run arbPlus
 - use `benchmarks/run_benchmarks.py` for benchmark sweeps and backend comparison
 - use [linux_gpu_colab_implementation.md](/docs/implementation/linux_gpu_colab_implementation.md) for Colab and Linux GPU runs
 - use [requirements-colab.txt](/requirements-colab.txt) and [colab_bootstrap.sh](/tools/colab_bootstrap.sh) for a CPU-safe Colab bootstrap that matches the local source-tree install
+- use [optional_comparison_backends.json](/configs/optional_comparison_backends.json) for the checked-in comparison/reference backend policy
 
 ## Day-to-day workflow
 
@@ -19,6 +20,7 @@ This page is for the practical question: how should someone actually run arbPlus
 - benchmark smoke checks separately from correctness
 - long benchmark sweeps outside the normal test loop
 - keep Linux, Windows, and Colab on the same source tree and the same repo entrypoints; switch backend mode with environment/harness flags rather than editing notebooks or scripts
+- treat Mathematica, `c_arb`, `mpmath`, `scipy`, `jax.scipy`, and experimental kernels as optional comparison layers rather than required runtime dependencies
 
 ## Supporting references
 

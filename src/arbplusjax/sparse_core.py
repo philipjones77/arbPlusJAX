@@ -1,8 +1,39 @@
 from __future__ import annotations
 
+from typing import NamedTuple
+
 import jax
 import jax.numpy as jnp
 from jax import ops
+
+
+class SparseNativePolicyDiagnostics(NamedTuple):
+    sparse_native: jax.Array
+    dense_lift_used: jax.Array
+    preserves_sparse_output: jax.Array
+    structured_input_required: jax.Array
+    rows: jax.Array
+    cols: jax.Array
+    nnz: jax.Array
+
+
+def sparse_native_policy_diagnostics(
+    x,
+    *,
+    sparse_native: bool,
+    dense_lift_used: bool,
+    preserves_sparse_output: bool,
+    structured_input_required: bool = False,
+) -> SparseNativePolicyDiagnostics:
+    return SparseNativePolicyDiagnostics(
+        sparse_native=jnp.asarray(sparse_native),
+        dense_lift_used=jnp.asarray(dense_lift_used),
+        preserves_sparse_output=jnp.asarray(preserves_sparse_output),
+        structured_input_required=jnp.asarray(structured_input_required),
+        rows=jnp.asarray(getattr(x, "rows")),
+        cols=jnp.asarray(getattr(x, "cols")),
+        nnz=jnp.asarray(getattr(x, "data").shape[0], dtype=jnp.int32),
+    )
 
 
 def swap_rows_dense_lax(a: jax.Array, i: int, j: int) -> jax.Array:
@@ -516,6 +547,45 @@ def sparse_lu_via_jax_dense(x, *, as_csr_fn, to_dense_fn, from_dense_csr_fn, per
         algebra=csr.algebra,
     )
     return p, l_sparse, u_sparse
+
+
+__all__ = [
+    "SparseNativePolicyDiagnostics",
+    "sparse_native_policy_diagnostics",
+    "swap_rows_dense_lax",
+    "swap_rows_dense",
+    "swap_perm_lax",
+    "swap_perm",
+    "dense_sparse_lu_partial_pivot_lax",
+    "dense_sparse_lu_partial_pivot",
+    "dense_householder_qr_real",
+    "dense_householder_qr_complex",
+    "sparse_midpoint_symmetric_part",
+    "sparse_midpoint_hermitian_part",
+    "sparse_midpoint_is_symmetric",
+    "sparse_midpoint_is_hermitian",
+    "sparse_midpoint_is_spd",
+    "sparse_midpoint_is_hpd",
+    "sparse_midpoint_cho_from_symmetric_part",
+    "sparse_midpoint_ldl_from_cho",
+    "coalesce_coo",
+    "sparse_diag",
+    "sparse_norm_1",
+    "sparse_norm_inf",
+    "sparse_matmul_sparse",
+    "sparse_structured_part_real",
+    "sparse_structured_part_hermitian",
+    "sparse_is_symmetric_structural",
+    "sparse_is_hermitian_structural",
+    "sparse_ldl_structural",
+    "sparse_cho_structural",
+    "sparse_is_pd_structural",
+    "sparse_lowest_eig_real_symmetric",
+    "sparse_lowest_eig_hermitian",
+    "sparse_is_spd_structural",
+    "sparse_is_hpd_structural",
+    "sparse_lu_via_jax_dense",
+]
 
 
 def sparse_direct_solve(x, b, *, to_dense_fn):

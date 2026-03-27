@@ -26,7 +26,7 @@ def test_platform_bootstrap_profiles_cover_windows_linux_and_colab() -> None:
     config = REPO_ROOT / "configs" / "platform_bootstrap_profiles.json"
     payload = json.loads(config.read_text(encoding="utf-8"))
 
-    assert set(payload) == {"linux", "windows", "colab"}
+    assert set(payload) == {"linux", "wsl", "windows", "github_submission", "colab"}
     for key, entry in payload.items():
         assert entry["purpose"]
         assert entry["owner"]
@@ -40,10 +40,14 @@ def test_portability_docs_reference_checked_in_bootstrap_surfaces() -> None:
     readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
     standard = (REPO_ROOT / "docs" / "standards" / "environment_portability_standard.md").read_text(encoding="utf-8")
     inventory = (REPO_ROOT / "docs" / "reports" / "environment_portability_inventory.md").read_text(encoding="utf-8")
+    compare = (REPO_ROOT / "requirements-compare.txt").read_text(encoding="utf-8")
+    config_readme = (REPO_ROOT / "configs" / "README.md").read_text(encoding="utf-8")
 
-    for text in (readme, standard, inventory):
+    for text in (readme, standard, inventory, config_readme):
         assert "requirements-colab.txt" in text
         assert "colab_bootstrap.sh" in text
+        assert "optional_comparison_backends.json" in text
 
     assert "native Windows" in standard
     assert "platform_bootstrap_profiles.json" in inventory
+    assert "mpmath" in compare

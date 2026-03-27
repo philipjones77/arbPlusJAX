@@ -1,4 +1,4 @@
-Last updated: 2026-03-23T00:00:00Z
+Last updated: 2026-03-25T00:00:00Z
 
 # Reports
 
@@ -10,6 +10,8 @@ Standards:
 
 Current reports:
 - [alternative_functions.md](/docs/reports/alternative_functions.md)
+- [api_cold_path_inventory.md](/docs/reports/api_cold_path_inventory.md)
+- [api_first_use_inventory.md](/docs/reports/api_first_use_inventory.md)
 - [arb_like_functions.md](/docs/reports/arb_like_functions.md)
 - [benchmark_group_inventory.md](/docs/reports/benchmark_group_inventory.md)
 - [cache_aware_surface_inventory.md](/docs/reports/cache_aware_surface_inventory.md)
@@ -19,12 +21,14 @@ Current reports:
 - [current_repo_mapping.md](/docs/reports/current_repo_mapping.md)
 - [dense_matrix_engineering_status.md](/docs/reports/dense_matrix_engineering_status.md)
 - [dense_matrix_surface_benchmark.md](/docs/reports/dense_matrix_surface_benchmark.md)
+- [entry_script_startup_inventory.md](/docs/reports/entry_script_startup_inventory.md)
 - [environment_portability_inventory.md](/docs/reports/environment_portability_inventory.md)
 - [example_notebook_inventory.md](/docs/reports/example_notebook_inventory.md)
 - [function_engineering_status.md](/docs/reports/function_engineering_status.md)
 - [function_implementation_index.md](/docs/reports/function_implementation_index.md)
 - [function_provenance_registry.md](/docs/reports/function_provenance_registry.md)
 - [hypgeom_status.md](/docs/reports/hypgeom_status.md)
+- [matrix_free_first_use_inventory.md](/docs/reports/matrix_free_first_use_inventory.md)
 - [matrix_free_krylov_benchmark.md](/docs/reports/matrix_free_krylov_benchmark.md)
 - [matrix_surface_workbook.md](/docs/reports/matrix_surface_workbook.md)
 - [new_functions.md](/docs/reports/new_functions.md)
@@ -32,3 +36,4 @@ Current reports:
 - [point_fast_jax_function_inventory.md](/docs/reports/point_fast_jax_function_inventory.md)
 - [repo_organization_by_coverage_categories.md](/docs/reports/repo_organization_by_coverage_categories.md)
 - [report_status_refresh_inventory.md](/docs/reports/report_status_refresh_inventory.md)
+- [special_function_status.md](/docs/reports/special_function_status.md)

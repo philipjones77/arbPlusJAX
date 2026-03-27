@@ -13,6 +13,8 @@ Policy:
 |---|---|---|
 | [docs/reports/README.md](/docs/reports/README.md) | `generated` | `python tools/generate_docs_indexes.py` |
 | [docs/reports/alternative_functions.md](/docs/reports/alternative_functions.md) | `generated` | `python tools/function_provenance_report.py` |
+| [docs/reports/api_cold_path_inventory.md](/docs/reports/api_cold_path_inventory.md) | `generated` | `python tools/api_cold_path_report.py` |
+| [docs/reports/api_first_use_inventory.md](/docs/reports/api_first_use_inventory.md) | `generated` | `python tools/api_first_use_report.py` |
 | [docs/reports/arb_like_functions.md](/docs/reports/arb_like_functions.md) | `generated` | `python tools/function_provenance_report.py` |
 | [docs/reports/benchmark_group_inventory.md](/docs/reports/benchmark_group_inventory.md) | `manual-authoritative` | `update the benchmark taxonomy/inventory doc when benchmark group ownership changes` |
 | [docs/reports/cache_aware_surface_inventory.md](/docs/reports/cache_aware_surface_inventory.md) | `generated` | `python tools/cache_aware_surface_report.py` |
@@ -22,12 +24,14 @@ Policy:
 | [docs/reports/current_repo_mapping.md](/docs/reports/current_repo_mapping.md) | `generated` | `python tools/generate_docs_indexes.py` |
 | [docs/reports/dense_matrix_engineering_status.md](/docs/reports/dense_matrix_engineering_status.md) | `manual-authoritative` | `update the owning source document directly` |
 | [docs/reports/dense_matrix_surface_benchmark.md](/docs/reports/dense_matrix_surface_benchmark.md) | `manual-authoritative` | `update the owning source document directly` |
+| [docs/reports/entry_script_startup_inventory.md](/docs/reports/entry_script_startup_inventory.md) | `generated` | `python tools/entry_script_startup_report.py` |
 | [docs/reports/environment_portability_inventory.md](/docs/reports/environment_portability_inventory.md) | `manual-authoritative` | `update when environment targets, bootstrap scripts, or portability support changes` |
 | [docs/reports/example_notebook_inventory.md](/docs/reports/example_notebook_inventory.md) | `manual-authoritative` | `regenerate notebooks and refresh inventory when canonical notebook set changes` |
 | [docs/reports/function_engineering_status.md](/docs/reports/function_engineering_status.md) | `generated` | `python tools/function_provenance_report.py` |
 | [docs/reports/function_implementation_index.md](/docs/reports/function_implementation_index.md) | `generated` | `python tools/function_provenance_report.py` |
 | [docs/reports/function_provenance_registry.md](/docs/reports/function_provenance_registry.md) | `generated` | `python tools/function_provenance_report.py` |
 | [docs/reports/hypgeom_status.md](/docs/reports/hypgeom_status.md) | `generated` | `python tools/hypgeom_status_report.py` |
+| [docs/reports/matrix_free_first_use_inventory.md](/docs/reports/matrix_free_first_use_inventory.md) | `generated` | `python tools/matrix_free_first_use_report.py` |
 | [docs/reports/matrix_free_krylov_benchmark.md](/docs/reports/matrix_free_krylov_benchmark.md) | `manual-authoritative` | `update the owning source document directly` |
 | [docs/reports/matrix_surface_workbook.md](/docs/reports/matrix_surface_workbook.md) | `generated` | `python benchmarks/matrix_surface_workbook.py --n 4 --warmup 0 --runs 1 --steps 4` |
 | [docs/reports/new_functions.md](/docs/reports/new_functions.md) | `generated` | `python tools/function_provenance_report.py` |
@@ -35,6 +39,7 @@ Policy:
 | [docs/reports/point_fast_jax_function_inventory.md](/docs/reports/point_fast_jax_function_inventory.md) | `generated` | `python tools/point_fast_jax_function_report.py` |
 | [docs/reports/repo_organization_by_coverage_categories.md](/docs/reports/repo_organization_by_coverage_categories.md) | `manual-authoritative` | `update when the repo grouping model or coverage-category map changes` |
 | [docs/reports/report_status_refresh_inventory.md](/docs/reports/report_status_refresh_inventory.md) | `generated` | `python tools/report_status_refresh_inventory.py` |
+| [docs/reports/special_function_status.md](/docs/reports/special_function_status.md) | `generated` | `python tools/special_function_status_report.py` |
 | [docs/status/README.md](/docs/status/README.md) | `generated` | `python tools/generate_docs_indexes.py` |
 | [docs/status/audit.md](/docs/status/audit.md) | `manual-authoritative` | `rerun the audit workflow and refresh the checked-in audit snapshot` |
 | [docs/status/matrix_free_completion_plan.md](/docs/status/matrix_free_completion_plan.md) | `manual-authoritative` | `update when matrix-free/operator completion planning changes` |

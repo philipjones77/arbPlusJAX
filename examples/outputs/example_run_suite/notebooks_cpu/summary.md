@@ -5,4 +5,4 @@
 
 ## Notebooks
 
-- `example_core_scalar_surface.ipynb`: elapsed_s=44.180232, executed=examples/outputs/example_core_scalar_surface/example_core_scalar_surface_cpu_executed.ipynb, output_root=examples/outputs/example_core_scalar_surface
+- `example_hypgeom_family_surface.ipynb`: elapsed_s=288.889243, executed=examples/outputs/example_hypgeom_family_surface/example_hypgeom_family_surface_cpu_executed.ipynb, output_root=examples/outputs/example_hypgeom_family_surface

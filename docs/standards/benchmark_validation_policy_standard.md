@@ -2,7 +2,7 @@
 
 Status: active
 Version: v1.0
-Date: 2026-03-22
+Date: 2026-03-25
 
 ## Purpose
 
@@ -106,8 +106,10 @@ engines.
 Examples:
 
 - JAX-native vs SciPy
+- JAX-native vs JAX-SciPy
 - JAX-native vs PETSc/SLEPc
 - JAX-native vs optional NUFFT backends
+- JAX-native vs `mpmath`, Mathematica, or `c_arb` reference backends when available
 
 Pytest marker:
 
@@ -240,12 +242,19 @@ Expected split:
   - CLI/help-path validation
   - taxonomy completeness
   - canonical benchmark entrypoint coverage for production-facing service/API benchmarks
+- benchmark/reference policy validation:
+  - checked-in comparison backend defaults stay current
+  - optional compare-stack install surfaces remain coherent
 - real benchmark sweeps:
   - run through benchmark tools or dedicated harness profiles
   - write artifacts under `experiments/benchmarks/`
 
 Benchmarks should fail in pytest only on explicit guardrails, not because a full
 performance report exists.
+
+GitHub submission may validate benchmark smoke and benchmark-policy contracts,
+but should not require heavyweight or licensed third-party comparison software
+to be present on every runner.
 
 ## Recompile Minimization Rule
 

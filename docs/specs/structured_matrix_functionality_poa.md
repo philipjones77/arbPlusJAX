@@ -510,7 +510,7 @@ Landing zone:
 - tests: `tests/`
 - benchmark runners: `benchmarks/`
 - broader exploratory sweeps: `experiments/benchmarks/`
-- reports: `docs/status/reports/`
+- reports: `docs/reports/`
 
 ## Minimal Serious Matrix Library Checklist
 

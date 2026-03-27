@@ -1,4 +1,4 @@
-Last updated: 2026-03-07T00:00:00Z
+Last updated: 2026-03-24T00:00:00Z
 
 # Hypgeom Status
 
@@ -9,6 +9,9 @@ Scope:
 - alternative hypergeometric implementations in `boost_hypgeom.py` and `cusf_compat.py`
 
 Summary: `canonical_rows=11`, `alternative_rows=3`, `total_rows=14`.
+- `canonical_four_mode_rows=10`
+- `orthogonal_rows=2`
+- `alternative_four_mode_rows=3`
 
 Columns:
 - `point/basic/adaptive/rigorous`: current public mode availability for the family row
@@ -40,9 +43,16 @@ Columns:
 
 ## Immediate Readout
 
-- The main canonical hypergeometric families `0f1`, `1f1`, `2f1`, and `u` already have all four modes and specialized rigorous kernels.
-- Gamma, erf, and the real Ei/Si/Ci/Shi/Chi/li/dilog/fresnel families already have four modes with ball-wrapper hardening.
-- Orthogonal families are mixed: Legendre/Jacobi/Gegenbauer are stronger than Chebyshev/Laguerre/Hermite.
-- Alternative Boost and CuSF families expose four modes, but their tightening remains shallower than canonical `hypgeom`.
-- Helper consolidation and stricter JAX engineering work are still partial; this report should be used to drive the next staged cleanup rather than claim completion.
+- The headline canonical families `0f1`, `1f1`, `2f1`, `u`, and `pfq` now all expose four public modes with direct family mode-batch routing and fixed-shape padded batch support.
+- Incomplete gamma is now in the same four-mode family view, with direct complement-aware mode-batch cores and explicit regularized-path coverage; it still trails base gamma on maturity.
+- Orthogonal/classical families are now clearer in the view: Legendre/Jacobi/Gegenbauer remain the stronger recurrence-specialized tranche, while Chebyshev/Laguerre/Hermite have caught up on point-batch/API/AD coverage but still use more generic tightening.
+- Alternative Boost and CuSF families now have a materially better view than before: the main Boost families have fixed/padded point/basic/adaptive/rigorous proofs, and CuSF `hyp1f1`/`hyp2f1` have explicit mode-containment and point-AD checks.
+- The remaining gaps are no longer basic surface availability; they are the harder cleanup items: helper consolidation, family-specific adaptive/rigorous specialization outside the headline kernels, compile-noise reduction, and broader benchmark/diagnostic packaging.
+
+## Current Priority Gaps
+
+- Keep reducing helper duplication in `hypgeom.py` so more families share regime/candidate logic without routing through overly generic wrappers.
+- Continue family-specific adaptive/rigorous specialization beyond the headline canonical kernels, especially where interval paths still rely on generic ball-wrapper tightening.
+- Keep extending direct fixed-shape batch and compile-noise audits to the remaining weaker alternative/helper families instead of only the main canonical paths.
+- Expand benchmark and downstream-facing diagnostic/report packaging for the families that are already implemented but not yet reported as cleanly as the core canonical tranche.
 

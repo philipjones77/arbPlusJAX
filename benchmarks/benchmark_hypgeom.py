@@ -16,7 +16,15 @@ import jax.numpy as jnp
 import numpy as np
 import psutil
 
-from arbplusjax import hypgeom
+hypgeom = None
+
+
+def _load_hypgeom():
+    global hypgeom
+    if hypgeom is None:
+        from arbplusjax import hypgeom as _hypgeom
+
+        hypgeom = _hypgeom
 
 
 class DI(ctypes.Structure):
@@ -325,6 +333,7 @@ def main() -> int:
     lib = load_hypgeom_lib(di_path, hyp_path)
     proc = psutil.Process()
     rng = np.random.default_rng(2026)
+    _load_hypgeom()
 
     xr = random_intervals(rng, args.samples_real, 10.0)
     xc = random_acb_boxes(rng, args.samples_complex, 3.0)

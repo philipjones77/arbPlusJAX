@@ -7,6 +7,7 @@ import jax.numpy as jnp
 
 from . import acb_core
 from . import api
+from . import double_gamma
 from . import double_interval as di
 from .capability_registry import DOWNSTREAM_KERNELS, lookup_capability
 
@@ -224,6 +225,50 @@ def incomplete_bessel_k_batch(
     )
 
 
+def provider_incomplete_bessel_i(
+    nu: jax.Array,
+    z: jax.Array,
+    upper_limit: jax.Array,
+    *,
+    mode: str = "point",
+    dtype: str | jnp.dtype | None = None,
+    **kwargs,
+) -> jax.Array:
+    return incomplete_bessel_i(nu, z, upper_limit, mode=mode, dtype=dtype, **kwargs)
+
+
+def provider_incomplete_bessel_k(
+    nu: jax.Array,
+    z: jax.Array,
+    lower_limit: jax.Array,
+    *,
+    mode: str = "point",
+    dtype: str | jnp.dtype | None = None,
+    **kwargs,
+) -> jax.Array:
+    return incomplete_bessel_k(nu, z, lower_limit, mode=mode, dtype=dtype, **kwargs)
+
+
+def barnesdoublegamma(
+    z: jax.Array,
+    tau: jax.Array,
+    *,
+    dtype: str | jnp.dtype | None = None,
+    **kwargs,
+) -> jax.Array:
+    return double_gamma.ifj_barnesdoublegamma(_cast_dtype(z, dtype), _cast_dtype(tau, dtype), **kwargs)
+
+
+def log_barnesdoublegamma(
+    z: jax.Array,
+    tau: jax.Array,
+    *,
+    dtype: str | jnp.dtype | None = None,
+    **kwargs,
+) -> jax.Array:
+    return double_gamma.ifj_log_barnesdoublegamma(_cast_dtype(z, dtype), _cast_dtype(tau, dtype), **kwargs)
+
+
 def list_supported_kernels() -> tuple[str, ...]:
     return tuple(sorted(DOWNSTREAM_KERNELS))
 
@@ -245,6 +290,10 @@ __all__ = [
     "incomplete_bessel_i_batch",
     "incomplete_bessel_k",
     "incomplete_bessel_k_batch",
+    "provider_incomplete_bessel_i",
+    "provider_incomplete_bessel_k",
+    "barnesdoublegamma",
+    "log_barnesdoublegamma",
     "list_supported_kernels",
     "get_kernel_capability",
 ]

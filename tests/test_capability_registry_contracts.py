@@ -72,8 +72,25 @@ def test_capability_registry_includes_barnes_provider_grade_aliases():
 
     assert downstream["barnesdoublegamma"]["public_name"] == "ifj_barnesdoublegamma"
     assert downstream["log_barnesdoublegamma"]["public_name"] == "ifj_log_barnesdoublegamma"
+    assert downstream["provider_barnesdoublegamma"]["public_name"] == "ifj_barnesdoublegamma"
+    assert downstream["provider_log_barnesdoublegamma"]["public_name"] == "ifj_log_barnesdoublegamma"
     assert downstream["barnesdoublegamma"]["capability"]["derivative_status"]
     assert "barnesdoublegamma" in downstream["barnesdoublegamma"]["capability"]["downstream_aliases"]
+    assert "provider_barnesdoublegamma" in downstream["provider_barnesdoublegamma"]["capability"]["downstream_aliases"]
+    assert "provider_log_barnesdoublegamma" in downstream["provider_log_barnesdoublegamma"]["capability"]["downstream_aliases"]
+
+
+def test_capability_registry_includes_incomplete_bessel_provider_aliases():
+    registry = cr.build_capability_registry()
+    downstream = registry["downstream_kernels"]
+
+    assert downstream["provider_incomplete_bessel_k"]["public_name"] == "incomplete_bessel_k"
+    assert downstream["provider_incomplete_bessel_i"]["public_name"] == "incomplete_bessel_i"
+    assert "quadrature" in downstream["provider_incomplete_bessel_k"]["capability"]["method_tags"]
+    assert "high_precision_refine" in downstream["provider_incomplete_bessel_k"]["capability"]["method_tags"]
+    assert "high_precision_refine" in downstream["provider_incomplete_bessel_i"]["capability"]["method_tags"]
+    assert "provider_incomplete_bessel_k" in downstream["provider_incomplete_bessel_k"]["capability"]["downstream_aliases"]
+    assert "provider_incomplete_bessel_i" in downstream["provider_incomplete_bessel_i"]["capability"]["downstream_aliases"]
 
 
 def test_capability_registry_includes_fragile_regime_promotion_aliases():

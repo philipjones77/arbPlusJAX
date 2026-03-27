@@ -323,6 +323,7 @@ Refresh with `python tools/cache_aware_surface_report.py` or the umbrella `pytho
 | [examples/example_fft_nufft_surface.ipynb](/examples/example_fft_nufft_surface.ipynb) | prepared transform plan reuse |
 | [examples/example_gamma_family_surface.ipynb](/examples/example_gamma_family_surface.ipynb) | bound callable reuse with stable point-mode controls |
 | [examples/example_barnes_double_gamma_surface.ipynb](/examples/example_barnes_double_gamma_surface.ipynb) | bound callable reuse with stable special-function controls |
+| [examples/example_hypgeom_family_surface.ipynb](/examples/example_hypgeom_family_surface.ipynb) | bound point-batch reuse with stable hypergeom point/mode controls |
 
 ## Canonical Benchmark Evidence
 
@@ -330,6 +331,7 @@ Refresh with `python tools/cache_aware_surface_report.py` or the umbrella `pytho
 |---|---|
 | [benchmarks/matrix_surface_workbook.py](/benchmarks/matrix_surface_workbook.py) | dense, sparse, block, vblock, and matrix-free reuse comparisons |
 | [benchmarks/run_hypgeom_benchmark_smoke.py](/benchmarks/run_hypgeom_benchmark_smoke.py) | fixed-shape padded hypgeom batch reuse |
+| [benchmarks/special_function_hardening_benchmark.py](/benchmarks/special_function_hardening_benchmark.py) | cross-family hardening metrics for incomplete-tail, Barnes, and hypergeom surfaces |
 | [benchmarks/benchmark_fft_nufft.py](/benchmarks/benchmark_fft_nufft.py) | prepared transform plan reuse |
 | [benchmarks/benchmark_sparse_matrix_surface.py](/benchmarks/benchmark_sparse_matrix_surface.py) | cached sparse prepare/apply reuse |
 | [benchmarks/benchmark_dense_matrix_surface.py](/benchmarks/benchmark_dense_matrix_surface.py) | dense repeated-call and cached apply behavior |

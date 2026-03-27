@@ -55,6 +55,16 @@ def incomplete_bessel_i(
     return_diagnostics: bool = False,
 ):
     del dps
+    if mode == "point" and not return_diagnostics:
+        return incomplete_bessel_i_point(
+            nu,
+            z,
+            upper_limit,
+            method=method,
+            panel_count=panel_count,
+            samples_per_panel=samples_per_panel,
+            return_diagnostics=False,
+        )
     point_value, diagnostics = incomplete_bessel_i_point(
         nu,
         z,
@@ -128,6 +138,8 @@ def _incomplete_bessel_i_point_base(
             jnp.asarray(refined_diag.estimated_tail_remainder, dtype=jnp.float64),
             jnp.asarray(consistency_err, dtype=jnp.float64),
         )
+        if not return_diagnostics:
+            return refined_value
         instability_flags: list[str] = []
         scale = jnp.maximum(jnp.abs(refined_value), jnp.asarray(1e-12, dtype=jnp.float64))
         if bool(consistency_err > 0.1 * scale):

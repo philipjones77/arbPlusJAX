@@ -16,7 +16,15 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from arbplusjax import arb_mat
+arb_mat = None
+
+
+def _load_arb_mat():
+    global arb_mat
+    if arb_mat is None:
+        from arbplusjax import arb_mat as _arb_mat
+
+        arb_mat = _arb_mat
 
 
 def _git_commit(repo_root: Path) -> str:
@@ -59,6 +67,7 @@ def main() -> int:
 
     rng = np.random.default_rng(2223)
     mats = jnp.asarray(_random_mats(rng, args.samples))
+    _load_arb_mat()
 
     if args.which == "det":
         fn = jax.jit(arb_mat.arb_mat_2x2_det_batch)

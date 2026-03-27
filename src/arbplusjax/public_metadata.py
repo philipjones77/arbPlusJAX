@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict, dataclass
+from functools import lru_cache
 from inspect import Parameter, signature
+from pathlib import Path
 from typing import Any, Callable, Container, Mapping
 
 
@@ -47,8 +49,49 @@ class PublicFunctionMetadata:
     notes: str
 
 
+_STATIC_REGISTRY_PATH = Path(__file__).with_name("public_metadata_registry.json")
+
+
 def metadata_to_record(entry: PublicFunctionMetadata) -> dict[str, Any]:
     return asdict(entry)
+
+
+def metadata_from_record(record: Mapping[str, Any]) -> PublicFunctionMetadata:
+    method_tags = tuple(record["method_tags"])
+    if "auto_routing" in method_tags and "auto" not in method_tags:
+        method_tags = method_tags + ("auto",)
+    return PublicFunctionMetadata(
+        name=str(record["name"]),
+        qualified_name=str(record["qualified_name"]),
+        module=str(record["module"]),
+        implementation_name=str(record["implementation_name"]),
+        family=str(record["family"]),
+        stability=str(record["stability"]),
+        point_support=bool(record["point_support"]),
+        interval_support=bool(record["interval_support"]),
+        interval_modes=tuple(record["interval_modes"]),
+        value_kinds=tuple(record["value_kinds"]),
+        implementation_options=tuple(record["implementation_options"]),
+        implementation_versions=tuple(record["implementation_versions"]),
+        default_implementation=str(record["default_implementation"]),
+        method_tags=method_tags,
+        default_method=record["default_method"],
+        method_parameter_names=tuple(record["method_parameter_names"]),
+        execution_strategies=tuple(record["execution_strategies"]),
+        regime_tags=tuple(record["regime_tags"]),
+        derivative_status=str(record["derivative_status"]),
+        notes=str(record["notes"]),
+    )
+
+
+@lru_cache(maxsize=1)
+def load_public_metadata_registry(
+    path: str | Path | None = None,
+) -> dict[str, PublicFunctionMetadata]:
+    registry_path = Path(path) if path is not None else _STATIC_REGISTRY_PATH
+    payload = json.loads(registry_path.read_text(encoding="utf-8"))
+    entries = [metadata_from_record(record) for record in payload]
+    return {entry.name: entry for entry in entries}
 
 
 def metadata_matches(

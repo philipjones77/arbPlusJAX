@@ -16,7 +16,15 @@ import subprocess
 import jax.numpy as jnp
 import numpy as np
 
-from arbplusjax import arb_mat
+arb_mat = None
+
+
+def _load_arb_mat():
+    global arb_mat
+    if arb_mat is None:
+        from arbplusjax import arb_mat as _arb_mat
+
+        arb_mat = _arb_mat
 
 
 class DI(ctypes.Structure):
@@ -131,6 +139,7 @@ def main() -> int:
     lib = load_lib(di_path, lib_path)
     rng = np.random.default_rng(2222)
     mats = random_mats(rng, args.samples)
+    _load_arb_mat()
 
     ok = True
     ok &= report(

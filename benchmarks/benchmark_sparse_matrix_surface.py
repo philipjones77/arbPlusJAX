@@ -13,14 +13,28 @@ from pathlib import Path
 import jax
 import jax.numpy as jnp
 
-from arbplusjax import mat_wrappers
-from arbplusjax import scb_mat
-from arbplusjax import srb_mat
 from benchmarks.schema import BenchmarkMeasurement
 from benchmarks.schema import BenchmarkRecord
 from benchmarks.schema import BenchmarkReport
 from benchmarks.schema import write_benchmark_report
 from tools.runtime_manifest import collect_runtime_manifest
+
+
+mat_wrappers = None
+scb_mat = None
+srb_mat = None
+
+
+def _load_sparse_matrix_modules() -> None:
+    global mat_wrappers, scb_mat, srb_mat
+    if mat_wrappers is None:
+        from arbplusjax import mat_wrappers as _mat_wrappers
+        from arbplusjax import scb_mat as _scb_mat
+        from arbplusjax import srb_mat as _srb_mat
+
+        mat_wrappers = _mat_wrappers
+        scb_mat = _scb_mat
+        srb_mat = _srb_mat
 
 
 def _time_call(fn, *args, warmup: int, runs: int) -> float:
@@ -37,6 +51,7 @@ def _time_call(fn, *args, warmup: int, runs: int) -> float:
 
 
 def _srb_case(n: int, real_dtype):
+    _load_sparse_matrix_modules()
     base = jnp.reshape(jnp.linspace(0.2, 1.2, n * n, dtype=real_dtype), (n, n))
     dense = base.T @ base + jnp.eye(n, dtype=real_dtype) * (n + 1.0)
     sparse = {
@@ -51,6 +66,7 @@ def _srb_case(n: int, real_dtype):
 
 
 def _scb_case(n: int, real_dtype, complex_dtype):
+    _load_sparse_matrix_modules()
     real = jnp.reshape(jnp.linspace(0.2, 1.1, n * n, dtype=real_dtype), (n, n))
     imag = jnp.reshape(jnp.linspace(-0.3, 0.3, n * n, dtype=real_dtype), (n, n))
     base = real + 1j * imag
@@ -401,6 +417,7 @@ def main() -> None:
         default=Path("experiments/benchmarks/outputs/matrix/benchmark_sparse_matrix_surface.json"),
     )
     args = parser.parse_args()
+    _load_sparse_matrix_modules()
     real_dtype = jnp.float64 if args.dtype == "float64" else jnp.float32
     complex_dtype = jnp.complex128 if args.dtype == "float64" else jnp.complex64
 

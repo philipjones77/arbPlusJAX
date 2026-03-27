@@ -1,4 +1,4 @@
-Last updated: 2026-03-25T16:20:00Z
+Last updated: 2026-03-25T18:05:00Z
 
 # Matrix-Free Practical Guide
 
@@ -215,9 +215,18 @@ The landed surface is broader than the original matrix-free tranche:
   and complex Jones matrix-free surfaces
 - contour-integral `sinh`, `cosh`, and `tanh` action wrappers now also exist
   on the real and complex Jones matrix-free surfaces
+- contour-integral `exp` and `tan` action wrappers now also exist on the real
+  and complex Jones matrix-free surfaces
 - shell preconditioners can now carry explicit transpose/adjoint callbacks
   through the shared implicit-solve path instead of silently falling back to
   the forward callback
+- cached rational Hutch++ metadata now records whether the cached-adjoint path
+  is actually supported for the chosen structure and preconditioner policy, and
+  shared probe-budget helpers can now report the remaining probe deficit and
+  next recommended total probe count
+- restarted Davidson and Jacobi-Davidson paths now share a common target
+  subspace-column helper and filter locked residual corrections before
+  expanding the basis
 
 The remaining heavy work is still advanced-method hardening:
 

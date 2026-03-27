@@ -1,4 +1,4 @@
-Last updated: 2026-03-23T00:00:00Z
+Last updated: 2026-03-25T00:00:00Z
 
 # Configuration Standard
 
@@ -31,6 +31,7 @@ Examples:
 - harness execution profiles
 - repo-specific tool configuration
 - documented environment presets that should be reviewed and versioned
+- optional comparison/reference backend inventories
 
 Do not put user-local editor preferences, ad hoc scratch files, or ephemeral
 machine-specific settings into `configs/`.
@@ -67,6 +68,7 @@ Recommended additional fields when relevant:
 - default dtype or precision expectations
 - whether the config is intended for tests, benchmarks, examples, or tooling
 - whether the config is stable, experimental, or transitional
+- whether the config defines canonical runtime behavior or only optional comparison/reference behavior
 
 ## Portability Rule
 
@@ -76,6 +78,31 @@ Checked-in configuration should be portable by default.
 - avoid hard-coding user-specific home directories
 - document backend assumptions explicitly
 - prefer repo-relative paths where a file path must be stored
+
+This includes optional comparison/reference backend inventories. Those should
+record required environment variables or licensed executables explicitly rather
+than leaving that policy implicit in prose.
+
+## Optional Backend Rule
+
+Optional runtime-adjacent backends such as:
+
+- `c_arb`
+- Mathematica / WolframKernel
+- `mpmath`
+- `scipy`
+- `jax.scipy`
+- experimental JAX kernels
+
+should be represented in checked-in config when they are part of the repo's
+validation, comparison, or submission policy.
+
+For this repo, the canonical config authority is:
+
+- [optional_comparison_backends.json](/configs/optional_comparison_backends.json)
+
+That config is for validation/comparison policy, not for the mandatory runtime
+contract.
 
 ## Naming Rule
 

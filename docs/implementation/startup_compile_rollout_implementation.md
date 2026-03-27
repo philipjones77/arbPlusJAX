@@ -11,9 +11,10 @@ Primary policy:
 Companion standards:
 
 - [caching_recompilation_standard.md](/docs/standards/caching_recompilation_standard.md)
-- [lazy_import_standard.md](/docs/standards/lazy_import_standard.md)
+- [lazy_loading_standard.md](/docs/standards/lazy_loading_standard.md)
 - [jax_api_runtime_standard.md](/docs/standards/jax_api_runtime_standard.md)
 - [point_fast_jax_standard.md](/docs/standards/point_fast_jax_standard.md)
+- [startup_compile_playbook_standard.md](/docs/standards/startup_compile_playbook_standard.md)
 - [point_fast_jax_implementation.md](/docs/implementation/point_fast_jax_implementation.md)
 
 ## Rollout Goal
@@ -26,6 +27,7 @@ Move the repo from accidental compile behavior to an explicit runtime model with
 - intentional warmup
 - regression measurement
 - fast JAX point-mode public kernels as the default bulk-evaluation path where point mode is a meaningful user surface
+- a reusable template for sibling repos rather than a repo-specific one-off fix
 
 ## Phase 1. Measure The Current Problem
 
@@ -136,6 +138,8 @@ Recommended next steps in this repo:
 2. Standardize warmup for the highest-traffic function families.
 3. Make point-mode docs and APIs teach the point-fast JAX path first, with precise/adaptive layers as fallback or validation engines.
 4. Add explicit compile-regression thresholds around the existing probes.
+5. Keep the shared repo template current in
+   [startup_compile_repo_template.md](/docs/implementation/startup_compile_repo_template.md)
 
 ## March 2026 tranche
 

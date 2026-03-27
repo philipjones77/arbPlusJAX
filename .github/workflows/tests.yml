@@ -5,7 +5,7 @@ on:
   pull_request:
 
 jobs:
-  chassis:
+  portable-chassis:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest]
@@ -17,10 +17,36 @@ jobs:
           python-version: "3.11"
       - name: Install
         run: python -m pip install -e .
-      - name: Run chassis tests
-        run: python -m pytest tests -q -m "not parity"
+      - name: Run chassis harness
+        run: python tools/run_test_harness.py --profile chassis --jax-mode cpu
       - name: Run benchmark smoke tests
         if: matrix.os == 'ubuntu-latest'
         env:
           ARBPLUSJAX_RUN_BENCHMARKS: "1"
-        run: python -m pytest benchmarks -q -m benchmark
+        run: python tools/run_test_harness.py --profile bench-smoke --jax-mode cpu
+
+  portable-colab-bootstrap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Run Colab-compatible bootstrap
+        run: bash tools/colab_bootstrap.sh "$PWD"
+      - name: Check JAX runtime
+        run: python tools/check_jax_runtime.py --quick-bench
+
+  optional-compare-stack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install compare stack
+        run: |
+          python -m pip install -e .
+          python -m pip install -r requirements-compare.txt
+      - name: Validate comparison backend policy
+        run: python -m pytest -q tests/test_comparison_backend_defaults.py tests/test_platform_bootstrap_contracts.py

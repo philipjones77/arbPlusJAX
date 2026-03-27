@@ -18,7 +18,9 @@ def test_cache_aware_surface_inventory_lists_binders_examples_and_benchmarks() -
         "api.bind_point_batch_jit",
         "api.bind_interval_batch",
         "examples/example_sparse_matrix_surface.ipynb",
+        "examples/example_hypgeom_family_surface.ipynb",
         "benchmarks/benchmark_sparse_matrix_surface.py",
+        "benchmarks/special_function_hardening_benchmark.py",
     ):
         assert needle in text
 

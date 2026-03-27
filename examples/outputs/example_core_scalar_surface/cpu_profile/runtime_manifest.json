@@ -1,5 +1,5 @@
 {
-  "timestamp_utc": "2026-03-22T19:03:39Z",
+  "timestamp_utc": "2026-03-26T21:27:44Z",
   "repo_root": "/home/phili/projects/arbplusJAX",
   "environment_kind": "wsl",
   "os": {
@@ -14,7 +14,7 @@
     "version": "3.12.12"
   },
   "git": {
-    "commit": "0e77df8709cb9b787bf456257d5b7fe1d8468ed2"
+    "commit": "591217612238e41941ea34b9b29762473bb1e147"
   },
   "jax": {
     "requested_mode": "cpu",
@@ -30,6 +30,6 @@
     "XLA_PYTHON_CLIENT_PREALLOCATE": "",
     "XLA_PYTHON_CLIENT_MEM_FRACTION": "",
     "ARB_C_REF_DIR": "",
-    "PYTHONPATH": "/home/phili/projects/arbplusJAX/src:/home/phili/projects/arbplusJAX/src:"
+    "PYTHONPATH": "/home/phili/projects/arbplusJAX/src:/home/phili/projects/arbplusJAX/src:/home/phili/projects/arbplusJAX/src:"
   }
 }

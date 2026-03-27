@@ -11,19 +11,46 @@ from pathlib import Path
 import jax
 import jax.numpy as jnp
 
-from arbplusjax import acb_mat
-from arbplusjax import acb_core
-from arbplusjax import arb_mat
-from arbplusjax import double_interval as di
-from arbplusjax import jax_diagnostics
-from arbplusjax import jcb_mat
-from arbplusjax import jrb_mat
-from arbplusjax import scb_mat
-from arbplusjax import sparse_common
-from arbplusjax import srb_mat
+acb_mat = None
+acb_core = None
+arb_mat = None
+di = None
+jax_diagnostics = None
+jcb_mat = None
+jrb_mat = None
+scb_mat = None
+sparse_common = None
+srb_mat = None
+
+
+def _load_matrix_stack_modules() -> None:
+    global acb_mat, acb_core, arb_mat, di, jax_diagnostics, jcb_mat, jrb_mat, scb_mat, sparse_common, srb_mat
+    if acb_mat is None:
+        from arbplusjax import acb_core as _acb_core
+        from arbplusjax import acb_mat as _acb_mat
+        from arbplusjax import arb_mat as _arb_mat
+        from arbplusjax import double_interval as _di
+        from arbplusjax import jax_diagnostics as _jax_diagnostics
+        from arbplusjax import jcb_mat as _jcb_mat
+        from arbplusjax import jrb_mat as _jrb_mat
+        from arbplusjax import scb_mat as _scb_mat
+        from arbplusjax import sparse_common as _sparse_common
+        from arbplusjax import srb_mat as _srb_mat
+
+        acb_core = _acb_core
+        acb_mat = _acb_mat
+        arb_mat = _arb_mat
+        di = _di
+        jax_diagnostics = _jax_diagnostics
+        jcb_mat = _jcb_mat
+        jrb_mat = _jrb_mat
+        scb_mat = _scb_mat
+        sparse_common = _sparse_common
+        srb_mat = _srb_mat
 
 
 def _interval(x):
+    _load_matrix_stack_modules()
     return di.interval(jnp.asarray(x, dtype=jnp.float64), jnp.asarray(x, dtype=jnp.float64))
 
 
@@ -66,6 +93,7 @@ def _diag_sparse_complex(n: int):
 
 
 def build_cases(n: int):
+    _load_matrix_stack_modules()
     dense_r = _dense_real_matrix(n)
     dense_c = _dense_complex_matrix(n)
     vec_r = _dense_real_vector(n)
@@ -162,6 +190,7 @@ def main():
         default=Path("experiments/benchmarks/outputs/diagnostics/matrix_stack_profile.json"),
     )
     args = parser.parse_args()
+    _load_matrix_stack_modules()
 
     cfg = jax_diagnostics.config_from_env()
     cases = build_cases(args.n)

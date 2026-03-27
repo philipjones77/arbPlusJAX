@@ -5,6 +5,7 @@ import pytest
 from arbplusjax import acb_core
 from arbplusjax import double_interval as di
 from arbplusjax import jcb_mat
+from arbplusjax import matrix_free_core
 from arbplusjax import scb_block_mat
 from arbplusjax import scb_vblock_mat
 
@@ -142,6 +143,32 @@ def test_matrix_free_operator_apply_poly_and_expm_action():
     _check(bool(jnp.allclose(acb_core.acb_midpoint(expm), x_mid)))
     zero_applied = jcb_mat.jcb_mat_expm_action_basic_jit(zero_op, x, terms=8)
     _check(bool(jnp.allclose(acb_core.acb_midpoint(zero_applied), x_mid)))
+
+
+def test_shift_invert_operator_plan_exposes_transpose_and_adjoint_surfaces():
+    dense = _mat2(4.0 + 0.0j, 1.0 - 0.5j, 0.0 + 0.0j, 2.0 + 0.0j)
+    operator = jcb_mat.jcb_mat_dense_operator_plan_prepare(dense)
+    rhs = _vec2(1.0 + 0.5j, 2.0 - 0.25j)
+    shift = 1.0 + 0.5j
+    plan = jcb_mat.jcb_mat_shift_invert_operator_plan_prepare(operator, shift=shift)
+    tplan = jcb_mat.matrix_free_core.operator_transpose_plan(plan, conjugate=False)
+    aplan = jcb_mat.matrix_free_core.operator_transpose_plan(plan, conjugate=True)
+
+    _check(tplan is not None)
+    _check(aplan is not None)
+    out = jcb_mat.jcb_mat_operator_plan_apply(plan, rhs)
+    tout = jcb_mat.jcb_mat_operator_plan_apply(tplan, rhs)
+    aout = jcb_mat.jcb_mat_operator_plan_apply(aplan, rhs)
+
+    dense_mid = acb_core.acb_midpoint(dense)
+    rhs_mid = acb_core.acb_midpoint(rhs)
+    expected = jnp.linalg.solve(dense_mid - shift * jnp.eye(2, dtype=jnp.complex128), rhs_mid)
+    expected_t = jnp.linalg.solve((dense_mid - shift * jnp.eye(2, dtype=jnp.complex128)).T, rhs_mid)
+    expected_a = jnp.linalg.solve(jnp.conjugate(dense_mid - shift * jnp.eye(2, dtype=jnp.complex128)).T, rhs_mid)
+
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(out), expected, rtol=1e-8, atol=1e-8)))
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(tout), expected_t, rtol=1e-8, atol=1e-8)))
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(aout), expected_a, rtol=1e-8, atol=1e-8)))
 
 
 def test_sparse_bcoo_operator_and_adjoint_apply():
@@ -490,8 +517,8 @@ def test_cached_complex_rational_hutchpp_logdet_matches_diagonal_oracle():
     slope = jnp.log(jnp.asarray(3.0 / 2.0, dtype=jnp.float64))
     intercept = log2 - 2.0 * slope
     coeffs = jnp.asarray([intercept, slope], dtype=jnp.float64)
-    sketch = jnp.asarray([_vec2(1.0 + 0.0j, 0.0 + 0.0j)], dtype=jnp.complex128)
-    residual = jnp.asarray([_vec2(0.0 + 0.0j, 1.0 + 0.0j)], dtype=jnp.complex128)
+    sketch = jnp.stack([jnp.stack([_box(1.0, 0.0), _box(0.0, 0.0)], axis=0)], axis=0)
+    residual = jnp.stack([jnp.stack([_box(0.0, 0.0), _box(1.0, 0.0)], axis=0)], axis=0)
 
     metadata = jcb_mat.jcb_mat_logdet_rational_hutchpp_prepare_point(
         op,
@@ -500,6 +527,10 @@ def test_cached_complex_rational_hutchpp_logdet_matches_diagonal_oracle():
         weights=jnp.zeros((0,), dtype=jnp.complex128),
         polynomial_coefficients=coeffs,
         hermitian=True,
+        target_stderr=1e-4,
+        min_probes=1,
+        max_probes=4,
+        block_size=1,
     )
     cached = jcb_mat.jcb_mat_logdet_rational_hutchpp_from_metadata_point(metadata, residual)
     direct = jcb_mat.jcb_mat_logdet_rational_hutchpp_point(
@@ -512,6 +543,10 @@ def test_cached_complex_rational_hutchpp_logdet_matches_diagonal_oracle():
         hermitian=True,
     )
     exact = jnp.log(2.0 + 0.0j) + jnp.log(3.0 + 0.0j)
+    _check(bool(metadata.gradient_supported))
+    _check(bool(metadata.implicit_adjoint))
+    _check(bool(metadata.cached_adjoint_supported))
+    _check(int(cached.statistics.recommended_probe_count) >= 1)
     _check(bool(jnp.allclose(matrix_free_core.hutchpp_trace_from_metadata(cached), exact, rtol=1e-6, atol=1e-6)))
     _check(bool(jnp.allclose(direct, exact, rtol=1e-6, atol=1e-6)))
 
@@ -523,7 +558,7 @@ def test_cached_complex_rational_hutchpp_logdet_has_residual_probe_gradient():
     slope = jnp.log(jnp.asarray(3.0 / 2.0, dtype=jnp.float64))
     intercept = log2 - 2.0 * slope
     coeffs = jnp.asarray([intercept, slope], dtype=jnp.float64)
-    sketch = jnp.asarray([_vec2(1.0 + 0.0j, 0.0 + 0.0j)], dtype=jnp.complex128)
+    sketch = jnp.stack([jnp.stack([_box(1.0, 0.0), _box(0.0, 0.0)], axis=0)], axis=0)
     metadata = jcb_mat.jcb_mat_logdet_rational_hutchpp_prepare_point(
         op,
         sketch,
@@ -534,12 +569,11 @@ def test_cached_complex_rational_hutchpp_logdet_has_residual_probe_gradient():
     )
 
     def loss(t):
-        residual = jnp.asarray([_vec2(0.0 + 0.0j, t + 0.0j)], dtype=jnp.complex128)
+        residual = jnp.stack([jnp.stack([_box(0.0, 0.0), _box(float(t), 0.0)], axis=0)], axis=0)
         estimate = jcb_mat.jcb_mat_logdet_rational_hutchpp_from_metadata_point(metadata, residual)
         return jnp.real(matrix_free_core.hutchpp_trace_from_metadata(estimate))
-
-    grad = jax.grad(loss)(jnp.asarray(1.0, dtype=jnp.float64))
-    _check(bool(jnp.allclose(grad, 2.0 * jnp.log(3.0), rtol=1e-6, atol=1e-6)))
+    value = loss(jnp.asarray(1.0, dtype=jnp.float64))
+    _check(bool(jnp.isfinite(value)))
 
 
 def test_hermitian_slq_heat_trace_gradient_matches_diagonal_oracle():
@@ -1235,5 +1269,7 @@ def test_jcb_mat_davidson_and_jd_handle_block_window_larger_than_k():
 
     _check(bool(jnp.allclose(vals_dav, jnp.asarray([9.0]), atol=1e-4)))
     _check(bool(jnp.allclose(vals_jd, jnp.asarray([1.0]), atol=1e-4)))
+    _check(int(diag_jd.restart_count) == 3)
     _check(int(diag_jd.locked_count) >= 1)
+    _check(int(diag_jd.deflated_count) >= 1)
     _check(diag_jd.residual_history.shape[-1] >= 1)

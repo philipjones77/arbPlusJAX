@@ -74,6 +74,7 @@ def _common_setup_cells(example_name: str):
             "from pathlib import Path\n"
             "\n"
             "import matplotlib.pyplot as plt\n"
+            "import numpy as np\n"
             "import pandas as pd\n"
             "\n"
             "def find_repo_root(start: Path) -> Path:\n"
@@ -241,21 +242,32 @@ def _core_scalar_notebook() -> list:
             "display({'jit_shape': fast_vals.shape, 'jit_dtype': fast_vals.dtype, 'jit_matches_vmap': bool(jnp.allclose(fast_vals, fast_vmap))})"
         ),
         *_ad_pattern_cells(
-            "AD should be shown on the production-facing bound callables, not only on local toy functions. "
-            "This section validates a scalar helper surface and plots primal versus gradient values over a representative sweep.",
+            "AD should be shown in both directions on the production-facing scalar surface: through the main value argument and through the family parameter. "
+            "This section validates `arb_pow` over both `x` and `y` sweeps and plots the paired sensitivities.",
             "import jax\n"
-            "sweep = jnp.linspace(0.1, 1.2, 32, dtype=jnp.float32)\n"
-            "exp_bound = api.bind_point_batch('arb_fpwrap_double_exp', dtype='float32', pad_to=32)\n"
-            "def scalar_loss(x):\n"
-            "    return jnp.sum(exp_bound(x))\n"
-            "grad_vals = jax.grad(scalar_loss)(sweep)\n"
-            "primal_vals = exp_bound(sweep)\n"
-            "ad_df = pd.DataFrame({'x': np.asarray(sweep), 'primal': np.asarray(primal_vals), 'grad': np.asarray(grad_vals)})\n"
+            "y_fixed = jnp.asarray(0.7, dtype=jnp.float32)\n"
+            "x_fixed = jnp.asarray(1.3, dtype=jnp.float32)\n"
+            "def scalar_loss_x(xv):\n"
+            "    return api.eval_point('arb_pow', xv, y_fixed, dtype='float32')\n"
+            "def scalar_loss_y(yv):\n"
+            "    return api.eval_point('arb_pow', x_fixed, yv, dtype='float32')\n"
+            "x_sweep = jnp.linspace(0.8, 1.8, 32, dtype=jnp.float32)\n"
+            "y_sweep = jnp.linspace(0.2, 1.2, 32, dtype=jnp.float32)\n"
+            "primal_x = jax.vmap(scalar_loss_x)(x_sweep)\n"
+            "grad_x = jax.vmap(jax.grad(scalar_loss_x))(x_sweep)\n"
+            "primal_y = jax.vmap(scalar_loss_y)(y_sweep)\n"
+            "grad_y = jax.vmap(jax.grad(scalar_loss_y))(y_sweep)\n"
+            "ad_df = pd.DataFrame({'x': np.asarray(x_sweep), 'primal_x': np.asarray(primal_x), 'grad_x': np.asarray(grad_x), 'y': np.asarray(y_sweep), 'primal_y': np.asarray(primal_y), 'grad_y': np.asarray(grad_y)})\n"
             "display(ad_df.head())\n"
-            "ax = ad_df.plot(x='x', y=['primal', 'grad'], figsize=(8, 4), title='Core Scalar AD Validation')\n"
+            "ax = ad_df.plot(x='x', y=['primal_x', 'grad_x'], figsize=(8, 4), title='Core Scalar AD Validation: Argument Direction')\n"
             "ax.set_ylabel('value')\n"
             "plt.tight_layout()\n"
-            "plt.savefig(EXAMPLE_OUTPUT_ROOT / f'ad_validation_{JAX_MODE}.png', dpi=160, bbox_inches='tight')\n"
+            "plt.savefig(EXAMPLE_OUTPUT_ROOT / f'ad_validation_argument_{JAX_MODE}.png', dpi=160, bbox_inches='tight')\n"
+            "plt.show()\n"
+            "ax = ad_df.plot(x='y', y=['primal_y', 'grad_y'], figsize=(8, 4), title='Core Scalar AD Validation: Parameter Direction')\n"
+            "ax.set_ylabel('value')\n"
+            "plt.tight_layout()\n"
+            "plt.savefig(EXAMPLE_OUTPUT_ROOT / f'ad_validation_parameter_{JAX_MODE}.png', dpi=160, bbox_inches='tight')\n"
             "plt.show()"
         ),
         nbf.v4.new_markdown_cell(
@@ -486,20 +498,32 @@ def _api_surface_notebook() -> list:
             "display({'jit_shape': jit_out.shape, 'jit_matches_vmap': bool(jnp.allclose(jit_out, vmap_out, rtol=1e-6, atol=1e-6))})"
         ),
         *_ad_pattern_cells(
-            "The routed API should demonstrate AD through the same public metadata-aware entrypoints used in product code. "
-            "This section differentiates a routed special-function call and plots primal and gradient behavior together.",
+            "The routed API should demonstrate AD in both directions through the same metadata-aware entrypoints used in product code. "
+            "This section differentiates routed incomplete-gamma evaluation over both `z` and `s` sweeps and plots the paired sensitivities.",
             "import jax\n"
-            "sweep = jnp.linspace(0.25, 1.5, 24, dtype=jnp.float64)\n"
-            "def routed_loss(zv):\n"
-            "    return jnp.sum(api.evaluate('incomplete_gamma_upper', jnp.asarray(2.5, dtype=jnp.float64), zv, method='quadrature', method_params={'samples_per_panel': 8, 'max_panels': 16}))\n"
-            "grad_vals = jax.grad(routed_loss)(sweep)\n"
-            "primal_vals = api.bind_point_batch('incomplete_gamma_upper', dtype='float64', pad_to=32, method='quadrature')(jnp.full_like(sweep, 2.5), sweep)\n"
-            "ad_df = pd.DataFrame({'z': np.asarray(sweep), 'primal': np.asarray(primal_vals), 'grad': np.asarray(grad_vals)})\n"
+            "s_fixed = jnp.asarray(2.5, dtype=jnp.float64)\n"
+            "z_fixed = jnp.asarray(1.0, dtype=jnp.float64)\n"
+            "def routed_loss_z(zv):\n"
+            "    return api.evaluate('incomplete_gamma_upper', s_fixed, zv, method='quadrature', method_params={'samples_per_panel': 8, 'max_panels': 16})\n"
+            "def routed_loss_s(sv):\n"
+            "    return api.evaluate('incomplete_gamma_upper', sv, z_fixed, method='quadrature', method_params={'samples_per_panel': 8, 'max_panels': 16})\n"
+            "z_sweep = jnp.linspace(0.25, 1.5, 24, dtype=jnp.float64)\n"
+            "s_sweep = jnp.linspace(1.5, 3.0, 24, dtype=jnp.float64)\n"
+            "primal_z = jax.vmap(routed_loss_z)(z_sweep)\n"
+            "grad_z = jax.vmap(jax.grad(routed_loss_z))(z_sweep)\n"
+            "primal_s = jax.vmap(routed_loss_s)(s_sweep)\n"
+            "grad_s = jax.vmap(jax.grad(routed_loss_s))(s_sweep)\n"
+            "ad_df = pd.DataFrame({'z': np.asarray(z_sweep), 'primal_z': np.asarray(primal_z), 'grad_z': np.asarray(grad_z), 's': np.asarray(s_sweep), 'primal_s': np.asarray(primal_s), 'grad_s': np.asarray(grad_s)})\n"
             "display(ad_df.head())\n"
-            "ax = ad_df.plot(x='z', y=['primal', 'grad'], figsize=(8, 4), title='API Routed AD Validation')\n"
+            "ax = ad_df.plot(x='z', y=['primal_z', 'grad_z'], figsize=(8, 4), title='API Routed AD Validation: Argument Direction')\n"
             "ax.set_ylabel('value')\n"
             "plt.tight_layout()\n"
-            "plt.savefig(EXAMPLE_OUTPUT_ROOT / f'ad_validation_{JAX_MODE}.png', dpi=160, bbox_inches='tight')\n"
+            "plt.savefig(EXAMPLE_OUTPUT_ROOT / f'ad_validation_argument_{JAX_MODE}.png', dpi=160, bbox_inches='tight')\n"
+            "plt.show()\n"
+            "ax = ad_df.plot(x='s', y=['primal_s', 'grad_s'], figsize=(8, 4), title='API Routed AD Validation: Parameter Direction')\n"
+            "ax.set_ylabel('value')\n"
+            "plt.tight_layout()\n"
+            "plt.savefig(EXAMPLE_OUTPUT_ROOT / f'ad_validation_parameter_{JAX_MODE}.png', dpi=160, bbox_inches='tight')\n"
             "plt.show()"
         ),
         nbf.v4.new_markdown_cell(
@@ -662,6 +686,7 @@ def _dense_matrix_surface_notebook() -> list:
         *_fast_jax_pattern_cells(
             "Dense point-mode fast JAX should run through the compiled public batch surface with cached-apply style operations where available.",
             "import jax\n"
+            "from arbplusjax import api\n"
             "dense_batch = di.interval(jnp.stack([a_mid, a_mid], axis=0), jnp.stack([a_mid, a_mid], axis=0))\n"
             "rhs_batch_fast = di.interval(jnp.stack([vec_mid, vec_mid], axis=0), jnp.stack([vec_mid, vec_mid], axis=0))\n"
             "dense_fast = api.bind_point_batch_jit('arb_mat_matvec', dtype='float64', pad_to=4)\n"
@@ -670,23 +695,35 @@ def _dense_matrix_surface_notebook() -> list:
             "display({'jit_shape': dense_fast_out.shape, 'jit_matches_vmap': bool(jnp.allclose(dense_fast_out, dense_vmap))})"
         ),
         *_ad_pattern_cells(
-            "Dense AD should be demonstrated on the production-facing plan-based or operator-plan surface rather than only on a raw midpoint helper. "
-            "This section differentiates a dense operator-plan objective and plots primal and gradient behavior over a scale sweep.",
+            "Dense AD should be demonstrated in both directions on the production-facing operator-plan surface rather than only on a raw midpoint helper. "
+            "This section differentiates dense operator-plan apply over both the input vector and a matrix scale parameter, then plots the paired sensitivities.",
             "import jax\n"
             "base = a_mid\n"
-            "def dense_loss(scale):\n"
+            "vec_fixed = vec_mid\n"
+            "def dense_loss_vec(v):\n"
+            "    plan = jrb_mat.jrb_mat_dense_operator_plan_prepare(di.interval(base, base))\n"
+            "    out = jrb_mat.jrb_mat_operator_plan_apply(plan, di.interval(v, v))\n"
+            "    return jnp.sum(di.midpoint(out))\n"
+            "def dense_loss_scale(scale):\n"
             "    scaled = di.interval(scale * base, scale * base)\n"
             "    plan = jrb_mat.jrb_mat_dense_operator_plan_prepare(scaled)\n"
             "    out = jrb_mat.jrb_mat_operator_plan_apply(plan, vec)\n"
             "    return jnp.sum(di.midpoint(out))\n"
+            "vec_sweep = jnp.linspace(-0.75, 0.75, 24, dtype=jnp.float64)\n"
             "scale_sweep = jnp.linspace(0.75, 1.25, 24, dtype=jnp.float64)\n"
-            "primal_vals = jax.vmap(dense_loss)(scale_sweep)\n"
-            "grad_vals = jax.vmap(jax.grad(dense_loss))(scale_sweep)\n"
-            "ad_df = pd.DataFrame({'scale': np.asarray(scale_sweep), 'primal': np.asarray(primal_vals), 'grad': np.asarray(grad_vals)})\n"
+            "primal_vec = jax.vmap(lambda t: dense_loss_vec(jnp.asarray([t, vec_fixed[1], vec_fixed[2]], dtype=jnp.float64)))(vec_sweep)\n"
+            "grad_vec = jax.vmap(lambda t: jax.grad(dense_loss_vec)(jnp.asarray([t, vec_fixed[1], vec_fixed[2]], dtype=jnp.float64))[0])(vec_sweep)\n"
+            "primal_scale = jax.vmap(dense_loss_scale)(scale_sweep)\n"
+            "grad_scale = jax.vmap(jax.grad(dense_loss_scale))(scale_sweep)\n"
+            "ad_df = pd.DataFrame({'vec_entry': np.asarray(vec_sweep), 'primal_vec': np.asarray(primal_vec), 'grad_vec': np.asarray(grad_vec), 'scale': np.asarray(scale_sweep), 'primal_scale': np.asarray(primal_scale), 'grad_scale': np.asarray(grad_scale)})\n"
             "display(ad_df.head())\n"
-            "ax = ad_df.plot(x='scale', y=['primal', 'grad'], figsize=(8, 4), title='Dense Matrix AD Validation')\n"
+            "ax = ad_df.plot(x='vec_entry', y=['primal_vec', 'grad_vec'], figsize=(8, 4), title='Dense Matrix AD Validation: Argument Direction')\n"
             "plt.tight_layout()\n"
-            "plt.savefig(EXAMPLE_OUTPUT_ROOT / f'ad_validation_{JAX_MODE}.png', dpi=160, bbox_inches='tight')\n"
+            "plt.savefig(EXAMPLE_OUTPUT_ROOT / f'ad_validation_argument_{JAX_MODE}.png', dpi=160, bbox_inches='tight')\n"
+            "plt.show()\n"
+            "ax = ad_df.plot(x='scale', y=['primal_scale', 'grad_scale'], figsize=(8, 4), title='Dense Matrix AD Validation: Parameter Direction')\n"
+            "plt.tight_layout()\n"
+            "plt.savefig(EXAMPLE_OUTPUT_ROOT / f'ad_validation_parameter_{JAX_MODE}.png', dpi=160, bbox_inches='tight')\n"
             "plt.show()"
         ),
         nbf.v4.new_markdown_cell(
@@ -773,6 +810,7 @@ def _sparse_matrix_surface_notebook() -> list:
             "Construct sparse real/complex operators and exercise the public sparse API surface."
         ),
         nbf.v4.new_code_cell(
+            "import jax\n"
             "import jax.numpy as jnp\n"
             "from arbplusjax import api, scb_mat, srb_mat\n"
             "\n"
@@ -792,12 +830,12 @@ def _sparse_matrix_surface_notebook() -> list:
             "real_rplan = api.eval_point('srb_mat_rmatvec_cached_prepare', sparse_real)\n"
             "sparse_results = {\n"
             "    'srb_matvec': api.eval_point_batch('srb_mat_matvec', sparse_real, vec_real),\n"
-            "    'srb_cached_matvec': api.eval_point_batch('srb_mat_matvec_cached_apply', real_plan, vec_real),\n"
-            "    'srb_cached_rmatvec': api.eval_point_batch('srb_mat_rmatvec_cached_apply', real_rplan, vec_real),\n"
+            "    'srb_cached_matvec': jax.vmap(lambda row: api.eval_point('srb_mat_matvec_cached_apply', real_plan, row))(vec_real),\n"
+            "    'srb_cached_rmatvec': jax.vmap(lambda row: api.eval_point('srb_mat_rmatvec_cached_apply', real_rplan, row))(vec_real),\n"
             "    'srb_block_matvec': api.eval_point_batch('srb_block_mat_matvec', block_real, vec_real),\n"
             "    'srb_vblock_matvec': api.eval_point_batch('srb_vblock_mat_matvec', vblock_real, vec_real),\n"
             "    'scb_matvec': api.eval_point_batch('scb_mat_matvec', sparse_complex, vec_complex),\n"
-            "    'scb_cached_matvec': api.eval_point_batch('scb_mat_matvec_cached_apply', complex_plan, vec_complex),\n"
+            "    'scb_cached_matvec': jax.vmap(lambda row: api.eval_point('scb_mat_matvec_cached_apply', complex_plan, row))(vec_complex),\n"
             "}\n"
             "display(sparse_results)"
         ),
@@ -805,12 +843,13 @@ def _sparse_matrix_surface_notebook() -> list:
             "Production Pattern",
             "Sparse production calls should prepare cached plans once and reuse them for repeated apply or solve traffic. "
             "If an API-facing service loop feeds variable batch sizes, pad the RHS batch to a stable multiple before calling the padded batch kernels.",
+            "import jax\n"
             "rhs_batch = vec_real\n"
             "real_cached = api.eval_point('srb_mat_matvec_cached_prepare', sparse_real)\n"
             "real_rcached = api.eval_point('srb_mat_rmatvec_cached_prepare', sparse_real)\n"
             "sparse_service_results = {\n"
-            "    'cached_apply': api.eval_point_batch('srb_mat_matvec_cached_apply', real_cached, rhs_batch),\n"
-            "    'cached_rmatvec': api.eval_point_batch('srb_mat_rmatvec_cached_apply', real_rcached, rhs_batch),\n"
+            "    'cached_apply': jax.vmap(lambda row: api.eval_point('srb_mat_matvec_cached_apply', real_cached, row))(rhs_batch),\n"
+            "    'cached_rmatvec': jax.vmap(lambda row: api.eval_point('srb_mat_rmatvec_cached_apply', real_rcached, row))(rhs_batch),\n"
             "    'padded_batch_apply': api.eval_point_batch('srb_mat_matvec', sparse_real, rhs_batch, pad_to=8),\n"
             "    'block_sparse_apply': api.eval_point_batch('srb_block_mat_matvec', block_real, rhs_batch),\n"
             "    'vblock_sparse_apply': api.eval_point_batch('srb_vblock_mat_matvec', vblock_real, rhs_batch),\n"
@@ -827,23 +866,34 @@ def _sparse_matrix_surface_notebook() -> list:
             "display({'jit_shape': sparse_fast_out.shape, 'jit_matches_vmap': bool(jnp.allclose(sparse_fast_out, sparse_vmap))})"
         ),
         *_ad_pattern_cells(
-            "Sparse AD should be demonstrated through stable public operations that are realistically differentiated in downstream models. "
-            "This section differentiates a squared-output objective through sparse matvec and plots primal versus gradient norms.",
+            "Sparse AD should be demonstrated in both directions through stable public operations that are realistically differentiated in downstream models. "
+            "This section differentiates sparse matvec over both the input vector and a matrix scale parameter, then plots the paired sensitivities.",
             "import jax\n"
             "dense_param = jnp.array([[4.0, 1.0, 0.0], [1.0, 5.0, 2.0], [0.0, 2.0, 6.0]], dtype=jnp.float64)\n"
-            "vec0 = jnp.array([1.0, 0.5, -0.25], dtype=jnp.float64)\n"
-            "def sparse_loss(scale):\n"
-            "    sparse_scaled = srb_mat.srb_mat_from_dense_bcoo(scale * dense_param)\n"
-            "    out = api.eval_point('srb_mat_matvec', sparse_scaled, vec0)\n"
+            "vec_fixed = jnp.array([1.0, 0.5, -0.25], dtype=jnp.float64)\n"
+            "def sparse_loss_vec(v):\n"
+            "    sparse_fixed = srb_mat.srb_mat_from_dense_bcoo(dense_param)\n"
+            "    out = api.eval_point('srb_mat_matvec', sparse_fixed, v)\n"
             "    return jnp.sum(out ** 2)\n"
+            "def sparse_loss_scale(scale):\n"
+            "    sparse_scaled = srb_mat.srb_mat_from_dense_bcoo(scale * dense_param)\n"
+            "    out = api.eval_point('srb_mat_matvec', sparse_scaled, vec_fixed)\n"
+            "    return jnp.sum(out ** 2)\n"
+            "vec_sweep = jnp.linspace(-0.75, 0.75, 24, dtype=jnp.float64)\n"
             "scale_sweep = jnp.linspace(0.5, 1.5, 24, dtype=jnp.float64)\n"
-            "primal_vals = jax.vmap(sparse_loss)(scale_sweep)\n"
-            "grad_vals = jax.vmap(jax.grad(sparse_loss))(scale_sweep)\n"
-            "ad_df = pd.DataFrame({'scale': np.asarray(scale_sweep), 'primal': np.asarray(primal_vals), 'grad': np.asarray(grad_vals)})\n"
+            "primal_vec = jax.vmap(lambda t: sparse_loss_vec(jnp.asarray([t, vec_fixed[1], vec_fixed[2]], dtype=jnp.float64)))(vec_sweep)\n"
+            "grad_vec = jax.vmap(lambda t: jax.grad(sparse_loss_vec)(jnp.asarray([t, vec_fixed[1], vec_fixed[2]], dtype=jnp.float64))[0])(vec_sweep)\n"
+            "primal_scale = jax.vmap(sparse_loss_scale)(scale_sweep)\n"
+            "grad_scale = jax.vmap(jax.grad(sparse_loss_scale))(scale_sweep)\n"
+            "ad_df = pd.DataFrame({'vec_entry': np.asarray(vec_sweep), 'primal_vec': np.asarray(primal_vec), 'grad_vec': np.asarray(grad_vec), 'scale': np.asarray(scale_sweep), 'primal_scale': np.asarray(primal_scale), 'grad_scale': np.asarray(grad_scale)})\n"
             "display(ad_df.head())\n"
-            "ax = ad_df.plot(x='scale', y=['primal', 'grad'], figsize=(8, 4), title='Sparse AD Validation')\n"
+            "ax = ad_df.plot(x='vec_entry', y=['primal_vec', 'grad_vec'], figsize=(8, 4), title='Sparse AD Validation: Argument Direction')\n"
             "plt.tight_layout()\n"
-            "plt.savefig(EXAMPLE_OUTPUT_ROOT / f'ad_validation_{JAX_MODE}.png', dpi=160, bbox_inches='tight')\n"
+            "plt.savefig(EXAMPLE_OUTPUT_ROOT / f'ad_validation_argument_{JAX_MODE}.png', dpi=160, bbox_inches='tight')\n"
+            "plt.show()\n"
+            "ax = ad_df.plot(x='scale', y=['primal_scale', 'grad_scale'], figsize=(8, 4), title='Sparse AD Validation: Parameter Direction')\n"
+            "plt.tight_layout()\n"
+            "plt.savefig(EXAMPLE_OUTPUT_ROOT / f'ad_validation_parameter_{JAX_MODE}.png', dpi=160, bbox_inches='tight')\n"
             "plt.show()"
         ),
         nbf.v4.new_markdown_cell(
@@ -851,7 +901,7 @@ def _sparse_matrix_surface_notebook() -> list:
             "Run the sparse API and chassis tests that own this surface."
         ),
         nbf.v4.new_code_cell(
-            "tests = run([\n"
+            "test_cmd = [\n"
             "    PYTHON, '-m', 'pytest', '-q',\n"
             "    'tests/test_sparse_point_api.py',\n"
             "    'tests/test_sparse_basic_contracts.py',\n"
@@ -861,11 +911,18 @@ def _sparse_matrix_surface_notebook() -> list:
             "    'tests/test_scb_block_mat_chassis.py',\n"
             "    'tests/test_srb_vblock_mat_chassis.py',\n"
             "    'tests/test_scb_vblock_mat_chassis.py',\n"
-            "], capture=True)\n"
+            "]\n"
+            "try:\n"
+            "    tests = run(test_cmd, capture=True)\n"
+            "    test_status = 'passed'\n"
+            "except subprocess.CalledProcessError as exc:\n"
+            "    tests = exc\n"
+            "    test_status = 'failed'\n"
             "print(tests.stdout)\n"
             "if tests.stderr:\n"
             "    print(tests.stderr)\n"
-            "(EXAMPLE_OUTPUT_ROOT / f'pytest_{JAX_MODE}.txt').write_text(tests.stdout + ('\\n' + tests.stderr if tests.stderr else ''), encoding='utf-8')"
+            "(EXAMPLE_OUTPUT_ROOT / f'pytest_{JAX_MODE}.txt').write_text((tests.stdout or '') + ('\\n' + tests.stderr if tests.stderr else ''), encoding='utf-8')\n"
+            "display({'validation_status': test_status})"
         ),
         nbf.v4.new_markdown_cell(
             "## Benchmark Summary\n\n"
@@ -958,7 +1015,7 @@ def _matrix_free_operator_surface_notebook() -> list:
             "    'apply': jrb_mat.jrb_mat_operator_plan_apply(plan, x),\n"
             "    'sparse_apply': jrb_mat.jrb_mat_operator_plan_apply(sparse_plan, x),\n"
             "    'solve': jrb_mat.jrb_mat_solve_action_point_jit(plan, x, symmetric=True),\n"
-            "    'logdet': jrb_mat.jrb_mat_logdet_slq_point(plan, probes, steps=6),\n"
+            "    'logdet': jrb_mat.jrb_mat_logdet_slq_point(plan, probes, steps=4),\n"
             "}\n"
             "display(operator_results)"
         ),
@@ -981,29 +1038,38 @@ def _matrix_free_operator_surface_notebook() -> list:
         *_fast_jax_pattern_cells(
             "Matrix-free fast JAX uses the family-owned compiled point kernels directly. "
             "The important contract is still the same: fixed problem shape, fixed Krylov steps, and no dynamic rescue logic in the hot path.",
-            "logdet_jit = jrb_mat.jrb_mat_logdet_slq_point_jit(plan, probes, 6)\n"
-            "logdet_ref = jrb_mat.jrb_mat_logdet_slq_point(plan, probes, 6)\n"
+            "logdet_jit = jrb_mat.jrb_mat_logdet_slq_point_jit(plan, probes, 4)\n"
+            "logdet_ref = jrb_mat.jrb_mat_logdet_slq_point(plan, probes, 4)\n"
             "display({'jit_value': logdet_jit, 'jit_matches_point': bool(jnp.allclose(logdet_jit, logdet_ref, rtol=1e-6, atol=1e-6))})"
         ),
         *_ad_pattern_cells(
-            "Matrix-free AD should be shown on operator-plan-first usage, since that is the production surface. "
-            "This section differentiates a solve-based scalar objective and plots primal and gradient behavior over a scale sweep.",
+            "Matrix-free AD should be shown in both directions on operator-plan-first usage, since that is the production surface. "
+            "This section differentiates a solve-based objective over both the RHS vector and a spectral shift parameter, then plots the paired sensitivities.",
             "import jax\n"
             "base_diag = jnp.array([2.0, 3.0, 5.0, 7.0], dtype=jnp.float64)\n"
-            "def mf_loss(scale):\n"
-            "    a_mid = jnp.diag(scale * base_diag)\n"
-            "    a = di.interval(a_mid, a_mid)\n"
-            "    local_plan = jrb_mat.jrb_mat_dense_operator_plan_prepare(a)\n"
-            "    solved = jrb_mat.jrb_mat_solve_action_point_jit(local_plan, x, symmetric=True)\n"
+            "rhs_fixed = jnp.asarray([1.0, 0.5, -0.25, 0.75], dtype=jnp.float64)\n"
+            "base_plan = jrb_mat.jrb_mat_dense_operator_plan_prepare(di.interval(jnp.diag(base_diag), jnp.diag(base_diag)))\n"
+            "def mf_loss_rhs(v):\n"
+            "    solved = jrb_mat.jrb_mat_solve_action_point_jit(base_plan, di.interval(v, v), symmetric=True)\n"
             "    return jnp.sum(di.midpoint(solved))\n"
-            "scale_sweep = jnp.linspace(0.75, 1.25, 24, dtype=jnp.float64)\n"
-            "primal_vals = jax.vmap(mf_loss)(scale_sweep)\n"
-            "grad_vals = jax.vmap(jax.grad(mf_loss))(scale_sweep)\n"
-            "ad_df = pd.DataFrame({'scale': np.asarray(scale_sweep), 'primal': np.asarray(primal_vals), 'grad': np.asarray(grad_vals)})\n"
+            "def mf_loss_shift(shift):\n"
+            "    solved = jrb_mat.jrb_mat_multi_shift_solve_point(base_plan, di.interval(rhs_fixed, rhs_fixed), jnp.asarray([shift], dtype=jnp.float64), symmetric=True)\n"
+            "    return jnp.sum(di.midpoint(solved))\n"
+            "rhs_sweep = jnp.linspace(-0.75, 0.75, 24, dtype=jnp.float64)\n"
+            "shift_sweep = jnp.linspace(0.0, 0.5, 24, dtype=jnp.float64)\n"
+            "primal_rhs = jax.vmap(lambda t: mf_loss_rhs(jnp.asarray([rhs_fixed[0], rhs_fixed[1], rhs_fixed[2], t], dtype=jnp.float64)))(rhs_sweep)\n"
+            "grad_rhs = jax.vmap(lambda t: jax.grad(mf_loss_rhs)(jnp.asarray([rhs_fixed[0], rhs_fixed[1], rhs_fixed[2], t], dtype=jnp.float64))[-1])(rhs_sweep)\n"
+            "primal_shift = jax.vmap(mf_loss_shift)(shift_sweep)\n"
+            "grad_shift = jax.vmap(jax.grad(mf_loss_shift))(shift_sweep)\n"
+            "ad_df = pd.DataFrame({'rhs_entry': np.asarray(rhs_sweep), 'primal_rhs': np.asarray(primal_rhs), 'grad_rhs': np.asarray(grad_rhs), 'shift': np.asarray(shift_sweep), 'primal_shift': np.asarray(primal_shift), 'grad_shift': np.asarray(grad_shift)})\n"
             "display(ad_df.head())\n"
-            "ax = ad_df.plot(x='scale', y=['primal', 'grad'], figsize=(8, 4), title='Matrix-Free AD Validation')\n"
+            "ax = ad_df.plot(x='rhs_entry', y=['primal_rhs', 'grad_rhs'], figsize=(8, 4), title='Matrix-Free AD Validation: Argument Direction')\n"
             "plt.tight_layout()\n"
-            "plt.savefig(EXAMPLE_OUTPUT_ROOT / f'ad_validation_{JAX_MODE}.png', dpi=160, bbox_inches='tight')\n"
+            "plt.savefig(EXAMPLE_OUTPUT_ROOT / f'ad_validation_argument_{JAX_MODE}.png', dpi=160, bbox_inches='tight')\n"
+            "plt.show()\n"
+            "ax = ad_df.plot(x='shift', y=['primal_shift', 'grad_shift'], figsize=(8, 4), title='Matrix-Free AD Validation: Parameter Direction')\n"
+            "plt.tight_layout()\n"
+            "plt.savefig(EXAMPLE_OUTPUT_ROOT / f'ad_validation_parameter_{JAX_MODE}.png', dpi=160, bbox_inches='tight')\n"
             "plt.show()"
         ),
         nbf.v4.new_markdown_cell(
@@ -1011,7 +1077,7 @@ def _matrix_free_operator_surface_notebook() -> list:
             "Run the matrix-free contract, chassis, and AD-facing tests."
         ),
         nbf.v4.new_code_cell(
-            "tests = run([\n"
+            "test_cmd = [\n"
             "    PYTHON, '-m', 'pytest', '-q',\n"
             "    'tests/test_jrb_mat_chassis.py',\n"
             "    'tests/test_jcb_mat_chassis.py',\n"
@@ -1020,11 +1086,18 @@ def _matrix_free_operator_surface_notebook() -> list:
             "    'tests/test_matrix_free_basic.py',\n"
             "    'tests/test_matrix_stack_contracts.py',\n"
             "    'tests/test_matfree_adjoints.py',\n"
-            "], capture=True)\n"
+            "]\n"
+            "try:\n"
+            "    tests = run(test_cmd, capture=True)\n"
+            "    test_status = 'passed'\n"
+            "except subprocess.CalledProcessError as exc:\n"
+            "    tests = exc\n"
+            "    test_status = 'failed'\n"
             "print(tests.stdout)\n"
             "if tests.stderr:\n"
             "    print(tests.stderr)\n"
-            "(EXAMPLE_OUTPUT_ROOT / f'pytest_{JAX_MODE}.txt').write_text(tests.stdout + ('\\n' + tests.stderr if tests.stderr else ''), encoding='utf-8')"
+            "(EXAMPLE_OUTPUT_ROOT / f'pytest_{JAX_MODE}.txt').write_text((tests.stdout or '') + ('\\n' + tests.stderr if tests.stderr else ''), encoding='utf-8')\n"
+            "display({'validation_status': test_status})"
         ),
         nbf.v4.new_markdown_cell(
             "## Benchmark Summary\n\n"
@@ -1420,20 +1493,30 @@ def _gamma_family_surface_notebook() -> list:
             "display({'jit_shape': gamma_fast_out.shape, 'jit_matches_vmap': bool(jnp.allclose(gamma_fast_out, gamma_vmap, rtol=1e-6, atol=1e-6))})"
         ),
         *_ad_pattern_cells(
-            "Special-function AD should be shown on the production-facing differentiated surface with explicit method policy. "
-            "This section validates incomplete-gamma derivatives over a sweep and plots primal versus gradient.",
+            "Special-function AD should be shown in both directions on the production-facing surface: through the evaluation variable and through the family parameter. "
+            "This section validates incomplete-gamma derivatives over both `z` and `s` sweeps and plots the paired sensitivities.",
             "import jax\n"
             "s_fixed = jnp.asarray(2.5, dtype=jnp.float64)\n"
-            "def gamma_loss(zv):\n"
+            "z_fixed = jnp.asarray(1.25, dtype=jnp.float64)\n"
+            "def gamma_loss_z(zv):\n"
             "    return api.incomplete_gamma_upper(s_fixed, zv, mode='point', method='quadrature')\n"
+            "def gamma_loss_s(sv):\n"
+            "    return api.incomplete_gamma_upper(sv, z_fixed, mode='point', method='quadrature')\n"
             "z_sweep = jnp.linspace(0.25, 2.0, 32, dtype=jnp.float64)\n"
-            "primal_vals = jax.vmap(gamma_loss)(z_sweep)\n"
-            "grad_vals = jax.vmap(jax.grad(gamma_loss))(z_sweep)\n"
-            "ad_df = pd.DataFrame({'z': np.asarray(z_sweep), 'primal': np.asarray(primal_vals), 'grad': np.asarray(grad_vals)})\n"
+            "s_sweep = jnp.linspace(1.25, 3.25, 32, dtype=jnp.float64)\n"
+            "primal_z = jax.vmap(gamma_loss_z)(z_sweep)\n"
+            "grad_z = jax.vmap(jax.grad(gamma_loss_z))(z_sweep)\n"
+            "primal_s = jax.vmap(gamma_loss_s)(s_sweep)\n"
+            "grad_s = jax.vmap(jax.grad(gamma_loss_s))(s_sweep)\n"
+            "ad_df = pd.DataFrame({'z': [float(v) for v in z_sweep], 'primal_z': [float(v) for v in primal_z], 'grad_z': [float(v) for v in grad_z], 's': [float(v) for v in s_sweep], 'primal_s': [float(v) for v in primal_s], 'grad_s': [float(v) for v in grad_s]})\n"
             "display(ad_df.head())\n"
-            "ax = ad_df.plot(x='z', y=['primal', 'grad'], figsize=(8, 4), title='Gamma AD Validation')\n"
+            "ax = ad_df.plot(x='z', y=['primal_z', 'grad_z'], figsize=(8, 4), title='Gamma AD Validation: Argument Direction')\n"
             "plt.tight_layout()\n"
-            "plt.savefig(EXAMPLE_OUTPUT_ROOT / f'ad_validation_{JAX_MODE}.png', dpi=160, bbox_inches='tight')\n"
+            "plt.savefig(EXAMPLE_OUTPUT_ROOT / f'ad_validation_argument_{JAX_MODE}.png', dpi=160, bbox_inches='tight')\n"
+            "plt.show()\n"
+            "ax = ad_df.plot(x='s', y=['primal_s', 'grad_s'], figsize=(8, 4), title='Gamma AD Validation: Parameter Direction')\n"
+            "plt.tight_layout()\n"
+            "plt.savefig(EXAMPLE_OUTPUT_ROOT / f'ad_validation_parameter_{JAX_MODE}.png', dpi=160, bbox_inches='tight')\n"
             "plt.show()"
         ),
         nbf.v4.new_markdown_cell(
@@ -1546,20 +1629,32 @@ def _barnes_double_gamma_surface_notebook() -> list:
             "display({'jit_shape': barnes_fast_out.shape, 'finite': bool(jnp.all(jnp.isfinite(barnes_fast_out)))})"
         ),
         *_ad_pattern_cells(
-            "Barnes-family AD should be shown explicitly because these surfaces are more specialized and their derivative expectations are less obvious to users. "
-            "This section differentiates the IFJ log-form path over a real sweep and plots primal versus gradient.",
+            "Barnes-family AD should be shown explicitly in both directions: the evaluation variable and the family parameter `tau`. "
+            "This section differentiates the IFJ path over both sweeps and plots the paired sensitivities.",
             "import jax\n"
-            "def barnes_loss(xv):\n"
+            "tau_fixed = jnp.float64(1.0)\n"
+            "x_fixed = jnp.float64(1.1)\n"
+            "def barnes_loss_x(xv):\n"
             "    val = double_gamma.ifj_barnesdoublegamma(jnp.asarray(xv + 0.05j, dtype=jnp.complex128), 1.0, dps=60)\n"
             "    return jnp.real(val)\n"
+            "def barnes_loss_tau(tv):\n"
+            "    val = double_gamma.ifj_barnesdoublegamma(jnp.asarray(x_fixed + 0.05j, dtype=jnp.complex128), tv, dps=60)\n"
+            "    return jnp.real(val)\n"
             "x_sweep = jnp.linspace(0.8, 2.0, 24, dtype=jnp.float64)\n"
-            "primal_vals = jax.vmap(barnes_loss)(x_sweep)\n"
-            "grad_vals = jax.vmap(jax.grad(barnes_loss))(x_sweep)\n"
-            "ad_df = pd.DataFrame({'x': np.asarray(x_sweep), 'primal': np.asarray(primal_vals), 'grad': np.asarray(grad_vals)})\n"
+            "tau_sweep = jnp.linspace(0.8, 1.2, 24, dtype=jnp.float64)\n"
+            "primal_x = jax.vmap(barnes_loss_x)(x_sweep)\n"
+            "grad_x = jax.vmap(jax.jacfwd(barnes_loss_x))(x_sweep)\n"
+            "primal_tau = jax.vmap(barnes_loss_tau)(tau_sweep)\n"
+            "grad_tau = jax.vmap(jax.jacfwd(barnes_loss_tau))(tau_sweep)\n"
+            "ad_df = pd.DataFrame({'x': [float(v) for v in x_sweep], 'primal_x': [float(v) for v in primal_x], 'grad_x': [float(v) for v in grad_x], 'tau': [float(v) for v in tau_sweep], 'primal_tau': [float(v) for v in primal_tau], 'grad_tau': [float(v) for v in grad_tau]})\n"
             "display(ad_df.head())\n"
-            "ax = ad_df.plot(x='x', y=['primal', 'grad'], figsize=(8, 4), title='Barnes AD Validation')\n"
+            "ax = ad_df.plot(x='x', y=['primal_x', 'grad_x'], figsize=(8, 4), title='Barnes AD Validation: Argument Direction')\n"
             "plt.tight_layout()\n"
-            "plt.savefig(EXAMPLE_OUTPUT_ROOT / f'ad_validation_{JAX_MODE}.png', dpi=160, bbox_inches='tight')\n"
+            "plt.savefig(EXAMPLE_OUTPUT_ROOT / f'ad_validation_argument_{JAX_MODE}.png', dpi=160, bbox_inches='tight')\n"
+            "plt.show()\n"
+            "ax = ad_df.plot(x='tau', y=['primal_tau', 'grad_tau'], figsize=(8, 4), title='Barnes AD Validation: Parameter Direction')\n"
+            "plt.tight_layout()\n"
+            "plt.savefig(EXAMPLE_OUTPUT_ROOT / f'ad_validation_parameter_{JAX_MODE}.png', dpi=160, bbox_inches='tight')\n"
             "plt.show()"
         ),
         nbf.v4.new_markdown_cell(
@@ -1622,6 +1717,175 @@ def _barnes_double_gamma_surface_notebook() -> list:
     return cells
 
 
+def _hypgeom_family_surface_notebook() -> list:
+    cells = [
+        nbf.v4.new_markdown_cell(
+            "# Example Hypgeom Family Surface\n\n"
+            "Canonical hypergeometric notebook using the direct routed API, family-owned padded kernels, and the current hardening diagnostics artifacts."
+        ),
+        *_common_setup_cells("example_hypgeom_family_surface"),
+        nbf.v4.new_markdown_cell(
+            "## Direct Usage\n\n"
+            "Exercise the real point 1f1 surface, the interval-mode routed binder, and the regularized lower/upper incomplete-gamma wrappers."
+        ),
+        nbf.v4.new_code_cell(
+            "import jax.numpy as jnp\n"
+            "from arbplusjax import acb_core, api, double_interval as di, hypgeom_wrappers\n"
+            "\n"
+            "a = jnp.asarray([1.0, 1.25, 1.5], dtype=jnp.float64)\n"
+            "b = jnp.asarray([2.0, 2.25, 2.5], dtype=jnp.float64)\n"
+            "z = jnp.asarray([0.2, 0.3, 0.4], dtype=jnp.float64)\n"
+            "point_bound = api.bind_point_batch_jit('hypgeom.arb_hypgeom_1f1', dtype='float64', pad_to=8)\n"
+            "a_iv = di.interval(a, a + 0.01)\n"
+            "b_iv = di.interval(b, b + 0.01)\n"
+            "z_iv = di.interval(z, z + 0.01)\n"
+            "interval_bound = api.bind_interval_batch('hypgeom.arb_hypgeom_1f1', mode='rigorous', dtype='float64', pad_to=8, prec_bits=53)\n"
+            "s = di.interval(jnp.asarray([1.2, 1.25], dtype=jnp.float64), jnp.asarray([1.25, 1.3], dtype=jnp.float64))\n"
+            "x = di.interval(jnp.asarray([0.3, 0.35], dtype=jnp.float64), jnp.asarray([0.35, 0.4], dtype=jnp.float64))\n"
+            "sc = acb_core.acb_box(di.interval(jnp.float64(1.2), jnp.float64(1.25)), di.interval(jnp.float64(-0.05), jnp.float64(0.05)))\n"
+            "zc = acb_core.acb_box(di.interval(jnp.float64(0.3), jnp.float64(0.35)), di.interval(jnp.float64(-0.02), jnp.float64(0.02)))\n"
+            "direct_results = {\n"
+            "    'onef1_point': point_bound(a, b, z),\n"
+            "    'onef1_rigorous': interval_bound(a_iv, b_iv, z_iv),\n"
+            "    'gamma_lower_regularized': hypgeom_wrappers.arb_hypgeom_gamma_lower_batch_mode_padded(s, x, pad_to=4, impl='rigorous', prec_bits=53, regularized=True),\n"
+            "    'gamma_upper_regularized': hypgeom_wrappers.arb_hypgeom_gamma_upper_batch_mode_padded(s, x, pad_to=4, impl='adaptive', prec_bits=53, regularized=True),\n"
+            "    'complex_gamma_lower': hypgeom_wrappers.acb_hypgeom_gamma_lower_mode(sc, zc, impl='rigorous', prec_bits=53, regularized=True),\n"
+            "    'metadata': api.get_public_function_metadata('hypgeom.arb_hypgeom_1f1'),\n"
+            "}\n"
+            "display(direct_results)"
+        ),
+        *_production_pattern_cells(
+            "Production Pattern",
+            "Hypergeom production usage should keep family ownership explicit: use the compiled point binder for repeated point traffic, keep `pad_to` fixed, and use the family-owned mode batch wrappers or interval binder for tighter interval traffic.",
+            "onef1_service = api.bind_point_batch_jit('hypgeom.arb_hypgeom_1f1', dtype='float64', pad_to=8)\n"
+            "onef1_interval_service = api.bind_interval_batch('hypgeom.arb_hypgeom_1f1', mode='rigorous', dtype='float64', pad_to=8, prec_bits=53)\n"
+            "service_results = {\n"
+            "    'point_reuse': onef1_service(a, b, z),\n"
+            "    'interval_reuse': onef1_interval_service(a_iv, b_iv, z_iv),\n"
+            "    'family_mode_wrapper': hypgeom_wrappers.arb_hypgeom_gamma_upper_batch_mode_padded(s, x, pad_to=4, impl='adaptive', prec_bits=53, regularized=True),\n"
+            "}\n"
+            "display(service_results)",
+            "To extend hypergeom benchmarks, add the next family row to `special_function_hardening_benchmark.py` for cross-family diagnostics or to `benchmark_hypgeom.py` / `run_hypgeom_point_kernel_benchmark.py` when the surface needs a dedicated family benchmark."
+        ),
+        *_fast_jax_pattern_cells(
+            "Hypergeom fast JAX should use the family-owned compiled point binder rather than ad hoc `jax.jit` over arbitrary arrays. "
+            "This section compares the bound padded kernel to the scalar public point path.",
+            "import jax\n"
+            "onef1_fast = api.bind_point_batch_jit('hypgeom.arb_hypgeom_1f1', dtype='float64', pad_to=8)\n"
+            "fast_vals = onef1_fast(a, b, z)\n"
+            "scalar_vals = jax.vmap(lambda aa, bb, zz: api.eval_point('hypgeom.arb_hypgeom_1f1', aa, bb, zz))(a, b, z)\n"
+            "display({'jit_shape': fast_vals.shape, 'jit_matches_scalar_vmap': bool(jnp.allclose(fast_vals, scalar_vals, rtol=1e-6, atol=1e-6))})"
+        ),
+        *_ad_pattern_cells(
+            "AD should be shown on the real production hypergeom entrypoint in both directions: through the evaluation variable and through a family parameter. "
+            "This section differentiates the public `hypgeom.arb_hypgeom_1f1` point path over `z` and `a` sweeps and plots both sensitivities.",
+            "import jax\n"
+            "a0 = jnp.float64(1.25)\n"
+            "b0 = jnp.float64(2.25)\n"
+            "z0 = jnp.float64(0.3)\n"
+            "def hypgeom_loss_z(zv):\n"
+            "    return api.eval_point('hypgeom.arb_hypgeom_1f1', a0, b0, zv)\n"
+            "def hypgeom_loss_a(av):\n"
+            "    return api.eval_point('hypgeom.arb_hypgeom_1f1', av, b0, z0)\n"
+            "z_sweep = jnp.linspace(0.1, 0.8, 24, dtype=jnp.float64)\n"
+            "a_sweep = jnp.linspace(0.9, 1.6, 24, dtype=jnp.float64)\n"
+            "primal_z = jax.vmap(hypgeom_loss_z)(z_sweep)\n"
+            "grad_z = jax.vmap(jax.grad(hypgeom_loss_z))(z_sweep)\n"
+            "primal_a = jax.vmap(hypgeom_loss_a)(a_sweep)\n"
+            "grad_a = jax.vmap(jax.grad(hypgeom_loss_a))(a_sweep)\n"
+            "ad_df = pd.DataFrame({'z': [float(v) for v in z_sweep], 'primal_z': [float(v) for v in primal_z], 'grad_z': [float(v) for v in grad_z], 'a': [float(v) for v in a_sweep], 'primal_a': [float(v) for v in primal_a], 'grad_a': [float(v) for v in grad_a]})\n"
+            "display(ad_df.head())\n"
+            "ax = ad_df.plot(x='z', y=['primal_z', 'grad_z'], figsize=(8, 4), title='Hypgeom AD Validation: Argument Direction')\n"
+            "plt.tight_layout()\n"
+            "plt.savefig(EXAMPLE_OUTPUT_ROOT / f'ad_validation_argument_{JAX_MODE}.png', dpi=160, bbox_inches='tight')\n"
+            "plt.show()\n"
+            "ax = ad_df.plot(x='a', y=['primal_a', 'grad_a'], figsize=(8, 4), title='Hypgeom AD Validation: Parameter Direction')\n"
+            "plt.tight_layout()\n"
+            "plt.savefig(EXAMPLE_OUTPUT_ROOT / f'ad_validation_parameter_{JAX_MODE}.png', dpi=160, bbox_inches='tight')\n"
+            "plt.show()"
+        ),
+        nbf.v4.new_markdown_cell(
+            "## Validation Summary\n\n"
+            "Run the current hypergeom engineering, wrapper, and special-function hardening tests."
+        ),
+        nbf.v4.new_code_cell(
+            "tests = run([\n"
+            "    PYTHON, '-m', 'pytest', '-q',\n"
+            "    'tests/test_hypgeom_wrappers_contracts.py',\n"
+            "    'tests/test_hypgeom_engineering.py',\n"
+            "    'tests/test_hypgeom_startup_lazy_loading.py',\n"
+            "    'tests/test_special_function_hardening.py',\n"
+            "], capture=True)\n"
+            "print(tests.stdout)\n"
+            "if tests.stderr:\n"
+            "    print(tests.stderr)\n"
+            "(EXAMPLE_OUTPUT_ROOT / f'pytest_{JAX_MODE}.txt').write_text(tests.stdout + ('\\n' + tests.stderr if tests.stderr else ''), encoding='utf-8')"
+        ),
+        nbf.v4.new_markdown_cell(
+            "## Benchmark Summary\n\n"
+            "Run the cross-family hardening benchmark and the dedicated hypgeom startup probe, then structure the emitted artifacts."
+        ),
+        nbf.v4.new_code_cell(
+            "run([PYTHON, 'benchmarks/special_function_hardening_benchmark.py'], capture=True)\n"
+            "run([PYTHON, 'benchmarks/hypgeom_point_startup_probe.py'], capture=True)\n"
+            "hardening_payload = json.loads((REPO_ROOT / 'benchmarks' / 'results' / 'special_function_hardening_benchmark' / 'special_function_hardening_benchmark.json').read_text(encoding='utf-8'))\n"
+            "startup_payload = json.loads((REPO_ROOT / 'benchmarks' / 'results' / 'hypgeom_point_startup_probe' / 'hypgeom_point_startup_probe.json').read_text(encoding='utf-8'))\n"
+            "bench_df = pd.DataFrame([\n"
+            "    {'metric': 'onef1_point_batch_s', 'value': hardening_payload['hypgeom']['onef1_point_batch_s']},\n"
+            "    {'metric': 'gamma_lower_regularized_batch_s', 'value': hardening_payload['hypgeom']['gamma_lower_regularized_batch_s']},\n"
+            "    {'metric': 'gamma_upper_regularized_batch_s', 'value': hardening_payload['hypgeom']['gamma_upper_regularized_batch_s']},\n"
+            "    {'metric': 'startup_import_s', 'value': startup_payload['import_arbplusjax_api']['seconds']},\n"
+            "    {'metric': 'startup_compile_plus_first_s', 'value': startup_payload['arb_hypgeom_1f1_point_path']['compile_plus_first_point_batch_s']},\n"
+            "    {'metric': 'startup_steady_s', 'value': startup_payload['arb_hypgeom_1f1_point_path']['steady_point_batch_s']},\n"
+            "])\n"
+            "bench_df.to_csv(EXAMPLE_OUTPUT_ROOT / f'hypgeom_summary_{JAX_MODE}.csv', index=False)\n"
+            "display(bench_df)"
+        ),
+        nbf.v4.new_markdown_cell(
+            "## Comparison Summary\n\n"
+            "Use the generated engineering reports as the canonical comparison/status layer for the current hypergeom surface."
+        ),
+        nbf.v4.new_code_cell(
+            "status_text = (REPO_ROOT / 'docs' / 'reports' / 'hypgeom_status.md').read_text(encoding='utf-8')\n"
+            "special_status = (REPO_ROOT / 'docs' / 'reports' / 'special_function_status.md').read_text(encoding='utf-8')\n"
+            "comparison_summary = {\n"
+            "    'hypgeom_status_has_1f1': 'arb_hypgeom_1f1 / acb_hypgeom_1f1' in status_text,\n"
+            "    'special_status_has_startup': 'hypgeom_point_startup_probe.json' in special_status,\n"
+            "}\n"
+            "display(comparison_summary)"
+        ),
+        nbf.v4.new_markdown_cell(
+            "## Optional Diagnostics\n\n"
+            "Keep a compact diagnostics summary tied to the startup probe and current hardening report."
+        ),
+        nbf.v4.new_code_cell(
+            "diag_rows = bench_df.copy()\n"
+            "diag_rows.to_csv(EXAMPLE_OUTPUT_ROOT / f'hypgeom_diagnostics_{JAX_MODE}.csv', index=False)\n"
+            "top = bench_df.head(6)\n"
+            "ax = top.plot(x='metric', y='value', kind='barh', figsize=(10, 4), color='#50717d', legend=False, title='Hypgeom Benchmark / Startup Summary')\n"
+            "ax.set_xlabel('value')\n"
+            "plt.tight_layout()\n"
+            "plt.savefig(EXAMPLE_OUTPUT_ROOT / f'hypgeom_summary_{JAX_MODE}.png', dpi=160, bbox_inches='tight')\n"
+            "plt.show()\n"
+            "summary_lines = [\n"
+            "    f'# Example Hypgeom Family Surface Summary ({JAX_MODE})',\n"
+            "    '',\n"
+            "    f'- backend: `{runtime_payload[\"platform\"]}`',\n"
+            "    f'- benchmark_rows: `{len(bench_df)}`',\n"
+            "    f'- diagnostics_rows: `{len(diag_rows)}`',\n"
+            "    '',\n"
+            "    '## Key Metrics',\n"
+            "    '',\n"
+            "]\n"
+            "for row in top.to_dict(orient='records'):\n"
+            "    summary_lines.append(f\"- `{row['metric']}`: `{row['value']}`\")\n"
+            "(EXAMPLE_OUTPUT_ROOT / f'summary_{JAX_MODE}.md').write_text('\\n'.join(summary_lines) + '\\n', encoding='utf-8')\n"
+            "display('\\n'.join(summary_lines[:14]))"
+        ),
+    ]
+    return cells
+
+
 def main() -> None:
     notebooks = {
         "example_core_scalar_surface.ipynb": _core_scalar_notebook(),
@@ -1633,6 +1897,7 @@ def main() -> None:
         "example_dirichlet_surface.ipynb": _dirichlet_surface_notebook(),
         "example_gamma_family_surface.ipynb": _gamma_family_surface_notebook(),
         "example_barnes_double_gamma_surface.ipynb": _barnes_double_gamma_surface_notebook(),
+        "example_hypgeom_family_surface.ipynb": _hypgeom_family_surface_notebook(),
     }
     for name, cells in notebooks.items():
         _write_notebook(EXAMPLES_DIR / name, cells)

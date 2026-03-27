@@ -19,6 +19,14 @@ classifiers = [
   "License :: OSI Approved :: GNU Lesser General Public License v3 or later (LGPLv3+)",
 ]
 
+[project.optional-dependencies]
+compare = [
+  "mpmath>=1.3",
+]
+colab = [
+  "matplotlib>=3.8",
+]
+
 [tool.setuptools]
 package-dir = {"" = "src"}
 

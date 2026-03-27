@@ -1,0 +1,60 @@
+{
+  "c_arb": {
+    "purpose": "Primary interval/enclosure reference backend when C Arb/FLINT reference adapters are available.",
+    "owner": "tests parity layer + compare benchmarks",
+    "execution_surface": "Linux, Windows, WSL local parity/compare runs",
+    "backend_scope": "backend-specific",
+    "required_env": [
+      "ARB_C_REF_DIR"
+    ],
+    "default_role": "interval_reference",
+    "optional": true
+  },
+  "mathematica": {
+    "purpose": "Optional high-confidence symbolic/numerical reference backend for difficult special-function and asymptotic comparisons.",
+    "owner": "compare benchmarks + reference scripts",
+    "execution_surface": "local licensed install or Wolfram-enabled environment",
+    "backend_scope": "backend-specific",
+    "required_env": [
+      "WOLFRAMKERNEL"
+    ],
+    "default_role": "high_precision_reference",
+    "optional": true
+  },
+  "mpmath": {
+    "purpose": "Portable high-precision point reference backend for benchmark and parity-style comparisons.",
+    "owner": "compare benchmarks + reference checks",
+    "execution_surface": "Windows, Linux, WSL, Colab, GitHub Actions",
+    "backend_scope": "CPU/GPU portable",
+    "required_env": [],
+    "default_role": "high_precision_reference",
+    "optional": true
+  },
+  "scipy": {
+    "purpose": "Default float64 engineering parity/reference backend where SciPy provides the target function or sparse operator.",
+    "owner": "runtime install + compare benchmarks",
+    "execution_surface": "Windows, Linux, WSL, Colab, GitHub Actions",
+    "backend_scope": "CPU/GPU portable",
+    "required_env": [],
+    "default_role": "float_reference",
+    "optional": true
+  },
+  "jax_scipy": {
+    "purpose": "Optional JAX-side comparison backend for engineering parity and fallback experiments.",
+    "owner": "benchmark/compare paths only",
+    "execution_surface": "Windows, Linux, WSL, Colab, GitHub Actions",
+    "backend_scope": "CPU/GPU portable",
+    "required_env": [],
+    "default_role": "experimental_jax_reference",
+    "optional": true
+  },
+  "experimental_jax": {
+    "purpose": "Optional experimental JAX kernels and alternate implementations that are not part of the canonical runtime contract.",
+    "owner": "family-specific experimental modules and compare benchmarks",
+    "execution_surface": "Windows, Linux, WSL, Colab, GitHub Actions",
+    "backend_scope": "CPU/GPU portable",
+    "required_env": [],
+    "default_role": "experimental",
+    "optional": true
+  }
+}

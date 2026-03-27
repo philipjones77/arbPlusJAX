@@ -60,16 +60,16 @@ def test_dense_matrix_benchmark_writes_shared_schema_report() -> None:
 
 
 def test_barnes_double_gamma_benchmark_writes_shared_schema_report() -> None:
-    result = subprocess.run(
-        [sys.executable, "benchmarks/benchmark_barnes_double_gamma.py", "--help"],
-        cwd=REPO_ROOT,
-        capture_output=True,
-        text=True,
+    payload = _run_and_load(
+        ["benchmarks/benchmark_barnes_double_gamma.py", "--iters", "1", "--dtype", "float32", "--jax-mode", "cpu", "--smoke"],
+        "benchmark_barnes_double_gamma.json",
     )
-    assert result.returncode == 0, result.stderr
-    assert "--dps" in result.stdout
-    assert "--prec-bits" in result.stdout
-    assert "--dtype" in result.stdout
+    assert payload["benchmark_name"] == "benchmark_barnes_double_gamma.py"
+    assert payload["category"] == "special"
+    assert payload["records"]
+    assert any(row["implementation"] == "ifj" for row in payload["records"])
+    assert any(row["operation"] == "barnes_double_gamma_scalar" for row in payload["records"])
+    assert payload["environment"]["jax"]["requested_mode"] == "cpu"
 
 
 def test_block_sparse_benchmark_writes_shared_schema_report() -> None:
@@ -245,6 +245,7 @@ def test_normalized_benchmark_help_shows_dtype_portability_controls() -> None:
         "benchmarks/benchmark_acb_dirichlet.py",
         "benchmarks/benchmark_hypgeom_extra.py",
         "benchmarks/benchmark_incomplete_bessel.py",
+        "benchmarks/benchmark_barnes_double_gamma.py",
     ):
         result = subprocess.run(
             [sys.executable, script, "--help"],
@@ -254,3 +255,5 @@ def test_normalized_benchmark_help_shows_dtype_portability_controls() -> None:
         )
         assert result.returncode == 0, result.stderr
         assert "--dtype" in result.stdout
+        if script.endswith("benchmark_barnes_double_gamma.py"):
+            assert "--jax-mode" in result.stdout

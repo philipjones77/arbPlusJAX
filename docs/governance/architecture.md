@@ -30,6 +30,77 @@ arbPlusJAX is a JAX-first implementation of key Arb functionality with four exec
 - `src/arbplusjax/point_wrappers.py`: point-only kernels (fast path).
 - `src/arbplusjax/api.py`: unified entry points for optimized calls.
 
+## Target Internal Package Architecture
+
+The public API should remain stable at the package root, but the internal
+runtime layout should converge toward six function-category packages plus
+explicit shared helpers.
+
+Target category packages:
+
+- `arbplusjax/core_scalar/`
+- `arbplusjax/special/`
+- `arbplusjax/dense_matrix/`
+- `arbplusjax/sparse_matrix/`
+- `arbplusjax/matrix_free/`
+- `arbplusjax/transforms/`
+
+Target shared helper layers:
+
+- `arbplusjax/runtime/`
+- `arbplusjax/diagnostics/`
+- `arbplusjax/validation/`
+- `arbplusjax/precision/`
+- `arbplusjax/curvature/`
+- `arbplusjax/helpers/`
+
+Architectural rules:
+
+- keep the public API stable at the package root
+- place category-owned implementations under the six category packages
+- move reusable cross-category substrate into explicit helper modules rather
+  than hiding it inside one category
+- refactor in tranches, not a mass move, so tests/reports/status stay aligned
+  after each structural step
+
+### Curvature Layer Placement
+
+Curvature is a cross-cutting helper layer, not a seventh public function
+category.
+
+In arbPlusJAX, `curvature` should mean:
+
+- any first-class representation or approximation of local second-order
+  structure for objectives, likelihoods, posteriors, operators, or maps
+- together with the linear algebra needed to apply, solve, factorize,
+  approximate, differentiate, and diagnose that structure
+
+That layer belongs under:
+
+- `arbplusjax/curvature/`
+
+instead of being split ad hoc between dense, sparse, and matrix-free modules.
+
+The curvature layer should stay operator-first and matrix-optional. It should
+cover:
+
+- exact Hessians and Hessian-vector products
+- generalized Gauss-Newton and Fisher operators
+- prior-precision plus likelihood-curvature composition
+- posterior-precision operators
+- diagonal, block, low-rank, and Lanczos-based approximations
+- inverse-diagonal and selected-inverse style marginal extraction
+- curvature-aware preconditioners
+- implicit-adjoint solve boundaries and transpose-solve policy
+
+The six function categories remain the public runtime decomposition. Curvature
+is the governed shared substrate that those categories consume, especially:
+
+- `dense_matrix`
+- `sparse_matrix`
+- `matrix_free`
+- selected `special` and downstream inference workflows
+
 ## Optimal Calling Structure (all functions)
 
 Use `arbplusjax.api` for stable, optimized entry points:

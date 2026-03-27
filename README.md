@@ -26,7 +26,6 @@ Tests, benchmarks, and notebooks are expected to run against the source tree in 
 
 ## Documentation Entry Points
 
-- docs index: [docs/index.md](/docs/index.md)
 - project overview: [docs/project_overview.md](/docs/project_overview.md)
 - standards: [docs/standards/README.md](/docs/standards/README.md)
 - reports: [docs/reports/README.md](/docs/reports/README.md)
@@ -60,5 +59,6 @@ PYTHONPATH=src python -m pytest tests -q -m "not parity"
 - JAX is the primary implementation surface.
 - The package root uses lazy public-module loading to keep import-time cost low.
 - Reference software and external engines are validation/comparison layers, not the default runtime path.
-- Linux, Windows, and Colab all use the same source tree; Colab has a CPU-safe bootstrap surface in [requirements-colab.txt](/requirements-colab.txt) and [tools/colab_bootstrap.sh](/tools/colab_bootstrap.sh).
+- Linux, Windows, WSL, GitHub submission, and Colab all use the same source tree; Colab has a CPU-safe bootstrap surface in [requirements-colab.txt](/requirements-colab.txt) and [tools/colab_bootstrap.sh](/tools/colab_bootstrap.sh).
+- Optional comparison/reference backends are tracked in [configs/optional_comparison_backends.json](/configs/optional_comparison_backends.json); Mathematica, `c_arb`, `mpmath`, `scipy`, `jax.scipy`, and experimental JAX paths are comparison layers, not mandatory runtime dependencies.
 - See [NOTICE](/NOTICE) for acknowledgments and reference links.

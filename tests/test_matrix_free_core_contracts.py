@@ -1,3 +1,4 @@
+import jax
 import jax.numpy as jnp
 
 from arbplusjax import double_interval as di
@@ -329,7 +330,7 @@ def test_deflated_operator_metadata_and_trace_helpers_have_stable_contracts():
         deflation=deflation,
         apply_operator_midpoint=lambda v: action_fn(v),
     )
-    assert bool(jnp.allclose(residual_apply, jnp.asarray([0.0, 4.0], dtype=jnp.float64), atol=1e-6))
+    assert bool(jnp.allclose(residual_apply, jnp.asarray([0.0, 9.0], dtype=jnp.float64), atol=1e-6))
 
     metadata = mfc.deflated_trace_estimate_from_metadata_point(
         action_fn,
@@ -482,6 +483,44 @@ def test_implicit_krylov_solve_midpoint_uses_transpose_shell_preconditioner_cont
     assert meta.transpose_preconditioner is not None
 
 
+def test_implicit_krylov_solve_midpoint_uses_custom_linear_solve_for_general_operator_with_transpose_plan():
+    dense = jnp.asarray([[4.0, 1.0], [0.0, 2.0]], dtype=jnp.float64)
+    operator = mfc.dense_operator_plan(dense, orientation="forward", algebra="jrb")
+    rhs = jnp.asarray([6.0, 4.0], dtype=jnp.float64)
+    preconditioner = mfc.oriented_shell_preconditioner_plan(
+        context={
+            "forward_callback": lambda v, ctx: ctx["diag"] * v,
+            "transpose_callback": lambda v, ctx: ctx["diag_t"] * v,
+            "diag": jnp.asarray([0.25, 0.5], dtype=jnp.float64),
+            "diag_t": jnp.asarray([0.25, 0.5], dtype=jnp.float64),
+        },
+        algebra="jrb",
+        orientation="forward",
+        forward_callback=lambda v, ctx: ctx["diag"] * v,
+        transpose_callback=lambda v, ctx: ctx["diag_t"] * v,
+    )
+
+    x_mid, info, residual, rhs_norm, meta = mfc.implicit_krylov_solve_midpoint(
+        operator,
+        rhs,
+        solver="gmres",
+        structured="general",
+        midpoint_vector=_midpoint_vector,
+        lift_vector=_identity_point_from_midpoint,
+        sparse_bcoo_matvec=_sparse_bcoo_matvec,
+        dtype=jnp.float64,
+        preconditioner=preconditioner,
+    )
+
+    assert jnp.allclose(x_mid, jnp.asarray([1.0, 2.0], dtype=jnp.float64), atol=1e-6)
+    assert bool(info["converged"])
+    assert float(residual) <= 1e-6
+    assert float(rhs_norm) > 0.0
+    assert meta.implicit_adjoint
+    assert meta.transpose_operator is not None
+    assert meta.transpose_preconditioner is not None
+
+
 def test_orthogonal_probe_block_helpers_return_orthonormal_midpoints():
     key = jnp.asarray([0, 321], dtype=jnp.uint32)
 
@@ -519,3 +558,55 @@ def test_probe_statistics_and_adaptive_budget_helpers_have_stable_contracts():
     assert int(recommended) >= 3
     assert int(recommended) <= 16
     assert int(recommended) % 2 == 0
+
+    stats = mfc.make_probe_estimate_statistics(
+        real_samples,
+        target_stderr=0.5,
+        min_probes=3,
+        max_probes=16,
+        block_size=2,
+    )
+    assert int(mfc.probe_statistics_probe_deficit(stats)) >= 0
+    assert int(mfc.probe_statistics_next_probe_count(stats, block_size=2, max_probes=16)) >= int(stats.probe_count)
+
+
+def test_restart_and_cached_rational_metadata_helpers_have_stable_contracts():
+    residuals = jnp.asarray([[1e-12, 1e-4, 1e-2]], dtype=jnp.float64)
+    filtered = mfc.eig_filter_residual_corrections(residuals, lock_tol=1e-6)
+    assert jnp.allclose(filtered[:, 0], 0.0)
+    assert int(mfc.eig_target_subspace_cols(size=8, seed_cols=3, residual_cols=5, block_size=2)) == 5
+
+    preconditioner = mfc.dense_preconditioner_plan(jnp.eye(2, dtype=jnp.float64), algebra="jrb")
+    meta = mfc.make_rational_hutchpp_metadata(
+        operator=lambda v: v,
+        deflation=mfc.make_deflated_operator_metadata(
+            basis=jnp.eye(2, dtype=jnp.float64),
+            image=jnp.eye(2, dtype=jnp.float64),
+            low_rank_trace=jnp.asarray(2.0, dtype=jnp.float64),
+        ),
+        shifts=jnp.zeros((0,), dtype=jnp.float64),
+        weights=jnp.zeros((0,), dtype=jnp.float64),
+        preconditioner=preconditioner,
+        target_stderr=0.25,
+        min_probes=2,
+        max_probes=8,
+        block_size=2,
+        gradient_supported=True,
+        implicit_adjoint=True,
+        structured="symmetric",
+        algebra="jrb",
+    )
+    estimate = mfc.make_hutchpp_trace_metadata(
+        basis=jnp.eye(2, dtype=jnp.float64),
+        low_rank_trace=jnp.asarray(2.0, dtype=jnp.float64),
+        residual_samples=jnp.asarray([1.0, 1.0], dtype=jnp.float64),
+        target_stderr=0.25,
+        min_probes=2,
+        max_probes=8,
+        block_size=2,
+    )
+    assert meta.transpose_preconditioner is not None
+    assert bool(meta.cached_adjoint_supported)
+    assert int(mfc.rational_hutchpp_probe_deficit(meta, estimate)) == 0
+    assert int(mfc.rational_hutchpp_next_probe_count(meta, estimate)) >= int(estimate.statistics.probe_count)
+    assert bool(mfc.rational_hutchpp_should_stop(meta, estimate))

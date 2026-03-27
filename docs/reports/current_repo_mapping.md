@@ -1,4 +1,4 @@
-Last updated: 2026-03-23T00:00:00Z
+Last updated: 2026-03-25T00:00:00Z
 
 # Current Repo Mapping
 
@@ -13,6 +13,7 @@ This report records the current high-level repository and documentation-tree map
 - `docs/`
 - `examples/`
 - `experiments/`
+- `migration/`
 - `outputs/`
 - `src/`
 - `stuff/`

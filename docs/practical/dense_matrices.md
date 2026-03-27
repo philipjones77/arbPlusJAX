@@ -35,14 +35,25 @@ Do not use padded batch helpers for tiny one-off workloads if latency matters. T
 General dense:
 
 1. prepare the dense matrix in `arb_mat` or `acb_mat` layout
-2. use direct `matvec` / `solve` first
-3. switch to cached `matvec` or LU plan reuse when repeated calls dominate runtime
+2. for repeated point-mode work, prefer cached `matvec` prepare/apply immediately
+3. bind the repeated point batch with `api.bind_point_batch_jit(..., pad_to=...)` when batch counts vary
+4. use direct `matvec` / `solve` only when the workload is genuinely one-off or shape churn is unavoidable
 
 Structured dense:
 
 1. let the dense layer auto-detect SPD / HPD structure where applicable
 2. use explicit SPD / HPD solve-plan reuse for repeated solves
 3. use `eigh` / `eigvalsh` for symmetric / Hermitian spectral work
+
+## Startup-Oriented Dense Workflow
+
+If startup compile behavior matters, the default teaching path is:
+
+1. point-mode dense matrix path
+2. cached prepare/apply for repeated matrix application or solve-plan reuse for repeated solves
+3. padded point batch binding such as `api.bind_point_batch_jit("arb_mat_matvec_cached_apply", pad_to=...)`
+
+This keeps point-only matrix traffic off interval/mode wrapper imports during startup and makes shape-stable repeated calls the default runtime contract.
 
 ## JAX Practical Notes
 
@@ -53,6 +64,7 @@ Structured dense:
 
 If you are tuning runtime:
 
+- benchmark point-only API import separately from first compiled cached `matvec`
 - benchmark cached `matvec` separately from padded cached `matvec`
 - benchmark real and complex dense paths separately
 - expect complex box padded paths to cost materially more than real interval paths
@@ -67,6 +79,7 @@ Implementation details:
 
 Validation and performance:
 
-- [dense_matrix_surface_benchmark.md](/docs/status/reports/dense_matrix_surface_benchmark.md)
+- [dense_matrix_surface_benchmark.md](/docs/reports/dense_matrix_surface_benchmark.md)
+- [dense_matrix_engineering_status.md](/docs/reports/dense_matrix_engineering_status.md)
 - [example_dense_matrix_surface.ipynb](/examples/example_dense_matrix_surface.ipynb)
 - [example_dense_structured_spectral.ipynb](/examples/example_dense_structured_spectral.ipynb)

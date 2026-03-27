@@ -21,21 +21,41 @@ os.environ.setdefault("JAX_ENABLE_X64", "1")
 import jax
 import jax.numpy as jnp
 
-from arbplusjax import acb_core
-from arbplusjax import double_interval as di
-from arbplusjax import jcb_mat
-from arbplusjax import jrb_mat
-from arbplusjax import precision
-from arbplusjax import sparse_common
+acb_core = None
+di = None
+jcb_mat = None
+jrb_mat = None
+precision = None
+sparse_common = None
 
-precision.enable_jax_x64()
+
+def _load_matrix_free_modules():
+    global acb_core, di, jcb_mat, jrb_mat, precision, sparse_common
+    if jrb_mat is not None:
+        return
+    from arbplusjax import acb_core as _acb_core
+    from arbplusjax import double_interval as _di
+    from arbplusjax import jcb_mat as _jcb_mat
+    from arbplusjax import jrb_mat as _jrb_mat
+    from arbplusjax import precision as _precision
+    from arbplusjax import sparse_common as _sparse_common
+
+    acb_core = _acb_core
+    di = _di
+    jcb_mat = _jcb_mat
+    jrb_mat = _jrb_mat
+    precision = _precision
+    sparse_common = _sparse_common
+    precision.enable_jax_x64()
 
 
 def _real_interval(x: jax.Array) -> jax.Array:
+    _load_matrix_free_modules()
     return di.interval(x, x)
 
 
 def _complex_box(z: jax.Array) -> jax.Array:
+    _load_matrix_free_modules()
     return acb_core.acb_box(_real_interval(jnp.real(z)), _real_interval(jnp.imag(z)))
 
 
@@ -104,6 +124,7 @@ def _precompile_many(entries: list[tuple[str, object, tuple]]) -> dict[str, floa
 
 
 def run_real_case(n: int = 32, steps: int = 12, *, warmup: int = 2, runs: int = 5, precompile_hot: bool = True) -> dict[str, float]:
+    _load_matrix_free_modules()
     a = _dense_real_diag(n)
     x = _real_vec(n)
     op = jrb_mat.jrb_mat_dense_operator(a)
@@ -367,6 +388,7 @@ def run_sparse_real_parametric_case(steps: int = 12) -> dict[str, float]:
 
 
 def run_complex_case(n: int = 24, steps: int = 10, *, warmup: int = 2, runs: int = 5, precompile_hot: bool = True) -> dict[str, float]:
+    _load_matrix_free_modules()
     a = _dense_complex_diag(n)
     x = _complex_vec(n)
     op = jcb_mat.jcb_mat_dense_operator(a)

@@ -26,6 +26,7 @@ Current notebook root:
 - `example_dirichlet_surface.ipynb`
 - `example_fft_nufft_surface.ipynb`
 - `example_gamma_family_surface.ipynb`
+- `example_hypgeom_family_surface.ipynb`
 - `example_hypgeom_robust_modes_sweep.ipynb`
 - `example_large_sweeps_progress.ipynb`
 - `example_matrix_free_operator_surface.ipynb`
@@ -56,6 +57,7 @@ Current notebook coverage:
 - `example_dirichlet_surface.ipynb`
 - `example_gamma_family_surface.ipynb`
 - `example_barnes_double_gamma_surface.ipynb`
+- `example_hypgeom_family_surface.ipynb`
 
 Status:
 
@@ -64,6 +66,7 @@ Status:
 Notes:
 
 - Bessel, hypergeometric, Dirichlet, gamma, and Barnes/double-gamma families now have dedicated notebooks.
+- `example_hypgeom_family_surface.ipynb` is the standards-aligned canonical hypergeom/API notebook; `example_hypgeom_robust_modes_sweep.ipynb` remains the broader harness-driven sweep companion.
 - Tail-acceleration-specific and narrower per-subfamily notebooks can still be added later without changing category coverage.
 
 ### Dense matrix

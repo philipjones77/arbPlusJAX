@@ -3,6 +3,8 @@ import jax.numpy as jnp
 from arbplusjax import acb_core
 from arbplusjax import api
 from arbplusjax import double_interval as di
+from arbplusjax import jcb_mat
+from arbplusjax import jrb_mat
 from arbplusjax import mat_common
 from arbplusjax import mat_wrappers
 from arbplusjax import scb_mat
@@ -233,6 +235,171 @@ def test_sparse_higher_function_jit_surface_and_exports():
     _check(evecs_c.shape == evecs_c_ref.shape)
 
 
+def test_sparse_operator_plan_specialization_uses_native_storage_for_coo_and_csr():
+    real_dense = jnp.array([[4.0, 1.0], [1.0, 3.0]], dtype=jnp.float64)
+    complex_base = jnp.array(
+        [
+            [2.0 + 0.0j, 1.0 - 0.25j],
+            [0.5 + 0.25j, 1.75 + 0.0j],
+        ],
+        dtype=jnp.complex128,
+    )
+    complex_dense = jnp.conj(complex_base.T) @ complex_base + jnp.eye(2, dtype=jnp.complex128)
+    rv = jnp.array([1.0, -2.0], dtype=jnp.float64)
+    cv = jnp.array([1.0 + 0.5j, -2.0 + 0.25j], dtype=jnp.complex128)
+
+    for storage, sparse in _real_formats(real_dense).items():
+        plan = srb_mat.srb_mat_operator_plan_prepare(sparse)
+        sym_plan = jrb_mat.jrb_mat_symmetric_operator_plan_prepare(sparse)
+        spd_plan = jrb_mat.jrb_mat_spd_operator_plan_prepare(sparse)
+        _check(plan.kind == ("sparse_bcoo" if storage == "bcoo" else "shell"))
+        _check(sym_plan.kind == plan.kind)
+        _check(spd_plan.kind == plan.kind)
+        out = jrb_mat.jrb_mat_operator_plan_apply(plan, di.interval(rv, rv))
+        sym_out = jrb_mat.jrb_mat_operator_plan_apply(sym_plan, di.interval(rv, rv))
+        spd_out = jrb_mat.jrb_mat_operator_plan_apply(spd_plan, di.interval(rv, rv))
+        _check(bool(jnp.allclose(di.midpoint(out), real_dense @ rv, rtol=1e-8, atol=1e-8)))
+        _check(bool(jnp.allclose(di.midpoint(sym_out), real_dense @ rv, rtol=1e-8, atol=1e-8)))
+        _check(bool(jnp.allclose(di.midpoint(spd_out), real_dense @ rv, rtol=1e-8, atol=1e-8)))
+
+    for storage, sparse in _complex_formats(complex_dense).items():
+        plan = scb_mat.scb_mat_operator_plan_prepare(sparse)
+        herm_plan = jcb_mat.jcb_mat_hermitian_operator_plan_prepare(sparse)
+        hpd_plan = jcb_mat.jcb_mat_hpd_operator_plan_prepare(sparse)
+        _check(plan.kind == ("sparse_bcoo" if storage == "bcoo" else "shell"))
+        _check(herm_plan.kind == plan.kind)
+        _check(hpd_plan.kind == plan.kind)
+        out = jcb_mat.jcb_mat_operator_plan_apply(plan, acb_core.acb_box(di.interval(cv.real, cv.real), di.interval(cv.imag, cv.imag)))
+        herm_out = jcb_mat.jcb_mat_operator_plan_apply(herm_plan, acb_core.acb_box(di.interval(cv.real, cv.real), di.interval(cv.imag, cv.imag)))
+        hpd_out = jcb_mat.jcb_mat_operator_plan_apply(hpd_plan, acb_core.acb_box(di.interval(cv.real, cv.real), di.interval(cv.imag, cv.imag)))
+        _check(bool(jnp.allclose(acb_core.acb_midpoint(out), complex_dense @ cv, rtol=1e-8, atol=1e-8)))
+        _check(bool(jnp.allclose(acb_core.acb_midpoint(herm_out), complex_dense @ cv, rtol=1e-8, atol=1e-8)))
+        _check(bool(jnp.allclose(acb_core.acb_midpoint(hpd_out), complex_dense @ cv, rtol=1e-8, atol=1e-8)))
+
+
+def test_sparse_preconditioner_and_multi_shift_plan_specialization():
+    real_dense = jnp.diag(jnp.asarray([2.0, 4.0, 8.0], dtype=jnp.float64))
+    complex_dense = jnp.diag(jnp.asarray([2.0 + 0.0j, 4.0 + 0.0j, 8.0 + 0.0j], dtype=jnp.complex128))
+    rhs_r = di.interval(jnp.asarray([2.0, 8.0, 16.0], dtype=jnp.float64), jnp.asarray([2.0, 8.0, 16.0], dtype=jnp.float64))
+    rhs_c = acb_core.acb_box(
+        di.interval(jnp.asarray([2.0, 8.0, 16.0], dtype=jnp.float64), jnp.asarray([2.0, 8.0, 16.0], dtype=jnp.float64)),
+        di.interval(jnp.zeros((3,), dtype=jnp.float64), jnp.zeros((3,), dtype=jnp.float64)),
+    )
+    shifts = jnp.asarray([0.0, 1.0], dtype=jnp.float64)
+    expected_r = jnp.stack(
+        [
+            jnp.asarray([1.0, 2.0, 2.0], dtype=jnp.float64),
+            jnp.asarray([2.0 / 3.0, 8.0 / 5.0, 16.0 / 9.0], dtype=jnp.float64),
+        ],
+        axis=0,
+    )
+    expected_c = expected_r.astype(jnp.complex128)
+
+    for storage, sparse in _real_formats(real_dense).items():
+        op_plan = srb_mat.srb_mat_operator_plan_prepare(sparse)
+        prec = jrb_mat.jrb_mat_jacobi_preconditioner_plan_prepare(op_plan)
+        _check(prec.kind == "diagonal")
+        prec_applied = jrb_mat.matrix_free_core.preconditioner_plan_apply(
+            prec,
+            rhs_r,
+            midpoint_vector=di.midpoint,
+            sparse_bcoo_matvec=jrb_mat.sparse_common.sparse_bcoo_matvec,
+            dtype=jnp.float64,
+        )
+        _check(bool(jnp.allclose(prec_applied, jnp.asarray([1.0, 2.0, 2.0], dtype=jnp.float64), rtol=1e-8, atol=1e-8)))
+        shifted_plan = jrb_mat.jrb_mat_multi_shift_solve_plan_prepare(sparse, shifts, symmetric=True, preconditioner=prec)
+        _check(shifted_plan.operator.kind == ("sparse_bcoo" if storage == "bcoo" else "shell"))
+        shifted = jrb_mat.jrb_mat_multi_shift_solve_point(sparse, rhs_r, shifts, symmetric=True, preconditioner=prec, tol=1e-10)
+        _check(bool(jnp.allclose(di.midpoint(shifted), expected_r, rtol=1e-6, atol=1e-6)))
+
+    for storage, sparse in _complex_formats(complex_dense).items():
+        op_plan = scb_mat.scb_mat_operator_plan_prepare(sparse)
+        prec = jcb_mat.jcb_mat_jacobi_preconditioner_plan_prepare(op_plan)
+        _check(prec.kind == "diagonal")
+        prec_applied = jcb_mat.matrix_free_core.preconditioner_plan_apply(
+            prec,
+            rhs_c,
+            midpoint_vector=acb_core.acb_midpoint,
+            sparse_bcoo_matvec=jcb_mat.sparse_common.sparse_bcoo_matvec,
+            dtype=jnp.complex128,
+        )
+        _check(bool(jnp.allclose(prec_applied, jnp.asarray([1.0, 2.0, 2.0], dtype=jnp.complex128), rtol=1e-8, atol=1e-8)))
+        shifted_plan = jcb_mat.jcb_mat_multi_shift_solve_plan_prepare(sparse, shifts, hermitian=True, preconditioner=prec)
+        _check(shifted_plan.operator.kind == ("sparse_bcoo" if storage == "bcoo" else "shell"))
+        shifted = jcb_mat.jcb_mat_multi_shift_solve_point(sparse, rhs_c, shifts, hermitian=True, preconditioner=prec, tol=1e-10)
+        _check(bool(jnp.allclose(acb_core.acb_midpoint(shifted), expected_c, rtol=1e-6, atol=1e-6)))
+
+
+def test_sparse_solve_preconditioner_specialization_for_repeated_gmres_and_minres():
+    real_general = jnp.array(
+        [
+            [4.0, 1.0, 0.0],
+            [0.0, 3.0, 1.0],
+            [0.0, 0.0, 2.0],
+        ],
+        dtype=jnp.float64,
+    )
+    real_spd = jnp.diag(jnp.asarray([2.0, 4.0, 8.0], dtype=jnp.float64))
+    complex_general = jnp.array(
+        [
+            [4.0 + 0.0j, 1.0 - 0.5j, 0.0 + 0.0j],
+            [0.0 + 0.0j, 3.0 + 0.0j, 1.0 + 0.25j],
+            [0.0 + 0.0j, 0.0 + 0.0j, 2.0 + 0.0j],
+        ],
+        dtype=jnp.complex128,
+    )
+    complex_hpd = jnp.diag(jnp.asarray([2.0 + 0.0j, 4.0 + 0.0j, 8.0 + 0.0j], dtype=jnp.complex128))
+    rhs_r = di.interval(
+        jnp.asarray([1.0, 2.0, 3.0], dtype=jnp.float64),
+        jnp.asarray([1.0, 2.0, 3.0], dtype=jnp.float64),
+    )
+    rhs_c = acb_core.acb_box(
+        di.interval(jnp.asarray([1.0, 2.0, 3.0], dtype=jnp.float64), jnp.asarray([1.0, 2.0, 3.0], dtype=jnp.float64)),
+        di.interval(jnp.asarray([0.5, -0.25, 0.25], dtype=jnp.float64), jnp.asarray([0.5, -0.25, 0.25], dtype=jnp.float64)),
+    )
+
+    expected_rg = jnp.linalg.solve(real_general, di.midpoint(rhs_r))
+    expected_rs = jnp.linalg.solve(real_spd, di.midpoint(rhs_r))
+    expected_cg = jnp.linalg.solve(complex_general, acb_core.acb_midpoint(rhs_c))
+    expected_ch = jnp.linalg.solve(complex_hpd, acb_core.acb_midpoint(rhs_c))
+
+    for storage, sparse in _real_formats(real_general).items():
+        op_plan = srb_mat.srb_mat_operator_plan_prepare(sparse)
+        prec = jrb_mat.jrb_mat_lu_preconditioner_plan_prepare(op_plan)
+        _check(prec.kind == "sparse_lu_solve")
+        tprec = jrb_mat.matrix_free_core.preconditioner_transpose_plan(prec, algebra="jrb", conjugate=False)
+        _check(tprec is not None and tprec.kind == "sparse_lu_solve")
+        solved = jrb_mat.jrb_mat_solve_action_point(op_plan, rhs_r, symmetric=False, preconditioner=prec, tol=1e-10, maxiter=10)
+        _check(bool(jnp.allclose(di.midpoint(solved), expected_rg, rtol=1e-8, atol=1e-8)))
+
+    for storage, sparse in _real_formats(real_spd).items():
+        op_plan = srb_mat.srb_mat_operator_plan_prepare(sparse)
+        prec = jrb_mat.jrb_mat_structured_preconditioner_plan_prepare(op_plan, symmetric=True)
+        _check(prec.kind == "sparse_cholesky_solve")
+        tprec = jrb_mat.matrix_free_core.preconditioner_transpose_plan(prec, algebra="jrb", conjugate=False)
+        _check(tprec is not None and tprec.kind == "sparse_cholesky_solve")
+        solved = jrb_mat.jrb_mat_minres_solve_action_point(op_plan, rhs_r, preconditioner=prec, tol=1e-10, maxiter=10)
+        _check(bool(jnp.allclose(di.midpoint(solved), expected_rs, rtol=1e-8, atol=1e-8)))
+
+    for storage, sparse in _complex_formats(complex_general).items():
+        op_plan = scb_mat.scb_mat_operator_plan_prepare(sparse)
+        prec = jcb_mat.jcb_mat_lu_preconditioner_plan_prepare(op_plan)
+        _check(prec.kind == "sparse_lu_solve")
+        tprec = jcb_mat.matrix_free_core.preconditioner_transpose_plan(prec, algebra="jcb", conjugate=True)
+        _check(tprec is not None and tprec.kind == "sparse_lu_solve")
+        solved = jcb_mat.jcb_mat_solve_action_point(op_plan, rhs_c, hermitian=False, preconditioner=prec, tol=1e-10, maxiter=10)
+        _check(bool(jnp.allclose(acb_core.acb_midpoint(solved), expected_cg, rtol=1e-8, atol=1e-8)))
+
+    for storage, sparse in _complex_formats(complex_hpd).items():
+        op_plan = scb_mat.scb_mat_operator_plan_prepare(sparse)
+        prec = jcb_mat.jcb_mat_structured_preconditioner_plan_prepare(op_plan, hermitian=True)
+        _check(prec.kind == "sparse_cholesky_solve")
+        tprec = jcb_mat.matrix_free_core.preconditioner_transpose_plan(prec, algebra="jcb", conjugate=True)
+        _check(tprec is not None and tprec.kind == "sparse_cholesky_solve")
+        solved = jcb_mat.jcb_mat_minres_solve_action_point(op_plan, rhs_c, preconditioner=prec, tol=1e-10, maxiter=10)
+        _check(bool(jnp.allclose(acb_core.acb_midpoint(solved), expected_ch, rtol=1e-8, atol=1e-8)))
+
+
 def test_sparse_eigsh_uses_matrix_free_operator_surface_without_dense_bridge(monkeypatch):
     real_dense = jnp.diag(jnp.asarray([1.0, 2.0, 4.0, 6.0], dtype=jnp.float64))
     complex_dense = jnp.diag(jnp.asarray([1.5, 3.0, 5.0, 7.5], dtype=jnp.float64)).astype(jnp.complex128)
@@ -328,3 +495,39 @@ def test_sparse_basic_core_entrypoints_avoid_dense_bridge(monkeypatch):
         _check(bool(jnp.allclose(acb_core.acb_midpoint(det), jnp.linalg.det(complex_dense), rtol=1e-8, atol=1e-8)))
         _check(bool(jnp.allclose(acb_core.acb_midpoint(inv), jnp.linalg.inv(complex_dense), rtol=1e-6, atol=1e-6)))
         _check(bool(jnp.allclose(acb_core.acb_midpoint(sqr), complex_dense @ complex_dense, rtol=1e-8, atol=1e-8)))
+
+
+def test_sparse_native_policy_diagnostics_expose_dense_lift_vs_sparse_native_paths():
+    real_dense = jnp.diag(jnp.asarray([2.0, 3.0, 5.0], dtype=jnp.float64))
+    complex_dense = jnp.diag(jnp.asarray([2.0, 4.0, 6.0], dtype=jnp.float64)).astype(jnp.complex128)
+
+    sreal = srb_mat.srb_mat_from_dense_csr(real_dense)
+    scomplex = scb_mat.scb_mat_from_dense_csr(complex_dense)
+
+    _, pow_diag_r = srb_mat.srb_mat_pow_ui_with_diagnostics(sreal, 2)
+    _, exp_diag_r = srb_mat.srb_mat_exp_with_diagnostics(sreal)
+    _, eigval_diag_r = srb_mat.srb_mat_eigvalsh_with_diagnostics(sreal)
+    _, eigh_diag_r = srb_mat.srb_mat_eigh_with_diagnostics(sreal)
+    _, eigsh_diag_r = srb_mat.srb_mat_eigsh_with_diagnostics(sreal, k=2, which="largest", steps=2)
+
+    _, pow_diag_c = scb_mat.scb_mat_pow_ui_with_diagnostics(scomplex, 2)
+    _, exp_diag_c = scb_mat.scb_mat_exp_with_diagnostics(scomplex)
+    _, eigval_diag_c = scb_mat.scb_mat_eigvalsh_with_diagnostics(scomplex)
+    _, eigh_diag_c = scb_mat.scb_mat_eigh_with_diagnostics(scomplex)
+    _, eigsh_diag_c = scb_mat.scb_mat_eigsh_with_diagnostics(scomplex, k=2, which="largest", steps=2)
+
+    for diag in (pow_diag_r, exp_diag_r, eigval_diag_r, eigh_diag_r, pow_diag_c, exp_diag_c, eigval_diag_c, eigh_diag_c):
+        _check(not bool(diag.dense_lift_used))
+        _check(bool(diag.sparse_native))
+        _check(not bool(diag.preserves_sparse_output))
+        _check(int(diag.rows) == 3)
+        _check(int(diag.cols) == 3)
+        _check(int(diag.nnz) == 3)
+
+    for diag in (eigval_diag_r, eigh_diag_r, eigval_diag_c, eigh_diag_c, eigsh_diag_r, eigsh_diag_c):
+        _check(bool(diag.structured_input_required))
+
+    for diag in (eigsh_diag_r, eigsh_diag_c):
+        _check(bool(diag.sparse_native))
+        _check(not bool(diag.dense_lift_used))
+        _check(not bool(diag.preserves_sparse_output))

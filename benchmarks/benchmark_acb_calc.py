@@ -13,12 +13,22 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from arbplusjax import acb_calc
 from benchmarks.schema import BenchmarkMeasurement
 from benchmarks.schema import BenchmarkRecord
 from benchmarks.schema import BenchmarkReport
 from benchmarks.schema import write_benchmark_report
 from tools.runtime_manifest import collect_runtime_manifest
+
+
+acb_calc = None
+
+
+def _load_acb_calc():
+    global acb_calc
+    if acb_calc is None:
+        from arbplusjax import acb_calc as _acb_calc
+
+        acb_calc = _acb_calc
 
 
 def _random_boxes(rng: np.random.Generator, n: int, scale: float = 2.0) -> np.ndarray:
@@ -53,6 +63,7 @@ def main() -> int:
     complex_dtype = jnp.complex128 if args.dtype == "float64" else jnp.complex64
     a = jnp.asarray(_random_boxes(rng, sample_count, 1.5), dtype=real_dtype)
     b = jnp.asarray(_random_boxes(rng, sample_count, 1.5), dtype=real_dtype)
+    _load_acb_calc()
 
     fn = jax.jit(acb_calc.acb_calc_integrate_line_batch, static_argnames=("integrand", "n_steps"))
     fn(a, b, integrand=args.integrand, n_steps=steps).block_until_ready()

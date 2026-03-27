@@ -133,6 +133,7 @@ def test_special_metadata_exposes_parameterized_production_surface():
     gamma = api.get_public_function_metadata("incomplete_gamma_upper")
 
     assert bessel.default_method == "quadrature"
+    assert "auto" in bessel.method_tags
     assert "samples_per_panel" in gamma.method_parameter_names
     assert "max_panels" in gamma.method_parameter_names
     assert "regularized" in gamma.method_parameter_names

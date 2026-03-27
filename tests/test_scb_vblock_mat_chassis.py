@@ -1,5 +1,7 @@
 import jax.numpy as jnp
 
+from arbplusjax import acb_core
+from arbplusjax import double_interval as di
 from arbplusjax import scb_vblock_mat
 
 from tests._test_checks import _check
@@ -100,9 +102,21 @@ def test_variable_block_complex_basic_det_inv_and_square():
     inv_basic = scb_vblock_mat.scb_vblock_mat_inv_basic(csr)
     sqr_basic = scb_vblock_mat.scb_vblock_mat_sqr_basic(csr)
 
-    _check(bool(jnp.allclose(det_basic, jnp.linalg.det(dense), rtol=1e-8, atol=1e-8)))
-    _check(bool(jnp.allclose(inv_basic, jnp.linalg.inv(dense), rtol=1e-6, atol=1e-6)))
-    _check(bool(jnp.allclose(scb_vblock_mat.scb_vblock_mat_to_dense(sqr_basic), dense @ dense, rtol=1e-8, atol=1e-8)))
+    det_ref = jnp.linalg.det(dense)
+    inv_ref = jnp.linalg.inv(dense)
+    sqr_ref = dense @ dense
+    det_box = acb_core.acb_box(di.interval(jnp.real(det_ref), jnp.real(det_ref)), di.interval(jnp.imag(det_ref), jnp.imag(det_ref)))
+    inv_box = acb_core.acb_box(di.interval(jnp.real(inv_ref), jnp.real(inv_ref)), di.interval(jnp.imag(inv_ref), jnp.imag(inv_ref)))
+    sqr_box = acb_core.acb_box(di.interval(jnp.real(sqr_ref), jnp.real(sqr_ref)), di.interval(jnp.imag(sqr_ref), jnp.imag(sqr_ref)))
+
+    _check(bool(di.contains(acb_core.acb_real(det_basic), acb_core.acb_real(det_box))))
+    _check(bool(di.contains(acb_core.acb_imag(det_basic), acb_core.acb_imag(det_box))))
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(inv_basic), inv_ref, rtol=1e-6, atol=1e-6)))
+    _check(bool(jnp.all(di.contains(acb_core.acb_real(inv_basic), acb_core.acb_real(inv_box)))))
+    _check(bool(jnp.all(di.contains(acb_core.acb_imag(inv_basic), acb_core.acb_imag(inv_box)))))
+    _check(bool(jnp.allclose(acb_core.acb_midpoint(sqr_basic), sqr_ref, rtol=1e-8, atol=1e-8)))
+    _check(bool(jnp.all(di.contains(acb_core.acb_real(sqr_basic), acb_core.acb_real(sqr_box)))))
+    _check(bool(jnp.all(di.contains(acb_core.acb_imag(sqr_basic), acb_core.acb_imag(sqr_box)))))
 
 
 def test_variable_block_complex_non_square_partitions_support_lu_and_qr_solves():

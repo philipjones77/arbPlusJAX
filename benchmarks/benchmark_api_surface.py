@@ -13,23 +13,36 @@ from pathlib import Path
 import jax
 import jax.numpy as jnp
 
-from arbplusjax import acb_core
-from arbplusjax import acb_mat
-from arbplusjax import api
-from arbplusjax import arb_mat
-from arbplusjax import double_interval as di
 from benchmarks.schema import BenchmarkMeasurement
 from benchmarks.schema import BenchmarkRecord
 from benchmarks.schema import BenchmarkReport
 from benchmarks.schema import write_benchmark_report
 from tools.runtime_manifest import collect_runtime_manifest
 
+api = None
+di = None
+
+
+def _load_api_modules():
+    global api, di
+    if api is not None:
+        return
+    from arbplusjax import api as _api
+    from arbplusjax import double_interval as _di
+
+    api = _api
+    di = _di
+
 
 def _interval_matrix_from_point(a: jax.Array) -> jax.Array:
+    _load_api_modules()
     return di.interval(a, a)
 
 
 def _box_matrix_from_point(a: jax.Array) -> jax.Array:
+    _load_api_modules()
+    from arbplusjax import acb_core
+
     return acb_core.acb_box(
         di.interval(jnp.real(a), jnp.real(a)),
         di.interval(jnp.imag(a), jnp.imag(a)),
@@ -90,6 +103,7 @@ def _record(operation: str, implementation: str, dtype: str, timings: dict[str, 
 
 
 def run_scalar_case(warmup: int, runs: int) -> tuple[dict[str, float], tuple[BenchmarkRecord, BenchmarkRecord]]:
+    _load_api_modules()
     x = jnp.asarray(0.5, dtype=jnp.float64)
     y = jnp.asarray(2.0, dtype=jnp.float64)
     direct = jax.jit(lambda a, b: api.eval_point("cuda_besselk", a, b))
@@ -107,6 +121,7 @@ def run_scalar_case(warmup: int, runs: int) -> tuple[dict[str, float], tuple[Ben
 
 
 def run_incomplete_gamma_case(warmup: int, runs: int) -> tuple[dict[str, float], tuple[BenchmarkRecord, BenchmarkRecord]]:
+    _load_api_modules()
     s = jnp.asarray(2.5, dtype=jnp.float64)
     z = jnp.asarray(1.0, dtype=jnp.float64)
     direct = jax.jit(
@@ -134,6 +149,7 @@ def run_incomplete_gamma_case(warmup: int, runs: int) -> tuple[dict[str, float],
 
 
 def run_matrix_case(warmup: int, runs: int) -> tuple[dict[str, float], tuple[BenchmarkRecord, ...]]:
+    _load_api_modules()
     a_mid = jnp.array([[4.0, 1.0], [1.0, 3.0]], dtype=jnp.float64)
     rhs_mid = jnp.array([[1.0], [2.0]], dtype=jnp.float64)
     a = _interval_matrix_from_point(a_mid)

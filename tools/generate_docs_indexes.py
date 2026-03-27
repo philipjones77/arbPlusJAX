@@ -65,7 +65,6 @@ def render_root_readme() -> str:
         "",
         "## Documentation Entry Points",
         "",
-        "- docs index: [docs/index.md](/docs/index.md)",
         "- project overview: [docs/project_overview.md](/docs/project_overview.md)",
         "- standards: [docs/standards/README.md](/docs/standards/README.md)",
         "- reports: [docs/reports/README.md](/docs/reports/README.md)",
@@ -99,32 +98,9 @@ def render_root_readme() -> str:
         "- JAX is the primary implementation surface.",
         "- The package root uses lazy public-module loading to keep import-time cost low.",
         "- Reference software and external engines are validation/comparison layers, not the default runtime path.",
-        "- Linux, Windows, and Colab all use the same source tree; Colab has a CPU-safe bootstrap surface in [requirements-colab.txt](/requirements-colab.txt) and [tools/colab_bootstrap.sh](/tools/colab_bootstrap.sh).",
+        "- Linux, Windows, WSL, GitHub submission, and Colab all use the same source tree; Colab has a CPU-safe bootstrap surface in [requirements-colab.txt](/requirements-colab.txt) and [tools/colab_bootstrap.sh](/tools/colab_bootstrap.sh).",
+        "- Optional comparison/reference backends are tracked in [configs/optional_comparison_backends.json](/configs/optional_comparison_backends.json); Mathematica, `c_arb`, `mpmath`, `scipy`, `jax.scipy`, and experimental JAX paths are comparison layers, not mandatory runtime dependencies.",
         "- See [NOTICE](/NOTICE) for acknowledgments and reference links.",
-    ]
-    return "\n".join(lines) + "\n"
-
-
-def render_docs_index() -> str:
-    lines = [
-        "Last updated: 2026-03-23T00:00:00Z",
-        "",
-        "# Docs Index",
-        "",
-        "Use the docs tree by intent.",
-        "",
-        f"- repo architecture: [governance/architecture.md](/{(DOCS_ROOT / 'governance' / 'architecture.md').relative_to(REPO_ROOT).as_posix()})",
-        f"- governance and placement rules: [governance/documentation_governance.md](/{(DOCS_ROOT / 'governance' / 'documentation_governance.md').relative_to(REPO_ROOT).as_posix()})",
-        f"- repo overview: [project_overview.md](/{(DOCS_ROOT / 'project_overview.md').relative_to(REPO_ROOT).as_posix()})",
-        f"- notation and symbol conventions: [notation/README.md](/{(DOCS_ROOT / 'notation' / 'README.md').relative_to(REPO_ROOT).as_posix()})",
-        f"- semantic definitions and invariants: [specs/README.md](/{(DOCS_ROOT / 'specs' / 'README.md').relative_to(REPO_ROOT).as_posix()})",
-        f"- named runtime catalogs and object registries: [objects/README.md](/{(DOCS_ROOT / 'objects' / 'README.md').relative_to(REPO_ROOT).as_posix()})",
-        f"- standards and contracts map: [standards/README.md](/{(DOCS_ROOT / 'standards' / 'README.md').relative_to(REPO_ROOT).as_posix()})",
-        f"- current repo inventories and generated reports: [reports/README.md](/{(DOCS_ROOT / 'reports' / 'README.md').relative_to(REPO_ROOT).as_posix()})",
-        f"- implementation notes: [implementation/README.md](/{(DOCS_ROOT / 'implementation' / 'README.md').relative_to(REPO_ROOT).as_posix()})",
-        f"- theory and methodology notes: [theory/README.md](/{(DOCS_ROOT / 'theory' / 'README.md').relative_to(REPO_ROOT).as_posix()})",
-        f"- practical runbooks and numerical guidance: [practical/README.md](/{(DOCS_ROOT / 'practical' / 'README.md').relative_to(REPO_ROOT).as_posix()})",
-        f"- current implementation state and TODOs: [status/README.md](/{(DOCS_ROOT / 'status' / 'README.md').relative_to(REPO_ROOT).as_posix()})",
     ]
     return "\n".join(lines) + "\n"
 
@@ -144,7 +120,7 @@ def render_project_overview() -> str:
         "data",
     ]
     lines = [
-        "Last updated: 2026-03-23T00:00:00Z",
+        "Last updated: 2026-03-25T00:00:00Z",
         "",
         "# Project Overview",
         "",
@@ -162,6 +138,10 @@ def render_project_overview() -> str:
             "",
             "## Docs Map",
             "",
+            "Use the docs tree by intent.",
+            "",
+            f"- repo architecture: {_repo_link(DOCS_ROOT / 'governance' / 'architecture.md')}",
+            f"- governance and placement rules: {_repo_link(DOCS_ROOT / 'governance' / 'documentation_governance.md')}",
             f"- governance: {_repo_link(DOCS_ROOT / 'governance' / 'README.md')}",
             f"- standards: {_repo_link(DOCS_ROOT / 'standards' / 'README.md')}",
             f"- notation: {_repo_link(DOCS_ROOT / 'notation' / 'README.md')}",
@@ -184,7 +164,7 @@ def render_project_overview() -> str:
 def render_governance_readme() -> str:
     files = _sorted_markdown_files(DOCS_ROOT / "governance")
     lines = [
-        "Last updated: 2026-03-23T00:00:00Z",
+        "Last updated: 2026-03-25T00:00:00Z",
         "",
         "# Governance",
         "",
@@ -198,7 +178,7 @@ def render_governance_readme() -> str:
 
 def render_standards_readme() -> str:
     lines = [
-        "Last updated: 2026-03-23T00:00:00Z",
+        "Last updated: 2026-03-25T00:00:00Z",
         "",
         "# Standards",
         "",
@@ -216,18 +196,22 @@ def render_standards_readme() -> str:
         "Specialized companion documents:",
         f"- {_doc_link(DOCS_ROOT / 'standards' / 'engineering_standard.md')}",
         f"- {_doc_link(DOCS_ROOT / 'standards' / 'caching_recompilation_standard.md')}",
+        f"- {_doc_link(DOCS_ROOT / 'standards' / 'implicit_adjoint_operator_solve_standard.md')}",
         f"- {_doc_link(DOCS_ROOT / 'standards' / 'jax_surface_policy_standard.md')}",
-        f"- {_doc_link(DOCS_ROOT / 'standards' / 'lazy_import_standard.md')}",
+        f"- {_doc_link(DOCS_ROOT / 'standards' / 'lazy_loading_standard.md')}",
         f"- {_doc_link(DOCS_ROOT / 'standards' / 'precision_standard.md')}",
+        f"- {_doc_link(DOCS_ROOT / 'standards' / 'configuration_standard.md')}",
         f"- {_doc_link(DOCS_ROOT / 'standards' / 'core_scalar_service_calling_standard.md')}",
         "",
         "Consolidation note:",
         "- treat `jax_api_runtime_standard.md` as the canonical runtime/API contract",
         "- treat `engineering_standard.md` as the hardening and status-interpretation overlay",
         "- treat `caching_recompilation_standard.md` as the explicit cache, binder-reuse, prepared-plan, and recompilation-discipline companion",
-        "- treat `lazy_import_standard.md` as the import-time load and public lazy-boundary companion",
+        "- treat `implicit_adjoint_operator_solve_standard.md` as the operator-first solve, transpose-solve, and implicit-adjoint differentiation companion",
+        "- treat `lazy_loading_standard.md` as the canonical import-time load and public lazy-boundary companion",
+        "- treat `configuration_standard.md` as the checked-in runtime/optional-backend configuration companion",
         "- treat `core_scalar_service_calling_standard.md` as a tranche-specific specialization, not a second general runtime policy",
-        "- API calling shape, binder reuse, diagnostics payloads, logging hooks, and the rule that diagnostics/profiling stay outside the mandatory numeric hot path all belong to this runtime concept",
+        "- API calling shape, binder reuse, diagnostics payloads, logging hooks, optional backend declaration, and the rule that diagnostics/profiling stay outside the mandatory numeric hot path all belong to this runtime concept",
         "",
         "### 2. Validation, Benchmarking, and Executable Examples",
         "",
@@ -252,6 +236,7 @@ def render_standards_readme() -> str:
         "",
         "Consolidation note:",
         "- these documents jointly own where things run and where artifacts live",
+        "- GitHub submission, Windows, Linux/WSL, and Colab portability expectations belong here rather than in ad hoc runbook notes",
         "",
         "### 4. Contracts And Provider Boundary",
         "",
@@ -305,7 +290,7 @@ def render_standards_readme() -> str:
 def render_notation_readme() -> str:
     files = _sorted_markdown_files(DOCS_ROOT / "notation")
     lines = [
-        "Last updated: 2026-03-23T00:00:00Z",
+        "Last updated: 2026-03-25T00:00:00Z",
         "",
         "# Notation",
         "",
@@ -320,7 +305,7 @@ def render_notation_readme() -> str:
 def render_reports_readme() -> str:
     files = _sorted_markdown_files(DOCS_ROOT / "reports")
     lines = [
-        "Last updated: 2026-03-23T00:00:00Z",
+        "Last updated: 2026-03-25T00:00:00Z",
         "",
         "# Reports",
         "",
@@ -340,7 +325,7 @@ def render_status_readme() -> str:
     files = _sorted_markdown_files(DOCS_ROOT / "status")
     primary = ["todo.md", "audit.md", "test_coverage_matrix.md", "test_gap_checklist.md"]
     lines = [
-        "Last updated: 2026-03-23T00:00:00Z",
+        "Last updated: 2026-03-25T00:00:00Z",
         "",
         "# Status",
         "",
@@ -366,7 +351,7 @@ def render_status_readme() -> str:
 def render_theory_readme() -> str:
     files = _sorted_markdown_files(DOCS_ROOT / "theory")
     lines = [
-        "Last updated: 2026-03-23T00:00:00Z",
+        "Last updated: 2026-03-25T00:00:00Z",
         "",
         "# Theory",
         "",
@@ -392,7 +377,7 @@ def render_implementation_readme() -> str:
     wrapper_files = _sorted_markdown_files(DOCS_ROOT / "implementation" / "wrappers")
     external_files = _sorted_markdown_files(DOCS_ROOT / "implementation" / "external")
     lines = [
-        "Last updated: 2026-03-23T00:00:00Z",
+        "Last updated: 2026-03-25T00:00:00Z",
         "",
         "# Implementation",
         "",
@@ -421,7 +406,7 @@ def render_implementation_subtree_readme(
 ) -> str:
     files = _sorted_markdown_files(folder)
     lines = [
-        "Last updated: 2026-03-23T00:00:00Z",
+        "Last updated: 2026-03-25T00:00:00Z",
         "",
         f"# {title}",
         "",
@@ -457,7 +442,7 @@ def render_current_repo_mapping() -> str:
         "notation",
     ]
     lines = [
-        "Last updated: 2026-03-23T00:00:00Z",
+        "Last updated: 2026-03-25T00:00:00Z",
         "",
         "# Current Repo Mapping",
         "",
@@ -486,7 +471,6 @@ def render_current_repo_mapping() -> str:
 def generated_docs() -> dict[Path, str]:
     return {
         REPO_ROOT / "README.md": render_root_readme(),
-        DOCS_ROOT / "index.md": render_docs_index(),
         DOCS_ROOT / "project_overview.md": render_project_overview(),
         DOCS_ROOT / "governance" / "README.md": render_governance_readme(),
         DOCS_ROOT / "implementation" / "README.md": render_implementation_readme(),

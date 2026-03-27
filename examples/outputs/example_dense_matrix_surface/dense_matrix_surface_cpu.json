@@ -1,0 +1,2366 @@
+{
+  "benchmark_name": "benchmark_dense_matrix_surface.py",
+  "category": "matrix_dense",
+  "concern": "matrix_speed",
+  "environment": {
+    "env": {
+      "ARB_C_REF_DIR": "",
+      "JAX_PLATFORMS": "cpu",
+      "PYTHONPATH": "/home/phili/projects/arbplusJAX/src:/home/phili/projects/arbplusJAX/src:",
+      "XLA_PYTHON_CLIENT_MEM_FRACTION": "",
+      "XLA_PYTHON_CLIENT_PREALLOCATE": ""
+    },
+    "environment_kind": "wsl",
+    "git": {
+      "commit": "591217612238e41941ea34b9b29762473bb1e147"
+    },
+    "jax": {
+      "available": true,
+      "backend": "cpu",
+      "devices": [
+        "TFRT_CPU_0"
+      ],
+      "jax_enable_x64": true,
+      "requested_mode": "cpu"
+    },
+    "os": {
+      "machine": "x86_64",
+      "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+      "release": "6.6.87.2-microsoft-standard-WSL2",
+      "system": "Linux",
+      "version": "#1 SMP PREEMPT_DYNAMIC Thu Jun  5 18:30:46 UTC 2025"
+    },
+    "python": {
+      "executable": "/home/phili/miniforge3/envs/jax/bin/python",
+      "version": "3.12.12"
+    },
+    "repo_root": "/home/phili/projects/arbplusJAX",
+    "timestamp_utc": "2026-03-26T21:34:13Z"
+  },
+  "notes": "Dense matrix benchmark. Stdout preserves metric-style lines for notebook/report compatibility.",
+  "records": [
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_dense_matrix_surface.py",
+      "category": "matrix_dense",
+      "cold_time_s": null,
+      "concern": "matrix_speed",
+      "device": "cpu",
+      "dtype": "complex128",
+      "implementation": "acb",
+      "measurements": [
+        {
+          "name": "n",
+          "notes": "",
+          "unit": "rows",
+          "value": 8
+        },
+        {
+          "name": "warmup",
+          "notes": "",
+          "unit": "calls",
+          "value": 1
+        },
+        {
+          "name": "runs",
+          "notes": "",
+          "unit": "calls",
+          "value": 2
+        },
+        {
+          "name": "requested_dtype",
+          "notes": "",
+          "unit": "",
+          "value": "float64"
+        },
+        {
+          "name": "smoke",
+          "notes": "",
+          "unit": "",
+          "value": false
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Dense matrix surface benchmark normalized onto the shared benchmark schema; stdout remains metric-style for notebook compatibility.",
+      "operation": "add",
+      "python_overhead_s": null,
+      "recompile_time_s": null,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 9.301950001372461e-05
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_dense_matrix_surface.py",
+      "category": "matrix_dense",
+      "cold_time_s": null,
+      "concern": "matrix_speed",
+      "device": "cpu",
+      "dtype": "complex128",
+      "implementation": "acb",
+      "measurements": [
+        {
+          "name": "n",
+          "notes": "",
+          "unit": "rows",
+          "value": 8
+        },
+        {
+          "name": "warmup",
+          "notes": "",
+          "unit": "calls",
+          "value": 1
+        },
+        {
+          "name": "runs",
+          "notes": "",
+          "unit": "calls",
+          "value": 2
+        },
+        {
+          "name": "requested_dtype",
+          "notes": "",
+          "unit": "",
+          "value": "float64"
+        },
+        {
+          "name": "smoke",
+          "notes": "",
+          "unit": "",
+          "value": false
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Dense matrix surface benchmark normalized onto the shared benchmark schema; stdout remains metric-style for notebook compatibility.",
+      "operation": "block_assemble",
+      "python_overhead_s": null,
+      "recompile_time_s": null,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.0002894689999948241
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_dense_matrix_surface.py",
+      "category": "matrix_dense",
+      "cold_time_s": null,
+      "concern": "matrix_speed",
+      "device": "cpu",
+      "dtype": "complex128",
+      "implementation": "acb",
+      "measurements": [
+        {
+          "name": "n",
+          "notes": "",
+          "unit": "rows",
+          "value": 8
+        },
+        {
+          "name": "warmup",
+          "notes": "",
+          "unit": "calls",
+          "value": 1
+        },
+        {
+          "name": "runs",
+          "notes": "",
+          "unit": "calls",
+          "value": 2
+        },
+        {
+          "name": "requested_dtype",
+          "notes": "",
+          "unit": "",
+          "value": "float64"
+        },
+        {
+          "name": "smoke",
+          "notes": "",
+          "unit": "",
+          "value": false
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Dense matrix surface benchmark normalized onto the shared benchmark schema; stdout remains metric-style for notebook compatibility.",
+      "operation": "block_diag",
+      "python_overhead_s": null,
+      "recompile_time_s": null,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.002510339999957978
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_dense_matrix_surface.py",
+      "category": "matrix_dense",
+      "cold_time_s": null,
+      "concern": "matrix_speed",
+      "device": "cpu",
+      "dtype": "complex128",
+      "implementation": "acb",
+      "measurements": [
+        {
+          "name": "n",
+          "notes": "",
+          "unit": "rows",
+          "value": 8
+        },
+        {
+          "name": "warmup",
+          "notes": "",
+          "unit": "calls",
+          "value": 1
+        },
+        {
+          "name": "runs",
+          "notes": "",
+          "unit": "calls",
+          "value": 2
+        },
+        {
+          "name": "requested_dtype",
+          "notes": "",
+          "unit": "",
+          "value": "float64"
+        },
+        {
+          "name": "smoke",
+          "notes": "",
+          "unit": "",
+          "value": false
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Dense matrix surface benchmark normalized onto the shared benchmark schema; stdout remains metric-style for notebook compatibility.",
+      "operation": "cached_matvec_padded",
+      "python_overhead_s": null,
+      "recompile_time_s": null,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.016938225999979295
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_dense_matrix_surface.py",
+      "category": "matrix_dense",
+      "cold_time_s": null,
+      "concern": "matrix_speed",
+      "device": "cpu",
+      "dtype": "complex128",
+      "implementation": "acb",
+      "measurements": [
+        {
+          "name": "n",
+          "notes": "",
+          "unit": "rows",
+          "value": 8
+        },
+        {
+          "name": "warmup",
+          "notes": "",
+          "unit": "calls",
+          "value": 1
+        },
+        {
+          "name": "runs",
+          "notes": "",
+          "unit": "calls",
+          "value": 2
+        },
+        {
+          "name": "requested_dtype",
+          "notes": "",
+          "unit": "",
+          "value": "float64"
+        },
+        {
+          "name": "smoke",
+          "notes": "",
+          "unit": "",
+          "value": false
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Dense matrix surface benchmark normalized onto the shared benchmark schema; stdout remains metric-style for notebook compatibility.",
+      "operation": "cached_matvec",
+      "python_overhead_s": null,
+      "recompile_time_s": null,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.00010104149998824141
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_dense_matrix_surface.py",
+      "category": "matrix_dense",
+      "cold_time_s": null,
+      "concern": "matrix_speed",
+      "device": "cpu",
+      "dtype": "complex128",
+      "implementation": "acb",
+      "measurements": [
+        {
+          "name": "n",
+          "notes": "",
+          "unit": "rows",
+          "value": 8
+        },
+        {
+          "name": "warmup",
+          "notes": "",
+          "unit": "calls",
+          "value": 1
+        },
+        {
+          "name": "runs",
+          "notes": "",
+          "unit": "calls",
+          "value": 2
+        },
+        {
+          "name": "requested_dtype",
+          "notes": "",
+          "unit": "",
+          "value": "float64"
+        },
+        {
+          "name": "smoke",
+          "notes": "",
+          "unit": "",
+          "value": false
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Dense matrix surface benchmark normalized onto the shared benchmark schema; stdout remains metric-style for notebook compatibility.",
+      "operation": "charpoly",
+      "python_overhead_s": null,
+      "recompile_time_s": null,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.0001517834999731349
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_dense_matrix_surface.py",
+      "category": "matrix_dense",
+      "cold_time_s": null,
+      "concern": "matrix_speed",
+      "device": "cpu",
+      "dtype": "complex128",
+      "implementation": "acb",
+      "measurements": [
+        {
+          "name": "n",
+          "notes": "",
+          "unit": "rows",
+          "value": 8
+        },
+        {
+          "name": "warmup",
+          "notes": "",
+          "unit": "calls",
+          "value": 1
+        },
+        {
+          "name": "runs",
+          "notes": "",
+          "unit": "calls",
+          "value": 2
+        },
+        {
+          "name": "requested_dtype",
+          "notes": "",
+          "unit": "",
+          "value": "float64"
+        },
+        {
+          "name": "smoke",
+          "notes": "",
+          "unit": "",
+          "value": false
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Dense matrix surface benchmark normalized onto the shared benchmark schema; stdout remains metric-style for notebook compatibility.",
+      "operation": "conjugate_transpose",
+      "python_overhead_s": null,
+      "recompile_time_s": null,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 1.9425499999670137e-05
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_dense_matrix_surface.py",
+      "category": "matrix_dense",
+      "cold_time_s": null,
+      "concern": "matrix_speed",
+      "device": "cpu",
+      "dtype": "complex128",
+      "implementation": "acb",
+      "measurements": [
+        {
+          "name": "n",
+          "notes": "",
+          "unit": "rows",
+          "value": 8
+        },
+        {
+          "name": "warmup",
+          "notes": "",
+          "unit": "calls",
+          "value": 1
+        },
+        {
+          "name": "runs",
+          "notes": "",
+          "unit": "calls",
+          "value": 2
+        },
+        {
+          "name": "requested_dtype",
+          "notes": "",
+          "unit": "",
+          "value": "float64"
+        },
+        {
+          "name": "smoke",
+          "notes": "",
+          "unit": "",
+          "value": false
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Dense matrix surface benchmark normalized onto the shared benchmark schema; stdout remains metric-style for notebook compatibility.",
+      "operation": "dense_plan_prepare",
+      "python_overhead_s": null,
+      "recompile_time_s": null,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 2.3097500047697395e-05
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_dense_matrix_surface.py",
+      "category": "matrix_dense",
+      "cold_time_s": null,
+      "concern": "matrix_speed",
+      "device": "cpu",
+      "dtype": "complex128",
+      "implementation": "acb",
+      "measurements": [
+        {
+          "name": "n",
+          "notes": "",
+          "unit": "rows",
+          "value": 8
+        },
+        {
+          "name": "warmup",
+          "notes": "",
+          "unit": "calls",
+          "value": 1
+        },
+        {
+          "name": "runs",
+          "notes": "",
+          "unit": "calls",
+          "value": 2
+        },
+        {
+          "name": "requested_dtype",
+          "notes": "",
+          "unit": "",
+          "value": "float64"
+        },
+        {
+          "name": "smoke",
+          "notes": "",
+          "unit": "",
+          "value": false
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Dense matrix surface benchmark normalized onto the shared benchmark schema; stdout remains metric-style for notebook compatibility.",
+      "operation": "diag",
+      "python_overhead_s": null,
+      "recompile_time_s": null,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 1.729050006815669e-05
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_dense_matrix_surface.py",
+      "category": "matrix_dense",
+      "cold_time_s": null,
+      "concern": "matrix_speed",
+      "device": "cpu",
+      "dtype": "complex128",
+      "implementation": "acb",
+      "measurements": [
+        {
+          "name": "n",
+          "notes": "",
+          "unit": "rows",
+          "value": 8
+        },
+        {
+          "name": "warmup",
+          "notes": "",
+          "unit": "calls",
+          "value": 1
+        },
+        {
+          "name": "runs",
+          "notes": "",
+          "unit": "calls",
+          "value": 2
+        },
+        {
+          "name": "requested_dtype",
+          "notes": "",
+          "unit": "",
+          "value": "float64"
+        },
+        {
+          "name": "smoke",
+          "notes": "",
+          "unit": "",
+          "value": false
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Dense matrix surface benchmark normalized onto the shared benchmark schema; stdout remains metric-style for notebook compatibility.",
+      "operation": "direct_solve",
+      "python_overhead_s": null,
+      "recompile_time_s": null,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.00021579750000455533
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_dense_matrix_surface.py",
+      "category": "matrix_dense",
+      "cold_time_s": null,
+      "concern": "matrix_speed",
+      "device": "cpu",
+      "dtype": "complex128",
+      "implementation": "acb",
+      "measurements": [
+        {
+          "name": "n",
+          "notes": "",
+          "unit": "rows",
+          "value": 8
+        },
+        {
+          "name": "warmup",
+          "notes": "",
+          "unit": "calls",
+          "value": 1
+        },
+        {
+          "name": "runs",
+          "notes": "",
+          "unit": "calls",
+          "value": 2
+        },
+        {
+          "name": "requested_dtype",
+          "notes": "",
+          "unit": "",
+          "value": "float64"
+        },
+        {
+          "name": "smoke",
+          "notes": "",
+          "unit": "",
+          "value": false
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Dense matrix surface benchmark normalized onto the shared benchmark schema; stdout remains metric-style for notebook compatibility.",
+      "operation": "exp",
+      "python_overhead_s": null,
+      "recompile_time_s": null,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.00029548650002197974
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_dense_matrix_surface.py",
+      "category": "matrix_dense",
+      "cold_time_s": null,
+      "concern": "matrix_speed",
+      "device": "cpu",
+      "dtype": "complex128",
+      "implementation": "acb",
+      "measurements": [
+        {
+          "name": "n",
+          "notes": "",
+          "unit": "rows",
+          "value": 8
+        },
+        {
+          "name": "warmup",
+          "notes": "",
+          "unit": "calls",
+          "value": 1
+        },
+        {
+          "name": "runs",
+          "notes": "",
+          "unit": "calls",
+          "value": 2
+        },
+        {
+          "name": "requested_dtype",
+          "notes": "",
+          "unit": "",
+          "value": "float64"
+        },
+        {
+          "name": "smoke",
+          "notes": "",
+          "unit": "",
+          "value": false
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Dense matrix surface benchmark normalized onto the shared benchmark schema; stdout remains metric-style for notebook compatibility.",
+      "operation": "hpd_eigh",
+      "python_overhead_s": null,
+      "recompile_time_s": null,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.00017718000003696943
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_dense_matrix_surface.py",
+      "category": "matrix_dense",
+      "cold_time_s": null,
+      "concern": "matrix_speed",
+      "device": "cpu",
+      "dtype": "complex128",
+      "implementation": "acb",
+      "measurements": [
+        {
+          "name": "n",
+          "notes": "",
+          "unit": "rows",
+          "value": 8
+        },
+        {
+          "name": "warmup",
+          "notes": "",
+          "unit": "calls",
+          "value": 1
+        },
+        {
+          "name": "runs",
+          "notes": "",
+          "unit": "calls",
+          "value": 2
+        },
+        {
+          "name": "requested_dtype",
+          "notes": "",
+          "unit": "",
+          "value": "float64"
+        },
+        {
+          "name": "smoke",
+          "notes": "",
+          "unit": "",
+          "value": false
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Dense matrix surface benchmark normalized onto the shared benchmark schema; stdout remains metric-style for notebook compatibility.",
+      "operation": "hpd_plan_solve",
+      "python_overhead_s": null,
+      "recompile_time_s": null,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 6.63314999655995e-05
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_dense_matrix_surface.py",
+      "category": "matrix_dense",
+      "cold_time_s": null,
+      "concern": "matrix_speed",
+      "device": "cpu",
+      "dtype": "complex128",
+      "implementation": "acb",
+      "measurements": [
+        {
+          "name": "n",
+          "notes": "",
+          "unit": "rows",
+          "value": 8
+        },
+        {
+          "name": "warmup",
+          "notes": "",
+          "unit": "calls",
+          "value": 1
+        },
+        {
+          "name": "runs",
+          "notes": "",
+          "unit": "calls",
+          "value": 2
+        },
+        {
+          "name": "requested_dtype",
+          "notes": "",
+          "unit": "",
+          "value": "float64"
+        },
+        {
+          "name": "smoke",
+          "notes": "",
+          "unit": "",
+          "value": false
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Dense matrix surface benchmark normalized onto the shared benchmark schema; stdout remains metric-style for notebook compatibility.",
+      "operation": "hpd_solve",
+      "python_overhead_s": null,
+      "recompile_time_s": null,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.0001259729999674164
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_dense_matrix_surface.py",
+      "category": "matrix_dense",
+      "cold_time_s": null,
+      "concern": "matrix_speed",
+      "device": "cpu",
+      "dtype": "complex128",
+      "implementation": "acb",
+      "measurements": [
+        {
+          "name": "n",
+          "notes": "",
+          "unit": "rows",
+          "value": 8
+        },
+        {
+          "name": "warmup",
+          "notes": "",
+          "unit": "calls",
+          "value": 1
+        },
+        {
+          "name": "runs",
+          "notes": "",
+          "unit": "calls",
+          "value": 2
+        },
+        {
+          "name": "requested_dtype",
+          "notes": "",
+          "unit": "",
+          "value": "float64"
+        },
+        {
+          "name": "smoke",
+          "notes": "",
+          "unit": "",
+          "value": false
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Dense matrix surface benchmark normalized onto the shared benchmark schema; stdout remains metric-style for notebook compatibility.",
+      "operation": "lu_reuse_add",
+      "python_overhead_s": null,
+      "recompile_time_s": null,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.00013338149994979176
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_dense_matrix_surface.py",
+      "category": "matrix_dense",
+      "cold_time_s": null,
+      "concern": "matrix_speed",
+      "device": "cpu",
+      "dtype": "complex128",
+      "implementation": "acb",
+      "measurements": [
+        {
+          "name": "n",
+          "notes": "",
+          "unit": "rows",
+          "value": 8
+        },
+        {
+          "name": "warmup",
+          "notes": "",
+          "unit": "calls",
+          "value": 1
+        },
+        {
+          "name": "runs",
+          "notes": "",
+          "unit": "calls",
+          "value": 2
+        },
+        {
+          "name": "requested_dtype",
+          "notes": "",
+          "unit": "",
+          "value": "float64"
+        },
+        {
+          "name": "smoke",
+          "notes": "",
+          "unit": "",
+          "value": false
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Dense matrix surface benchmark normalized onto the shared benchmark schema; stdout remains metric-style for notebook compatibility.",
+      "operation": "lu_reuse",
+      "python_overhead_s": null,
+      "recompile_time_s": null,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 6.535950001307356e-05
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_dense_matrix_surface.py",
+      "category": "matrix_dense",
+      "cold_time_s": null,
+      "concern": "matrix_speed",
+      "device": "cpu",
+      "dtype": "complex128",
+      "implementation": "acb",
+      "measurements": [
+        {
+          "name": "n",
+          "notes": "",
+          "unit": "rows",
+          "value": 8
+        },
+        {
+          "name": "warmup",
+          "notes": "",
+          "unit": "calls",
+          "value": 1
+        },
+        {
+          "name": "runs",
+          "notes": "",
+          "unit": "calls",
+          "value": 2
+        },
+        {
+          "name": "requested_dtype",
+          "notes": "",
+          "unit": "",
+          "value": "float64"
+        },
+        {
+          "name": "smoke",
+          "notes": "",
+          "unit": "",
+          "value": false
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Dense matrix surface benchmark normalized onto the shared benchmark schema; stdout remains metric-style for notebook compatibility.",
+      "operation": "lu_reuse_transpose",
+      "python_overhead_s": null,
+      "recompile_time_s": null,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.00013215199999194738
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_dense_matrix_surface.py",
+      "category": "matrix_dense",
+      "cold_time_s": null,
+      "concern": "matrix_speed",
+      "device": "cpu",
+      "dtype": "complex128",
+      "implementation": "acb",
+      "measurements": [
+        {
+          "name": "n",
+          "notes": "",
+          "unit": "rows",
+          "value": 8
+        },
+        {
+          "name": "warmup",
+          "notes": "",
+          "unit": "calls",
+          "value": 1
+        },
+        {
+          "name": "runs",
+          "notes": "",
+          "unit": "calls",
+          "value": 2
+        },
+        {
+          "name": "requested_dtype",
+          "notes": "",
+          "unit": "",
+          "value": "float64"
+        },
+        {
+          "name": "smoke",
+          "notes": "",
+          "unit": "",
+          "value": false
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Dense matrix surface benchmark normalized onto the shared benchmark schema; stdout remains metric-style for notebook compatibility.",
+      "operation": "mul_entrywise",
+      "python_overhead_s": null,
+      "recompile_time_s": null,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.00024618949998966855
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_dense_matrix_surface.py",
+      "category": "matrix_dense",
+      "cold_time_s": null,
+      "concern": "matrix_speed",
+      "device": "cpu",
+      "dtype": "complex128",
+      "implementation": "acb",
+      "measurements": [
+        {
+          "name": "n",
+          "notes": "",
+          "unit": "rows",
+          "value": 8
+        },
+        {
+          "name": "warmup",
+          "notes": "",
+          "unit": "calls",
+          "value": 1
+        },
+        {
+          "name": "runs",
+          "notes": "",
+          "unit": "calls",
+          "value": 2
+        },
+        {
+          "name": "requested_dtype",
+          "notes": "",
+          "unit": "",
+          "value": "float64"
+        },
+        {
+          "name": "smoke",
+          "notes": "",
+          "unit": "",
+          "value": false
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Dense matrix surface benchmark normalized onto the shared benchmark schema; stdout remains metric-style for notebook compatibility.",
+      "operation": "pow_ui",
+      "python_overhead_s": null,
+      "recompile_time_s": null,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 4.766849997395184e-05
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_dense_matrix_surface.py",
+      "category": "matrix_dense",
+      "cold_time_s": null,
+      "concern": "matrix_speed",
+      "device": "cpu",
+      "dtype": "complex128",
+      "implementation": "acb",
+      "measurements": [
+        {
+          "name": "n",
+          "notes": "",
+          "unit": "rows",
+          "value": 8
+        },
+        {
+          "name": "warmup",
+          "notes": "",
+          "unit": "calls",
+          "value": 1
+        },
+        {
+          "name": "runs",
+          "notes": "",
+          "unit": "calls",
+          "value": 2
+        },
+        {
+          "name": "requested_dtype",
+          "notes": "",
+          "unit": "",
+          "value": "float64"
+        },
+        {
+          "name": "smoke",
+          "notes": "",
+          "unit": "",
+          "value": false
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Dense matrix surface benchmark normalized onto the shared benchmark schema; stdout remains metric-style for notebook compatibility.",
+      "operation": "solve_lu",
+      "python_overhead_s": null,
+      "recompile_time_s": null,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.00019379100001515326
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_dense_matrix_surface.py",
+      "category": "matrix_dense",
+      "cold_time_s": null,
+      "concern": "matrix_speed",
+      "device": "cpu",
+      "dtype": "complex128",
+      "implementation": "acb",
+      "measurements": [
+        {
+          "name": "n",
+          "notes": "",
+          "unit": "rows",
+          "value": 8
+        },
+        {
+          "name": "warmup",
+          "notes": "",
+          "unit": "calls",
+          "value": 1
+        },
+        {
+          "name": "runs",
+          "notes": "",
+          "unit": "calls",
+          "value": 2
+        },
+        {
+          "name": "requested_dtype",
+          "notes": "",
+          "unit": "",
+          "value": "float64"
+        },
+        {
+          "name": "smoke",
+          "notes": "",
+          "unit": "",
+          "value": false
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Dense matrix surface benchmark normalized onto the shared benchmark schema; stdout remains metric-style for notebook compatibility.",
+      "operation": "solve_tril",
+      "python_overhead_s": null,
+      "recompile_time_s": null,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 2.505300005850586e-05
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_dense_matrix_surface.py",
+      "category": "matrix_dense",
+      "cold_time_s": null,
+      "concern": "matrix_speed",
+      "device": "cpu",
+      "dtype": "complex128",
+      "implementation": "acb",
+      "measurements": [
+        {
+          "name": "n",
+          "notes": "",
+          "unit": "rows",
+          "value": 8
+        },
+        {
+          "name": "warmup",
+          "notes": "",
+          "unit": "calls",
+          "value": 1
+        },
+        {
+          "name": "runs",
+          "notes": "",
+          "unit": "calls",
+          "value": 2
+        },
+        {
+          "name": "requested_dtype",
+          "notes": "",
+          "unit": "",
+          "value": "float64"
+        },
+        {
+          "name": "smoke",
+          "notes": "",
+          "unit": "",
+          "value": false
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Dense matrix surface benchmark normalized onto the shared benchmark schema; stdout remains metric-style for notebook compatibility.",
+      "operation": "transpose",
+      "python_overhead_s": null,
+      "recompile_time_s": null,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 1.7297499994128884e-05
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_dense_matrix_surface.py",
+      "category": "matrix_dense",
+      "cold_time_s": null,
+      "concern": "matrix_speed",
+      "device": "cpu",
+      "dtype": "float64",
+      "implementation": "arb",
+      "measurements": [
+        {
+          "name": "n",
+          "notes": "",
+          "unit": "rows",
+          "value": 8
+        },
+        {
+          "name": "warmup",
+          "notes": "",
+          "unit": "calls",
+          "value": 1
+        },
+        {
+          "name": "runs",
+          "notes": "",
+          "unit": "calls",
+          "value": 2
+        },
+        {
+          "name": "requested_dtype",
+          "notes": "",
+          "unit": "",
+          "value": "float64"
+        },
+        {
+          "name": "smoke",
+          "notes": "",
+          "unit": "",
+          "value": false
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Dense matrix surface benchmark normalized onto the shared benchmark schema; stdout remains metric-style for notebook compatibility.",
+      "operation": "add",
+      "python_overhead_s": null,
+      "recompile_time_s": null,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 8.463699998628726e-05
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_dense_matrix_surface.py",
+      "category": "matrix_dense",
+      "cold_time_s": null,
+      "concern": "matrix_speed",
+      "device": "cpu",
+      "dtype": "float64",
+      "implementation": "arb",
+      "measurements": [
+        {
+          "name": "n",
+          "notes": "",
+          "unit": "rows",
+          "value": 8
+        },
+        {
+          "name": "warmup",
+          "notes": "",
+          "unit": "calls",
+          "value": 1
+        },
+        {
+          "name": "runs",
+          "notes": "",
+          "unit": "calls",
+          "value": 2
+        },
+        {
+          "name": "requested_dtype",
+          "notes": "",
+          "unit": "",
+          "value": "float64"
+        },
+        {
+          "name": "smoke",
+          "notes": "",
+          "unit": "",
+          "value": false
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Dense matrix surface benchmark normalized onto the shared benchmark schema; stdout remains metric-style for notebook compatibility.",
+      "operation": "block_assemble",
+      "python_overhead_s": null,
+      "recompile_time_s": null,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.0002763425000011921
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_dense_matrix_surface.py",
+      "category": "matrix_dense",
+      "cold_time_s": null,
+      "concern": "matrix_speed",
+      "device": "cpu",
+      "dtype": "float64",
+      "implementation": "arb",
+      "measurements": [
+        {
+          "name": "n",
+          "notes": "",
+          "unit": "rows",
+          "value": 8
+        },
+        {
+          "name": "warmup",
+          "notes": "",
+          "unit": "calls",
+          "value": 1
+        },
+        {
+          "name": "runs",
+          "notes": "",
+          "unit": "calls",
+          "value": 2
+        },
+        {
+          "name": "requested_dtype",
+          "notes": "",
+          "unit": "",
+          "value": "float64"
+        },
+        {
+          "name": "smoke",
+          "notes": "",
+          "unit": "",
+          "value": false
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Dense matrix surface benchmark normalized onto the shared benchmark schema; stdout remains metric-style for notebook compatibility.",
+      "operation": "block_diag",
+      "python_overhead_s": null,
+      "recompile_time_s": null,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.0028285910000249714
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_dense_matrix_surface.py",
+      "category": "matrix_dense",
+      "cold_time_s": null,
+      "concern": "matrix_speed",
+      "device": "cpu",
+      "dtype": "float64",
+      "implementation": "arb",
+      "measurements": [
+        {
+          "name": "n",
+          "notes": "",
+          "unit": "rows",
+          "value": 8
+        },
+        {
+          "name": "warmup",
+          "notes": "",
+          "unit": "calls",
+          "value": 1
+        },
+        {
+          "name": "runs",
+          "notes": "",
+          "unit": "calls",
+          "value": 2
+        },
+        {
+          "name": "requested_dtype",
+          "notes": "",
+          "unit": "",
+          "value": "float64"
+        },
+        {
+          "name": "smoke",
+          "notes": "",
+          "unit": "",
+          "value": false
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Dense matrix surface benchmark normalized onto the shared benchmark schema; stdout remains metric-style for notebook compatibility.",
+      "operation": "cached_matvec_padded",
+      "python_overhead_s": null,
+      "recompile_time_s": null,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.0045323624999582535
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_dense_matrix_surface.py",
+      "category": "matrix_dense",
+      "cold_time_s": null,
+      "concern": "matrix_speed",
+      "device": "cpu",
+      "dtype": "float64",
+      "implementation": "arb",
+      "measurements": [
+        {
+          "name": "n",
+          "notes": "",
+          "unit": "rows",
+          "value": 8
+        },
+        {
+          "name": "warmup",
+          "notes": "",
+          "unit": "calls",
+          "value": 1
+        },
+        {
+          "name": "runs",
+          "notes": "",
+          "unit": "calls",
+          "value": 2
+        },
+        {
+          "name": "requested_dtype",
+          "notes": "",
+          "unit": "",
+          "value": "float64"
+        },
+        {
+          "name": "smoke",
+          "notes": "",
+          "unit": "",
+          "value": false
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Dense matrix surface benchmark normalized onto the shared benchmark schema; stdout remains metric-style for notebook compatibility.",
+      "operation": "cached_matvec",
+      "python_overhead_s": null,
+      "recompile_time_s": null,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.00023422200001732563
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_dense_matrix_surface.py",
+      "category": "matrix_dense",
+      "cold_time_s": null,
+      "concern": "matrix_speed",
+      "device": "cpu",
+      "dtype": "float64",
+      "implementation": "arb",
+      "measurements": [
+        {
+          "name": "n",
+          "notes": "",
+          "unit": "rows",
+          "value": 8
+        },
+        {
+          "name": "warmup",
+          "notes": "",
+          "unit": "calls",
+          "value": 1
+        },
+        {
+          "name": "runs",
+          "notes": "",
+          "unit": "calls",
+          "value": 2
+        },
+        {
+          "name": "requested_dtype",
+          "notes": "",
+          "unit": "",
+          "value": "float64"
+        },
+        {
+          "name": "smoke",
+          "notes": "",
+          "unit": "",
+          "value": false
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Dense matrix surface benchmark normalized onto the shared benchmark schema; stdout remains metric-style for notebook compatibility.",
+      "operation": "charpoly",
+      "python_overhead_s": null,
+      "recompile_time_s": null,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.000404645999992681
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_dense_matrix_surface.py",
+      "category": "matrix_dense",
+      "cold_time_s": null,
+      "concern": "matrix_speed",
+      "device": "cpu",
+      "dtype": "float64",
+      "implementation": "arb",
+      "measurements": [
+        {
+          "name": "n",
+          "notes": "",
+          "unit": "rows",
+          "value": 8
+        },
+        {
+          "name": "warmup",
+          "notes": "",
+          "unit": "calls",
+          "value": 1
+        },
+        {
+          "name": "runs",
+          "notes": "",
+          "unit": "calls",
+          "value": 2
+        },
+        {
+          "name": "requested_dtype",
+          "notes": "",
+          "unit": "",
+          "value": "float64"
+        },
+        {
+          "name": "smoke",
+          "notes": "",
+          "unit": "",
+          "value": false
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Dense matrix surface benchmark normalized onto the shared benchmark schema; stdout remains metric-style for notebook compatibility.",
+      "operation": "dense_plan_prepare",
+      "python_overhead_s": null,
+      "recompile_time_s": null,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 3.739150008641445e-05
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_dense_matrix_surface.py",
+      "category": "matrix_dense",
+      "cold_time_s": null,
+      "concern": "matrix_speed",
+      "device": "cpu",
+      "dtype": "float64",
+      "implementation": "arb",
+      "measurements": [
+        {
+          "name": "n",
+          "notes": "",
+          "unit": "rows",
+          "value": 8
+        },
+        {
+          "name": "warmup",
+          "notes": "",
+          "unit": "calls",
+          "value": 1
+        },
+        {
+          "name": "runs",
+          "notes": "",
+          "unit": "calls",
+          "value": 2
+        },
+        {
+          "name": "requested_dtype",
+          "notes": "",
+          "unit": "",
+          "value": "float64"
+        },
+        {
+          "name": "smoke",
+          "notes": "",
+          "unit": "",
+          "value": false
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Dense matrix surface benchmark normalized onto the shared benchmark schema; stdout remains metric-style for notebook compatibility.",
+      "operation": "diag",
+      "python_overhead_s": null,
+      "recompile_time_s": null,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 2.009599995744793e-05
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_dense_matrix_surface.py",
+      "category": "matrix_dense",
+      "cold_time_s": null,
+      "concern": "matrix_speed",
+      "device": "cpu",
+      "dtype": "float64",
+      "implementation": "arb",
+      "measurements": [
+        {
+          "name": "n",
+          "notes": "",
+          "unit": "rows",
+          "value": 8
+        },
+        {
+          "name": "warmup",
+          "notes": "",
+          "unit": "calls",
+          "value": 1
+        },
+        {
+          "name": "runs",
+          "notes": "",
+          "unit": "calls",
+          "value": 2
+        },
+        {
+          "name": "requested_dtype",
+          "notes": "",
+          "unit": "",
+          "value": "float64"
+        },
+        {
+          "name": "smoke",
+          "notes": "",
+          "unit": "",
+          "value": false
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Dense matrix surface benchmark normalized onto the shared benchmark schema; stdout remains metric-style for notebook compatibility.",
+      "operation": "direct_solve",
+      "python_overhead_s": null,
+      "recompile_time_s": null,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 5.831500004660484e-05
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_dense_matrix_surface.py",
+      "category": "matrix_dense",
+      "cold_time_s": null,
+      "concern": "matrix_speed",
+      "device": "cpu",
+      "dtype": "float64",
+      "implementation": "arb",
+      "measurements": [
+        {
+          "name": "n",
+          "notes": "",
+          "unit": "rows",
+          "value": 8
+        },
+        {
+          "name": "warmup",
+          "notes": "",
+          "unit": "calls",
+          "value": 1
+        },
+        {
+          "name": "runs",
+          "notes": "",
+          "unit": "calls",
+          "value": 2
+        },
+        {
+          "name": "requested_dtype",
+          "notes": "",
+          "unit": "",
+          "value": "float64"
+        },
+        {
+          "name": "smoke",
+          "notes": "",
+          "unit": "",
+          "value": false
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Dense matrix surface benchmark normalized onto the shared benchmark schema; stdout remains metric-style for notebook compatibility.",
+      "operation": "exp",
+      "python_overhead_s": null,
+      "recompile_time_s": null,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.00014830650002295442
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_dense_matrix_surface.py",
+      "category": "matrix_dense",
+      "cold_time_s": null,
+      "concern": "matrix_speed",
+      "device": "cpu",
+      "dtype": "float64",
+      "implementation": "arb",
+      "measurements": [
+        {
+          "name": "n",
+          "notes": "",
+          "unit": "rows",
+          "value": 8
+        },
+        {
+          "name": "warmup",
+          "notes": "",
+          "unit": "calls",
+          "value": 1
+        },
+        {
+          "name": "runs",
+          "notes": "",
+          "unit": "calls",
+          "value": 2
+        },
+        {
+          "name": "requested_dtype",
+          "notes": "",
+          "unit": "",
+          "value": "float64"
+        },
+        {
+          "name": "smoke",
+          "notes": "",
+          "unit": "",
+          "value": false
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Dense matrix surface benchmark normalized onto the shared benchmark schema; stdout remains metric-style for notebook compatibility.",
+      "operation": "lu_reuse_add",
+      "python_overhead_s": null,
+      "recompile_time_s": null,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 4.566850009268819e-05
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_dense_matrix_surface.py",
+      "category": "matrix_dense",
+      "cold_time_s": null,
+      "concern": "matrix_speed",
+      "device": "cpu",
+      "dtype": "float64",
+      "implementation": "arb",
+      "measurements": [
+        {
+          "name": "n",
+          "notes": "",
+          "unit": "rows",
+          "value": 8
+        },
+        {
+          "name": "warmup",
+          "notes": "",
+          "unit": "calls",
+          "value": 1
+        },
+        {
+          "name": "runs",
+          "notes": "",
+          "unit": "calls",
+          "value": 2
+        },
+        {
+          "name": "requested_dtype",
+          "notes": "",
+          "unit": "",
+          "value": "float64"
+        },
+        {
+          "name": "smoke",
+          "notes": "",
+          "unit": "",
+          "value": false
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Dense matrix surface benchmark normalized onto the shared benchmark schema; stdout remains metric-style for notebook compatibility.",
+      "operation": "lu_reuse",
+      "python_overhead_s": null,
+      "recompile_time_s": null,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.00012385999991693097
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_dense_matrix_surface.py",
+      "category": "matrix_dense",
+      "cold_time_s": null,
+      "concern": "matrix_speed",
+      "device": "cpu",
+      "dtype": "float64",
+      "implementation": "arb",
+      "measurements": [
+        {
+          "name": "n",
+          "notes": "",
+          "unit": "rows",
+          "value": 8
+        },
+        {
+          "name": "warmup",
+          "notes": "",
+          "unit": "calls",
+          "value": 1
+        },
+        {
+          "name": "runs",
+          "notes": "",
+          "unit": "calls",
+          "value": 2
+        },
+        {
+          "name": "requested_dtype",
+          "notes": "",
+          "unit": "",
+          "value": "float64"
+        },
+        {
+          "name": "smoke",
+          "notes": "",
+          "unit": "",
+          "value": false
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Dense matrix surface benchmark normalized onto the shared benchmark schema; stdout remains metric-style for notebook compatibility.",
+      "operation": "lu_reuse_transpose",
+      "python_overhead_s": null,
+      "recompile_time_s": null,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 3.422849999878963e-05
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_dense_matrix_surface.py",
+      "category": "matrix_dense",
+      "cold_time_s": null,
+      "concern": "matrix_speed",
+      "device": "cpu",
+      "dtype": "float64",
+      "implementation": "arb",
+      "measurements": [
+        {
+          "name": "n",
+          "notes": "",
+          "unit": "rows",
+          "value": 8
+        },
+        {
+          "name": "warmup",
+          "notes": "",
+          "unit": "calls",
+          "value": 1
+        },
+        {
+          "name": "runs",
+          "notes": "",
+          "unit": "calls",
+          "value": 2
+        },
+        {
+          "name": "requested_dtype",
+          "notes": "",
+          "unit": "",
+          "value": "float64"
+        },
+        {
+          "name": "smoke",
+          "notes": "",
+          "unit": "",
+          "value": false
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Dense matrix surface benchmark normalized onto the shared benchmark schema; stdout remains metric-style for notebook compatibility.",
+      "operation": "mul_entrywise",
+      "python_overhead_s": null,
+      "recompile_time_s": null,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 6.519199996546376e-05
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_dense_matrix_surface.py",
+      "category": "matrix_dense",
+      "cold_time_s": null,
+      "concern": "matrix_speed",
+      "device": "cpu",
+      "dtype": "float64",
+      "implementation": "arb",
+      "measurements": [
+        {
+          "name": "n",
+          "notes": "",
+          "unit": "rows",
+          "value": 8
+        },
+        {
+          "name": "warmup",
+          "notes": "",
+          "unit": "calls",
+          "value": 1
+        },
+        {
+          "name": "runs",
+          "notes": "",
+          "unit": "calls",
+          "value": 2
+        },
+        {
+          "name": "requested_dtype",
+          "notes": "",
+          "unit": "",
+          "value": "float64"
+        },
+        {
+          "name": "smoke",
+          "notes": "",
+          "unit": "",
+          "value": false
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Dense matrix surface benchmark normalized onto the shared benchmark schema; stdout remains metric-style for notebook compatibility.",
+      "operation": "pow_ui",
+      "python_overhead_s": null,
+      "recompile_time_s": null,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 4.7934999997778505e-05
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_dense_matrix_surface.py",
+      "category": "matrix_dense",
+      "cold_time_s": null,
+      "concern": "matrix_speed",
+      "device": "cpu",
+      "dtype": "float64",
+      "implementation": "arb",
+      "measurements": [
+        {
+          "name": "n",
+          "notes": "",
+          "unit": "rows",
+          "value": 8
+        },
+        {
+          "name": "warmup",
+          "notes": "",
+          "unit": "calls",
+          "value": 1
+        },
+        {
+          "name": "runs",
+          "notes": "",
+          "unit": "calls",
+          "value": 2
+        },
+        {
+          "name": "requested_dtype",
+          "notes": "",
+          "unit": "",
+          "value": "float64"
+        },
+        {
+          "name": "smoke",
+          "notes": "",
+          "unit": "",
+          "value": false
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Dense matrix surface benchmark normalized onto the shared benchmark schema; stdout remains metric-style for notebook compatibility.",
+      "operation": "solve_lu",
+      "python_overhead_s": null,
+      "recompile_time_s": null,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 9.313900000051945e-05
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_dense_matrix_surface.py",
+      "category": "matrix_dense",
+      "cold_time_s": null,
+      "concern": "matrix_speed",
+      "device": "cpu",
+      "dtype": "float64",
+      "implementation": "arb",
+      "measurements": [
+        {
+          "name": "n",
+          "notes": "",
+          "unit": "rows",
+          "value": 8
+        },
+        {
+          "name": "warmup",
+          "notes": "",
+          "unit": "calls",
+          "value": 1
+        },
+        {
+          "name": "runs",
+          "notes": "",
+          "unit": "calls",
+          "value": 2
+        },
+        {
+          "name": "requested_dtype",
+          "notes": "",
+          "unit": "",
+          "value": "float64"
+        },
+        {
+          "name": "smoke",
+          "notes": "",
+          "unit": "",
+          "value": false
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Dense matrix surface benchmark normalized onto the shared benchmark schema; stdout remains metric-style for notebook compatibility.",
+      "operation": "solve_tril",
+      "python_overhead_s": null,
+      "recompile_time_s": null,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 3.071800006182457e-05
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_dense_matrix_surface.py",
+      "category": "matrix_dense",
+      "cold_time_s": null,
+      "concern": "matrix_speed",
+      "device": "cpu",
+      "dtype": "float64",
+      "implementation": "arb",
+      "measurements": [
+        {
+          "name": "n",
+          "notes": "",
+          "unit": "rows",
+          "value": 8
+        },
+        {
+          "name": "warmup",
+          "notes": "",
+          "unit": "calls",
+          "value": 1
+        },
+        {
+          "name": "runs",
+          "notes": "",
+          "unit": "calls",
+          "value": 2
+        },
+        {
+          "name": "requested_dtype",
+          "notes": "",
+          "unit": "",
+          "value": "float64"
+        },
+        {
+          "name": "smoke",
+          "notes": "",
+          "unit": "",
+          "value": false
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Dense matrix surface benchmark normalized onto the shared benchmark schema; stdout remains metric-style for notebook compatibility.",
+      "operation": "spd_eigh",
+      "python_overhead_s": null,
+      "recompile_time_s": null,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.0002812994999885632
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_dense_matrix_surface.py",
+      "category": "matrix_dense",
+      "cold_time_s": null,
+      "concern": "matrix_speed",
+      "device": "cpu",
+      "dtype": "float64",
+      "implementation": "arb",
+      "measurements": [
+        {
+          "name": "n",
+          "notes": "",
+          "unit": "rows",
+          "value": 8
+        },
+        {
+          "name": "warmup",
+          "notes": "",
+          "unit": "calls",
+          "value": 1
+        },
+        {
+          "name": "runs",
+          "notes": "",
+          "unit": "calls",
+          "value": 2
+        },
+        {
+          "name": "requested_dtype",
+          "notes": "",
+          "unit": "",
+          "value": "float64"
+        },
+        {
+          "name": "smoke",
+          "notes": "",
+          "unit": "",
+          "value": false
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Dense matrix surface benchmark normalized onto the shared benchmark schema; stdout remains metric-style for notebook compatibility.",
+      "operation": "spd_plan_solve",
+      "python_overhead_s": null,
+      "recompile_time_s": null,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 5.953049992513115e-05
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_dense_matrix_surface.py",
+      "category": "matrix_dense",
+      "cold_time_s": null,
+      "concern": "matrix_speed",
+      "device": "cpu",
+      "dtype": "float64",
+      "implementation": "arb",
+      "measurements": [
+        {
+          "name": "n",
+          "notes": "",
+          "unit": "rows",
+          "value": 8
+        },
+        {
+          "name": "warmup",
+          "notes": "",
+          "unit": "calls",
+          "value": 1
+        },
+        {
+          "name": "runs",
+          "notes": "",
+          "unit": "calls",
+          "value": 2
+        },
+        {
+          "name": "requested_dtype",
+          "notes": "",
+          "unit": "",
+          "value": "float64"
+        },
+        {
+          "name": "smoke",
+          "notes": "",
+          "unit": "",
+          "value": false
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Dense matrix surface benchmark normalized onto the shared benchmark schema; stdout remains metric-style for notebook compatibility.",
+      "operation": "spd_solve",
+      "python_overhead_s": null,
+      "recompile_time_s": null,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.000476474500032964
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_dense_matrix_surface.py",
+      "category": "matrix_dense",
+      "cold_time_s": null,
+      "concern": "matrix_speed",
+      "device": "cpu",
+      "dtype": "float64",
+      "implementation": "arb",
+      "measurements": [
+        {
+          "name": "n",
+          "notes": "",
+          "unit": "rows",
+          "value": 8
+        },
+        {
+          "name": "warmup",
+          "notes": "",
+          "unit": "calls",
+          "value": 1
+        },
+        {
+          "name": "runs",
+          "notes": "",
+          "unit": "calls",
+          "value": 2
+        },
+        {
+          "name": "requested_dtype",
+          "notes": "",
+          "unit": "",
+          "value": "float64"
+        },
+        {
+          "name": "smoke",
+          "notes": "",
+          "unit": "",
+          "value": false
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Dense matrix surface benchmark normalized onto the shared benchmark schema; stdout remains metric-style for notebook compatibility.",
+      "operation": "transpose",
+      "python_overhead_s": null,
+      "recompile_time_s": null,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 2.360450002925063e-05
+    }
+  ],
+  "schema_version": "v1"
+}

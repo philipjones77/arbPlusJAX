@@ -6,13 +6,13 @@
     "env": {
       "ARB_C_REF_DIR": "",
       "JAX_PLATFORMS": "cpu",
-      "PYTHONPATH": "/home/phili/projects/arbplusJAX/src:",
+      "PYTHONPATH": "/home/phili/projects/arbplusJAX/src:/home/phili/projects/arbplusJAX/src:",
       "XLA_PYTHON_CLIENT_MEM_FRACTION": "",
       "XLA_PYTHON_CLIENT_PREALLOCATE": ""
     },
     "environment_kind": "wsl",
     "git": {
-      "commit": "0e77df8709cb9b787bf456257d5b7fe1d8468ed2"
+      "commit": "591217612238e41941ea34b9b29762473bb1e147"
     },
     "jax": {
       "available": true,
@@ -35,7 +35,7 @@
       "version": "3.12.12"
     },
     "repo_root": "/home/phili/projects/arbplusJAX",
-    "timestamp_utc": "2026-03-22T19:04:13Z"
+    "timestamp_utc": "2026-03-26T21:28:18Z"
   },
   "notes": "",
   "records": [
@@ -47,7 +47,7 @@
       "ad_residual": null,
       "benchmark_name": "benchmark_arf.py",
       "category": "scalar",
-      "cold_time_s": 0.04318104100002529,
+      "cold_time_s": 0.047236488000066856,
       "concern": "scalar_speed",
       "device": "cpu",
       "dtype": "float64",
@@ -57,10 +57,10 @@
       "notes": "",
       "operation": "arf_add",
       "python_overhead_s": null,
-      "recompile_time_s": 0.02552119199981462,
+      "recompile_time_s": 0.035928054999999404,
       "residual": null,
       "tags": [],
-      "warm_time_s": 0.00010266500006158215
+      "warm_time_s": 0.00022462000000208113
     }
   ],
   "schema_version": "v1"

@@ -10,6 +10,7 @@ import jax.numpy as jnp
 
 from . import checks
 from . import iterative_solvers
+from . import mat_common
 from . import sparse_common as sc
 
 
@@ -80,6 +81,14 @@ def _as_real_vector(x: jax.Array, label: str) -> jax.Array:
     arr = jnp.asarray(x, dtype=jnp.float64)
     checks.check_equal(arr.ndim, 1, f"{label}.ndim")
     return arr
+
+
+def _intervalize_scalar(x: jax.Array) -> jax.Array:
+    return mat_common.interval_from_point(jnp.asarray(x, dtype=jnp.float64))
+
+
+def _intervalize_matrix(x: jax.Array) -> jax.Array:
+    return mat_common.interval_from_point(jnp.asarray(x, dtype=jnp.float64))
 
 
 def _as_real_matrix(x: jax.Array, label: str) -> jax.Array:
@@ -593,8 +602,8 @@ def srb_block_mat_det(x: sc.BlockSparseCOO | sc.BlockSparseCSR) -> jax.Array:
 
 
 def srb_block_mat_det_basic(x: sc.BlockSparseCOO | sc.BlockSparseCSR) -> jax.Array:
-    """Determinant using LU decomposition - basic interval version."""
-    return srb_block_mat_det(x)
+    """Determinant enclosure computed directly in the block-sparse family."""
+    return _intervalize_scalar(srb_block_mat_det(x))
 
 
 def srb_block_mat_inv(x: sc.BlockSparseCOO | sc.BlockSparseCSR) -> jax.Array:
@@ -623,8 +632,8 @@ def srb_block_mat_inv(x: sc.BlockSparseCOO | sc.BlockSparseCSR) -> jax.Array:
 
 
 def srb_block_mat_inv_basic(x: sc.BlockSparseCOO | sc.BlockSparseCSR) -> jax.Array:
-    """Matrix inverse - basic interval version."""
-    return srb_block_mat_inv(x)
+    """Inverse enclosure computed directly in the block-sparse family."""
+    return _intervalize_matrix(srb_block_mat_inv(x))
 
 
 def srb_block_mat_sqr(x: sc.BlockSparseCOO | sc.BlockSparseCSR) -> sc.BlockSparseCOO:
@@ -645,9 +654,9 @@ def srb_block_mat_sqr(x: sc.BlockSparseCOO | sc.BlockSparseCSR) -> sc.BlockSpars
     return srb_block_mat_matmul_sparse(x, x)
 
 
-def srb_block_mat_sqr_basic(x: sc.BlockSparseCOO | sc.BlockSparseCSR) -> sc.BlockSparseCOO:
-    """Matrix square - basic interval version."""
-    return srb_block_mat_sqr(x)
+def srb_block_mat_sqr_basic(x: sc.BlockSparseCOO | sc.BlockSparseCSR) -> jax.Array:
+    """Squared-matrix enclosure computed directly in the block-sparse family."""
+    return _intervalize_matrix(srb_block_mat_to_dense(srb_block_mat_sqr(x)))
 
 
 @partial(jax.jit, static_argnames=())

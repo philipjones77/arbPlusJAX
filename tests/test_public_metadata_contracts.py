@@ -1,8 +1,16 @@
 import json
 from dataclasses import asdict, fields
+import os
+from pathlib import Path
+import subprocess
+import sys
 
 from arbplusjax import api
 from arbplusjax import public_metadata as pm
+from tools import generate_public_metadata_registry as gpmr
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def test_public_metadata_registry_matches_public_api_surface():
@@ -125,3 +133,42 @@ def test_public_metadata_json_render_has_stable_top_level_shape():
     assert payload["functions"] == sorted(payload["functions"], key=lambda row: row["name"])
     assert all(row["family"] == "matrix" for row in payload["functions"])
     assert all(row["module"] == "arb_mat" for row in payload["functions"])
+
+
+def test_static_public_metadata_loader_stays_off_runtime_implementation_modules():
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(REPO_ROOT / "src") + os.pathsep + env.get("PYTHONPATH", "")
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import json, sys\n"
+                "from arbplusjax import public_metadata as pm\n"
+                "_ = pm.load_public_metadata_registry()\n"
+                "print(json.dumps({"
+                "\"api\": \"arbplusjax.api\" in sys.modules, "
+                "\"point_wrappers\": \"arbplusjax.point_wrappers\" in sys.modules, "
+                "\"hypgeom\": \"arbplusjax.hypgeom\" in sys.modules, "
+                "\"hypgeom_wrappers\": \"arbplusjax.hypgeom_wrappers\" in sys.modules"
+                "}))\n"
+            ),
+        ],
+        cwd=REPO_ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    payload = json.loads(completed.stdout.splitlines()[-1])
+    assert payload == {
+        "api": False,
+        "point_wrappers": False,
+        "hypgeom": False,
+        "hypgeom_wrappers": False,
+    }
+
+
+def test_public_metadata_registry_artifact_is_current():
+    path = REPO_ROOT / "src" / "arbplusjax" / "public_metadata_registry.json"
+    assert path.read_text(encoding="utf-8") == gpmr.render()

@@ -1,4 +1,4 @@
-Last updated: 2026-03-25T16:20:00Z
+Last updated: 2026-03-25T18:05:00Z
 
 # Matrix-Free Operator Methods
 
@@ -120,6 +120,11 @@ shared core. These now back public real/complex matrix-free wrappers for:
 - `sign`
 - `sin`
 - `cos`
+- `sinh`
+- `cosh`
+- `tanh`
+- `exp`
+- `tan`
 
 This gives a unified story:
 
@@ -157,6 +162,9 @@ The current shared postprocessing layer also exposes:
 - cached rational-Hutch++ metadata carrying compact deflation state together
   with the rational approximation parameters needed to reuse the same residual
   estimator across repeated trace or logdet evaluations
+- cached rational-Hutch++ metadata now also tracks whether the chosen
+  preconditioner/structure combination supports the cached-adjoint path and, if
+  so, retains the transpose-aware preconditioner object needed by that policy
 
 ## 5. Solve And Inverse Actions
 
@@ -211,6 +219,10 @@ The same design rule now applies to the estimator stack:
   outside the differentiated estimator boundary
 - prefer projected-state reuse and implicit adjoints over replaying primal
   Lanczos/Arnoldi loops
+- for restarted Davidson/JD-style eigensolvers, filter locked residual
+  corrections before basis expansion and keep restart target-column policy in
+  shared helper logic rather than duplicating it in the real and complex
+  wrappers
 
 ## 7. What Is Optimized Today
 

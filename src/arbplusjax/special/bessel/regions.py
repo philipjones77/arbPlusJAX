@@ -1,8 +1,13 @@
 from __future__ import annotations
 
+from jax import core as jax_core
 import jax.numpy as jnp
 
 from ..tail_acceleration import TailRegimeMetadata
+
+
+def _contains_tracer(*values) -> bool:
+    return any(isinstance(value, jax_core.Tracer) for value in values)
 
 
 def incomplete_bessel_k_regime_metadata(nu, z, lower_limit) -> TailRegimeMetadata:
@@ -53,7 +58,7 @@ def choose_incomplete_bessel_k_method(
     nu_v = jnp.asarray(nu, dtype=jnp.float64)
     z_v = jnp.asarray(z, dtype=jnp.float64)
     lower_v = jnp.asarray(lower_limit, dtype=jnp.float64)
-    if any(jnp.ndim(val) > 0 for val in (nu_v, z_v, lower_v)):
+    if _contains_tracer(nu_v, z_v, lower_v) or any(jnp.ndim(val) > 0 for val in (nu_v, z_v, lower_v)):
         return "quadrature"
 
     zf = float(z_v)
@@ -89,7 +94,7 @@ def choose_incomplete_bessel_i_method(
     nu_v = jnp.asarray(nu, dtype=jnp.float64)
     z_v = jnp.asarray(z, dtype=jnp.float64)
     upper_v = jnp.asarray(upper_limit, dtype=jnp.float64)
-    if any(jnp.ndim(val) > 0 for val in (nu_v, z_v, upper_v)):
+    if _contains_tracer(nu_v, z_v, upper_v) or any(jnp.ndim(val) > 0 for val in (nu_v, z_v, upper_v)):
         return "quadrature"
 
     metadata = incomplete_bessel_i_regime_metadata(nu, z, upper_limit)

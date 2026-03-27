@@ -64,6 +64,7 @@ Default fallback is `stuff/migration/c_chassis/build_linux_wsl`.
 - `example_special_modes_sweep.ipynb`
 - `example_bessel_modes_sweep.ipynb`
 - `example_hypgeom_robust_modes_sweep.ipynb`
+- `example_hypgeom_family_surface.ipynb`
 - `example_all_modes_sweep.ipynb`
 - `example_api_surface.ipynb`
 - `example_large_sweeps_progress.ipynb`
@@ -145,6 +146,12 @@ This runs:
 - `example_core_scalar_surface.ipynb`
 - `example_api_surface.ipynb`
 
+To execute the canonical special-function notebooks directly:
+
+```bash
+/home/phili/miniforge3/envs/jax/bin/python tools/run_example_notebooks.py --jax-mode cpu --jax-dtype float64 --notebooks example_gamma_family_surface.ipynb example_barnes_double_gamma_surface.ipynb example_hypgeom_family_surface.ipynb
+```
+
 and writes:
 
 - executed notebooks under each example-owned output root
@@ -156,3 +163,7 @@ Aggregated notebook execution output is written under:
 
 - `examples/outputs/example_run_suite/notebooks_cpu/`
 - `examples/outputs/example_run_suite/notebooks_gpu/`
+For special-function examples:
+- `example_gamma_family_surface.ipynb` is the canonical incomplete-gamma and incomplete-tail notebook
+- `example_barnes_double_gamma_surface.ipynb` is the canonical Barnes/double-gamma notebook
+- `example_hypgeom_family_surface.ipynb` is the canonical hypergeom notebook using direct routed API and family-owned mode wrappers
