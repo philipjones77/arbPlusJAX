@@ -20,9 +20,13 @@ Those belong to:
 
 - [experiment_layout_standard.md](/docs/standards/experiment_layout_standard.md)
 - [environment_portability_standard.md](/docs/standards/environment_portability_standard.md)
+- [api_usability_standard.md](/docs/standards/api_usability_standard.md)
 
 Example notebooks are not optional decoration. They are the canonical
 demonstration layer for a functionality group.
+
+They are also the primary executable teaching layer for public API usability
+under [api_usability_standard.md](/docs/standards/api_usability_standard.md).
 
 They must show:
 
@@ -196,11 +200,19 @@ That means showing the appropriate combination of:
 
 - pre-bound service callables through `api.bind_point_batch()` or
   `api.bind_interval_batch()` where the public API supports them
+- diagnostics-bearing and compiled repeated-call surfaces such as
+  `api.bind_point_batch_jit_with_diagnostics()` and
+  `api.bind_interval_batch_jit_with_diagnostics()` when the family owns a
+  backend-aware repeated-call pattern
 - cached prepare/apply plan reuse for matrix, sparse, transform, or
   operator-plan surfaces
 - fixed dtype, mode, and precision policy across repeated calls
-- optional `pad_to` and `chunk_size` controls when they are relevant for
+- optional `pad_to`, `shape_bucket_multiple`, and `chunk_size` controls when
+  they are relevant for
   reducing avoidable recompiles or handling variable request sizes
+- explicit policy helpers such as `choose_point_batch_policy()` or
+  `choose_interval_batch_policy()` when backend choice and stable-shape policy
+  are part of the intended runtime contract
 - an explicit note about what is being reused: binder cache, prepared plan,
   padded batch shape, or equivalent reuse boundary
 

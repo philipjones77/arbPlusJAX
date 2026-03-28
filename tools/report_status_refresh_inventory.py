@@ -10,6 +10,7 @@ OUT_PATH = REPO_ROOT / "docs" / "reports" / "report_status_refresh_inventory.md"
 GENERATED_BY = {
     "docs/reports/README.md": "python tools/generate_docs_indexes.py",
     "docs/reports/api_cold_path_inventory.md": "python tools/api_cold_path_report.py",
+    "docs/reports/api_surface_structure.md": "python tools/api_surface_structure_report.py",
     "docs/reports/api_first_use_inventory.md": "python tools/api_first_use_report.py",
     "docs/reports/cache_aware_surface_inventory.md": "python tools/cache_aware_surface_report.py",
     "docs/reports/current_repo_mapping.md": "python tools/generate_docs_indexes.py",

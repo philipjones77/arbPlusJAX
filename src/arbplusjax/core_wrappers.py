@@ -411,7 +411,7 @@ for _mod in (arb_core, acb_core):
         if not callable(_fn):
             continue
         try:
-            sig = inspect.signature(_fn)
+            sig = inspect.signature(inspect.unwrap(_fn))
         except (TypeError, ValueError):
             continue
         if "prec_bits" not in sig.parameters:

@@ -11,6 +11,7 @@ Use [implementation](/docs/implementation) for code structure, module layout, wr
 
 - [running.md](/docs/practical/running.md): day-to-day run workflows across local, CI-style, and Colab environments
 - [benchmarking.md](/docs/practical/benchmarking.md): benchmark workflow, harness roles, and comparison policy
+- [backend_realized_performance_usage.md](/docs/practical/backend_realized_performance_usage.md): when GPU actually helps, what a raw or lightly wrapped compiled path means, and how to call the API for repeated CPU/GPU execution
 - [numerical_guidance.md](/docs/practical/numerical_guidance.md): numerically informed operating guidance and guardrails
 - [dense_matrices.md](/docs/practical/dense_matrices.md): practical dense runtime guidance for direct dense, cached `matvec`, structured solve reuse, and padded batch tradeoffs
 - [matrix_free_adjoints.md](/docs/practical/matrix_free_adjoints.md): practical use of the matrix-free custom-adjoint Lanczos, Arnoldi, quadrature, and trace-estimator surfaces

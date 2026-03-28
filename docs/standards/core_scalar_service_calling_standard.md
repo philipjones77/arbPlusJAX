@@ -1,4 +1,4 @@
-Last updated: 2026-03-22T00:00:00Z
+Last updated: 2026-03-28T00:00:00Z
 
 # Core Scalar Service Calling Standard
 
@@ -15,8 +15,13 @@ tranche.
 Use it together with:
 
 - [jax_api_runtime_standard.md](/docs/standards/jax_api_runtime_standard.md)
+- [api_surface_kinds_standard.md](/docs/standards/api_surface_kinds_standard.md)
 - [environment_portability_standard.md](/docs/standards/environment_portability_standard.md)
 - [test_coverage_matrix.md](/docs/status/test_coverage_matrix.md)
+
+This document is explicitly an arbPlusJAX specialization of the broader API,
+runtime, and backend-realized performance standards. It should not be read as
+the general rule for all JAX numerical libraries.
 
 ## Scope
 
@@ -31,6 +36,11 @@ This standard applies to:
 - `arb_fpwrap`
 
 when used through the public API and runtime configuration surfaces.
+
+This document is a scalar specialization. It does not redefine the repo-wide
+public API surface taxonomy; that is owned by:
+
+- [api_surface_kinds_standard.md](/docs/standards/api_surface_kinds_standard.md)
 
 ## Canonical Production Pattern
 
@@ -68,6 +78,13 @@ Continuous-call service code should use the real public API surface:
 For repeated worker calls, prefer the bound-call surfaces so operation choice,
 dtype policy, and optional batch settings are fixed once per worker.
 
+Scalar service usage should also prefer the explicit backend-policy layer:
+
+- `api.choose_point_batch_policy(...)`
+- `api.bind_point_batch_with_diagnostics(...)`
+- `api.bind_point_batch_jit_with_diagnostics(...)`
+- `api.prewarm_core_point_kernels(...)`
+
 Recommended example:
 
 ```python
@@ -76,7 +93,9 @@ from arbplusjax import api
 service_fn = api.bind_point_batch(
     "fmpr_mul",
     dtype="float32",
-    pad_to=4096,
+    shape_bucket_multiple=4096,
+    backend="auto",
+    min_gpu_batch_size=8192,
 )
 ```
 
@@ -90,7 +109,24 @@ service_fn = api.bind_point_batch(
     dtype="float64",
     pad_to=4096,
     chunk_size=1024,
+    backend="cpu",
 )
+```
+
+Diagnostics-bearing service example:
+
+```python
+from arbplusjax import api
+
+service_fn = api.bind_point_batch_jit_with_diagnostics(
+    "arf_add",
+    dtype="float32",
+    shape_bucket_multiple=1024,
+    backend="auto",
+    min_gpu_batch_size=8192,
+)
+
+values, diagnostics = service_fn(x, y)
 ```
 
 ## Dtype Policy Rule
@@ -119,6 +155,7 @@ Instead:
 - define a small number of batch-size buckets
 - pad requests into those buckets
 - keep `pad_to` stable for the workload class
+- use `shape_bucket_multiple` when the workload has nearby variable lengths
 
 This is the default strategy for reducing recompilation churn.
 
@@ -132,6 +169,10 @@ Warmup should:
 - touch each expected dtype policy
 - populate the in-process JIT cache
 - populate the persistent compile cache when enabled
+
+The preferred repo-level scalar warmup entrypoint is:
+
+- `api.prewarm_core_point_kernels(...)`
 
 ## Persistent Cache Rule
 
@@ -152,7 +193,10 @@ decided ad hoc at every call include:
 
 - `dtype`
 - `pad_to`
+- `shape_bucket_multiple`
 - `chunk_size`
+- `backend`
+- `min_gpu_batch_size`
 - `mode`
 - `prec_bits`
 - `dps`
@@ -195,6 +239,8 @@ Notebooks are demonstration and reporting layers.
 They should:
 
 - show the canonical service-style API call shape
+- show the explicit backend-policy layer
+- show binder diagnostics on at least one representative surface
 - summarize retained benchmark/test artifacts
 - visualize latency and compile behavior
 
@@ -212,3 +258,24 @@ be:
 - warmup before steady-state calls
 
 That is the default professional setup for this tranche.
+
+## Current Verified Backend Rule
+
+For the current scalar tranche, the verified backend guidance is:
+
+- CPU is the default preferred backend for many tiny repeated scalar service
+  calls
+- GPU is supported and validated, but should be selected intentionally for
+  larger repeated batch-heavy scalar workloads
+- stable shape still matters on both backends:
+  `pad_to`, `shape_bucket_multiple`, and binder reuse remain part of the
+  required calling pattern
+
+This is a verified repo specialization, not a universal JAX-law claim.
+
+The current scalar backend result should be interpreted as:
+
+- structural fast-JAX readiness is complete for the public scalar point surface
+- backend-realized scalar performance is workload-sensitive
+- correctness and availability on GPU do not imply that GPU is always the
+  lowest-latency scalar backend

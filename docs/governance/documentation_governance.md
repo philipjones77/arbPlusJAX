@@ -80,12 +80,23 @@ Preferred top-level structure:
 - `benchmarks/`: benchmark scripts and harness integration
 - `configs/`: checked-in repo-level configuration definitions and profile
   templates
+- `papers/`: long-form LaTeX manuscript projects and publication-grade paper
+  builds
 - `benchmarks/results/`: canonical benchmark run artifact directory
 - `outputs/`: canonical top-level root whose named subfolders contain retained generated artifacts and other permanent run outputs
 - `data/`: local or shared datasets, including large generated inputs that do not belong under source or docs trees
 - `experiments/benchmarks/outputs/`: experiment-local benchmark diagnostics and scratch artifact directory
-- additional standard folders such as `stuff/` and `papers/` may be added when
-  the repository starts using them directly
+- additional standard folders such as `stuff/` may be added when the
+  repository starts using them directly
+
+Correct structure rule:
+
+- `docs/` is the authoritative Markdown-first documentation tree for active
+  repo development
+- `papers/` is the separate publication/manuscript lane for LaTeX paper builds
+- the repository should not collapse those two roles into one folder
+- documentation development should continue to happen in `docs/`
+- publication-oriented paper assembly should happen in `papers/`
 
 Artifact storage rule:
 
@@ -103,6 +114,16 @@ Tools placement rule:
 - benchmark-facing scripts belong under `benchmarks/`
 - example-facing runnable notebooks and scripts belong under `examples/`
 - exploratory or retained large-scale runs belong under `experiments/`
+
+Papers placement rule:
+
+- `papers/` is the canonical repo-root home for long-form LaTeX manuscript
+  projects
+- `papers/` does not replace `docs/`
+- theory, standards, implementation notes, practical guidance, reports, and
+  status still belong under `docs/`
+- use `papers/` only when the target output is a real paper/manuscript with its
+  own LaTeX build structure
 
 ## Docs Layout
 
@@ -123,6 +144,25 @@ Large documentation subtrees should have a section `README.md` when they act as
 browsable indexes rather than single-document folders. Those README surfaces
 should be generated once the subtree becomes large enough that hand-maintained
 lists drift.
+
+Status subtree structure rule:
+
+- `docs/status/todo.md` is the top-level implementation TODO index, not the
+  only status document
+- once one mixed TODO grows large enough to combine unrelated programs, split
+  the backlog into dedicated status files by program or subsystem
+- keep cross-cutting and family-specific backlogs separate when that improves
+  readability and ownership
+- examples of dedicated status files include:
+  - `docs/status/cross_cutting_todo.md`
+  - `docs/status/theory_todo.md`
+  - `docs/status/curvature_todo.md`
+  - `docs/status/special_functions_todo.md`
+  - `docs/status/api_runtime_todo.md`
+- completion-plan documents such as matrix-free or sparse plans should stay as
+  separate status files rather than being folded back into one monolithic TODO
+- `docs/status/README.md` should remain generated and should list both the
+  top-level TODO index and the current dedicated status files
 
 The `docs/standards/` folder is the canonical home for cross-library and
 cross-subsystem standards such as documentation placement, naming conventions,

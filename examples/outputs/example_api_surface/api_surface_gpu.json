@@ -1,0 +1,344 @@
+{
+  "benchmark_name": "benchmark_api_surface.py",
+  "category": "api",
+  "concern": "api_speed",
+  "environment": {
+    "env": {
+      "ARB_C_REF_DIR": "",
+      "JAX_PLATFORMS": "cuda",
+      "PYTHONPATH": "/home/phili/projects/arbplusJAX/src:/home/phili/projects/arbplusJAX/src:",
+      "XLA_PYTHON_CLIENT_MEM_FRACTION": "",
+      "XLA_PYTHON_CLIENT_PREALLOCATE": ""
+    },
+    "environment_kind": "wsl",
+    "git": {
+      "commit": "ec6227c42b6c055115d746c0fe970e18c2a0e067"
+    },
+    "jax": {
+      "available": true,
+      "backend": "gpu",
+      "devices": [
+        "cuda:0"
+      ],
+      "jax_enable_x64": true,
+      "requested_mode": "auto"
+    },
+    "os": {
+      "machine": "x86_64",
+      "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+      "release": "6.6.87.2-microsoft-standard-WSL2",
+      "system": "Linux",
+      "version": "#1 SMP PREEMPT_DYNAMIC Thu Jun  5 18:30:46 UTC 2025"
+    },
+    "python": {
+      "executable": "/home/phili/miniforge3/envs/jax/bin/python",
+      "version": "3.12.12"
+    },
+    "repo_root": "/home/phili/projects/arbplusJAX",
+    "timestamp_utc": "2026-03-28T20:16:40Z"
+  },
+  "notes": "Direct-vs-routed API timing for representative scalar, special, and matrix surfaces.",
+  "records": [
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_api_surface.py",
+      "category": "api",
+      "cold_time_s": 4.421269381999082,
+      "concern": "api_speed",
+      "device": "gpu",
+      "dtype": "float64",
+      "implementation": "direct_cuda_besselk",
+      "measurements": [
+        {
+          "name": "compile_to_warm_ratio",
+          "notes": "",
+          "unit": "ratio",
+          "value": 566.701706337498
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "point direct implementation",
+      "operation": "besselk",
+      "python_overhead_s": 4.413467624332649,
+      "recompile_time_s": 0.009407663999809301,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.007801757666432725
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_api_surface.py",
+      "category": "api",
+      "cold_time_s": 0.8511141750004754,
+      "concern": "api_speed",
+      "device": "gpu",
+      "dtype": "float64",
+      "implementation": "routed_cuda_besselk",
+      "measurements": [
+        {
+          "name": "compile_to_warm_ratio",
+          "notes": "",
+          "unit": "ratio",
+          "value": 97.17637643199257
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "capability-routed API path",
+      "operation": "besselk",
+      "python_overhead_s": 0.8423557276673819,
+      "recompile_time_s": 0.007459287000529002,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.0087584473330935
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_api_surface.py",
+      "category": "api",
+      "cold_time_s": 0.7600624629994854,
+      "concern": "api_speed",
+      "device": "gpu",
+      "dtype": "float64",
+      "implementation": "direct",
+      "measurements": [
+        {
+          "name": "compile_to_warm_ratio",
+          "notes": "",
+          "unit": "ratio",
+          "value": 145.34656020931573
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "explicit direct API",
+      "operation": "incomplete_gamma_upper",
+      "python_overhead_s": 0.754833151332908,
+      "recompile_time_s": 0.003804218998993747,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.0052293116665775114
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_api_surface.py",
+      "category": "api",
+      "cold_time_s": 0.41203282399874297,
+      "concern": "api_speed",
+      "device": "gpu",
+      "dtype": "float64",
+      "implementation": "routed",
+      "measurements": [
+        {
+          "name": "compile_to_warm_ratio",
+          "notes": "",
+          "unit": "ratio",
+          "value": 107.79509889632361
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "general evaluate() routing path",
+      "operation": "incomplete_gamma_upper",
+      "python_overhead_s": 0.40821045333238243,
+      "recompile_time_s": 0.003099594001469086,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.0038223706663605603
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_api_surface.py",
+      "category": "api",
+      "cold_time_s": 2.6852022240000224,
+      "concern": "api_speed",
+      "device": "gpu",
+      "dtype": "float64",
+      "implementation": "direct",
+      "measurements": [
+        {
+          "name": "compile_to_warm_ratio",
+          "notes": "",
+          "unit": "ratio",
+          "value": 858.6490488268515
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "real interval matrix solve",
+      "operation": "arb_mat_solve",
+      "python_overhead_s": 2.682074983333223,
+      "recompile_time_s": 0.0031536890001007123,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.00312724066679948
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_api_surface.py",
+      "category": "api",
+      "cold_time_s": 0.8877903469983721,
+      "concern": "api_speed",
+      "device": "gpu",
+      "dtype": "float64",
+      "implementation": "routed",
+      "measurements": [
+        {
+          "name": "compile_to_warm_ratio",
+          "notes": "",
+          "unit": "ratio",
+          "value": 256.4231689565885
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "real interval matrix solve through evaluate()",
+      "operation": "arb_mat_solve",
+      "python_overhead_s": 0.8843281389981712,
+      "recompile_time_s": 0.003471963000265532,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.003462208000200917
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_api_surface.py",
+      "category": "api",
+      "cold_time_s": 1.9018529169989051,
+      "concern": "api_speed",
+      "device": "gpu",
+      "dtype": "complex128",
+      "implementation": "direct",
+      "measurements": [
+        {
+          "name": "compile_to_warm_ratio",
+          "notes": "",
+          "unit": "ratio",
+          "value": 694.9176412475853
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "complex box matrix solve",
+      "operation": "acb_mat_solve",
+      "python_overhead_s": 1.8991161136655137,
+      "recompile_time_s": 0.0028521229996840702,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.0027368033333914354
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_api_surface.py",
+      "category": "api",
+      "cold_time_s": 1.4860017020000669,
+      "concern": "api_speed",
+      "device": "gpu",
+      "dtype": "complex128",
+      "implementation": "routed",
+      "measurements": [
+        {
+          "name": "compile_to_warm_ratio",
+          "notes": "",
+          "unit": "ratio",
+          "value": 476.37135657244056
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "complex box matrix solve through evaluate()",
+      "operation": "acb_mat_solve",
+      "python_overhead_s": 1.4828822833333106,
+      "recompile_time_s": 0.0035398269992583664,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.0031194186667562462
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_api_surface.py",
+      "category": "api",
+      "cold_time_s": 2.0946353139988787,
+      "concern": "api_speed",
+      "device": "gpu",
+      "dtype": "float64",
+      "implementation": "interval_service_jit",
+      "measurements": [
+        {
+          "name": "compile_to_warm_ratio",
+          "notes": "",
+          "unit": "ratio",
+          "value": 282.3213950946799
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "basic interval service binder with diagnostics/policy",
+      "operation": "arb_add",
+      "python_overhead_s": 2.087215984998693,
+      "recompile_time_s": 0.0035564890004025074,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.007419329000185826
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_api_surface.py",
+      "category": "api",
+      "cold_time_s": 1.6140357940003014,
+      "concern": "api_speed",
+      "device": "gpu",
+      "dtype": "float64",
+      "implementation": "interval_direct_batch",
+      "measurements": [
+        {
+          "name": "compile_to_warm_ratio",
+          "notes": "",
+          "unit": "ratio",
+          "value": 1105.8978498089873
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "direct eval_interval_batch padded path",
+      "operation": "arb_add",
+      "python_overhead_s": 1.6125763140001557,
+      "recompile_time_s": 0.0016496039988851408,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.0014594800001456558
+    }
+  ],
+  "schema_version": "v1"
+}

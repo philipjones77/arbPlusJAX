@@ -27,6 +27,15 @@ The goal is to keep benchmark concerns separate:
 - AD/forward-backward cost
 - backend/reference comparison
 
+This benchmark-layer separation should remain reusable across JAX-first
+numerical libraries.
+
+arbPlusJAX then specializes it through:
+
+- its benchmark taxonomy under `benchmarks/`
+- its retained benchmark artifacts
+- its current official benchmark choices
+
 ## Benchmark Layers
 
 ### Accuracy

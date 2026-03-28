@@ -18,6 +18,7 @@ This document is a companion to:
 - [caching_recompilation_standard.md](/docs/standards/caching_recompilation_standard.md)
 - [lazy_loading_standard.md](/docs/standards/lazy_loading_standard.md)
 - [point_fast_jax_standard.md](/docs/standards/point_fast_jax_standard.md)
+- [backend_realized_performance_standard.md](/docs/standards/backend_realized_performance_standard.md)
 - [startup_compile_playbook_standard.md](/docs/standards/startup_compile_playbook_standard.md)
 
 ## Scope

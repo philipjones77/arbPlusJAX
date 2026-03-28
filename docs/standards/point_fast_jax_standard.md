@@ -16,6 +16,24 @@ precision/adaptive acceleration.
 This standard does not require every public point function to already satisfy
 the fast-path contract. It defines the target state and the acceptance rule.
 
+This standard governs structural JAX readiness, not realized backend speed.
+Practical CPU/GPU performance after compile/startup, padding, bucketing, and
+batch amortization is governed separately by:
+
+- [backend_realized_performance_standard.md](/docs/standards/backend_realized_performance_standard.md)
+
+This is an arbPlusJAX specialization standard.
+
+The reusable general rule is:
+
+- define one structural acceptance standard for hot JAX kernels separate from
+  realized backend speed
+
+The arbPlusJAX specialization is:
+
+- applying that rule specifically to public `point` mode across the repo's six
+  top-level categories
+
 ## Definition
 
 A function qualifies as a `fast JAX` point kernel only if all of the following

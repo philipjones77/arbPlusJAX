@@ -2,8 +2,15 @@ Last updated: 2026-03-27T00:00:00Z
 
 # TODO
 
-This is the canonical consolidated TODO list for active implementation work in
+This is the top-level implementation TODO index for active repo work in
 `docs/status/`.
+
+Detailed cross-cutting and specialized backlogs are split into dedicated files:
+- [cross_cutting_todo.md](/docs/status/cross_cutting_todo.md)
+- [theory_todo.md](/docs/status/theory_todo.md)
+- [curvature_todo.md](/docs/status/curvature_todo.md)
+- [special_functions_todo.md](/docs/status/special_functions_todo.md)
+- [api_runtime_todo.md](/docs/status/api_runtime_todo.md)
 
 Organization rule:
 - Sections follow the top-level function and infrastructure categories defined in
@@ -31,166 +38,23 @@ Current phase snapshot:
 
 Status: `in_progress`
 
-- `done`
-  - root-level [tests](/tests) and
-    [benchmarks](/benchmarks) remain the
-    canonical run surfaces
-  - dedicated test orchestration exists in
-    [tools/run_test_harness.py](/tools/run_test_harness.py)
-  - dedicated benchmark orchestration exists in
-    [benchmarks/run_benchmarks.py](/benchmarks/run_benchmarks.py)
-    and
-    [benchmarks/run_harness_profile.py](/benchmarks/run_harness_profile.py)
-  - a shared `runtime_manifest.json` schema now exists across test and benchmark
-    outputs
-  - the existing
-    [example_run_suite.py](/examples/example_run_suite.py)
-    flow now writes a suite-level runtime manifest, summary markdown, and SVG
-    plots under
-    [examples/outputs/example_run_suite/](/examples/outputs/example_run_suite/)
-  - canonical notebook execution now exists through
-    [run_example_notebooks.py](/tools/run_example_notebooks.py),
-    which executes the standards-aligned notebook surfaces and retains
-    executed notebooks plus runtime/summary artifacts in the owning
-    [examples/outputs/](/examples/outputs/)
-    folders
-  - canonical notebooks now also encode production calling patterns:
-    binder reuse, optional padding/chunking, cached plan reuse, and benchmark
-    extension guidance for the main top-level categories
-  - the existing official API benchmark
-    [benchmark_api_surface.py](/benchmarks/benchmark_api_surface.py)
-    now emits the shared benchmark-report JSON schema instead of only printing
-    timings
-  - Windows, Linux, and Colab run instructions are documented
-  - a CPU-safe Colab bootstrap surface now exists in
-    [requirements-colab.txt](/requirements-colab.txt)
-    and
-    [colab_bootstrap.sh](/tools/colab_bootstrap.sh),
-    with checked-in platform profile metadata in
-    [platform_bootstrap_profiles.json](/configs/platform_bootstrap_profiles.json)
-  - bounded CPU validation profiles were re-run through
-    [run_test_harness.py](/tools/run_test_harness.py) for `matrix`,
-    `special`, and `bench-smoke`; see
-    [cpu_validation_profiles.md](/docs/reports/cpu_validation_profiles.md)
-  - a dedicated sparse-matrix harness profile exists in
-    [run_test_harness.py](/tools/run_test_harness.py) on top of the landed
-    sparse point layer
-  - a single repo-facing execution checklist now exists in
-    [release_execution_checklist_standard.md](/docs/standards/release_execution_checklist_standard.md)
-    and
-    [release_execution_checklist.md](/docs/implementation/release_execution_checklist.md),
-    naming the minimum CPU, startup/import, benchmark, example, and
-    generated-artifact slices required for a release-quality change
-- `in_progress`
-  - unify long-run benchmark scheduling and report collection behind a single
-    environment manifest and execution policy
-  - keep benchmark ownership distinct from correctness ownership, but make the
-    pass/fail boundaries clearer in status docs
-  - keep docs landing pages, report indexes, status indexes, and current repo
-    mapping generated automatically so push/commit does not rely on hand-edited
-    tree summaries
-  - normalize more legacy benchmark scripts onto the shared benchmark-report
-    schema instead of stdout-only summaries; direct normalized coverage now
-    includes `benchmark_arb_poly.py`, `benchmark_acb_poly.py`,
-    `benchmark_arb_calc.py`, `benchmark_acb_calc.py`,
-    `benchmark_dirichlet.py`, and `benchmark_acb_dirichlet.py`
-  - keep normalized benchmark CLIs explicitly parameterized for CPU/GPU
-    portability and `float32`/`float64` execution, even when the current
-    validation slice only runs on CPU
-  - continue turning theory coverage into first-class tranche status rather than
-    leaving methodology gaps implicit
-- `planned`
-  - retain a broader periodic CPU validation slice for the newest matrix-free
-    estimator and contour-action tranches once the heavier test/runtime slices
-    settle
+Detailed backlog:
+- [cross_cutting_todo.md](/docs/status/cross_cutting_todo.md)
 
 ## Cross-cutting point-fast JAX conversion
 
 Status: `in_progress`
 
-- `done`
-  - the repo now has an explicit definition of `fast JAX` for point mode in
-    [point_fast_jax_standard.md](/docs/standards/point_fast_jax_standard.md)
-  - the six-category implementation program now exists in
-    [point_fast_jax_implementation.md](/docs/implementation/point_fast_jax_implementation.md)
-  - the six-category status plan now exists in
-    [point_fast_jax_plan.md](/docs/status/point_fast_jax_plan.md)
-  - the required six-category coverage matrix now exists in
-    [point_fast_jax_category_matrix.md](/docs/reports/point_fast_jax_category_matrix.md)
-  - all public point functions now have compiled single-call, compiled batch,
-    and family-owned direct batch public surfaces; see
-    [point_fast_jax_function_inventory.md](/docs/reports/point_fast_jax_function_inventory.md)
-  - a joined family-level point/basic verification ledger now exists in
-    [point_basic_surface_status.md](/docs/reports/point_basic_surface_status.md),
-    covering the seven public point/basic function families plus the
-    `curvature` cross-helper layer
-  - an explicit parameterized public AD proof ledger now exists in
-    [parameterized_ad_verification.md](/docs/reports/parameterized_ad_verification.md),
-    covering production-facing parameterized cases across `core`, `bessel`,
-    `gamma`, `barnes`, `hypergeometric`, and `matrix`/`curvature`
-  - parameterized-family AD direction evidence now belongs in both the
-    family-level ledger and the explicit parameterized-AD ledger, so status can
-    distinguish argument-direction from parameter-direction proof
-  - family-level direct-batch proof coverage now exists for the previously
-    generic-batch incomplete-tail set:
-    `incomplete_gamma_upper`, `incomplete_gamma_lower`,
-    `incomplete_bessel_i`, `incomplete_bessel_k`, and
-    `laplace_bessel_k_tail`
-  - a traced-parameter AD bug in
-    [curvature/composition.py](/src/arbplusjax/curvature/composition.py)
-    is fixed: posterior-precision `damping` / `jitter` are now JAX-traceable
-    instead of forcing Python `float(...)`
-- `in_progress`
-  - widen the now-landed category and incomplete-tail proof slices into deeper
-    family-by-family numerical proof coverage across the remaining large public
-    matrix/core/hypergeometric surfaces
-  - keep the parameterized-AD audit widened as new public parameterized
-    families or helper surfaces are added, especially when new continuous
-    controls appear on matrix-free or curvature helpers
-  - refactor point kernels so Python control flow, dynamic shapes, Arb objects,
-    and precise fallback logic remain outside the hot path
-  - build shared point-fast infrastructure for logspace, recurrence,
-    approximants, and region routing
-- `planned`
-  - add machine-readable point-fast capability metadata for downstream routing
+Detailed backlog:
+- [cross_cutting_todo.md](/docs/status/cross_cutting_todo.md)
+- [point_fast_jax_plan.md](/docs/status/point_fast_jax_plan.md)
 
 ## Cross-repo provider boundary
 
 Status: `in_progress`
 
-- `done`
-  - arbPlusJAX remains the hardened numeric-kernel repo rather than being
-    repurposed as another library's orchestration layer
-  - matrix, sparse, block/vblock, and matrix-free/operator infrastructure are
-    being hardened as repo-owned numeric infrastructure inside arbPlusJAX
-- `in_progress`
-  - keep hardening public provider-worthy families instead of exposing more ad
-    hoc module-internal integration paths
-  - prefer stable capability entrypoints and metadata-bearing public surfaces
-    over downstream imports of internal module layout
-  - strengthen metadata and diagnostics so downstream orchestration can route
-    intelligently on method, hardening level, derivative support, and runtime
-    strategy
-  - keep notebooks, tests, and benchmarks written as downstream-consumer
-    documentation and validation surfaces, not only as internal development
-    checks
-  - keep cross-repo integration thin: downstream libraries should integrate
-    through adapter/provider layers on their side rather than by restructuring
-    arbPlusJAX around a specific consumer
-  - Barnes/double-gamma now has explicit downstream capability aliases through
-    the IFJ-compatible public surface; continue tightening diagnostics and
-    narrower provider wording around that capability
-  - fragile-regime promotion hooks now have explicit downstream capability
-    aliases for incomplete gamma upper and incomplete Bessel `I`/`K`;
-    continue narrowing terminology and diagnostics expectations around those
-    hooks
-  - incomplete-Bessel now has explicit downstream provider aliases and a
-    normalized family benchmark; remaining work is numerical maturity and
-    diagnostics tightening rather than missing provider/report surfaces
-- `planned`
-  - document a narrower capability-contract surface specifically for
-    downstream-provider use once the Barnes/promotion/incomplete-Bessel tranche
-    is hardened enough to freeze terminology
+Detailed backlog:
+- [cross_cutting_todo.md](/docs/status/cross_cutting_todo.md)
 
 ## 1. Core Numeric Scalars
 
@@ -226,6 +90,12 @@ Status: `done`
     [example_api_surface](/examples/outputs/example_api_surface)
   - scalar/API notebooks now explicitly show production service usage with
     binder reuse, stable dtype policy, and optional padding/chunking
+  - the owned scalar CPU parity/owner slice now passes end-to-end, and the
+    owned scalar GPU JAX-facing slice also passes on CUDA
+  - retained scalar benchmark and notebook artifacts now exist for both CPU and
+    GPU policy runs, and the backend-realized conclusion is explicit: CPU
+    remains the default winner for many tiny scalar service workloads while GPU
+    is validated for larger repeated scalar batches
 
 ## 2. Interval / Box / Precision Modes
 
@@ -242,6 +112,23 @@ Status: `in_progress`
   - targeted helper coverage now exists for shared batch padding, trimming,
     midpoint conversion, and low-level shape guards in the existing runtime/API
     test surface
+  - the public interval repeated-call API now has the same backend-aware
+    policy and diagnostics surface as point mode through
+    `choose_interval_batch_policy(...)`,
+    `bind_interval_batch_with_diagnostics(...)`,
+    `bind_interval_batch_jit(...)`,
+    `bind_interval_batch_jit_with_diagnostics(...)`, and
+    `prewarm_interval_mode_kernels(...)`
+  - direct owner tests now cover the new interval service API surface on CPU
+    and CUDA in
+    [test_interval_mode_service_contracts.py](/tests/test_interval_mode_service_contracts.py)
+  - the routed API benchmark now records interval service binder versus direct
+    padded interval batch timing on both CPU and GPU in
+    [benchmark_api_surface_cpu_modes_refresh.json](/benchmarks/results/benchmark_api_surface/benchmark_api_surface_cpu_modes_refresh.json)
+    and
+    [benchmark_api_surface_gpu_modes_refresh.json](/benchmarks/results/benchmark_api_surface/benchmark_api_surface_gpu_modes_refresh.json)
+  - the canonical routed API notebook source now teaches the interval
+    diagnostics/policy layer in [example_api_surface.ipynb](/examples/example_api_surface.ipynb)
 - `in_progress`
   - continue tightening wrapper ownership for the remaining indirect wrapper
     modules beyond the now-landed `hypgeom_wrappers`, `poly_wrappers`,
@@ -255,6 +142,9 @@ Status: `in_progress`
   - direct owner tests now exist for `checks`, `coeffs`, and `precision`
   - keep precision-routing and dtype policy explicit instead of letting wrapper
     behavior drift by family
+  - finish the retained CPU/GPU executed-notebook refresh for the updated
+    interval/routed API notebook outputs under
+    [examples/outputs/example_api_surface](/examples/outputs/example_api_surface)
 - `planned`
   - add a repo-wide wrapper contract matrix covering shape normalization,
     broadcasting, dtype promotion, batch padding, and mode dispatch invariants
@@ -565,173 +455,25 @@ Status: `in_progress`
 
 ## Curvature Layer
 
-### Shared Helper Placement
+Status: `in_progress`
 
-- `in_progress`
-  - curvature is now being treated as a shared helper layer rather than being
-    folded into one runtime category
-  - target placement is `src/arbplusjax/curvature/`
-  - current implementation note exists at
-    [curvature_implementation.md](/docs/implementation/curvature_implementation.md)
-  - root package and architecture docs now recognize curvature as a
-    cross-cutting layer used by dense, sparse, and matrix-free stacks
-
-### Phase 1 Core Operator Surface
-
-- `in_progress`
-  - harden the newly introduced shared operator surface:
-    - `CurvatureOperator`
-    - `CurvatureSpec`
-    - HVP builders
-    - dense Hessian builders
-    - posterior-precision composition
-    - generic solve and Newton-step helpers
-    - PSD/symmetrization helpers
-  - keep the implementation operator-first and matrix-optional
-  - minimize duplication by delegating to current dense and Jones
-    matrix-free/sparse surfaces where they already exist
-
-### Phase 2 Bayesian And Approximation Surfaces
-
-- `planned`
-  - generalized Gauss-Newton and Fisher operators
-  - inverse-diagonal estimation
-  - selected-inverse extraction
-  - operator-first `logdet` integration
-
-### Phase 3 Spectral And Posterior Summaries
-
-- `planned`
-  - low-rank curvature approximations
-  - Lanczos curvature approximations
-  - posterior marginal-variance extraction
-  - custom VJP/JVP support for scalable evidence terms
-
-### Phase 4 Advanced Stabilization
-
-- `planned`
-  - trust-region and advanced damping policy
-  - curvature regime detection
-  - automated approximation selection
-    - FWHT and QR probe-block parity checks for unbiased trace estimation on
-      small reference problems
-    - low-rank-deflated estimator variance scans versus undeflated estimators
-      at fixed probe budgets
-    - cached-deflation forward/VJP consistency checks across nearby parameter
-      values
-    - eigen-interval and nugget sensitivity sweeps for logdet stability
-    - JIT/cache stability checks so value changes do not trigger recompiles for
-      fixed operator shapes/configuration
-    - pytree contract checks so cached aux metadata survives `jit`, `vmap`, and
-      repeated calls without hidden Python-side state
-
-### Longer-Horizon Additions
-
-- `planned`
-  - add contour-integral matrix functions plus reusable dense/operator-first
-    `logm`, `sqrtm`, `rootm`, and `signm` infrastructure
-  - add broader operator-parameter adjoints beyond the now-landed
-    parameter-differentiable operator-plan tranche
-  - keep PETSc/SLEPc as benchmark and design references only, not governed
-    runtime backends
+Detailed backlog:
+- [curvature_todo.md](/docs/status/curvature_todo.md)
 
 ## 6. Special Functions
 
 Status: `in_progress`
 
-- `done`
-  - canonical example notebooks now exist for top-level gamma and
-    Barnes/double-gamma production surfaces, with explicit production-calling
-    guidance and benchmark-extension notes
-  - dedicated theory notes now exist for the gamma-family production stack
-  - dedicated theory notes now exist for hypergeometric and Barnes/double-gamma
-    production methodology
-- `in_progress`
-  - normalize special-function service benchmarks and diagnostics reporting more
-    fully across hypergeometric, Bessel, gamma, and Barnes families
-  - direct normalized special benchmark coverage now also includes
-    `benchmark_hypgeom_extra.py`
-  - continue converting notebook and benchmark guidance into schema-backed
-    artifacts rather than stdout-only summaries
+Detailed backlog:
+- [special_functions_todo.md](/docs/status/special_functions_todo.md)
 
 ## Theory And Methodology
 
 Status: `in_progress`
 
-- `done`
-  - theory index now reflects production-readiness interpretation rather than
-    only listing older notes
-  - dedicated methodology notes now exist for gamma-family and transform/NUFFT
-    surfaces
-  - dedicated methodology notes now exist for sparse/block/vblock and
-    matrix-free production surfaces
-
-- `done`
-  - canonical public entry points exist for `tail_integral`,
-    `tail_integral_accelerated`, `incomplete_bessel_k`,
-    `incomplete_bessel_i`, `incomplete_gamma_upper`,
-    `incomplete_gamma_lower`, and `laplace_bessel_k_tail`
-  - generic tail-engine modules exist under
-    `src/arbplusjax/special/tail_acceleration/`
-  - incomplete-Bessel modules exist under `src/arbplusjax/special/bessel/`
-  - pure-JAX `high_precision_refine` is exposed, with `mpfallback` retained
-    only as a compatibility alias
-  - explicit derivative support exists for incomplete gamma, Laplace-Bessel
-    tails, and the current incomplete `K` / incomplete `I` point paths
-  - `boost_hypgeom` and `cusf_compat` surfaces now exist with tests and docs
-- `in_progress`
-  - continue hardening ordinary gamma, Barnes-family, and ordinary Bessel
-    families where coverage remains uneven
-  - continue calibrating the generic tail-engine recurrence and sequence logic
-    across more families
-  - bring incomplete `I` to the same regime maturity as incomplete `K`
-  - finish hardening and characterization of the `bdg_*` Barnes and
-    double-gamma family
-  - keep extending Barnes/double-gamma diagnostics and provider contracts
-    beyond the current scalar IFJ surface
-  - reduce runtime cost of rigorous/adaptive `bdg_*` samplers in
-    `src/arbplusjax/ball_wrappers.py`
-  - continue hypergeometric engineering cleanup:
-    helper consolidation, family-specific adaptive/rigorous kernels, and
-    compile-noise reduction outside the current representative families
-  - `pfq` fixed/padded basic and adaptive/rigorous mode-batch proofs are now
-    landed on the canonical real/complex paths
-  - alternative hypergeometric hardening is now stronger:
-    Boost `pfq` fixed/padded mode-batch proofs and helper/`pfq` point-AD smoke
-    are landed, and CuSF `hyp1f1`/`hyp2f1` now have explicit mode containment
-    plus point-AD checks
-  - regularized Boost `0f1`/`1f1` fixed-vs-padded containment and reciprocal
-    `pfq` fixed-vs-padded/mode-containment proofs are now landed
-  - Boost helper aliases now have explicit cross-mode consistency checks
-  - direct owner tests now exist for `bessel_kernels` and `barnesg`
-  - extend benchmark and RF77-facing usage/report coverage where diagnostics
-    exist but packaging is still incomplete
-- `planned`
-  - extend the general incomplete-tail engine to more hypergeometric-tail
-    families
-  - add multivariate Bessel work only after scalar incomplete infrastructure is
-    genuinely stable
-  - add incomplete multivariate-Bessel-type routines only if reductions justify
-    them
-  - resolve what true arbitrary precision means under a strict pure-JAX
-    constraint
-
-Priority rule for remaining Arb/FLINT-style breadth:
-- do not migrate the missing callable surface breadth-first
-- prefer one canonical JAX-native implementation per important function family
-- prioritize IFJ and RF77-facing work first:
-  - Barnes-family hardening and IFJ-derived double-gamma work
-  - gamma-adjacent continuation functions that unblock contour and residue
-    workflows
-  - selected complex special functions with direct downstream use:
-    `Ei`, `Chi`, `Ci`, dilogarithm, Tricomi `U`, and selected `pfq`
-- after that, prioritize broad-value parity:
-  - dense matrix parity in `arb_mat` / `acb_mat`
-  - polynomial parity in `arb_poly` / `acb_poly`
-  - selected scalar gaps such as `lambertw`, zeta-adjacent functions, and
-    rising/beta families
-- defer broad elliptic/modular and full Dirichlet/L-function expansion until
-  the Barnes/gamma/integration path is stable enough to justify it
+Detailed backlog:
+- [theory_todo.md](/docs/status/theory_todo.md)
+- [special_functions_todo.md](/docs/status/special_functions_todo.md)
 
 ## 7. Analytic / Algebraic / Domain Functionality
 
@@ -761,112 +503,17 @@ Status: `in_progress`
 
 Status: `in_progress`
 
-- `done`
-  - public metadata exists for family, stability, method tags, regime tags, and
-    derivative status
-  - direct test owners already exist for `api`, `runtime`, `elementary`,
-    `function_provenance`, `jax_diagnostics`, `jax_precision`, `cusf_compat`,
-    and `soft_ops`
-  - direct owner tests now exist for `public_metadata` and
-    `capability_registry`
-  - direct owner tests now exist for `checks`, `coeffs`, `precision`,
-    `validation`, and `soft_types`
-  - public metadata now supports explicit filtering and deterministic JSON
-    serialization for report-facing and downstream-adapter usage
-- `in_progress`
-  - keep stable versus experimental API status explicit in metadata and status
-    reports
-  - keep naming cleanup moving toward canonical mathematical names with
-    implementation selection, rather than provenance-prefixed public names
-  - keep `docs/implementation/modules/arb_mat_implementation.md`,
-    `docs/implementation/modules/acb_mat_implementation.md`,
-    `docs/implementation/modules/jrb_mat_implementation.md`, and
-    `docs/implementation/modules/jcb_mat_implementation.md` aligned with source
+Detailed backlog:
+- [api_runtime_todo.md](/docs/status/api_runtime_todo.md)
 
 ## Priority test-owner additions
 
 Status: `in_progress`
 
-Highest priority:
-- landed
-  [test_ball_wrappers_contracts.py](/tests/test_ball_wrappers_contracts.py)
-- landed
-  [test_baseline_wrappers_contracts.py](/tests/test_baseline_wrappers_contracts.py)
-- landed
-  [test_mat_wrappers_contracts.py](/tests/test_mat_wrappers_contracts.py)
-- landed
-  [test_wrappers_common_contracts.py](/tests/test_wrappers_common_contracts.py)
-- landed
-  [test_double_interval_wrappers_contracts.py](/tests/test_double_interval_wrappers_contracts.py)
-- landed
-  [test_core_wrappers_contracts.py](/tests/test_core_wrappers_contracts.py)
-- landed
-  [test_calc_wrappers_contracts.py](/tests/test_calc_wrappers_contracts.py)
-- landed
-  [test_checks_contracts.py](/tests/test_checks_contracts.py)
-- landed
-  [test_coeffs_contracts.py](/tests/test_coeffs_contracts.py)
-- landed
-  [test_precision_contracts.py](/tests/test_precision_contracts.py)
-- landed
-  [test_kernel_helpers_contracts.py](/tests/test_kernel_helpers_contracts.py)
-- landed
-  [test_mat_common_contracts.py](/tests/test_mat_common_contracts.py)
-- landed
-  [test_sampling_helpers_contracts.py](/tests/test_sampling_helpers_contracts.py)
-- landed
-  [test_sparse_common_contracts.py](/tests/test_sparse_common_contracts.py)
-- landed
-  [test_iterative_solvers_contracts.py](/tests/test_iterative_solvers_contracts.py)
-- landed
-  [test_soft_types_contracts.py](/tests/test_soft_types_contracts.py)
-- landed
-  [test_validation_contracts.py](/tests/test_validation_contracts.py)
-
-Next priority:
-- landed
-  [test_krylov_solvers_contracts.py](/tests/test_krylov_solvers_contracts.py)
-- landed
-  [test_transform_common_contracts.py](/tests/test_transform_common_contracts.py)
-- landed
-  [test_dft_engineering.py](/tests/test_dft_engineering.py)
-  for cached DFT/NUFFT plan reuse, padded-batch stability, wrapper-mode
-  containment, diagnostics, and point/basic AD smoke
-
-Execution order:
-1. Re-run the CPU chassis and profile suite after the newly landed direct-owner
-   tests.
-2. Expand AD and compile-behavior assertions where those tests expose weak
-   spots.
-3. Identify the next shared-infrastructure tranche that still lacks a direct
-   owner.
-4. Add that next tranche of focused tests.
-5. Re-run the full CPU harness, then opt-in parity and benchmark slices.
+Detailed backlog:
+- [api_runtime_todo.md](/docs/status/api_runtime_todo.md)
 
 ## Missing C implementation snapshot
 
-Source:
-[audit.md](/docs/status/audit.md)
-snapshot `2026-02-25T03:51:38Z`.
-
-- Arb Core: 195
-- ACB Core: 144
-- ARF: 95
-- MAG: 78
-- ACB Mat: 110
-- Arb Mat: 109
-- FMPR: 59
-- ACB Dirichlet: 87
-- Arb Poly: 87
-- ACB Poly: 86
-- Dirichlet: 38
-- Bool Mat: 34
-- ACB Modular: 27
-- ACB Elliptic: 17
-- ACF: 10
-- ACB DFT: 0
-- Arb Calc: 0
-- ACB Calc: 0
-
-Use the snapshot above for gap sizing only. Detailed missing-symbol inventories
-belong in `docs/reports/missing_impls/`.
+Detailed backlog:
+- [api_runtime_todo.md](/docs/status/api_runtime_todo.md)

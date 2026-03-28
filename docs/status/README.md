@@ -15,6 +15,11 @@ Primary entry points:
 - [test_gap_checklist.md](/docs/status/test_gap_checklist.md)
 
 Other status documents:
+- [api_runtime_todo.md](/docs/status/api_runtime_todo.md)
+- [cross_cutting_todo.md](/docs/status/cross_cutting_todo.md)
+- [curvature_todo.md](/docs/status/curvature_todo.md)
 - [matrix_free_completion_plan.md](/docs/status/matrix_free_completion_plan.md)
 - [point_fast_jax_plan.md](/docs/status/point_fast_jax_plan.md)
 - [sparse_completion_plan.md](/docs/status/sparse_completion_plan.md)
+- [special_functions_todo.md](/docs/status/special_functions_todo.md)
+- [theory_todo.md](/docs/status/theory_todo.md)

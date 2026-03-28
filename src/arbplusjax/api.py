@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 import importlib
 import inspect
 from functools import lru_cache, partial
@@ -45,12 +46,306 @@ _COMPLEX_BY_FLOAT_DTYPE = {
 _MODE_SET = ("point", "basic", "adaptive", "rigorous")
 
 
+@dataclass(frozen=True)
+class PointBatchPolicy:
+    requested_backend: str
+    chosen_backend: str
+    batch_size: int | None
+    dtype: str | None
+    pad_to: int | None
+    shape_bucket_multiple: int | None
+    effective_pad_to: int | None
+    chunk_size: int | None
+    min_gpu_batch_size: int
+    prewarm: bool
+
+
+@dataclass(frozen=True)
+class PointBatchCallDiagnostics:
+    name: str
+    requested_backend: str
+    chosen_backend: str
+    batch_size: int | None
+    dtype: str | None
+    pad_to: int | None
+    shape_bucket_multiple: int | None
+    effective_pad_to: int | None
+    chunk_size: int | None
+    jit_enabled: bool
+    compiled_this_call: bool
+    prewarmed: bool
+
+
+@dataclass(frozen=True)
+class IntervalBatchPolicy:
+    requested_backend: str
+    chosen_backend: str
+    batch_size: int | None
+    dtype: str | None
+    mode: str
+    prec_bits: int | None
+    dps: int | None
+    pad_to: int | None
+    shape_bucket_multiple: int | None
+    effective_pad_to: int | None
+    chunk_size: int | None
+    min_gpu_batch_size: int
+    prewarm: bool
+
+
+@dataclass(frozen=True)
+class IntervalBatchCallDiagnostics:
+    name: str
+    requested_backend: str
+    chosen_backend: str
+    batch_size: int | None
+    dtype: str | None
+    mode: str
+    prec_bits: int | None
+    dps: int | None
+    pad_to: int | None
+    shape_bucket_multiple: int | None
+    effective_pad_to: int | None
+    chunk_size: int | None
+    jit_enabled: bool
+    compiled_this_call: bool
+    prewarmed: bool
+
+
 def _resolve_lazy_callable(entry: object) -> Callable:
     return resolve_lazy_callable(entry, package=__package__)
 
 
 def _resolve_lazy_pair(entry: object) -> tuple[Callable, Callable]:
     return resolve_lazy_pair(entry, package=__package__)
+
+
+def _resolve_shape_bucket_pad_to(
+    args: tuple[object, ...],
+    *,
+    pad_to: int | None,
+    shape_bucket_multiple: int | None,
+) -> int | None:
+    explicit = None if pad_to is None else int(pad_to)
+    if shape_bucket_multiple is None:
+        return explicit
+    multiple = int(shape_bucket_multiple)
+    if multiple <= 0:
+        raise ValueError("shape_bucket_multiple must be > 0")
+    batch_n = mixed_batch_size_or_none(args)
+    if batch_n is None:
+        return explicit
+    bucketed = ((batch_n + multiple - 1) // multiple) * multiple
+    if explicit is None:
+        return bucketed
+    return max(explicit, bucketed)
+
+
+def _normalize_backend_name(backend: str | None) -> str:
+    value = "auto" if backend is None else str(backend).lower()
+    if value not in {"auto", "cpu", "gpu"}:
+        raise ValueError("backend must be one of: 'auto', 'cpu', 'gpu'")
+    return value
+
+
+@lru_cache(maxsize=1)
+def _available_backends() -> tuple[str, ...]:
+    names = set()
+    try:
+        if jax.devices("cpu"):
+            names.add("cpu")
+    except Exception:
+        pass
+    try:
+        if jax.devices("gpu"):
+            names.add("gpu")
+    except Exception:
+        pass
+    if not names:
+        names.add(jax.default_backend())
+    return tuple(sorted(names))
+
+
+@lru_cache(maxsize=None)
+def _backend_device(backend: str):
+    return jax.devices(backend)[0]
+
+
+def _choose_effective_backend(
+    *,
+    requested_backend: str,
+    batch_size: int | None,
+    min_gpu_batch_size: int,
+) -> str:
+    available = set(_available_backends())
+    if requested_backend != "auto":
+        if requested_backend not in available:
+            raise ValueError(f"requested backend {requested_backend!r} is not available; available={sorted(available)}")
+        return requested_backend
+    if "gpu" in available and batch_size is not None and batch_size >= int(min_gpu_batch_size):
+        return "gpu"
+    if "cpu" in available:
+        return "cpu"
+    return jax.default_backend()
+
+
+def _coerce_dtype_label(dtype: str | jnp.dtype | None) -> str | None:
+    if dtype is None:
+        return None
+    return str(jnp.dtype(dtype))
+
+
+def _place_args_on_backend(args: tuple[object, ...], backend: str) -> tuple[object, ...]:
+    device = _backend_device(backend)
+    placed: list[object] = []
+    for arg in args:
+        if hasattr(arg, "shape") or hasattr(arg, "dtype") or isinstance(arg, (int, float, complex)):
+            placed.append(jax.device_put(arg, device))
+        else:
+            placed.append(arg)
+    return tuple(placed)
+
+
+def choose_point_batch_policy(
+    *,
+    batch_size: int | None = None,
+    dtype: str | jnp.dtype | None = None,
+    backend: str = "auto",
+    pad_to: int | None = None,
+    shape_bucket_multiple: int | None = None,
+    chunk_size: int | None = None,
+    min_gpu_batch_size: int = 2048,
+    prewarm: bool = False,
+) -> PointBatchPolicy:
+    requested_backend = _normalize_backend_name(backend)
+    effective_pad_to = _resolve_shape_bucket_pad_to(
+        tuple(()),
+        pad_to=pad_to,
+        shape_bucket_multiple=shape_bucket_multiple,
+    ) if batch_size is None else (
+        (max(int(pad_to), ((int(batch_size) + int(shape_bucket_multiple) - 1) // int(shape_bucket_multiple)) * int(shape_bucket_multiple))
+         if pad_to is not None and shape_bucket_multiple is not None else
+         (((int(batch_size) + int(shape_bucket_multiple) - 1) // int(shape_bucket_multiple)) * int(shape_bucket_multiple)
+          if shape_bucket_multiple is not None else
+          (int(pad_to) if pad_to is not None else None)))
+    )
+    chosen_backend = _choose_effective_backend(
+        requested_backend=requested_backend,
+        batch_size=batch_size,
+        min_gpu_batch_size=min_gpu_batch_size,
+    )
+    return PointBatchPolicy(
+        requested_backend=requested_backend,
+        chosen_backend=chosen_backend,
+        batch_size=batch_size,
+        dtype=_coerce_dtype_label(dtype),
+        pad_to=None if pad_to is None else int(pad_to),
+        shape_bucket_multiple=None if shape_bucket_multiple is None else int(shape_bucket_multiple),
+        effective_pad_to=effective_pad_to,
+        chunk_size=None if chunk_size is None else int(chunk_size),
+        min_gpu_batch_size=int(min_gpu_batch_size),
+        prewarm=bool(prewarm),
+    )
+
+
+def _point_batch_policy_for_args(
+    args: tuple[object, ...],
+    *,
+    dtype: str | jnp.dtype | None,
+    backend: str,
+    pad_to: int | None,
+    shape_bucket_multiple: int | None,
+    chunk_size: int | None,
+    min_gpu_batch_size: int,
+    prewarm: bool,
+) -> PointBatchPolicy:
+    return choose_point_batch_policy(
+        batch_size=mixed_batch_size_or_none(args),
+        dtype=dtype,
+        backend=backend,
+        pad_to=pad_to,
+        shape_bucket_multiple=shape_bucket_multiple,
+        chunk_size=chunk_size,
+        min_gpu_batch_size=min_gpu_batch_size,
+        prewarm=prewarm,
+    )
+
+
+def choose_interval_batch_policy(
+    *,
+    batch_size: int | None = None,
+    dtype: str | jnp.dtype | None = None,
+    mode: str = "basic",
+    prec_bits: int | None = None,
+    dps: int | None = None,
+    backend: str = "auto",
+    pad_to: int | None = None,
+    shape_bucket_multiple: int | None = None,
+    chunk_size: int | None = None,
+    min_gpu_batch_size: int = 2048,
+    prewarm: bool = False,
+) -> IntervalBatchPolicy:
+    requested_backend = _normalize_backend_name(backend)
+    effective_pad_to = _resolve_shape_bucket_pad_to(
+        tuple(()),
+        pad_to=pad_to,
+        shape_bucket_multiple=shape_bucket_multiple,
+    ) if batch_size is None else (
+        (max(int(pad_to), ((int(batch_size) + int(shape_bucket_multiple) - 1) // int(shape_bucket_multiple)) * int(shape_bucket_multiple))
+         if pad_to is not None and shape_bucket_multiple is not None else
+         (((int(batch_size) + int(shape_bucket_multiple) - 1) // int(shape_bucket_multiple)) * int(shape_bucket_multiple)
+          if shape_bucket_multiple is not None else
+          (int(pad_to) if pad_to is not None else None)))
+    )
+    chosen_backend = _choose_effective_backend(
+        requested_backend=requested_backend,
+        batch_size=batch_size,
+        min_gpu_batch_size=min_gpu_batch_size,
+    )
+    return IntervalBatchPolicy(
+        requested_backend=requested_backend,
+        chosen_backend=chosen_backend,
+        batch_size=batch_size,
+        dtype=_coerce_dtype_label(dtype),
+        mode=str(mode),
+        prec_bits=None if prec_bits is None else int(prec_bits),
+        dps=None if dps is None else int(dps),
+        pad_to=None if pad_to is None else int(pad_to),
+        shape_bucket_multiple=None if shape_bucket_multiple is None else int(shape_bucket_multiple),
+        effective_pad_to=effective_pad_to,
+        chunk_size=None if chunk_size is None else int(chunk_size),
+        min_gpu_batch_size=int(min_gpu_batch_size),
+        prewarm=bool(prewarm),
+    )
+
+
+def _interval_batch_policy_for_args(
+    args: tuple[object, ...],
+    *,
+    dtype: str | jnp.dtype | None,
+    mode: str,
+    prec_bits: int | None,
+    dps: int | None,
+    backend: str,
+    pad_to: int | None,
+    shape_bucket_multiple: int | None,
+    chunk_size: int | None,
+    min_gpu_batch_size: int,
+    prewarm: bool,
+) -> IntervalBatchPolicy:
+    return choose_interval_batch_policy(
+        batch_size=mixed_batch_size_or_none(args),
+        dtype=dtype,
+        mode=mode,
+        prec_bits=prec_bits,
+        dps=dps,
+        backend=backend,
+        pad_to=pad_to,
+        shape_bucket_multiple=shape_bucket_multiple,
+        chunk_size=chunk_size,
+        min_gpu_batch_size=min_gpu_batch_size,
+        prewarm=prewarm,
+    )
 
 
 @lru_cache(maxsize=None)
@@ -2068,29 +2363,114 @@ def bind_point_batch(
     name: str,
     dtype: str | jnp.dtype | None = None,
     pad_to: int | None = None,
+    shape_bucket_multiple: int | None = None,
     pad_value: float | complex = 0.0,
     chunk_size: int | None = None,
+    backend: str = "auto",
+    min_gpu_batch_size: int = 2048,
+    prewarm: bool = False,
     **bound_kwargs,
 ) -> Callable:
+    requested_backend = _normalize_backend_name(backend)
+
     def wrapped(*args):
+        policy = _point_batch_policy_for_args(
+            args,
+            dtype=dtype,
+            backend=requested_backend,
+            pad_to=pad_to,
+            shape_bucket_multiple=shape_bucket_multiple,
+            chunk_size=chunk_size,
+            min_gpu_batch_size=min_gpu_batch_size,
+            prewarm=prewarm,
+        )
+        placed_args = _place_args_on_backend(args, policy.chosen_backend)
+        compiled_this_call = False
         if chunk_size is not None:
-            return eval_point_batch_chunked(
+            out = eval_point_batch_chunked(
                 name,
-                *args,
+                *placed_args,
                 chunk_size=chunk_size,
                 dtype=dtype,
-                pad_to=pad_to,
+                pad_to=policy.effective_pad_to,
                 pad_value=pad_value,
                 **bound_kwargs,
             )
-        return eval_point_batch(
+        else:
+            out = eval_point_batch(
+                name,
+                *placed_args,
+                dtype=dtype,
+                pad_to=policy.effective_pad_to,
+                pad_value=pad_value,
+                **bound_kwargs,
+            )
+        wrapped.last_diagnostics = PointBatchCallDiagnostics(
             name,
-            *args,
+            policy.requested_backend,
+            policy.chosen_backend,
+            policy.batch_size,
+            policy.dtype,
+            policy.pad_to,
+            policy.shape_bucket_multiple,
+            policy.effective_pad_to,
+            policy.chunk_size,
+            jit_enabled=False,
+            compiled_this_call=compiled_this_call,
+            prewarmed=getattr(wrapped, "_prewarmed", False),
+        )
+        return out
+
+    def diagnostics(*args):
+        policy = _point_batch_policy_for_args(
+            args,
+            dtype=dtype,
+            backend=requested_backend,
+            pad_to=pad_to,
+            shape_bucket_multiple=shape_bucket_multiple,
+            chunk_size=chunk_size,
+            min_gpu_batch_size=min_gpu_batch_size,
+            prewarm=prewarm,
+        )
+        return PointBatchCallDiagnostics(
+            name,
+            policy.requested_backend,
+            policy.chosen_backend,
+            policy.batch_size,
+            policy.dtype,
+            policy.pad_to,
+            policy.shape_bucket_multiple,
+            policy.effective_pad_to,
+            policy.chunk_size,
+            jit_enabled=False,
+            compiled_this_call=False,
+            prewarmed=getattr(wrapped, "_prewarmed", False),
+        )
+
+    wrapped.policy = lambda batch_size=None: choose_point_batch_policy(
+        batch_size=batch_size,
+        dtype=dtype,
+        backend=requested_backend,
+        pad_to=pad_to,
+        shape_bucket_multiple=shape_bucket_multiple,
+        chunk_size=chunk_size,
+        min_gpu_batch_size=min_gpu_batch_size,
+        prewarm=prewarm,
+    )
+    wrapped.diagnostics = diagnostics
+    wrapped.last_diagnostics = None
+    wrapped._prewarmed = False
+    if prewarm:
+        _prewarm_point_batch_binding(
+            wrapped,
+            name=name,
             dtype=dtype,
             pad_to=pad_to,
-            pad_value=pad_value,
-            **bound_kwargs,
+            shape_bucket_multiple=shape_bucket_multiple,
+            backend=requested_backend,
+            min_gpu_batch_size=min_gpu_batch_size,
         )
+        wrapped._prewarmed = True
 
     return wrapped
 
@@ -2099,7 +2479,11 @@ def bind_point_batch_jit(
     name: str,
     dtype: str | jnp.dtype | None = None,
     pad_to: int | None = None,
+    shape_bucket_multiple: int | None = None,
     pad_value: float | complex = 0.0,
+    backend: str = "auto",
+    min_gpu_batch_size: int = 2048,
+    prewarm: bool = False,
     **bound_kwargs,
 ) -> Callable:
     """Return a compiled point-batch callable with static routing policy.
@@ -2118,17 +2502,182 @@ def bind_point_batch_jit(
     else:
         _resolve_point_fn(name)
 
-    @jax.jit
+    frozen_kwargs = _freeze_static_kwargs(bound_kwargs)
+    if frozen_kwargs is _UNFREEZABLE:
+        raise ValueError("bind_point_batch_jit requires kwargs that can be frozen as static routing policy")
+
+    requested_backend = _normalize_backend_name(backend)
+    seen_compile_keys: set[tuple[object, ...]] = set()
+
     def wrapped(*args):
-        return eval_point_batch(
-            name,
-            *args,
+        policy = _point_batch_policy_for_args(
+            args,
             dtype=dtype,
+            backend=requested_backend,
             pad_to=pad_to,
-            pad_value=pad_value,
-            **bound_kwargs,
+            shape_bucket_multiple=shape_bucket_multiple,
+            chunk_size=None,
+            min_gpu_batch_size=min_gpu_batch_size,
+            prewarm=prewarm,
+        )
+        compile_key = (
+            name,
+            dtype,
+            policy.effective_pad_to,
+            pad_value,
+            frozen_kwargs,
+            policy.chosen_backend,
+        )
+        compiled_this_call = compile_key not in seen_compile_keys
+        seen_compile_keys.add(compile_key)
+        compiled = _point_batch_bound_jit_fn(
+            name,
+            dtype,
+            policy.effective_pad_to,
+            pad_value,
+            frozen_kwargs,
+        )
+        placed_args = _place_args_on_backend(args, policy.chosen_backend)
+        out = compiled(*placed_args)
+        wrapped.last_diagnostics = PointBatchCallDiagnostics(
+            name,
+            policy.requested_backend,
+            policy.chosen_backend,
+            policy.batch_size,
+            policy.dtype,
+            policy.pad_to,
+            policy.shape_bucket_multiple,
+            policy.effective_pad_to,
+            policy.chunk_size,
+            jit_enabled=True,
+            compiled_this_call=compiled_this_call,
+            prewarmed=getattr(wrapped, "_prewarmed", False),
+        )
+        return out
+
+    def diagnostics(*args):
+        policy = _point_batch_policy_for_args(
+            args,
+            dtype=dtype,
+            backend=requested_backend,
+            pad_to=pad_to,
+            shape_bucket_multiple=shape_bucket_multiple,
+            chunk_size=None,
+            min_gpu_batch_size=min_gpu_batch_size,
+            prewarm=prewarm,
+        )
+        compile_key = (
+            name,
+            dtype,
+            policy.effective_pad_to,
+            pad_value,
+            frozen_kwargs,
+            policy.chosen_backend,
+        )
+        return PointBatchCallDiagnostics(
+            name,
+            policy.requested_backend,
+            policy.chosen_backend,
+            policy.batch_size,
+            policy.dtype,
+            policy.pad_to,
+            policy.shape_bucket_multiple,
+            policy.effective_pad_to,
+            policy.chunk_size,
+            jit_enabled=True,
+            compiled_this_call=compile_key not in seen_compile_keys,
+            prewarmed=getattr(wrapped, "_prewarmed", False),
         )
 
+    wrapped.policy = lambda batch_size=None: choose_point_batch_policy(
+        batch_size=batch_size,
+        dtype=dtype,
+        backend=requested_backend,
+        pad_to=pad_to,
+        shape_bucket_multiple=shape_bucket_multiple,
+        chunk_size=None,
+        min_gpu_batch_size=min_gpu_batch_size,
+        prewarm=prewarm,
+    )
+    wrapped.diagnostics = diagnostics
+    wrapped.last_diagnostics = None
+    wrapped._prewarmed = False
+    if prewarm:
+        _prewarm_point_batch_binding(
+            wrapped,
+            name=name,
+            dtype=dtype,
+            pad_to=pad_to,
+            shape_bucket_multiple=shape_bucket_multiple,
+            backend=requested_backend,
+            min_gpu_batch_size=min_gpu_batch_size,
+        )
+        wrapped._prewarmed = True
+
+    return wrapped
+
+
+def bind_point_batch_with_diagnostics(
+    name: str,
+    dtype: str | jnp.dtype | None = None,
+    pad_to: int | None = None,
+    shape_bucket_multiple: int | None = None,
+    pad_value: float | complex = 0.0,
+    chunk_size: int | None = None,
+    backend: str = "auto",
+    min_gpu_batch_size: int = 2048,
+    prewarm: bool = False,
+    **bound_kwargs,
+) -> Callable:
+    bound = bind_point_batch(
+        name,
+        dtype=dtype,
+        pad_to=pad_to,
+        shape_bucket_multiple=shape_bucket_multiple,
+        pad_value=pad_value,
+        chunk_size=chunk_size,
+        backend=backend,
+        min_gpu_batch_size=min_gpu_batch_size,
+        prewarm=prewarm,
+        **bound_kwargs,
+    )
+
+    def wrapped(*args):
+        return bound(*args), bound.last_diagnostics
+
+    wrapped.policy = bound.policy
+    wrapped.diagnostics = bound.diagnostics
+    return wrapped
+
+
+def bind_point_batch_jit_with_diagnostics(
+    name: str,
+    dtype: str | jnp.dtype | None = None,
+    pad_to: int | None = None,
+    shape_bucket_multiple: int | None = None,
+    pad_value: float | complex = 0.0,
+    backend: str = "auto",
+    min_gpu_batch_size: int = 2048,
+    prewarm: bool = False,
+    **bound_kwargs,
+) -> Callable:
+    bound = bind_point_batch_jit(
+        name,
+        dtype=dtype,
+        pad_to=pad_to,
+        shape_bucket_multiple=shape_bucket_multiple,
+        pad_value=pad_value,
+        backend=backend,
+        min_gpu_batch_size=min_gpu_batch_size,
+        prewarm=prewarm,
+        **bound_kwargs,
+    )
+
+    def wrapped(*args):
+        return bound(*args), bound.last_diagnostics
+
+    wrapped.policy = bound.policy
+    wrapped.diagnostics = bound.diagnostics
     return wrapped
 
 
@@ -2139,36 +2688,370 @@ def bind_interval_batch(
     dps: int | None = None,
     dtype: str | jnp.dtype | None = None,
     pad_to: int | None = None,
+    shape_bucket_multiple: int | None = None,
     pad_value: float | complex = 0.0,
     chunk_size: int | None = None,
+    backend: str = "auto",
+    min_gpu_batch_size: int = 2048,
+    prewarm: bool = False,
     **bound_kwargs,
 ) -> Callable:
+    requested_backend = _normalize_backend_name(backend)
+
     def wrapped(*args):
+        policy = _interval_batch_policy_for_args(
+            args,
+            dtype=dtype,
+            mode=mode,
+            prec_bits=prec_bits,
+            dps=dps,
+            backend=requested_backend,
+            pad_to=pad_to,
+            shape_bucket_multiple=shape_bucket_multiple,
+            chunk_size=chunk_size,
+            min_gpu_batch_size=min_gpu_batch_size,
+            prewarm=prewarm,
+        )
+        placed_args = _place_args_on_backend(args, policy.chosen_backend)
         if chunk_size is not None:
-            return eval_interval_batch_chunked(
+            out = eval_interval_batch_chunked(
                 name,
-                *args,
+                *placed_args,
                 mode=mode,
                 prec_bits=prec_bits,
                 dps=dps,
                 chunk_size=chunk_size,
                 dtype=dtype,
-                pad_to=pad_to,
+                pad_to=policy.effective_pad_to,
                 pad_value=pad_value,
                 **bound_kwargs,
             )
-        return eval_interval_batch(
+        else:
+            out = eval_interval_batch(
+                name,
+                *placed_args,
+                mode=mode,
+                prec_bits=prec_bits,
+                dps=dps,
+                dtype=dtype,
+                pad_to=policy.effective_pad_to,
+                pad_value=pad_value,
+                **bound_kwargs,
+            )
+        wrapped.last_diagnostics = IntervalBatchCallDiagnostics(
             name,
-            *args,
+            policy.requested_backend,
+            policy.chosen_backend,
+            policy.batch_size,
+            policy.dtype,
+            policy.mode,
+            policy.prec_bits,
+            policy.dps,
+            policy.pad_to,
+            policy.shape_bucket_multiple,
+            policy.effective_pad_to,
+            policy.chunk_size,
+            jit_enabled=False,
+            compiled_this_call=False,
+            prewarmed=getattr(wrapped, "_prewarmed", False),
+        )
+        return out
+
+    def diagnostics(*args):
+        policy = _interval_batch_policy_for_args(
+            args,
+            dtype=dtype,
+            mode=mode,
+            prec_bits=prec_bits,
+            dps=dps,
+            backend=requested_backend,
+            pad_to=pad_to,
+            shape_bucket_multiple=shape_bucket_multiple,
+            chunk_size=chunk_size,
+            min_gpu_batch_size=min_gpu_batch_size,
+            prewarm=prewarm,
+        )
+        return IntervalBatchCallDiagnostics(
+            name,
+            policy.requested_backend,
+            policy.chosen_backend,
+            policy.batch_size,
+            policy.dtype,
+            policy.mode,
+            policy.prec_bits,
+            policy.dps,
+            policy.pad_to,
+            policy.shape_bucket_multiple,
+            policy.effective_pad_to,
+            policy.chunk_size,
+            jit_enabled=False,
+            compiled_this_call=False,
+            prewarmed=getattr(wrapped, "_prewarmed", False),
+        )
+
+    wrapped.policy = lambda batch_size=None: choose_interval_batch_policy(
+        batch_size=batch_size,
+        dtype=dtype,
+        mode=mode,
+        prec_bits=prec_bits,
+        dps=dps,
+        backend=requested_backend,
+        pad_to=pad_to,
+        shape_bucket_multiple=shape_bucket_multiple,
+        chunk_size=chunk_size,
+        min_gpu_batch_size=min_gpu_batch_size,
+        prewarm=prewarm,
+    )
+    wrapped.diagnostics = diagnostics
+    wrapped.last_diagnostics = None
+    wrapped._prewarmed = False
+    if prewarm:
+        _prewarm_interval_batch_binding(
+            wrapped,
+            name=name,
             mode=mode,
             prec_bits=prec_bits,
             dps=dps,
             dtype=dtype,
             pad_to=pad_to,
-            pad_value=pad_value,
-            **bound_kwargs,
+            shape_bucket_multiple=shape_bucket_multiple,
+            backend=requested_backend,
+            min_gpu_batch_size=min_gpu_batch_size,
+        )
+        wrapped._prewarmed = True
+
+    return wrapped
+
+
+def bind_interval_batch_jit(
+    name: str,
+    mode: str = "basic",
+    prec_bits: int | None = None,
+    dps: int | None = None,
+    dtype: str | jnp.dtype | None = None,
+    pad_to: int | None = None,
+    shape_bucket_multiple: int | None = None,
+    pad_value: float | complex = 0.0,
+    backend: str = "auto",
+    min_gpu_batch_size: int = 2048,
+    prewarm: bool = False,
+    **bound_kwargs,
+) -> Callable:
+    frozen_kwargs = _freeze_static_kwargs(bound_kwargs)
+    if frozen_kwargs is _UNFREEZABLE:
+        raise ValueError("bind_interval_batch_jit requires kwargs that can be frozen as static routing policy")
+
+    requested_backend = _normalize_backend_name(backend)
+    seen_compile_keys: set[tuple[object, ...]] = set()
+
+    def wrapped(*args):
+        policy = _interval_batch_policy_for_args(
+            args,
+            dtype=dtype,
+            mode=mode,
+            prec_bits=prec_bits,
+            dps=dps,
+            backend=requested_backend,
+            pad_to=pad_to,
+            shape_bucket_multiple=shape_bucket_multiple,
+            chunk_size=None,
+            min_gpu_batch_size=min_gpu_batch_size,
+            prewarm=prewarm,
+        )
+        compile_key = (
+            name,
+            mode,
+            prec_bits,
+            dps,
+            dtype,
+            policy.effective_pad_to,
+            pad_value,
+            frozen_kwargs,
+            policy.chosen_backend,
+        )
+        compiled_this_call = compile_key not in seen_compile_keys
+        seen_compile_keys.add(compile_key)
+        compiled = _interval_batch_bound_jit_fn(
+            name,
+            mode,
+            prec_bits,
+            dps,
+            dtype,
+            policy.effective_pad_to,
+            pad_value,
+            frozen_kwargs,
+        )
+        placed_args = _place_args_on_backend(args, policy.chosen_backend)
+        out = compiled(*placed_args)
+        wrapped.last_diagnostics = IntervalBatchCallDiagnostics(
+            name,
+            policy.requested_backend,
+            policy.chosen_backend,
+            policy.batch_size,
+            policy.dtype,
+            policy.mode,
+            policy.prec_bits,
+            policy.dps,
+            policy.pad_to,
+            policy.shape_bucket_multiple,
+            policy.effective_pad_to,
+            policy.chunk_size,
+            jit_enabled=True,
+            compiled_this_call=compiled_this_call,
+            prewarmed=getattr(wrapped, "_prewarmed", False),
+        )
+        return out
+
+    def diagnostics(*args):
+        policy = _interval_batch_policy_for_args(
+            args,
+            dtype=dtype,
+            mode=mode,
+            prec_bits=prec_bits,
+            dps=dps,
+            backend=requested_backend,
+            pad_to=pad_to,
+            shape_bucket_multiple=shape_bucket_multiple,
+            chunk_size=None,
+            min_gpu_batch_size=min_gpu_batch_size,
+            prewarm=prewarm,
+        )
+        compile_key = (
+            name,
+            mode,
+            prec_bits,
+            dps,
+            dtype,
+            policy.effective_pad_to,
+            pad_value,
+            frozen_kwargs,
+            policy.chosen_backend,
+        )
+        return IntervalBatchCallDiagnostics(
+            name,
+            policy.requested_backend,
+            policy.chosen_backend,
+            policy.batch_size,
+            policy.dtype,
+            policy.mode,
+            policy.prec_bits,
+            policy.dps,
+            policy.pad_to,
+            policy.shape_bucket_multiple,
+            policy.effective_pad_to,
+            policy.chunk_size,
+            jit_enabled=True,
+            compiled_this_call=compile_key not in seen_compile_keys,
+            prewarmed=getattr(wrapped, "_prewarmed", False),
         )
 
+    wrapped.policy = lambda batch_size=None: choose_interval_batch_policy(
+        batch_size=batch_size,
+        dtype=dtype,
+        mode=mode,
+        prec_bits=prec_bits,
+        dps=dps,
+        backend=requested_backend,
+        pad_to=pad_to,
+        shape_bucket_multiple=shape_bucket_multiple,
+        chunk_size=None,
+        min_gpu_batch_size=min_gpu_batch_size,
+        prewarm=prewarm,
+    )
+    wrapped.diagnostics = diagnostics
+    wrapped.last_diagnostics = None
+    wrapped._prewarmed = False
+    if prewarm:
+        _prewarm_interval_batch_binding(
+            wrapped,
+            name=name,
+            mode=mode,
+            prec_bits=prec_bits,
+            dps=dps,
+            dtype=dtype,
+            pad_to=pad_to,
+            shape_bucket_multiple=shape_bucket_multiple,
+            backend=requested_backend,
+            min_gpu_batch_size=min_gpu_batch_size,
+        )
+        wrapped._prewarmed = True
+
+    return wrapped
+
+
+def bind_interval_batch_with_diagnostics(
+    name: str,
+    mode: str = "basic",
+    prec_bits: int | None = None,
+    dps: int | None = None,
+    dtype: str | jnp.dtype | None = None,
+    pad_to: int | None = None,
+    shape_bucket_multiple: int | None = None,
+    pad_value: float | complex = 0.0,
+    chunk_size: int | None = None,
+    backend: str = "auto",
+    min_gpu_batch_size: int = 2048,
+    prewarm: bool = False,
+    **bound_kwargs,
+) -> Callable:
+    bound = bind_interval_batch(
+        name,
+        mode=mode,
+        prec_bits=prec_bits,
+        dps=dps,
+        dtype=dtype,
+        pad_to=pad_to,
+        shape_bucket_multiple=shape_bucket_multiple,
+        pad_value=pad_value,
+        chunk_size=chunk_size,
+        backend=backend,
+        min_gpu_batch_size=min_gpu_batch_size,
+        prewarm=prewarm,
+        **bound_kwargs,
+    )
+
+    def wrapped(*args):
+        return bound(*args), bound.last_diagnostics
+
+    wrapped.policy = bound.policy
+    wrapped.diagnostics = bound.diagnostics
+    return wrapped
+
+
+def bind_interval_batch_jit_with_diagnostics(
+    name: str,
+    mode: str = "basic",
+    prec_bits: int | None = None,
+    dps: int | None = None,
+    dtype: str | jnp.dtype | None = None,
+    pad_to: int | None = None,
+    shape_bucket_multiple: int | None = None,
+    pad_value: float | complex = 0.0,
+    backend: str = "auto",
+    min_gpu_batch_size: int = 2048,
+    prewarm: bool = False,
+    **bound_kwargs,
+) -> Callable:
+    bound = bind_interval_batch_jit(
+        name,
+        mode=mode,
+        prec_bits=prec_bits,
+        dps=dps,
+        dtype=dtype,
+        pad_to=pad_to,
+        shape_bucket_multiple=shape_bucket_multiple,
+        pad_value=pad_value,
+        backend=backend,
+        min_gpu_batch_size=min_gpu_batch_size,
+        prewarm=prewarm,
+        **bound_kwargs,
+    )
+
+    def wrapped(*args):
+        return bound(*args), bound.last_diagnostics
+
+    wrapped.policy = bound.policy
+    wrapped.diagnostics = bound.diagnostics
     return wrapped
 
 
@@ -2262,6 +3145,228 @@ def _point_batch_fn_with_static_kwargs(name: str, frozen_kwargs):
 
 
 @lru_cache(maxsize=None)
+def _point_batch_bound_jit_fn(
+    name: str,
+    dtype: str | jnp.dtype | None,
+    pad_to: int | None,
+    pad_value: float | complex,
+    frozen_kwargs,
+):
+    kwargs = _thaw_static_kwargs(frozen_kwargs)
+
+    @jax.jit
+    def _compiled(*vals):
+        return eval_point_batch(
+            name,
+            *vals,
+            dtype=dtype,
+            pad_to=pad_to,
+            pad_value=pad_value,
+            **kwargs,
+        )
+
+    return _compiled
+
+
+@lru_cache(maxsize=None)
+def _interval_batch_bound_jit_fn(
+    name: str,
+    mode: str,
+    prec_bits: int | None,
+    dps: int | None,
+    dtype: str | jnp.dtype | None,
+    pad_to: int | None,
+    pad_value: float | complex,
+    frozen_kwargs,
+):
+    kwargs = _thaw_static_kwargs(frozen_kwargs)
+
+    @jax.jit
+    def _compiled(*vals):
+        return eval_interval_batch(
+            name,
+            *vals,
+            mode=mode,
+            prec_bits=prec_bits,
+            dps=dps,
+            dtype=dtype,
+            pad_to=pad_to,
+            pad_value=pad_value,
+            **kwargs,
+        )
+
+    return _compiled
+
+
+_CORE_SCALAR_PREWARM_DEFAULTS: tuple[str, ...] = (
+    "arf_add",
+    "fmpr_mul",
+    "acf_mul",
+    "fmpzi_add",
+    "arb_fpwrap_double_exp",
+)
+
+_INTERVAL_MODE_PREWARM_DEFAULTS: tuple[tuple[str, str], ...] = (
+    ("arb_add", "basic"),
+    ("arb_exp", "rigorous"),
+    ("acb_exp", "rigorous"),
+)
+
+
+def _dummy_point_batch_args(name: str, batch_size: int, dtype: str | jnp.dtype | None) -> tuple[object, ...]:
+    float_dtype = _resolve_dtype_for_args(tuple(()), dtype)
+    if name.startswith("acf_"):
+        complex_dtype = _COMPLEX_BY_FLOAT_DTYPE[float_dtype]
+        x = jnp.linspace(0.1, 1.0, batch_size, dtype=float_dtype).astype(complex_dtype)
+        y = jnp.linspace(1.0, 2.0, batch_size, dtype=float_dtype).astype(complex_dtype)
+        return (x + 0.1j, y - 0.2j)
+    if name.startswith("fmpzi_"):
+        base = jnp.arange(batch_size, dtype=jnp.int64)
+        a = jnp.stack([base, base + 2], axis=-1)
+        b = jnp.stack([base + 1, base + 3], axis=-1)
+        return (a, b)
+    x = jnp.linspace(0.1, 1.0, batch_size, dtype=float_dtype)
+    if name in {"arb_fpwrap_double_exp", "arb_fpwrap_cdouble_log", "arb_fpwrap_double_log"} or name.endswith(("_exp", "_log", "_sqrt")):
+        return (x,)
+    return (x, x)
+
+
+def _dummy_interval_batch_args(
+    name: str,
+    batch_size: int,
+    dtype: str | jnp.dtype | None,
+) -> tuple[object, ...]:
+    float_dtype = _resolve_dtype_for_args(tuple(()), dtype)
+    x = jnp.linspace(0.1, 1.0, batch_size, dtype=float_dtype)
+    y = jnp.linspace(1.0, 2.0, batch_size, dtype=float_dtype)
+    if name.startswith("acb_"):
+        re_x = di.interval(x, x + 0.01)
+        im_x = di.interval(0.1 * x, 0.1 * x + 0.01)
+        z = acb_core.acb_box(re_x, im_x)
+        if name in {"acb_exp", "acb_log", "acb_sqrt", "acb_sin", "acb_cos", "acb_tan"}:
+            return (z,)
+        return (z, z)
+    xv = di.interval(x, x + 0.01)
+    yv = di.interval(y, y + 0.01)
+    if name in {"arb_exp", "arb_log", "arb_sqrt", "arb_sin", "arb_cos", "arb_tan"}:
+        return (xv,)
+    return (xv, yv)
+
+
+def _prewarm_point_batch_binding(
+    fn: Callable,
+    *,
+    name: str,
+    dtype: str | jnp.dtype | None,
+    pad_to: int | None,
+    shape_bucket_multiple: int | None,
+    backend: str,
+    min_gpu_batch_size: int,
+) -> None:
+    sample_n = int(pad_to or shape_bucket_multiple or 8)
+    args = _dummy_point_batch_args(name, sample_n, dtype)
+    policy = _point_batch_policy_for_args(
+        args,
+        dtype=dtype,
+        backend=backend,
+        pad_to=pad_to,
+        shape_bucket_multiple=shape_bucket_multiple,
+        chunk_size=None,
+        min_gpu_batch_size=min_gpu_batch_size,
+        prewarm=True,
+    )
+    placed_args = _place_args_on_backend(args, policy.chosen_backend)
+    fn(*placed_args)
+
+
+def _prewarm_interval_batch_binding(
+    fn: Callable,
+    *,
+    name: str,
+    mode: str,
+    prec_bits: int | None,
+    dps: int | None,
+    dtype: str | jnp.dtype | None,
+    pad_to: int | None,
+    shape_bucket_multiple: int | None,
+    backend: str,
+    min_gpu_batch_size: int,
+) -> None:
+    sample_n = int(pad_to or shape_bucket_multiple or 8)
+    args = _dummy_interval_batch_args(name, sample_n, dtype)
+    policy = _interval_batch_policy_for_args(
+        args,
+        dtype=dtype,
+        mode=mode,
+        prec_bits=prec_bits,
+        dps=dps,
+        backend=backend,
+        pad_to=pad_to,
+        shape_bucket_multiple=shape_bucket_multiple,
+        chunk_size=None,
+        min_gpu_batch_size=min_gpu_batch_size,
+        prewarm=True,
+    )
+    placed_args = _place_args_on_backend(args, policy.chosen_backend)
+    fn(*placed_args)
+
+
+def prewarm_core_point_kernels(
+    names: tuple[str, ...] | None = None,
+    *,
+    dtype: str | jnp.dtype | None = "float64",
+    backend: str = "auto",
+    batch_size: int = 1024,
+    shape_bucket_multiple: int | None = 128,
+    min_gpu_batch_size: int = 2048,
+) -> dict[str, PointBatchCallDiagnostics]:
+    chosen_names = _CORE_SCALAR_PREWARM_DEFAULTS if names is None else tuple(names)
+    out: dict[str, PointBatchCallDiagnostics] = {}
+    for name in chosen_names:
+        bound = bind_point_batch_jit(
+            name,
+            dtype=dtype,
+            shape_bucket_multiple=shape_bucket_multiple,
+            backend=backend,
+            min_gpu_batch_size=min_gpu_batch_size,
+        )
+        args = _dummy_point_batch_args(name, batch_size, dtype)
+        bound(*args)
+        out[name] = bound.last_diagnostics
+    return out
+
+
+def prewarm_interval_mode_kernels(
+    names: tuple[tuple[str, str], ...] | None = None,
+    *,
+    dtype: str | jnp.dtype | None = "float64",
+    prec_bits: int | None = 53,
+    dps: int | None = None,
+    backend: str = "auto",
+    batch_size: int = 256,
+    shape_bucket_multiple: int | None = 64,
+    min_gpu_batch_size: int = 512,
+) -> dict[str, IntervalBatchCallDiagnostics]:
+    chosen = _INTERVAL_MODE_PREWARM_DEFAULTS if names is None else tuple(names)
+    out: dict[str, IntervalBatchCallDiagnostics] = {}
+    for name, mode in chosen:
+        bound = bind_interval_batch_jit(
+            name,
+            mode=mode,
+            prec_bits=prec_bits,
+            dps=dps,
+            dtype=dtype,
+            shape_bucket_multiple=shape_bucket_multiple,
+            backend=backend,
+            min_gpu_batch_size=min_gpu_batch_size,
+        )
+        args = _dummy_interval_batch_args(name, batch_size, dtype)
+        bound(*args)
+        out[f"{name}:{mode}"] = bound.last_diagnostics
+    return out
+
+
+@lru_cache(maxsize=None)
 def _interval_jit_fn(name: str, mode: str, prec_bits: int | None, dps: int | None):
     fn = _bound_interval_fn(name, mode, prec_bits, dps)
     if _is_host_point_backend(name):
@@ -2335,12 +3440,21 @@ __all__ = [
     "incomplete_bessel_k_lower_limit_derivative",
     "bind_point",
     "bind_point_batch",
+    "bind_point_batch_with_diagnostics",
     "bind_point_batch_jit",
+    "bind_point_batch_jit_with_diagnostics",
     "bind_interval",
     "bind_point_jit",
     "bind_interval_jit",
     "bind_point_ad",
     "bind_interval_batch",
+    "bind_interval_batch_with_diagnostics",
+    "bind_interval_batch_jit",
+    "bind_interval_batch_jit_with_diagnostics",
+    "choose_point_batch_policy",
+    "choose_interval_batch_policy",
+    "prewarm_core_point_kernels",
+    "prewarm_interval_mode_kernels",
     "list_public_functions",
     "list_point_functions",
     "list_interval_functions",
@@ -2348,6 +3462,10 @@ __all__ = [
     "list_public_function_metadata",
     "render_public_function_metadata_json",
     "PublicFunctionMetadata",
+    "PointBatchPolicy",
+    "PointBatchCallDiagnostics",
+    "IntervalBatchPolicy",
+    "IntervalBatchCallDiagnostics",
     "TailDerivativeMetadata",
     "TailEvaluationDiagnostics",
     "TailIntegralProblem",

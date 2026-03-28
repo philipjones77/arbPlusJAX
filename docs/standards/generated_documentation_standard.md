@@ -19,6 +19,10 @@ across:
 Those specialized standards still define audience and content. This document
 defines the shared generation rule.
 
+The shared generation rule is intended to be reusable across documentation-heavy
+JAX libraries. arbPlusJAX then specializes it through its current docs tree,
+generators, and freshness tests.
+
 ## Generated Surface Rule
 
 The following surfaces should be generated rather than maintained by hand:

@@ -15,6 +15,7 @@ Policy:
 | [docs/reports/alternative_functions.md](/docs/reports/alternative_functions.md) | `generated` | `python tools/function_provenance_report.py` |
 | [docs/reports/api_cold_path_inventory.md](/docs/reports/api_cold_path_inventory.md) | `generated` | `python tools/api_cold_path_report.py` |
 | [docs/reports/api_first_use_inventory.md](/docs/reports/api_first_use_inventory.md) | `generated` | `python tools/api_first_use_report.py` |
+| [docs/reports/api_surface_structure.md](/docs/reports/api_surface_structure.md) | `generated` | `python tools/api_surface_structure_report.py` |
 | [docs/reports/arb_like_functions.md](/docs/reports/arb_like_functions.md) | `generated` | `python tools/function_provenance_report.py` |
 | [docs/reports/benchmark_group_inventory.md](/docs/reports/benchmark_group_inventory.md) | `manual-authoritative` | `update the benchmark taxonomy/inventory doc when benchmark group ownership changes` |
 | [docs/reports/cache_aware_surface_inventory.md](/docs/reports/cache_aware_surface_inventory.md) | `generated` | `python tools/cache_aware_surface_report.py` |
@@ -46,10 +47,15 @@ Policy:
 | [docs/reports/report_status_refresh_inventory.md](/docs/reports/report_status_refresh_inventory.md) | `generated` | `python tools/report_status_refresh_inventory.py` |
 | [docs/reports/special_function_status.md](/docs/reports/special_function_status.md) | `generated` | `python tools/special_function_status_report.py` |
 | [docs/status/README.md](/docs/status/README.md) | `generated` | `python tools/generate_docs_indexes.py` |
+| [docs/status/api_runtime_todo.md](/docs/status/api_runtime_todo.md) | `manual-authoritative` | `update the owning source document directly` |
 | [docs/status/audit.md](/docs/status/audit.md) | `manual-authoritative` | `rerun the audit workflow and refresh the checked-in audit snapshot` |
+| [docs/status/cross_cutting_todo.md](/docs/status/cross_cutting_todo.md) | `manual-authoritative` | `update the owning source document directly` |
+| [docs/status/curvature_todo.md](/docs/status/curvature_todo.md) | `manual-authoritative` | `update the owning source document directly` |
 | [docs/status/matrix_free_completion_plan.md](/docs/status/matrix_free_completion_plan.md) | `manual-authoritative` | `update when matrix-free/operator completion planning changes` |
 | [docs/status/point_fast_jax_plan.md](/docs/status/point_fast_jax_plan.md) | `manual-authoritative` | `update the owning source document directly` |
 | [docs/status/sparse_completion_plan.md](/docs/status/sparse_completion_plan.md) | `manual-authoritative` | `update when sparse/block/vblock completion planning changes` |
+| [docs/status/special_functions_todo.md](/docs/status/special_functions_todo.md) | `manual-authoritative` | `update the owning source document directly` |
 | [docs/status/test_coverage_matrix.md](/docs/status/test_coverage_matrix.md) | `manual-authoritative` | `update when the category model or primary test ownership changes` |
 | [docs/status/test_gap_checklist.md](/docs/status/test_gap_checklist.md) | `manual-authoritative` | `update when direct-owner test coverage lands or gaps move` |
+| [docs/status/theory_todo.md](/docs/status/theory_todo.md) | `manual-authoritative` | `update the owning source document directly` |
 | [docs/status/todo.md](/docs/status/todo.md) | `manual-authoritative` | `update when implementation status or active backlog changes` |

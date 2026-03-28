@@ -19,6 +19,7 @@ def main() -> None:
     _run([PYTHON, "tools/cache_aware_surface_report.py"])
     _run([PYTHON, "tools/comparison_backend_defaults_report.py"])
     _run([PYTHON, "tools/api_cold_path_report.py"])
+    _run([PYTHON, "tools/api_surface_structure_report.py"])
     _run([PYTHON, "tools/api_first_use_report.py"])
     _run([PYTHON, "tools/entry_script_startup_report.py"])
     _run([PYTHON, "tools/matrix_free_first_use_report.py"])
@@ -44,6 +45,7 @@ def main() -> None:
             "tests/test_function_provenance_reports.py",
             "tests/test_comparison_backend_defaults.py",
             "tests/test_api_cold_path_report.py",
+            "tests/test_api_surface_structure_report.py",
             "tests/test_api_first_use_report.py",
             "tests/test_entry_script_startup_report.py",
             "tests/test_matrix_free_first_use_report.py",

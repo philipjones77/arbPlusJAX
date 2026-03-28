@@ -62,3 +62,125 @@ def test_core_scalar_service_binders_are_safe_for_repeated_calls():
         out = bound(real)
         assert out.shape == real.shape
         assert jnp.allclose(out, expected)
+
+
+def test_core_scalar_service_shape_bucket_binder_matches_eval_point_batch_for_varying_lengths():
+    bound = api.bind_point_batch("arf_add", dtype="float32", shape_bucket_multiple=8)
+
+    x5 = jnp.linspace(0.1, 0.5, 5, dtype=jnp.float32)
+    x7 = jnp.linspace(0.1, 0.7, 7, dtype=jnp.float32)
+
+    out5 = bound(x5, x5)
+    out7 = bound(x7, x7)
+
+    expected5 = api.eval_point_batch("arf_add", x5, x5, dtype="float32", pad_to=8)
+    expected7 = api.eval_point_batch("arf_add", x7, x7, dtype="float32", pad_to=8)
+
+    assert out5.shape == x5.shape
+    assert out7.shape == x7.shape
+    assert jnp.allclose(out5, expected5)
+    assert jnp.allclose(out7, expected7)
+
+
+def test_core_scalar_service_shape_bucket_jit_binder_matches_eval_point_batch_for_varying_lengths():
+    api._point_batch_bound_jit_fn.cache_clear()
+    bound = api.bind_point_batch_jit("arb_fpwrap_double_exp", dtype="float32", shape_bucket_multiple=8)
+
+    x5 = jnp.linspace(0.1, 0.5, 5, dtype=jnp.float32)
+    x7 = jnp.linspace(0.1, 0.7, 7, dtype=jnp.float32)
+
+    out5 = bound(x5)
+    out7 = bound(x7)
+
+    expected5 = api.eval_point_batch("arb_fpwrap_double_exp", x5, dtype="float32", pad_to=8)
+    expected7 = api.eval_point_batch("arb_fpwrap_double_exp", x7, dtype="float32", pad_to=8)
+
+    assert out5.shape == x5.shape
+    assert out7.shape == x7.shape
+    assert jnp.allclose(out5, expected5)
+    assert jnp.allclose(out7, expected7)
+    info = api._point_batch_bound_jit_fn.cache_info()
+    assert info.misses == 1
+
+
+def test_core_scalar_service_policy_helper_chooses_backend_and_effective_pad():
+    policy_small = api.choose_point_batch_policy(
+        batch_size=64,
+        dtype="float32",
+        backend="auto",
+        shape_bucket_multiple=128,
+        min_gpu_batch_size=256,
+    )
+    policy_large = api.choose_point_batch_policy(
+        batch_size=512,
+        dtype="float32",
+        backend="auto",
+        shape_bucket_multiple=128,
+        min_gpu_batch_size=256,
+    )
+
+    assert policy_small.effective_pad_to == 128
+    assert policy_large.effective_pad_to == 512
+    assert policy_small.chosen_backend in {"cpu", "gpu"}
+    assert policy_large.chosen_backend in {"cpu", "gpu"}
+    if "gpu" in api._available_backends():
+        assert policy_small.chosen_backend == "cpu"
+        assert policy_large.chosen_backend == "gpu"
+
+
+def test_core_scalar_service_diagnostics_wrappers_report_backend_and_compile_state():
+    api._point_batch_bound_jit_fn.cache_clear()
+    bound = api.bind_point_batch_jit_with_diagnostics(
+        "arb_fpwrap_double_exp",
+        dtype="float32",
+        shape_bucket_multiple=8,
+        backend="cpu",
+    )
+    x = jnp.linspace(0.1, 0.5, 5, dtype=jnp.float32)
+
+    _, diag1 = bound(x)
+    _, diag2 = bound(x)
+
+    assert diag1.jit_enabled is True
+    assert diag1.chosen_backend == "cpu"
+    assert diag1.effective_pad_to == 8
+    assert diag1.compiled_this_call is True
+    assert diag2.compiled_this_call is False
+
+
+def test_core_scalar_service_bound_callable_exposes_diagnostics_and_policy():
+    bound = api.bind_point_batch(
+        "arf_add",
+        dtype="float32",
+        shape_bucket_multiple=8,
+        backend="cpu",
+    )
+    x = jnp.linspace(0.1, 0.5, 5, dtype=jnp.float32)
+
+    diag_before = bound.diagnostics(x, x)
+    out = bound(x, x)
+    diag_after = bound.last_diagnostics
+    policy = bound.policy(batch_size=5)
+
+    assert out.shape == x.shape
+    assert diag_before.chosen_backend == "cpu"
+    assert diag_before.effective_pad_to == 8
+    assert diag_after.jit_enabled is False
+    assert policy.effective_pad_to == 8
+    assert policy.requested_backend == "cpu"
+
+
+def test_core_scalar_service_prewarm_entrypoint_returns_scalar_family_diagnostics():
+    diagnostics = api.prewarm_core_point_kernels(
+        names=("arf_add", "acf_mul"),
+        dtype="float32",
+        backend="cpu",
+        batch_size=16,
+        shape_bucket_multiple=8,
+        min_gpu_batch_size=128,
+    )
+
+    assert set(diagnostics) == {"arf_add", "acf_mul"}
+    assert diagnostics["arf_add"].chosen_backend == "cpu"
+    assert diagnostics["arf_add"].jit_enabled is True
+    assert diagnostics["acf_mul"].effective_pad_to == 16

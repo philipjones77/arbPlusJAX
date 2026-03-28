@@ -186,6 +186,38 @@ def run_matrix_case(warmup: int, runs: int) -> tuple[dict[str, float], tuple[Ben
     )
 
 
+def run_interval_service_case(warmup: int, runs: int) -> tuple[dict[str, float], tuple[BenchmarkRecord, BenchmarkRecord]]:
+    _load_api_modules()
+    x_mid = jnp.linspace(0.1, 0.5, 5, dtype=jnp.float64)
+    y_mid = jnp.linspace(1.0, 1.4, 5, dtype=jnp.float64)
+    x = di.interval(x_mid, x_mid + 0.01)
+    y = di.interval(y_mid, y_mid + 0.01)
+    x_alt = di.interval(x_mid + 0.05, x_mid + 0.06)
+    y_alt = di.interval(y_mid + 0.05, y_mid + 0.06)
+
+    service = api.bind_interval_batch_jit_with_diagnostics(
+        "arb_add",
+        mode="basic",
+        dtype="float64",
+        shape_bucket_multiple=8,
+        prec_bits=53,
+        backend="auto",
+        min_gpu_batch_size=16,
+    )
+    direct = jax.jit(lambda a, b: api.eval_interval_batch("arb_add", a, b, mode="basic", dtype="float64", pad_to=8, prec_bits=53))
+
+    service_stats = _profile_case(lambda a, b: service(a, b)[0], (x, y), (x_alt, y_alt), warmup=warmup, runs=runs)
+    direct_stats = _profile_case(direct, (x, y), (x_alt, y_alt), warmup=warmup, runs=runs)
+    stats = {
+        "api_interval_service_jit_s": service_stats["warm_time_s"],
+        "api_interval_direct_batch_s": direct_stats["warm_time_s"],
+    }
+    return stats, (
+        _record("arb_add", "interval_service_jit", "float64", service_stats, notes="basic interval service binder with diagnostics/policy"),
+        _record("arb_add", "interval_direct_batch", "float64", direct_stats, notes="direct eval_interval_batch padded path"),
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Benchmark routed public API overhead against direct API calls.")
     parser.add_argument("--warmup", type=int, default=1)
@@ -208,12 +240,15 @@ def main() -> None:
     scalar_stats, scalar_records = run_scalar_case(args.warmup, args.runs)
     incgamma_stats, incgamma_records = run_incomplete_gamma_case(args.warmup, args.runs)
     matrix_stats, matrix_records = run_matrix_case(args.warmup, args.runs)
+    interval_service_stats, interval_service_records = run_interval_service_case(args.warmup, args.runs)
     stats.update(scalar_stats)
     stats.update(incgamma_stats)
     stats.update(matrix_stats)
+    stats.update(interval_service_stats)
     records.extend(scalar_records)
     records.extend(incgamma_records)
     records.extend(matrix_records)
+    records.extend(interval_service_records)
 
     report = BenchmarkReport(
         benchmark_name="benchmark_api_surface.py",

@@ -1,4 +1,4 @@
-Last updated: 2026-03-22T00:00:00Z
+Last updated: 2026-03-28T00:00:00Z
 
 # Core Numeric Scalars Status
 
@@ -16,6 +16,7 @@ It records which families are:
 - covered by parity/reference checks
 - covered by benchmarks
 - covered by canonical examples
+- verified on CPU and GPU for the owned scalar tranche
 
 ## Category Scope
 
@@ -60,7 +61,7 @@ That is the correct production interpretation for the tranche.
 
 ## Completion Criteria
 
-For this category to be treated as complete in the current CPU tranche, the
+For this category to be treated as complete in the current CPU/GPU tranche, the
 repo should have all of the following:
 
 - direct owner tests for each family
@@ -68,11 +69,14 @@ repo should have all of the following:
 - scalar benchmark coverage for helper families
 - scalar comparison coverage for `arb_core` and `acb_core`
 - canonical notebook coverage for scalar/API usage
-- retained runtime/summary artifacts for the CPU notebook run
+- retained runtime/summary artifacts for the CPU and GPU notebook runs
+- CPU and GPU execution of the owned scalar JAX-facing test slice
+- explicit backend-realized performance guidance for when CPU remains the
+  preferred backend versus when GPU is worth using
 
 ## Current Status
 
-Status: `done` for the current CPU tranche.
+Status: `done` for the current CPU/GPU tranche.
 
 Why:
 
@@ -83,8 +87,51 @@ Why:
   artifacts
 - `example_core_scalar_surface.ipynb` is the canonical scalar notebook
 - `example_api_surface.ipynb` provides the routed API companion notebook
-- CPU notebook outputs now retain executed notebooks, manifests, summaries,
-  comparison status, and plots under `examples/outputs/`
+- CPU and GPU notebook outputs now retain executed notebooks, manifests,
+  summaries, comparison status, and plots under `examples/outputs/`
+- the owned scalar CPU parity/owner slice passes:
+  `38 passed, 7 skipped`
+- the owned scalar GPU owner slice passes on CUDA:
+  `38 passed`
+- the current backend-realized result is explicit rather than assumed:
+  CPU remains the default winner for many tiny repeated scalar service calls,
+  while GPU is validated and available for larger repeated batch-heavy scalar
+  workloads
+
+## Current Backend Interpretation
+
+The scalar category is now structurally and operationally closed, but the
+backend conclusion is workload-sensitive.
+
+What is true now:
+
+- CPU and GPU execution are both verified for the owned scalar JAX-facing
+  tranche
+- backend-aware binders, prewarm hooks, diagnostics-bearing binders, and stable
+  shape controls exist on the public scalar service surface
+- canonical CPU and GPU notebooks retain benchmark artifacts, AD plots, and
+  profile summaries
+
+What the current scalar benchmark evidence says:
+
+- CPU is still the preferred default for many tiny scalar service workloads
+- GPU is available and validated, but it is not a universal latency win for
+  these scalar helper kernels
+- padded or batch-heavy raw/API paths can help on GPU, but service-binder
+  overhead and launch/compile cost still matter heavily for small scalar jobs
+
+So this category is complete in the sense of:
+
+- public/API/mode surface present
+- tests/parity/benchmarks/examples retained
+- CPU/GPU verified
+- backend guidance explicit
+
+It is not complete in the sense of:
+
+- GPU must beat CPU for every scalar workload
+
+That stronger claim would be false and is not the repo standard.
 
 ## Canonical Evidence
 
@@ -98,6 +145,7 @@ Primary tests:
 - [test_fmpzi_chassis.py](/tests/test_fmpzi_chassis.py)
 - [test_arb_fpwrap_chassis.py](/tests/test_arb_fpwrap_chassis.py)
 - [test_core_scalar_api_contracts.py](/tests/test_core_scalar_api_contracts.py)
+- [test_core_scalar_service_contracts.py](/tests/test_core_scalar_service_contracts.py)
 
 Parity tests:
 
@@ -123,3 +171,12 @@ Examples:
 
 - [example_core_scalar_surface.ipynb](/examples/example_core_scalar_surface.ipynb)
 - [example_api_surface.ipynb](/examples/example_api_surface.ipynb)
+
+Retained executed artifacts:
+
+- [example_core_scalar_surface_cpu_executed.ipynb](/examples/outputs/example_core_scalar_surface/example_core_scalar_surface_cpu_executed.ipynb)
+- [example_core_scalar_surface_gpu_executed.ipynb](/examples/outputs/example_core_scalar_surface/example_core_scalar_surface_gpu_executed.ipynb)
+- [execution_summary_cpu.json](/examples/outputs/example_core_scalar_surface/execution_summary_cpu.json)
+- [execution_summary_gpu.json](/examples/outputs/example_core_scalar_surface/execution_summary_gpu.json)
+- [benchmark_core_scalar_service_api_cpu_policy_refresh.json](/benchmarks/results/benchmark_core_scalar_service_api/benchmark_core_scalar_service_api_cpu_policy_refresh.json)
+- [benchmark_core_scalar_service_api_gpu_policy_refresh.json](/benchmarks/results/benchmark_core_scalar_service_api/benchmark_core_scalar_service_api_gpu_policy_refresh.json)

@@ -15,6 +15,7 @@ This report records the current high-level repository and documentation-tree map
 - `experiments/`
 - `migration/`
 - `outputs/`
+- `papers/`
 - `src/`
 - `stuff/`
 - `tests/`

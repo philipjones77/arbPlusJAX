@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import inspect
+
 import jax
 import jax.numpy as jnp
 from jax import lax
@@ -13,7 +15,12 @@ from .lazy_jit import lazy_jit
 
 def lazy_jit_decorator(*jit_args, **jit_kwargs):
     def decorate(fn):
-        return lazy_jit(lambda: jax.jit(fn, *jit_args, **jit_kwargs))
+        wrapped = lazy_jit(lambda: jax.jit(fn, *jit_args, **jit_kwargs))
+        wrapped.__wrapped__ = fn
+        wrapped.__signature__ = inspect.signature(fn)
+        wrapped.__name__ = fn.__name__
+        wrapped.__doc__ = fn.__doc__
+        return wrapped
 
     return decorate
 

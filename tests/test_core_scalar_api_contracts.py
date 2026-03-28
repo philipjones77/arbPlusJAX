@@ -1,6 +1,7 @@
 import jax.numpy as jnp
 
 from arbplusjax import api
+from arbplusjax import core_wrappers
 
 
 def test_core_scalar_api_eval_point_routes_representative_scalar_families():
@@ -53,3 +54,17 @@ def test_core_scalar_api_metadata_exposes_public_contract_fields():
         assert meta.family == "core"
         assert isinstance(meta.implementation_options, tuple)
         assert meta.default_implementation in meta.implementation_options
+
+
+def test_core_scalar_mode_wrappers_include_lazy_jitted_complex_precision_exports():
+    # Some `acb_core.*_prec` functions are exposed through a lazy-JIT decorator.
+    # The mode-surface generator must still preserve them as public wrappers.
+    for name in (
+        "acb_abs_mode",
+        "acb_add_mode",
+        "acb_mul_mode",
+        "acb_div_mode",
+        "acb_log1p_mode",
+        "acb_expm1_mode",
+    ):
+        assert hasattr(core_wrappers, name), name

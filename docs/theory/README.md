@@ -18,6 +18,7 @@ Current methodology notes:
 - [matrix_free_operator_methods.md](/docs/theory/matrix_free_operator_methods.md)
 - [matrix_interval_and_modes.md](/docs/theory/matrix_interval_and_modes.md)
 - [point_basic_surface_methodology.md](/docs/theory/point_basic_surface_methodology.md)
+- [repo_theory_overview.md](/docs/theory/repo_theory_overview.md)
 - [sparse_block_vblock_methodology.md](/docs/theory/sparse_block_vblock_methodology.md)
 - [sparse_selected_inversion_domain_decomposition.md](/docs/theory/sparse_selected_inversion_domain_decomposition.md)
 - [sparse_symmetric_leja_hutchpp_logdet.md](/docs/theory/sparse_symmetric_leja_hutchpp_logdet.md)

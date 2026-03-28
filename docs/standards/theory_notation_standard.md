@@ -16,6 +16,17 @@ This standard consolidates two related concerns:
 - what a methodology note must contain
 - how mathematical notation is kept stable across docs, code, and examples
 
+The generic rule is reusable:
+
+- JAX libraries with substantial mathematical content should separate theory,
+  notation, implementation, and status
+
+The arbPlusJAX specialization is:
+
+- point/basic/adaptive/rigorous terminology
+- diagnostics payload notation
+- matrix/dense/sparse/matrix-free/curvature terminology
+
 ## Theory Placement Rule
 
 Put a document in `docs/theory/` when the main question is:

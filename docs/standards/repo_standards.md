@@ -18,10 +18,16 @@ It owns:
   `docs/governance/documentation_governance.md`
 - what is allowed at the repo root as stable top-level governance material
 - the role and placement of repo-level checked-in configuration under `configs/`
+- the role and placement of long-form manuscript projects under `papers/`
 - the intended purpose of `AGENTS.md` when present
 - the target internal package decomposition beneath the stable package-root API
 
 This is the canonical repo-level communication and placement standard.
+
+It is intentionally more repo-specific than the general JAX runtime standards.
+The reusable layer is the communication-surface split itself; the concrete
+repo-root files, docs-tree layout, and package decomposition listed here are
+arbPlusJAX specializations of that broader pattern.
 
 ## Repo-Root Communication Surfaces
 
@@ -139,6 +145,7 @@ Allowed stable repo-root structural directories include:
 - `contracts/`
 - `outputs/`
 - `data/`
+- `papers/`
 
 Do not casually add new repo-root prose files when the content actually belongs
 under `docs/`.
@@ -159,6 +166,36 @@ clear.
 See
 [configuration_standard.md](/docs/standards/configuration_standard.md)
 for the detailed configuration policy.
+
+## `papers/` Rule
+
+If the repository maintains publication-grade LaTeX manuscripts, the canonical
+home is:
+
+- `papers/`
+
+`papers/` should contain:
+
+- standalone manuscript projects
+- paper-specific figures, bibliography files, and build helpers
+- long-form publication text that needs a real LaTeX paper structure
+
+`papers/` should not replace the docs tree.
+
+The governing split is:
+
+- `docs/`
+  - Markdown-first repo documentation, standards, theory, implementation,
+    practical guidance, reports, and status
+- `papers/`
+  - publication-facing LaTeX manuscripts built from or informed by the
+    stabilized docs/runtime surface
+
+This is the intended correct repo structure:
+
+- active documentation and development explanation stays in `docs/`
+- paper/manuscript production stays in `papers/`
+- `papers/` supplements the docs tree; it does not replace it
 
 ## License And Notice Rule
 

@@ -1,6 +1,6 @@
 [
   {
-    "compile_ms": 116.40301700003874,
+    "compile_ms": 507.54953999967256,
     "device_memory_delta_mb": null,
     "diagnostics_enabled": false,
     "hlo": null,
@@ -9,12 +9,12 @@
     "jaxpr_error": null,
     "name": "arb_dense_matvec_cached_apply",
     "peak_rss_delta_mb": 0.0,
-    "recompile_new_shape_ms": 113.60466299998961,
-    "steady_ms_median": 0.2919319999818981,
-    "steady_ms_p95": 0.2919319999818981
+    "recompile_new_shape_ms": 289.03166400050395,
+    "steady_ms_median": 0.36989699947298504,
+    "steady_ms_p95": 0.36989699947298504
   },
   {
-    "compile_ms": 167.58938599997464,
+    "compile_ms": 598.9356480004062,
     "device_memory_delta_mb": null,
     "diagnostics_enabled": false,
     "hlo": null,
@@ -23,12 +23,12 @@
     "jaxpr_error": null,
     "name": "acb_dense_matvec_cached_apply",
     "peak_rss_delta_mb": 0.0,
-    "recompile_new_shape_ms": 169.8082269999759,
-    "steady_ms_median": 0.22653100000979975,
-    "steady_ms_p95": 0.22653100000979975
+    "recompile_new_shape_ms": 594.00956600075,
+    "steady_ms_median": 0.96018499971251,
+    "steady_ms_p95": 0.96018499971251
   },
   {
-    "compile_ms": 37.71794800002226,
+    "compile_ms": 94.44060399982845,
     "device_memory_delta_mb": null,
     "diagnostics_enabled": false,
     "hlo": null,
@@ -37,12 +37,12 @@
     "jaxpr_error": null,
     "name": "srb_sparse_matvec_point",
     "peak_rss_delta_mb": 0.0,
-    "recompile_new_shape_ms": 33.93379900001037,
-    "steady_ms_median": 0.04692800001748765,
-    "steady_ms_p95": 0.04692800001748765
+    "recompile_new_shape_ms": 98.97774899945944,
+    "steady_ms_median": 0.07910599924798589,
+    "steady_ms_p95": 0.07910599924798589
   },
   {
-    "compile_ms": 49.878642999999556,
+    "compile_ms": 161.59311800038267,
     "device_memory_delta_mb": null,
     "diagnostics_enabled": false,
     "hlo": null,
@@ -51,12 +51,12 @@
     "jaxpr_error": null,
     "name": "jrb_operator_apply_point",
     "peak_rss_delta_mb": 0.0,
-    "recompile_new_shape_ms": 57.41051699999389,
-    "steady_ms_median": 0.05987699995557705,
-    "steady_ms_p95": 0.05987699995557705
+    "recompile_new_shape_ms": 207.68092400066962,
+    "steady_ms_median": 0.09626500104786828,
+    "steady_ms_p95": 0.09626500104786828
   },
   {
-    "compile_ms": 359.3425259999776,
+    "compile_ms": 1515.1595799998177,
     "device_memory_delta_mb": null,
     "diagnostics_enabled": false,
     "hlo": null,
@@ -65,12 +65,12 @@
     "jaxpr_error": null,
     "name": "jrb_logdet_slq_point",
     "peak_rss_delta_mb": 0.0,
-    "recompile_new_shape_ms": 217.2578960000351,
-    "steady_ms_median": 0.1948309999875164,
-    "steady_ms_p95": 0.1948309999875164
+    "recompile_new_shape_ms": 738.6129540009279,
+    "steady_ms_median": 0.6058229992049746,
+    "steady_ms_p95": 0.6058229992049746
   },
   {
-    "compile_ms": 60.549553999976524,
+    "compile_ms": 192.2947839993867,
     "device_memory_delta_mb": null,
     "diagnostics_enabled": false,
     "hlo": null,
@@ -79,12 +79,12 @@
     "jaxpr_error": null,
     "name": "jcb_operator_apply_point",
     "peak_rss_delta_mb": 0.0,
-    "recompile_new_shape_ms": 63.342174000013074,
-    "steady_ms_median": 0.042201999974622595,
-    "steady_ms_p95": 0.042201999974622595
+    "recompile_new_shape_ms": 200.37950199912302,
+    "steady_ms_median": 0.09477300045546144,
+    "steady_ms_p95": 0.09477300045546144
   },
   {
-    "compile_ms": 363.47444099999393,
+    "compile_ms": 1079.3917310002143,
     "device_memory_delta_mb": null,
     "diagnostics_enabled": false,
     "hlo": null,
@@ -93,12 +93,12 @@
     "jaxpr_error": null,
     "name": "jcb_logdet_slq_point",
     "peak_rss_delta_mb": 0.0,
-    "recompile_new_shape_ms": 297.591892000014,
-    "steady_ms_median": 0.2473650000069938,
-    "steady_ms_p95": 0.2473650000069938
+    "recompile_new_shape_ms": 1431.875377000324,
+    "steady_ms_median": 0.6442850008170353,
+    "steady_ms_p95": 0.6442850008170353
   },
   {
-    "compile_ms": 262.77275099999997,
+    "compile_ms": 2258.244929000284,
     "device_memory_delta_mb": null,
     "diagnostics_enabled": false,
     "hlo": null,
@@ -107,8 +107,8 @@
     "jaxpr_error": null,
     "name": "jcb_sparse_logdet_slq_point",
     "peak_rss_delta_mb": 0.0,
-    "recompile_new_shape_ms": 0.11553899997807093,
-    "steady_ms_median": 0.13427000004639922,
-    "steady_ms_p95": 0.13427000004639922
+    "recompile_new_shape_ms": 0.9576570009812713,
+    "steady_ms_median": 6.218025999260135,
+    "steady_ms_p95": 6.218025999260135
   }
 ]

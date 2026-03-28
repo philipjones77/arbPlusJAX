@@ -1,0 +1,35 @@
+{
+  "timestamp_utc": "2026-03-28T10:51:01Z",
+  "repo_root": "/home/phili/projects/arbplusJAX",
+  "environment_kind": "wsl",
+  "os": {
+    "system": "Linux",
+    "release": "6.6.87.2-microsoft-standard-WSL2",
+    "version": "#1 SMP PREEMPT_DYNAMIC Thu Jun  5 18:30:46 UTC 2025",
+    "machine": "x86_64",
+    "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39"
+  },
+  "python": {
+    "executable": "/home/phili/miniforge3/envs/jax/bin/python",
+    "version": "3.12.12"
+  },
+  "git": {
+    "commit": "ec6227c42b6c055115d746c0fe970e18c2a0e067"
+  },
+  "jax": {
+    "requested_mode": "cuda",
+    "available": true,
+    "backend": "gpu",
+    "devices": [
+      "cuda:0"
+    ],
+    "jax_enable_x64": true
+  },
+  "env": {
+    "JAX_PLATFORMS": "cuda",
+    "XLA_PYTHON_CLIENT_PREALLOCATE": "",
+    "XLA_PYTHON_CLIENT_MEM_FRACTION": "",
+    "ARB_C_REF_DIR": "",
+    "PYTHONPATH": "/home/phili/projects/arbplusJAX/src:/home/phili/projects/arbplusJAX/src:/home/phili/projects/arbplusJAX/src:"
+  }
+}

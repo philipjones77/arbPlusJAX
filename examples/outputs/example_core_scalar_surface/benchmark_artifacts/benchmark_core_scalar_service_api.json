@@ -1,0 +1,2474 @@
+{
+  "benchmark_name": "benchmark_core_scalar_service_api.py",
+  "category": "scalar",
+  "concern": "service_api_speed",
+  "environment": {
+    "env": {
+      "ARB_C_REF_DIR": "",
+      "JAX_PLATFORMS": "cuda",
+      "PYTHONPATH": "/home/phili/projects/arbplusJAX/src:/home/phili/projects/arbplusJAX/src:",
+      "XLA_PYTHON_CLIENT_MEM_FRACTION": "",
+      "XLA_PYTHON_CLIENT_PREALLOCATE": ""
+    },
+    "environment_kind": "wsl",
+    "git": {
+      "commit": "ec6227c42b6c055115d746c0fe970e18c2a0e067"
+    },
+    "jax": {
+      "available": true,
+      "backend": "gpu",
+      "devices": [
+        "cuda:0"
+      ],
+      "jax_enable_x64": true,
+      "requested_mode": "auto"
+    },
+    "os": {
+      "machine": "x86_64",
+      "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+      "release": "6.6.87.2-microsoft-standard-WSL2",
+      "system": "Linux",
+      "version": "#1 SMP PREEMPT_DYNAMIC Thu Jun  5 18:30:46 UTC 2025"
+    },
+    "python": {
+      "executable": "/home/phili/miniforge3/envs/jax/bin/python",
+      "version": "3.12.12"
+    },
+    "repo_root": "/home/phili/projects/arbplusJAX",
+    "timestamp_utc": "2026-03-28T10:53:19Z"
+  },
+  "notes": "Repeated-call public API benchmark for the core numeric scalar helper families, including padded, bucketed, backend-aware, and optional prewarmed service use.",
+  "records": [
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_core_scalar_service_api.py",
+      "category": "scalar",
+      "cold_time_s": 0.07537722999950347,
+      "concern": "service_api_speed",
+      "device": "gpu",
+      "dtype": "float32",
+      "implementation": "service_api_unpadded",
+      "measurements": [
+        {
+          "name": "samples",
+          "notes": "",
+          "unit": "rows",
+          "value": 4099
+        },
+        {
+          "name": "pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 0
+        },
+        {
+          "name": "shape_bucket_multiple",
+          "notes": "",
+          "unit": "rows",
+          "value": 0
+        },
+        {
+          "name": "chosen_backend",
+          "notes": "",
+          "unit": "name",
+          "value": "gpu"
+        },
+        {
+          "name": "requested_backend",
+          "notes": "",
+          "unit": "name",
+          "value": "gpu"
+        },
+        {
+          "name": "effective_pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 0
+        },
+        {
+          "name": "min_gpu_batch_size",
+          "notes": "",
+          "unit": "rows",
+          "value": 2048
+        },
+        {
+          "name": "iterations",
+          "notes": "",
+          "unit": "calls",
+          "value": 3
+        },
+        {
+          "name": "p50_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.0008134830004564719
+        },
+        {
+          "name": "p95_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.0037077029999636577
+        },
+        {
+          "name": "p99_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.003964966999919852
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Public API service-style repeated-call benchmark through api.bind_point_batch with explicit backend and stable-shape policy.",
+      "operation": "arf_add",
+      "python_overhead_s": null,
+      "recompile_time_s": 0.0431128379987058,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.0018292709998301386
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_core_scalar_service_api.py",
+      "category": "scalar",
+      "cold_time_s": 0.24702899099975184,
+      "concern": "service_api_speed",
+      "device": "gpu",
+      "dtype": "float32",
+      "implementation": "service_api_padded",
+      "measurements": [
+        {
+          "name": "samples",
+          "notes": "",
+          "unit": "rows",
+          "value": 4099
+        },
+        {
+          "name": "pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 4224
+        },
+        {
+          "name": "shape_bucket_multiple",
+          "notes": "",
+          "unit": "rows",
+          "value": 0
+        },
+        {
+          "name": "chosen_backend",
+          "notes": "",
+          "unit": "name",
+          "value": "gpu"
+        },
+        {
+          "name": "requested_backend",
+          "notes": "",
+          "unit": "name",
+          "value": "gpu"
+        },
+        {
+          "name": "effective_pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 4224
+        },
+        {
+          "name": "min_gpu_batch_size",
+          "notes": "",
+          "unit": "rows",
+          "value": 2048
+        },
+        {
+          "name": "iterations",
+          "notes": "",
+          "unit": "calls",
+          "value": 3
+        },
+        {
+          "name": "p50_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.0031987210004444933
+        },
+        {
+          "name": "p95_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.0036108535003222643
+        },
+        {
+          "name": "p99_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.0036474875003113996
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Public API service-style repeated-call benchmark through api.bind_point_batch with explicit backend and stable-shape policy.",
+      "operation": "arf_add",
+      "python_overhead_s": null,
+      "recompile_time_s": 0.12532007299887482,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.0031583893335967637
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_core_scalar_service_api.py",
+      "category": "scalar",
+      "cold_time_s": 0.00477397199938423,
+      "concern": "service_api_speed",
+      "device": "gpu",
+      "dtype": "float32",
+      "implementation": "service_api_bucketed",
+      "measurements": [
+        {
+          "name": "samples",
+          "notes": "",
+          "unit": "rows",
+          "value": 4099
+        },
+        {
+          "name": "pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 0
+        },
+        {
+          "name": "shape_bucket_multiple",
+          "notes": "",
+          "unit": "rows",
+          "value": 128
+        },
+        {
+          "name": "chosen_backend",
+          "notes": "",
+          "unit": "name",
+          "value": "gpu"
+        },
+        {
+          "name": "requested_backend",
+          "notes": "",
+          "unit": "name",
+          "value": "gpu"
+        },
+        {
+          "name": "effective_pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 4224
+        },
+        {
+          "name": "min_gpu_batch_size",
+          "notes": "",
+          "unit": "rows",
+          "value": 2048
+        },
+        {
+          "name": "iterations",
+          "notes": "",
+          "unit": "calls",
+          "value": 3
+        },
+        {
+          "name": "p50_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.0036677890002465574
+        },
+        {
+          "name": "p95_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.006060430000798078
+        },
+        {
+          "name": "p99_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.006273109200847103
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Public API service-style repeated-call benchmark through api.bind_point_batch with explicit backend and stable-shape policy.",
+      "operation": "arf_add",
+      "python_overhead_s": null,
+      "recompile_time_s": 0.16288034199897083,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.004411642333555695
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_core_scalar_service_api.py",
+      "category": "scalar",
+      "cold_time_s": 0.04778579300000274,
+      "concern": "service_api_speed",
+      "device": "gpu",
+      "dtype": "float32",
+      "implementation": "service_api_unpadded",
+      "measurements": [
+        {
+          "name": "samples",
+          "notes": "",
+          "unit": "rows",
+          "value": 4099
+        },
+        {
+          "name": "pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 0
+        },
+        {
+          "name": "shape_bucket_multiple",
+          "notes": "",
+          "unit": "rows",
+          "value": 0
+        },
+        {
+          "name": "chosen_backend",
+          "notes": "",
+          "unit": "name",
+          "value": "gpu"
+        },
+        {
+          "name": "requested_backend",
+          "notes": "",
+          "unit": "name",
+          "value": "gpu"
+        },
+        {
+          "name": "effective_pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 0
+        },
+        {
+          "name": "min_gpu_batch_size",
+          "notes": "",
+          "unit": "rows",
+          "value": 2048
+        },
+        {
+          "name": "iterations",
+          "notes": "",
+          "unit": "calls",
+          "value": 3
+        },
+        {
+          "name": "p50_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.001561188000778202
+        },
+        {
+          "name": "p95_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.001599309300763707
+        },
+        {
+          "name": "p99_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.0016026978607624187
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Public API service-style repeated-call benchmark through api.bind_point_batch with explicit backend and stable-shape policy.",
+      "operation": "fmpr_mul",
+      "python_overhead_s": null,
+      "recompile_time_s": 0.044621557999562356,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.0012724980006169062
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_core_scalar_service_api.py",
+      "category": "scalar",
+      "cold_time_s": 0.0576142810004967,
+      "concern": "service_api_speed",
+      "device": "gpu",
+      "dtype": "float32",
+      "implementation": "service_api_padded",
+      "measurements": [
+        {
+          "name": "samples",
+          "notes": "",
+          "unit": "rows",
+          "value": 4099
+        },
+        {
+          "name": "pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 4224
+        },
+        {
+          "name": "shape_bucket_multiple",
+          "notes": "",
+          "unit": "rows",
+          "value": 0
+        },
+        {
+          "name": "chosen_backend",
+          "notes": "",
+          "unit": "name",
+          "value": "gpu"
+        },
+        {
+          "name": "requested_backend",
+          "notes": "",
+          "unit": "name",
+          "value": "gpu"
+        },
+        {
+          "name": "effective_pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 4224
+        },
+        {
+          "name": "min_gpu_batch_size",
+          "notes": "",
+          "unit": "rows",
+          "value": 2048
+        },
+        {
+          "name": "iterations",
+          "notes": "",
+          "unit": "calls",
+          "value": 3
+        },
+        {
+          "name": "p50_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.003812680999544682
+        },
+        {
+          "name": "p95_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.005757920299947727
+        },
+        {
+          "name": "p99_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.005930830459983554
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Public API service-style repeated-call benchmark through api.bind_point_batch with explicit backend and stable-shape policy.",
+      "operation": "fmpr_mul",
+      "python_overhead_s": null,
+      "recompile_time_s": 0.0027727730011974927,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.004337014333335294
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_core_scalar_service_api.py",
+      "category": "scalar",
+      "cold_time_s": 0.001977170000827755,
+      "concern": "service_api_speed",
+      "device": "gpu",
+      "dtype": "float32",
+      "implementation": "service_api_bucketed",
+      "measurements": [
+        {
+          "name": "samples",
+          "notes": "",
+          "unit": "rows",
+          "value": 4099
+        },
+        {
+          "name": "pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 0
+        },
+        {
+          "name": "shape_bucket_multiple",
+          "notes": "",
+          "unit": "rows",
+          "value": 128
+        },
+        {
+          "name": "chosen_backend",
+          "notes": "",
+          "unit": "name",
+          "value": "gpu"
+        },
+        {
+          "name": "requested_backend",
+          "notes": "",
+          "unit": "name",
+          "value": "gpu"
+        },
+        {
+          "name": "effective_pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 4224
+        },
+        {
+          "name": "min_gpu_batch_size",
+          "notes": "",
+          "unit": "rows",
+          "value": 2048
+        },
+        {
+          "name": "iterations",
+          "notes": "",
+          "unit": "calls",
+          "value": 3
+        },
+        {
+          "name": "p50_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.00173919899862085
+        },
+        {
+          "name": "p95_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.0018209820005722576
+        },
+        {
+          "name": "p99_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.0018282516007457161
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Public API service-style repeated-call benchmark through api.bind_point_batch with explicit backend and stable-shape policy.",
+      "operation": "fmpr_mul",
+      "python_overhead_s": null,
+      "recompile_time_s": 0.035152353999365005,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.0017656330001045717
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_core_scalar_service_api.py",
+      "category": "scalar",
+      "cold_time_s": 0.04465880099996866,
+      "concern": "service_api_speed",
+      "device": "gpu",
+      "dtype": "float32",
+      "implementation": "service_api_unpadded",
+      "measurements": [
+        {
+          "name": "samples",
+          "notes": "",
+          "unit": "rows",
+          "value": 4099
+        },
+        {
+          "name": "pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 0
+        },
+        {
+          "name": "shape_bucket_multiple",
+          "notes": "",
+          "unit": "rows",
+          "value": 0
+        },
+        {
+          "name": "chosen_backend",
+          "notes": "",
+          "unit": "name",
+          "value": "gpu"
+        },
+        {
+          "name": "requested_backend",
+          "notes": "",
+          "unit": "name",
+          "value": "gpu"
+        },
+        {
+          "name": "effective_pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 0
+        },
+        {
+          "name": "min_gpu_batch_size",
+          "notes": "",
+          "unit": "rows",
+          "value": 2048
+        },
+        {
+          "name": "iterations",
+          "notes": "",
+          "unit": "calls",
+          "value": 3
+        },
+        {
+          "name": "p50_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.00158713800010446
+        },
+        {
+          "name": "p95_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.0016538855998078361
+        },
+        {
+          "name": "p99_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.0016598187197814696
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Public API service-style repeated-call benchmark through api.bind_point_batch with explicit backend and stable-shape policy.",
+      "operation": "arb_fpwrap_double_exp",
+      "python_overhead_s": null,
+      "recompile_time_s": 0.04809775499961688,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.0013308126666136861
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_core_scalar_service_api.py",
+      "category": "scalar",
+      "cold_time_s": 0.042103777999727754,
+      "concern": "service_api_speed",
+      "device": "gpu",
+      "dtype": "float32",
+      "implementation": "service_api_padded",
+      "measurements": [
+        {
+          "name": "samples",
+          "notes": "",
+          "unit": "rows",
+          "value": 4099
+        },
+        {
+          "name": "pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 4224
+        },
+        {
+          "name": "shape_bucket_multiple",
+          "notes": "",
+          "unit": "rows",
+          "value": 0
+        },
+        {
+          "name": "chosen_backend",
+          "notes": "",
+          "unit": "name",
+          "value": "gpu"
+        },
+        {
+          "name": "requested_backend",
+          "notes": "",
+          "unit": "name",
+          "value": "gpu"
+        },
+        {
+          "name": "effective_pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 4224
+        },
+        {
+          "name": "min_gpu_batch_size",
+          "notes": "",
+          "unit": "rows",
+          "value": 2048
+        },
+        {
+          "name": "iterations",
+          "notes": "",
+          "unit": "calls",
+          "value": 3
+        },
+        {
+          "name": "p50_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.0023852220001572277
+        },
+        {
+          "name": "p95_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.002936327099632763
+        },
+        {
+          "name": "p99_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.0029853142195861437
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Public API service-style repeated-call benchmark through api.bind_point_batch with explicit backend and stable-shape policy.",
+      "operation": "arb_fpwrap_double_exp",
+      "python_overhead_s": null,
+      "recompile_time_s": 0.003547969999999623,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.0025724016668391414
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_core_scalar_service_api.py",
+      "category": "scalar",
+      "cold_time_s": 0.006902519000504981,
+      "concern": "service_api_speed",
+      "device": "gpu",
+      "dtype": "float32",
+      "implementation": "service_api_bucketed",
+      "measurements": [
+        {
+          "name": "samples",
+          "notes": "",
+          "unit": "rows",
+          "value": 4099
+        },
+        {
+          "name": "pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 0
+        },
+        {
+          "name": "shape_bucket_multiple",
+          "notes": "",
+          "unit": "rows",
+          "value": 128
+        },
+        {
+          "name": "chosen_backend",
+          "notes": "",
+          "unit": "name",
+          "value": "gpu"
+        },
+        {
+          "name": "requested_backend",
+          "notes": "",
+          "unit": "name",
+          "value": "gpu"
+        },
+        {
+          "name": "effective_pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 4224
+        },
+        {
+          "name": "min_gpu_batch_size",
+          "notes": "",
+          "unit": "rows",
+          "value": 2048
+        },
+        {
+          "name": "iterations",
+          "notes": "",
+          "unit": "calls",
+          "value": 3
+        },
+        {
+          "name": "p50_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.004087251998498687
+        },
+        {
+          "name": "p95_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.004185233200223593
+        },
+        {
+          "name": "p99_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.004193942640376917
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Public API service-style repeated-call benchmark through api.bind_point_batch with explicit backend and stable-shape policy.",
+      "operation": "arb_fpwrap_double_exp",
+      "python_overhead_s": null,
+      "recompile_time_s": 0.0484303049997834,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.0035841533329706485
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_core_scalar_service_api.py",
+      "category": "scalar",
+      "cold_time_s": 0.040610210000522784,
+      "concern": "service_api_speed",
+      "device": "gpu",
+      "dtype": "float32",
+      "implementation": "service_api_unpadded",
+      "measurements": [
+        {
+          "name": "samples",
+          "notes": "",
+          "unit": "rows",
+          "value": 4099
+        },
+        {
+          "name": "pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 0
+        },
+        {
+          "name": "shape_bucket_multiple",
+          "notes": "",
+          "unit": "rows",
+          "value": 0
+        },
+        {
+          "name": "chosen_backend",
+          "notes": "",
+          "unit": "name",
+          "value": "gpu"
+        },
+        {
+          "name": "requested_backend",
+          "notes": "",
+          "unit": "name",
+          "value": "gpu"
+        },
+        {
+          "name": "effective_pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 0
+        },
+        {
+          "name": "min_gpu_batch_size",
+          "notes": "",
+          "unit": "rows",
+          "value": 2048
+        },
+        {
+          "name": "iterations",
+          "notes": "",
+          "unit": "calls",
+          "value": 3
+        },
+        {
+          "name": "p50_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.0005994640014250763
+        },
+        {
+          "name": "p95_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.000606683801197505
+        },
+        {
+          "name": "p99_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.0006073255611772766
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Public API service-style repeated-call benchmark through api.bind_point_batch with explicit backend and stable-shape policy.",
+      "operation": "acf_mul",
+      "python_overhead_s": null,
+      "recompile_time_s": 0.04592208500071138,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.0005921186675550416
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_core_scalar_service_api.py",
+      "category": "scalar",
+      "cold_time_s": 0.20033416299884266,
+      "concern": "service_api_speed",
+      "device": "gpu",
+      "dtype": "float32",
+      "implementation": "service_api_padded",
+      "measurements": [
+        {
+          "name": "samples",
+          "notes": "",
+          "unit": "rows",
+          "value": 4099
+        },
+        {
+          "name": "pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 4224
+        },
+        {
+          "name": "shape_bucket_multiple",
+          "notes": "",
+          "unit": "rows",
+          "value": 0
+        },
+        {
+          "name": "chosen_backend",
+          "notes": "",
+          "unit": "name",
+          "value": "gpu"
+        },
+        {
+          "name": "requested_backend",
+          "notes": "",
+          "unit": "name",
+          "value": "gpu"
+        },
+        {
+          "name": "effective_pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 4224
+        },
+        {
+          "name": "min_gpu_batch_size",
+          "notes": "",
+          "unit": "rows",
+          "value": 2048
+        },
+        {
+          "name": "iterations",
+          "notes": "",
+          "unit": "calls",
+          "value": 3
+        },
+        {
+          "name": "p50_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.0022154100006446242
+        },
+        {
+          "name": "p95_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.005333719200825726
+        },
+        {
+          "name": "p99_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.005610902240841824
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Public API service-style repeated-call benchmark through api.bind_point_batch with explicit backend and stable-shape policy.",
+      "operation": "acf_mul",
+      "python_overhead_s": null,
+      "recompile_time_s": 0.13866257599875098,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.003313289667251714
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_core_scalar_service_api.py",
+      "category": "scalar",
+      "cold_time_s": 0.004048274000524543,
+      "concern": "service_api_speed",
+      "device": "gpu",
+      "dtype": "float32",
+      "implementation": "service_api_bucketed",
+      "measurements": [
+        {
+          "name": "samples",
+          "notes": "",
+          "unit": "rows",
+          "value": 4099
+        },
+        {
+          "name": "pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 0
+        },
+        {
+          "name": "shape_bucket_multiple",
+          "notes": "",
+          "unit": "rows",
+          "value": 128
+        },
+        {
+          "name": "chosen_backend",
+          "notes": "",
+          "unit": "name",
+          "value": "gpu"
+        },
+        {
+          "name": "requested_backend",
+          "notes": "",
+          "unit": "name",
+          "value": "gpu"
+        },
+        {
+          "name": "effective_pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 4224
+        },
+        {
+          "name": "min_gpu_batch_size",
+          "notes": "",
+          "unit": "rows",
+          "value": 2048
+        },
+        {
+          "name": "iterations",
+          "notes": "",
+          "unit": "calls",
+          "value": 3
+        },
+        {
+          "name": "p50_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.007175973998528207
+        },
+        {
+          "name": "p95_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.007805749900944648
+        },
+        {
+          "name": "p99_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.007861729981159441
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Public API service-style repeated-call benchmark through api.bind_point_batch with explicit backend and stable-shape policy.",
+      "operation": "acf_mul",
+      "python_overhead_s": null,
+      "recompile_time_s": 0.17838228199980222,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.006492966333098593
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_core_scalar_service_api.py",
+      "category": "scalar",
+      "cold_time_s": 0.049048981001760694,
+      "concern": "service_api_speed",
+      "device": "gpu",
+      "dtype": "float64",
+      "implementation": "service_api_unpadded",
+      "measurements": [
+        {
+          "name": "samples",
+          "notes": "",
+          "unit": "rows",
+          "value": 4099
+        },
+        {
+          "name": "pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 0
+        },
+        {
+          "name": "shape_bucket_multiple",
+          "notes": "",
+          "unit": "rows",
+          "value": 0
+        },
+        {
+          "name": "chosen_backend",
+          "notes": "",
+          "unit": "name",
+          "value": "gpu"
+        },
+        {
+          "name": "requested_backend",
+          "notes": "",
+          "unit": "name",
+          "value": "gpu"
+        },
+        {
+          "name": "effective_pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 0
+        },
+        {
+          "name": "min_gpu_batch_size",
+          "notes": "",
+          "unit": "rows",
+          "value": 2048
+        },
+        {
+          "name": "iterations",
+          "notes": "",
+          "unit": "calls",
+          "value": 3
+        },
+        {
+          "name": "p50_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.0011387110007490264
+        },
+        {
+          "name": "p95_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.004980501399950299
+        },
+        {
+          "name": "p99_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.005321993879879301
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Public API service-style repeated-call benchmark through api.bind_point_batch with explicit backend and stable-shape policy.",
+      "operation": "arf_add",
+      "python_overhead_s": null,
+      "recompile_time_s": 0.056149570000343374,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.002462399334035581
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_core_scalar_service_api.py",
+      "category": "scalar",
+      "cold_time_s": 0.25830793200111657,
+      "concern": "service_api_speed",
+      "device": "gpu",
+      "dtype": "float64",
+      "implementation": "service_api_padded",
+      "measurements": [
+        {
+          "name": "samples",
+          "notes": "",
+          "unit": "rows",
+          "value": 4099
+        },
+        {
+          "name": "pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 4224
+        },
+        {
+          "name": "shape_bucket_multiple",
+          "notes": "",
+          "unit": "rows",
+          "value": 0
+        },
+        {
+          "name": "chosen_backend",
+          "notes": "",
+          "unit": "name",
+          "value": "gpu"
+        },
+        {
+          "name": "requested_backend",
+          "notes": "",
+          "unit": "name",
+          "value": "gpu"
+        },
+        {
+          "name": "effective_pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 4224
+        },
+        {
+          "name": "min_gpu_batch_size",
+          "notes": "",
+          "unit": "rows",
+          "value": 2048
+        },
+        {
+          "name": "iterations",
+          "notes": "",
+          "unit": "calls",
+          "value": 3
+        },
+        {
+          "name": "p50_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.0037234940009511774
+        },
+        {
+          "name": "p95_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.008265863299493503
+        },
+        {
+          "name": "p99_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.008669629459363932
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Public API service-style repeated-call benchmark through api.bind_point_batch with explicit backend and stable-shape policy.",
+      "operation": "arf_add",
+      "python_overhead_s": null,
+      "recompile_time_s": 0.16763459399953717,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.005394548667027266
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_core_scalar_service_api.py",
+      "category": "scalar",
+      "cold_time_s": 0.0033599920006963657,
+      "concern": "service_api_speed",
+      "device": "gpu",
+      "dtype": "float64",
+      "implementation": "service_api_bucketed",
+      "measurements": [
+        {
+          "name": "samples",
+          "notes": "",
+          "unit": "rows",
+          "value": 4099
+        },
+        {
+          "name": "pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 0
+        },
+        {
+          "name": "shape_bucket_multiple",
+          "notes": "",
+          "unit": "rows",
+          "value": 128
+        },
+        {
+          "name": "chosen_backend",
+          "notes": "",
+          "unit": "name",
+          "value": "gpu"
+        },
+        {
+          "name": "requested_backend",
+          "notes": "",
+          "unit": "name",
+          "value": "gpu"
+        },
+        {
+          "name": "effective_pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 4224
+        },
+        {
+          "name": "min_gpu_batch_size",
+          "notes": "",
+          "unit": "rows",
+          "value": 2048
+        },
+        {
+          "name": "iterations",
+          "notes": "",
+          "unit": "calls",
+          "value": 3
+        },
+        {
+          "name": "p50_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.003369207001014729
+        },
+        {
+          "name": "p95_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.005891104200782138
+        },
+        {
+          "name": "p99_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.006115272840761463
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Public API service-style repeated-call benchmark through api.bind_point_batch with explicit backend and stable-shape policy.",
+      "operation": "arf_add",
+      "python_overhead_s": null,
+      "recompile_time_s": 0.16899956599991128,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.004271582667570328
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_core_scalar_service_api.py",
+      "category": "scalar",
+      "cold_time_s": 0.043390996999733034,
+      "concern": "service_api_speed",
+      "device": "gpu",
+      "dtype": "float64",
+      "implementation": "service_api_unpadded",
+      "measurements": [
+        {
+          "name": "samples",
+          "notes": "",
+          "unit": "rows",
+          "value": 4099
+        },
+        {
+          "name": "pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 0
+        },
+        {
+          "name": "shape_bucket_multiple",
+          "notes": "",
+          "unit": "rows",
+          "value": 0
+        },
+        {
+          "name": "chosen_backend",
+          "notes": "",
+          "unit": "name",
+          "value": "gpu"
+        },
+        {
+          "name": "requested_backend",
+          "notes": "",
+          "unit": "name",
+          "value": "gpu"
+        },
+        {
+          "name": "effective_pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 0
+        },
+        {
+          "name": "min_gpu_batch_size",
+          "notes": "",
+          "unit": "rows",
+          "value": 2048
+        },
+        {
+          "name": "iterations",
+          "notes": "",
+          "unit": "calls",
+          "value": 3
+        },
+        {
+          "name": "p50_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.0008194919992092764
+        },
+        {
+          "name": "p95_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.0016560896990995388
+        },
+        {
+          "name": "p99_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.0017304539390897843
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Public API service-style repeated-call benchmark through api.bind_point_batch with explicit backend and stable-shape policy.",
+      "operation": "fmpr_mul",
+      "python_overhead_s": null,
+      "recompile_time_s": 0.0407828920015163,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.001110615333042612
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_core_scalar_service_api.py",
+      "category": "scalar",
+      "cold_time_s": 0.0445669770015229,
+      "concern": "service_api_speed",
+      "device": "gpu",
+      "dtype": "float64",
+      "implementation": "service_api_padded",
+      "measurements": [
+        {
+          "name": "samples",
+          "notes": "",
+          "unit": "rows",
+          "value": 4099
+        },
+        {
+          "name": "pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 4224
+        },
+        {
+          "name": "shape_bucket_multiple",
+          "notes": "",
+          "unit": "rows",
+          "value": 0
+        },
+        {
+          "name": "chosen_backend",
+          "notes": "",
+          "unit": "name",
+          "value": "gpu"
+        },
+        {
+          "name": "requested_backend",
+          "notes": "",
+          "unit": "name",
+          "value": "gpu"
+        },
+        {
+          "name": "effective_pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 4224
+        },
+        {
+          "name": "min_gpu_batch_size",
+          "notes": "",
+          "unit": "rows",
+          "value": 2048
+        },
+        {
+          "name": "iterations",
+          "notes": "",
+          "unit": "calls",
+          "value": 3
+        },
+        {
+          "name": "p50_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.0027892779999092454
+        },
+        {
+          "name": "p95_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.0034204560997750377
+        },
+        {
+          "name": "p99_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.003476560819763108
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Public API service-style repeated-call benchmark through api.bind_point_batch with explicit backend and stable-shape policy.",
+      "operation": "fmpr_mul",
+      "python_overhead_s": null,
+      "recompile_time_s": 0.0023315179987548618,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.0028387223331568143
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_core_scalar_service_api.py",
+      "category": "scalar",
+      "cold_time_s": 0.0018713040008151438,
+      "concern": "service_api_speed",
+      "device": "gpu",
+      "dtype": "float64",
+      "implementation": "service_api_bucketed",
+      "measurements": [
+        {
+          "name": "samples",
+          "notes": "",
+          "unit": "rows",
+          "value": 4099
+        },
+        {
+          "name": "pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 0
+        },
+        {
+          "name": "shape_bucket_multiple",
+          "notes": "",
+          "unit": "rows",
+          "value": 128
+        },
+        {
+          "name": "chosen_backend",
+          "notes": "",
+          "unit": "name",
+          "value": "gpu"
+        },
+        {
+          "name": "requested_backend",
+          "notes": "",
+          "unit": "name",
+          "value": "gpu"
+        },
+        {
+          "name": "effective_pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 4224
+        },
+        {
+          "name": "min_gpu_batch_size",
+          "notes": "",
+          "unit": "rows",
+          "value": 2048
+        },
+        {
+          "name": "iterations",
+          "notes": "",
+          "unit": "calls",
+          "value": 3
+        },
+        {
+          "name": "p50_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.0017833540005085524
+        },
+        {
+          "name": "p95_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.001856603200212703
+        },
+        {
+          "name": "p99_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.0018631142401864054
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Public API service-style repeated-call benchmark through api.bind_point_batch with explicit backend and stable-shape policy.",
+      "operation": "fmpr_mul",
+      "python_overhead_s": null,
+      "recompile_time_s": 0.053780890000780346,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.001746691999869654
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_core_scalar_service_api.py",
+      "category": "scalar",
+      "cold_time_s": 0.04690623599890387,
+      "concern": "service_api_speed",
+      "device": "gpu",
+      "dtype": "float64",
+      "implementation": "service_api_unpadded",
+      "measurements": [
+        {
+          "name": "samples",
+          "notes": "",
+          "unit": "rows",
+          "value": 4099
+        },
+        {
+          "name": "pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 0
+        },
+        {
+          "name": "shape_bucket_multiple",
+          "notes": "",
+          "unit": "rows",
+          "value": 0
+        },
+        {
+          "name": "chosen_backend",
+          "notes": "",
+          "unit": "name",
+          "value": "gpu"
+        },
+        {
+          "name": "requested_backend",
+          "notes": "",
+          "unit": "name",
+          "value": "gpu"
+        },
+        {
+          "name": "effective_pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 0
+        },
+        {
+          "name": "min_gpu_batch_size",
+          "notes": "",
+          "unit": "rows",
+          "value": 2048
+        },
+        {
+          "name": "iterations",
+          "notes": "",
+          "unit": "calls",
+          "value": 3
+        },
+        {
+          "name": "p50_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.0008004029987205286
+        },
+        {
+          "name": "p95_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.001399001999743632
+        },
+        {
+          "name": "p99_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.0014522107998345747
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Public API service-style repeated-call benchmark through api.bind_point_batch with explicit backend and stable-shape policy.",
+      "operation": "arb_fpwrap_double_exp",
+      "python_overhead_s": null,
+      "recompile_time_s": 0.043200436999541125,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.0009211696663745291
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_core_scalar_service_api.py",
+      "category": "scalar",
+      "cold_time_s": 0.037161910000577336,
+      "concern": "service_api_speed",
+      "device": "gpu",
+      "dtype": "float64",
+      "implementation": "service_api_padded",
+      "measurements": [
+        {
+          "name": "samples",
+          "notes": "",
+          "unit": "rows",
+          "value": 4099
+        },
+        {
+          "name": "pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 4224
+        },
+        {
+          "name": "shape_bucket_multiple",
+          "notes": "",
+          "unit": "rows",
+          "value": 0
+        },
+        {
+          "name": "chosen_backend",
+          "notes": "",
+          "unit": "name",
+          "value": "gpu"
+        },
+        {
+          "name": "requested_backend",
+          "notes": "",
+          "unit": "name",
+          "value": "gpu"
+        },
+        {
+          "name": "effective_pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 4224
+        },
+        {
+          "name": "min_gpu_batch_size",
+          "notes": "",
+          "unit": "rows",
+          "value": 2048
+        },
+        {
+          "name": "iterations",
+          "notes": "",
+          "unit": "calls",
+          "value": 3
+        },
+        {
+          "name": "p50_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.0027146360007463954
+        },
+        {
+          "name": "p95_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.005866611499732243
+        },
+        {
+          "name": "p99_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.006146787099642097
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Public API service-style repeated-call benchmark through api.bind_point_batch with explicit backend and stable-shape policy.",
+      "operation": "arb_fpwrap_double_exp",
+      "python_overhead_s": null,
+      "recompile_time_s": 0.0028529629998956807,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.0035443556668421175
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_core_scalar_service_api.py",
+      "category": "scalar",
+      "cold_time_s": 0.0018628899997565895,
+      "concern": "service_api_speed",
+      "device": "gpu",
+      "dtype": "float64",
+      "implementation": "service_api_bucketed",
+      "measurements": [
+        {
+          "name": "samples",
+          "notes": "",
+          "unit": "rows",
+          "value": 4099
+        },
+        {
+          "name": "pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 0
+        },
+        {
+          "name": "shape_bucket_multiple",
+          "notes": "",
+          "unit": "rows",
+          "value": 128
+        },
+        {
+          "name": "chosen_backend",
+          "notes": "",
+          "unit": "name",
+          "value": "gpu"
+        },
+        {
+          "name": "requested_backend",
+          "notes": "",
+          "unit": "name",
+          "value": "gpu"
+        },
+        {
+          "name": "effective_pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 4224
+        },
+        {
+          "name": "min_gpu_batch_size",
+          "notes": "",
+          "unit": "rows",
+          "value": 2048
+        },
+        {
+          "name": "iterations",
+          "notes": "",
+          "unit": "calls",
+          "value": 3
+        },
+        {
+          "name": "p50_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.0014566509998985566
+        },
+        {
+          "name": "p95_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.002730500200050301
+        },
+        {
+          "name": "p99_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.002843731240063789
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Public API service-style repeated-call benchmark through api.bind_point_batch with explicit backend and stable-shape policy.",
+      "operation": "arb_fpwrap_double_exp",
+      "python_overhead_s": null,
+      "recompile_time_s": 0.04957814399858762,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.0018905893333188335
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_core_scalar_service_api.py",
+      "category": "scalar",
+      "cold_time_s": 0.04368530399915471,
+      "concern": "service_api_speed",
+      "device": "gpu",
+      "dtype": "float64",
+      "implementation": "service_api_unpadded",
+      "measurements": [
+        {
+          "name": "samples",
+          "notes": "",
+          "unit": "rows",
+          "value": 4099
+        },
+        {
+          "name": "pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 0
+        },
+        {
+          "name": "shape_bucket_multiple",
+          "notes": "",
+          "unit": "rows",
+          "value": 0
+        },
+        {
+          "name": "chosen_backend",
+          "notes": "",
+          "unit": "name",
+          "value": "gpu"
+        },
+        {
+          "name": "requested_backend",
+          "notes": "",
+          "unit": "name",
+          "value": "gpu"
+        },
+        {
+          "name": "effective_pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 0
+        },
+        {
+          "name": "min_gpu_batch_size",
+          "notes": "",
+          "unit": "rows",
+          "value": 2048
+        },
+        {
+          "name": "iterations",
+          "notes": "",
+          "unit": "calls",
+          "value": 3
+        },
+        {
+          "name": "p50_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.0007327800012717489
+        },
+        {
+          "name": "p95_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.0010273607997078216
+        },
+        {
+          "name": "p99_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.0010535457595688058
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Public API service-style repeated-call benchmark through api.bind_point_batch with explicit backend and stable-shape policy.",
+      "operation": "acf_mul",
+      "python_overhead_s": null,
+      "recompile_time_s": 0.0489505530003953,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.0007822056668373989
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_core_scalar_service_api.py",
+      "category": "scalar",
+      "cold_time_s": 0.23513196600106312,
+      "concern": "service_api_speed",
+      "device": "gpu",
+      "dtype": "float64",
+      "implementation": "service_api_padded",
+      "measurements": [
+        {
+          "name": "samples",
+          "notes": "",
+          "unit": "rows",
+          "value": 4099
+        },
+        {
+          "name": "pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 4224
+        },
+        {
+          "name": "shape_bucket_multiple",
+          "notes": "",
+          "unit": "rows",
+          "value": 0
+        },
+        {
+          "name": "chosen_backend",
+          "notes": "",
+          "unit": "name",
+          "value": "gpu"
+        },
+        {
+          "name": "requested_backend",
+          "notes": "",
+          "unit": "name",
+          "value": "gpu"
+        },
+        {
+          "name": "effective_pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 4224
+        },
+        {
+          "name": "min_gpu_batch_size",
+          "notes": "",
+          "unit": "rows",
+          "value": 2048
+        },
+        {
+          "name": "iterations",
+          "notes": "",
+          "unit": "calls",
+          "value": 3
+        },
+        {
+          "name": "p50_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.0029737179993389873
+        },
+        {
+          "name": "p95_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.003357510400564934
+        },
+        {
+          "name": "p99_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.0033916252806739065
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Public API service-style repeated-call benchmark through api.bind_point_batch with explicit backend and stable-shape policy.",
+      "operation": "acf_mul",
+      "python_overhead_s": null,
+      "recompile_time_s": 0.13673177999953623,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.003028848333390973
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_core_scalar_service_api.py",
+      "category": "scalar",
+      "cold_time_s": 0.005216202000156045,
+      "concern": "service_api_speed",
+      "device": "gpu",
+      "dtype": "float64",
+      "implementation": "service_api_bucketed",
+      "measurements": [
+        {
+          "name": "samples",
+          "notes": "",
+          "unit": "rows",
+          "value": 4099
+        },
+        {
+          "name": "pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 0
+        },
+        {
+          "name": "shape_bucket_multiple",
+          "notes": "",
+          "unit": "rows",
+          "value": 128
+        },
+        {
+          "name": "chosen_backend",
+          "notes": "",
+          "unit": "name",
+          "value": "gpu"
+        },
+        {
+          "name": "requested_backend",
+          "notes": "",
+          "unit": "name",
+          "value": "gpu"
+        },
+        {
+          "name": "effective_pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 4224
+        },
+        {
+          "name": "min_gpu_batch_size",
+          "notes": "",
+          "unit": "rows",
+          "value": 2048
+        },
+        {
+          "name": "iterations",
+          "notes": "",
+          "unit": "calls",
+          "value": 3
+        },
+        {
+          "name": "p50_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.0032467700002598576
+        },
+        {
+          "name": "p95_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.0033597451989408
+        },
+        {
+          "name": "p99_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.0033697874388235504
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Public API service-style repeated-call benchmark through api.bind_point_batch with explicit backend and stable-shape policy.",
+      "operation": "acf_mul",
+      "python_overhead_s": null,
+      "recompile_time_s": 0.17905822300053842,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.003073542999724547
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_core_scalar_service_api.py",
+      "category": "scalar",
+      "cold_time_s": 0.06655855400094879,
+      "concern": "service_api_speed",
+      "device": "gpu",
+      "dtype": "int64",
+      "implementation": "service_api_unpadded",
+      "measurements": [
+        {
+          "name": "samples",
+          "notes": "",
+          "unit": "rows",
+          "value": 4099
+        },
+        {
+          "name": "pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 0
+        },
+        {
+          "name": "shape_bucket_multiple",
+          "notes": "",
+          "unit": "rows",
+          "value": 0
+        },
+        {
+          "name": "chosen_backend",
+          "notes": "",
+          "unit": "name",
+          "value": "gpu"
+        },
+        {
+          "name": "requested_backend",
+          "notes": "",
+          "unit": "name",
+          "value": "gpu"
+        },
+        {
+          "name": "effective_pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 0
+        },
+        {
+          "name": "min_gpu_batch_size",
+          "notes": "",
+          "unit": "rows",
+          "value": 2048
+        },
+        {
+          "name": "iterations",
+          "notes": "",
+          "unit": "calls",
+          "value": 3
+        },
+        {
+          "name": "p50_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.0010384969991719117
+        },
+        {
+          "name": "p95_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.0015055051986564648
+        },
+        {
+          "name": "p99_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.0015470170386106474
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Public API service-style repeated-call benchmark through api.bind_point_batch with explicit backend and stable-shape policy.",
+      "operation": "fmpzi_add",
+      "python_overhead_s": null,
+      "recompile_time_s": 0.08332383600100002,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.0010811063323975152
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_core_scalar_service_api.py",
+      "category": "scalar",
+      "cold_time_s": 0.27399820299979183,
+      "concern": "service_api_speed",
+      "device": "gpu",
+      "dtype": "int64",
+      "implementation": "service_api_padded",
+      "measurements": [
+        {
+          "name": "samples",
+          "notes": "",
+          "unit": "rows",
+          "value": 4099
+        },
+        {
+          "name": "pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 4224
+        },
+        {
+          "name": "shape_bucket_multiple",
+          "notes": "",
+          "unit": "rows",
+          "value": 0
+        },
+        {
+          "name": "chosen_backend",
+          "notes": "",
+          "unit": "name",
+          "value": "gpu"
+        },
+        {
+          "name": "requested_backend",
+          "notes": "",
+          "unit": "name",
+          "value": "gpu"
+        },
+        {
+          "name": "effective_pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 4224
+        },
+        {
+          "name": "min_gpu_batch_size",
+          "notes": "",
+          "unit": "rows",
+          "value": 2048
+        },
+        {
+          "name": "iterations",
+          "notes": "",
+          "unit": "calls",
+          "value": 3
+        },
+        {
+          "name": "p50_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.004289215999961016
+        },
+        {
+          "name": "p95_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.004819078400214494
+        },
+        {
+          "name": "p99_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.004866177280237025
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Public API service-style repeated-call benchmark through api.bind_point_batch with explicit backend and stable-shape policy.",
+      "operation": "fmpzi_add",
+      "python_overhead_s": null,
+      "recompile_time_s": 0.18111177399987355,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.004470700666691603
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_core_scalar_service_api.py",
+      "category": "scalar",
+      "cold_time_s": 0.005059924000306637,
+      "concern": "service_api_speed",
+      "device": "gpu",
+      "dtype": "int64",
+      "implementation": "service_api_bucketed",
+      "measurements": [
+        {
+          "name": "samples",
+          "notes": "",
+          "unit": "rows",
+          "value": 4099
+        },
+        {
+          "name": "pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 0
+        },
+        {
+          "name": "shape_bucket_multiple",
+          "notes": "",
+          "unit": "rows",
+          "value": 128
+        },
+        {
+          "name": "chosen_backend",
+          "notes": "",
+          "unit": "name",
+          "value": "gpu"
+        },
+        {
+          "name": "requested_backend",
+          "notes": "",
+          "unit": "name",
+          "value": "gpu"
+        },
+        {
+          "name": "effective_pad_to",
+          "notes": "",
+          "unit": "rows",
+          "value": 4224
+        },
+        {
+          "name": "min_gpu_batch_size",
+          "notes": "",
+          "unit": "rows",
+          "value": 2048
+        },
+        {
+          "name": "iterations",
+          "notes": "",
+          "unit": "calls",
+          "value": 3
+        },
+        {
+          "name": "p50_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.005516162000276381
+        },
+        {
+          "name": "p95_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.00590131789977022
+        },
+        {
+          "name": "p99_latency_s",
+          "notes": "",
+          "unit": "s",
+          "value": 0.005935553979725228
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Public API service-style repeated-call benchmark through api.bind_point_batch with explicit backend and stable-shape policy.",
+      "operation": "fmpzi_add",
+      "python_overhead_s": null,
+      "recompile_time_s": 0.2606943880000472,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.0052651249995202916
+    }
+  ],
+  "schema_version": "v1"
+}

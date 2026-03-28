@@ -12,6 +12,7 @@ Current reports:
 - [alternative_functions.md](/docs/reports/alternative_functions.md)
 - [api_cold_path_inventory.md](/docs/reports/api_cold_path_inventory.md)
 - [api_first_use_inventory.md](/docs/reports/api_first_use_inventory.md)
+- [api_surface_structure.md](/docs/reports/api_surface_structure.md)
 - [arb_like_functions.md](/docs/reports/arb_like_functions.md)
 - [benchmark_group_inventory.md](/docs/reports/benchmark_group_inventory.md)
 - [cache_aware_surface_inventory.md](/docs/reports/cache_aware_surface_inventory.md)

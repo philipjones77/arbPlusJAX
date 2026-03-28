@@ -5,20 +5,20 @@
   "environment": {
     "env": {
       "ARB_C_REF_DIR": "",
-      "JAX_PLATFORMS": "cpu",
+      "JAX_PLATFORMS": "cuda",
       "PYTHONPATH": "/home/phili/projects/arbplusJAX/src:/home/phili/projects/arbplusJAX/src:",
       "XLA_PYTHON_CLIENT_MEM_FRACTION": "",
       "XLA_PYTHON_CLIENT_PREALLOCATE": ""
     },
     "environment_kind": "wsl",
     "git": {
-      "commit": "5e1bef0ba378e627a93e8dd36747e8edb998d510"
+      "commit": "ec6227c42b6c055115d746c0fe970e18c2a0e067"
     },
     "jax": {
       "available": true,
-      "backend": "cpu",
+      "backend": "gpu",
       "devices": [
-        "TFRT_CPU_0"
+        "cuda:0"
       ],
       "jax_enable_x64": true,
       "requested_mode": "auto"
@@ -35,7 +35,7 @@
       "version": "3.12.12"
     },
     "repo_root": "/home/phili/projects/arbplusJAX",
-    "timestamp_utc": "2026-03-27T18:12:31Z"
+    "timestamp_utc": "2026-03-28T10:53:29Z"
   },
   "notes": "",
   "records": [
@@ -63,7 +63,7 @@
       "warm_time_s": null
     },
     {
-      "accuracy_abs": 0.0,
+      "accuracy_abs": 5.551115123125783e-17,
       "accuracy_rel": null,
       "ad_backward_time_s": null,
       "ad_forward_time_s": null,
@@ -109,7 +109,7 @@
       "warm_time_s": null
     },
     {
-      "accuracy_abs": 0.0,
+      "accuracy_abs": 1.1102230246251565e-16,
       "accuracy_rel": null,
       "ad_backward_time_s": null,
       "ad_forward_time_s": null,
@@ -132,7 +132,7 @@
       "warm_time_s": null
     },
     {
-      "accuracy_abs": 0.0,
+      "accuracy_abs": 1.1102230246251565e-16,
       "accuracy_rel": null,
       "ad_backward_time_s": null,
       "ad_forward_time_s": null,
@@ -155,7 +155,7 @@
       "warm_time_s": null
     },
     {
-      "accuracy_abs": 0.0,
+      "accuracy_abs": 3.552713678800501e-15,
       "accuracy_rel": null,
       "ad_backward_time_s": null,
       "ad_forward_time_s": null,
@@ -178,7 +178,7 @@
       "warm_time_s": null
     },
     {
-      "accuracy_abs": 4.547473508864641e-13,
+      "accuracy_abs": 2.2737367544323206e-13,
       "accuracy_rel": null,
       "ad_backward_time_s": null,
       "ad_forward_time_s": null,
@@ -201,7 +201,7 @@
       "warm_time_s": null
     },
     {
-      "accuracy_abs": 4.547473508864641e-13,
+      "accuracy_abs": 2.2737367544323206e-13,
       "accuracy_rel": null,
       "ad_backward_time_s": null,
       "ad_forward_time_s": null,
@@ -224,7 +224,7 @@
       "warm_time_s": null
     },
     {
-      "accuracy_abs": 4.440892098500626e-16,
+      "accuracy_abs": 1.1102230246251565e-16,
       "accuracy_rel": null,
       "ad_backward_time_s": null,
       "ad_forward_time_s": null,

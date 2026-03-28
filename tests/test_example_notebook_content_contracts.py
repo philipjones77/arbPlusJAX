@@ -43,16 +43,16 @@ def test_canonical_notebooks_include_production_pattern_section() -> None:
 
 def test_canonical_notebooks_show_production_controls_or_caching() -> None:
     keyword_sets = {
-        "example_core_scalar_surface.ipynb": ("bind_point_batch", "pad_to"),
-        "example_api_surface.ipynb": ("bind_point_batch", "bind_interval_batch", "cached_plan"),
+        "example_core_scalar_surface.ipynb": ("bind_point_batch", "bind_point_batch_with_diagnostics", "choose_point_batch_policy", "prewarm_core_point_kernels"),
+        "example_api_surface.ipynb": ("bind_point_batch", "bind_interval_batch", "bind_interval_batch_jit_with_diagnostics", "choose_interval_batch_policy", "cached_plan"),
         "example_dense_matrix_surface.ipynb": ("cached_matvec", "cached_rmatvec", "operator_plan"),
         "example_sparse_matrix_surface.ipynb": ("cached_prepare", "cached_apply", "pad_to"),
         "example_matrix_free_operator_surface.ipynb": ("plan_prepare", "preconditioner"),
         "example_fft_nufft_surface.ipynb": ("cached_prepare", "cached_apply"),
         "example_dirichlet_surface.ipynb": ("bind_point_batch_jit", "n_terms", "prec_bits"),
-        "example_gamma_family_surface.ipynb": ("bind_point_batch", "bind_interval_batch"),
+        "example_gamma_family_surface.ipynb": ("bind_point_batch", "bind_interval_batch", "bind_interval_batch_with_diagnostics"),
         "example_barnes_double_gamma_surface.ipynb": ("diagnostics", "prec_bits", "dps"),
-        "example_hypgeom_family_surface.ipynb": ("bind_point_batch_jit", "bind_interval_batch", "hypgeom_status", "special_function_hardening_benchmark"),
+        "example_hypgeom_family_surface.ipynb": ("bind_point_batch_jit", "bind_interval_batch", "bind_interval_batch_jit_with_diagnostics", "hypgeom_status", "special_function_hardening_benchmark"),
     }
     for name, keywords in keyword_sets.items():
         text = _notebook_text(EXAMPLES_DIR / name)

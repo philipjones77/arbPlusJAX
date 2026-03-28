@@ -12,7 +12,7 @@
     },
     "environment_kind": "wsl",
     "git": {
-      "commit": "5e1bef0ba378e627a93e8dd36747e8edb998d510"
+      "commit": "ec6227c42b6c055115d746c0fe970e18c2a0e067"
     },
     "jax": {
       "available": true,
@@ -35,7 +35,7 @@
       "version": "3.12.12"
     },
     "repo_root": "/home/phili/projects/arbplusJAX",
-    "timestamp_utc": "2026-03-27T18:13:48Z"
+    "timestamp_utc": "2026-03-28T20:15:15Z"
   },
   "notes": "Direct-vs-routed API timing for representative scalar, special, and matrix surfaces.",
   "records": [
@@ -47,7 +47,7 @@
       "ad_residual": null,
       "benchmark_name": "benchmark_api_surface.py",
       "category": "api",
-      "cold_time_s": 0.14919766699995307,
+      "cold_time_s": 1.064392163998491,
       "concern": "api_speed",
       "device": "cpu",
       "dtype": "float64",
@@ -57,17 +57,17 @@
           "name": "compile_to_warm_ratio",
           "notes": "",
           "unit": "ratio",
-          "value": 17015.510393520384
+          "value": 26925.27861118685
         }
       ],
       "memory_bytes": null,
       "notes": "point direct implementation",
       "operation": "besselk",
-      "python_overhead_s": 0.1491888986666178,
-      "recompile_time_s": 8.554000032745535e-06,
+      "python_overhead_s": 1.064352632665153,
+      "recompile_time_s": 0.00013531799959309865,
       "residual": null,
       "tags": [],
-      "warm_time_s": 8.768333335259134e-06
+      "warm_time_s": 3.953133333804241e-05
     },
     {
       "accuracy_abs": null,
@@ -77,7 +77,7 @@
       "ad_residual": null,
       "benchmark_name": "benchmark_api_surface.py",
       "category": "api",
-      "cold_time_s": 0.3584168810000392,
+      "cold_time_s": 0.2129481339998165,
       "concern": "api_speed",
       "device": "cpu",
       "dtype": "float64",
@@ -87,17 +87,17 @@
           "name": "compile_to_warm_ratio",
           "notes": "",
           "unit": "ratio",
-          "value": 36659.18798290707
+          "value": 9022.971162022137
         }
       ],
       "memory_bytes": null,
       "notes": "capability-routed API path",
       "operation": "besselk",
-      "python_overhead_s": 0.3584071040000367,
-      "recompile_time_s": 1.050800000257368e-05,
+      "python_overhead_s": 0.2129245333332316,
+      "recompile_time_s": 2.93950015475275e-05,
       "residual": null,
       "tags": [],
-      "warm_time_s": 9.777000002486602e-06
+      "warm_time_s": 2.360066658487388e-05
     },
     {
       "accuracy_abs": null,
@@ -107,7 +107,7 @@
       "ad_residual": null,
       "benchmark_name": "benchmark_api_surface.py",
       "category": "api",
-      "cold_time_s": 0.1503233820000105,
+      "cold_time_s": 1.4268880830004491,
       "concern": "api_speed",
       "device": "cpu",
       "dtype": "float64",
@@ -117,17 +117,17 @@
           "name": "compile_to_warm_ratio",
           "notes": "",
           "unit": "ratio",
-          "value": 7906.347339618575
+          "value": 41472.472917135805
         }
       ],
       "memory_bytes": null,
       "notes": "explicit direct API",
       "operation": "incomplete_gamma_upper",
-      "python_overhead_s": 0.15030436900000646,
-      "recompile_time_s": 2.0815000027596398e-05,
+      "python_overhead_s": 1.4268536773336866,
+      "recompile_time_s": 4.471700049180072e-05,
       "residual": null,
       "tags": [],
-      "warm_time_s": 1.9013000004027465e-05
+      "warm_time_s": 3.4405666762419664e-05
     },
     {
       "accuracy_abs": null,
@@ -137,7 +137,7 @@
       "ad_residual": null,
       "benchmark_name": "benchmark_api_surface.py",
       "category": "api",
-      "cold_time_s": 0.0984886260000053,
+      "cold_time_s": 0.543027763000282,
       "concern": "api_speed",
       "device": "cpu",
       "dtype": "float64",
@@ -147,17 +147,17 @@
           "name": "compile_to_warm_ratio",
           "notes": "",
           "unit": "ratio",
-          "value": 6705.075978961357
+          "value": 7208.620214030173
         }
       ],
       "memory_bytes": null,
       "notes": "general evaluate() routing path",
       "operation": "incomplete_gamma_upper",
-      "python_overhead_s": 0.09847393733334305,
-      "recompile_time_s": 1.1749999998755811e-05,
+      "python_overhead_s": 0.5429524326670313,
+      "recompile_time_s": 5.817199962621089e-05,
       "residual": null,
       "tags": [],
-      "warm_time_s": 1.4688666662247366e-05
+      "warm_time_s": 7.533033325065237e-05
     },
     {
       "accuracy_abs": null,
@@ -167,7 +167,7 @@
       "ad_residual": null,
       "benchmark_name": "benchmark_api_surface.py",
       "category": "api",
-      "cold_time_s": 0.4128530529999921,
+      "cold_time_s": 3.2219859580000048,
       "concern": "api_speed",
       "device": "cpu",
       "dtype": "float64",
@@ -177,17 +177,17 @@
           "name": "compile_to_warm_ratio",
           "notes": "",
           "unit": "ratio",
-          "value": 30097.180189801933
+          "value": 36930.886555062054
         }
       ],
       "memory_bytes": null,
       "notes": "real interval matrix solve",
       "operation": "arb_mat_solve",
-      "python_overhead_s": 0.41283933566666065,
-      "recompile_time_s": 1.2744000002840039e-05,
+      "python_overhead_s": 3.2218987143332924,
+      "recompile_time_s": 0.00020492400108196307,
       "residual": null,
       "tags": [],
-      "warm_time_s": 1.3717333331442205e-05
+      "warm_time_s": 8.72436667123111e-05
     },
     {
       "accuracy_abs": null,
@@ -197,7 +197,7 @@
       "ad_residual": null,
       "benchmark_name": "benchmark_api_surface.py",
       "category": "api",
-      "cold_time_s": 0.1180873970000107,
+      "cold_time_s": 0.43223086100078945,
       "concern": "api_speed",
       "device": "cpu",
       "dtype": "float64",
@@ -207,17 +207,17 @@
           "name": "compile_to_warm_ratio",
           "notes": "",
           "unit": "ratio",
-          "value": 9866.65341756946
+          "value": 6442.488697027645
         }
       ],
       "memory_bytes": null,
       "notes": "real interval matrix solve through evaluate()",
       "operation": "arb_mat_solve",
-      "python_overhead_s": 0.11807542866667593,
-      "recompile_time_s": 9.525999985271483e-06,
+      "python_overhead_s": 0.4321637703342276,
+      "recompile_time_s": 6.13370011706138e-05,
       "residual": null,
       "tags": [],
-      "warm_time_s": 1.1968333334759032e-05
+      "warm_time_s": 6.709066656185314e-05
     },
     {
       "accuracy_abs": null,
@@ -227,7 +227,7 @@
       "ad_residual": null,
       "benchmark_name": "benchmark_api_surface.py",
       "category": "api",
-      "cold_time_s": 0.20616050699999278,
+      "cold_time_s": 1.23348235100093,
       "concern": "api_speed",
       "device": "cpu",
       "dtype": "complex128",
@@ -237,17 +237,17 @@
           "name": "compile_to_warm_ratio",
           "notes": "",
           "unit": "ratio",
-          "value": 19823.76102835249
+          "value": 38834.344855196694
         }
       ],
       "memory_bytes": null,
       "notes": "complex box matrix solve",
       "operation": "acb_mat_solve",
-      "python_overhead_s": 0.20615010733331474,
-      "recompile_time_s": 1.039400001445756e-05,
+      "python_overhead_s": 1.2334505883342597,
+      "recompile_time_s": 3.077800101891626e-05,
       "residual": null,
       "tags": [],
-      "warm_time_s": 1.0399666678040376e-05
+      "warm_time_s": 3.176266667045032e-05
     },
     {
       "accuracy_abs": null,
@@ -257,7 +257,7 @@
       "ad_residual": null,
       "benchmark_name": "benchmark_api_surface.py",
       "category": "api",
-      "cold_time_s": 0.14444265700001324,
+      "cold_time_s": 0.5403605199990125,
       "concern": "api_speed",
       "device": "cpu",
       "dtype": "complex128",
@@ -267,17 +267,77 @@
           "name": "compile_to_warm_ratio",
           "notes": "",
           "unit": "ratio",
-          "value": 11182.368745551117
+          "value": 10541.562894828514
         }
       ],
       "memory_bytes": null,
       "notes": "complex box matrix solve through evaluate()",
       "operation": "acb_mat_solve",
-      "python_overhead_s": 0.14442974000002096,
-      "recompile_time_s": 1.1233999998694344e-05,
+      "python_overhead_s": 0.5403092599984424,
+      "recompile_time_s": 4.332800017436966e-05,
       "residual": null,
       "tags": [],
-      "warm_time_s": 1.2916999992285128e-05
+      "warm_time_s": 5.126000057013395e-05
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_api_surface.py",
+      "category": "api",
+      "cold_time_s": 1.368739405001179,
+      "concern": "api_speed",
+      "device": "cpu",
+      "dtype": "float64",
+      "implementation": "interval_service_jit",
+      "measurements": [
+        {
+          "name": "compile_to_warm_ratio",
+          "notes": "",
+          "unit": "ratio",
+          "value": 2344.3165980744707
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "basic interval service binder with diagnostics/policy",
+      "operation": "arb_add",
+      "python_overhead_s": 1.368155550667628,
+      "recompile_time_s": 0.00036790500053029973,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.0005838543335509409
+    },
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_api_surface.py",
+      "category": "api",
+      "cold_time_s": 0.12282788599986816,
+      "concern": "api_speed",
+      "device": "cpu",
+      "dtype": "float64",
+      "implementation": "interval_direct_batch",
+      "measurements": [
+        {
+          "name": "compile_to_warm_ratio",
+          "notes": "",
+          "unit": "ratio",
+          "value": 11149.278392772916
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "direct eval_interval_batch padded path",
+      "operation": "arb_add",
+      "python_overhead_s": 0.12281686933298867,
+      "recompile_time_s": 1.1158001143485308e-05,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 1.1016666879489398e-05
     }
   ],
   "schema_version": "v1"

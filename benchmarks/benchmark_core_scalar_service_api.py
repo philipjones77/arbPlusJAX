@@ -104,6 +104,9 @@ def main() -> int:
     parser.add_argument("--samples", type=int, default=4099)
     parser.add_argument("--pad-multiple", type=int, default=128)
     parser.add_argument("--iterations", type=int, default=20)
+    parser.add_argument("--backend", choices=("auto", "cpu", "gpu"), default="auto")
+    parser.add_argument("--min-gpu-batch-size", type=int, default=2048)
+    parser.add_argument("--startup-prewarm", action="store_true")
     parser.add_argument(
         "--output",
         type=Path,
@@ -115,6 +118,15 @@ def main() -> int:
     pad_to = _next_multiple(args.samples, args.pad_multiple)
     alt_n = max(8, args.samples // 2 + 3)
     records: list[BenchmarkRecord] = []
+
+    if args.startup_prewarm:
+        api.prewarm_core_point_kernels(
+            dtype="float64",
+            backend=args.backend,
+            batch_size=pad_to,
+            shape_bucket_multiple=args.pad_multiple,
+            min_gpu_batch_size=args.min_gpu_batch_size,
+        )
 
     cases: list[tuple[str, str, tuple[object, ...], tuple[object, ...]]] = []
     for dtype in ("float32", "float64"):
@@ -131,9 +143,21 @@ def main() -> int:
     cases.append(("fmpzi_add", "int64", (ia, ib), (ia2, ib2)))
 
     for name, dtype, call_args, alt_args in cases:
-        for implementation, pad_target in (("service_api_unpadded", None), ("service_api_padded", pad_to)):
-            fn = api.bind_point_batch(name, dtype=None if dtype == "int64" else dtype, pad_to=pad_target)
+        for implementation, pad_target, shape_bucket_multiple in (
+            ("service_api_unpadded", None, None),
+            ("service_api_padded", pad_to, None),
+            ("service_api_bucketed", None, args.pad_multiple),
+        ):
+            fn = api.bind_point_batch(
+                name,
+                dtype=None if dtype == "int64" else dtype,
+                pad_to=pad_target,
+                shape_bucket_multiple=shape_bucket_multiple,
+                backend=args.backend,
+                min_gpu_batch_size=args.min_gpu_batch_size,
+            )
             stats, steady = _profile(fn, call_args, alt_args, iterations=args.iterations)
+            diag = fn.diagnostics(*call_args)
             records.append(
                 BenchmarkRecord(
                     benchmark_name="benchmark_core_scalar_service_api.py",
@@ -149,12 +173,21 @@ def main() -> int:
                     measurements=(
                         BenchmarkMeasurement(name="samples", value=args.samples, unit="rows"),
                         BenchmarkMeasurement(name="pad_to", value=pad_target if pad_target is not None else 0, unit="rows"),
+                        BenchmarkMeasurement(
+                            name="shape_bucket_multiple",
+                            value=shape_bucket_multiple if shape_bucket_multiple is not None else 0,
+                            unit="rows",
+                        ),
+                        BenchmarkMeasurement(name="chosen_backend", value=diag.chosen_backend, unit="name"),
+                        BenchmarkMeasurement(name="requested_backend", value=diag.requested_backend, unit="name"),
+                        BenchmarkMeasurement(name="effective_pad_to", value=diag.effective_pad_to or 0, unit="rows"),
+                        BenchmarkMeasurement(name="min_gpu_batch_size", value=args.min_gpu_batch_size, unit="rows"),
                         BenchmarkMeasurement(name="iterations", value=args.iterations, unit="calls"),
                         BenchmarkMeasurement(name="p50_latency_s", value=_percentile(steady, 50), unit="s"),
                         BenchmarkMeasurement(name="p95_latency_s", value=_percentile(steady, 95), unit="s"),
                         BenchmarkMeasurement(name="p99_latency_s", value=_percentile(steady, 99), unit="s"),
                     ),
-                    notes="Public API service-style repeated-call benchmark through api.bind_point_batch.",
+                    notes="Public API service-style repeated-call benchmark through api.bind_point_batch with explicit backend and stable-shape policy.",
                 )
             )
 
@@ -164,7 +197,7 @@ def main() -> int:
         category="scalar",
         records=tuple(records),
         environment=collect_runtime_manifest(Path(__file__).resolve().parents[1], jax_mode="auto"),
-        notes="Repeated-call public API benchmark for the core numeric scalar helper families, including padded vs unpadded service use.",
+        notes="Repeated-call public API benchmark for the core numeric scalar helper families, including padded, bucketed, backend-aware, and optional prewarmed service use.",
     )
     path = write_benchmark_report(args.output, report)
     print(f"report: {path}")

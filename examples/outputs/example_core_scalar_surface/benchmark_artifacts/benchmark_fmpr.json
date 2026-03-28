@@ -5,20 +5,20 @@
   "environment": {
     "env": {
       "ARB_C_REF_DIR": "",
-      "JAX_PLATFORMS": "cpu",
+      "JAX_PLATFORMS": "cuda",
       "PYTHONPATH": "/home/phili/projects/arbplusJAX/src:/home/phili/projects/arbplusJAX/src:",
       "XLA_PYTHON_CLIENT_MEM_FRACTION": "",
       "XLA_PYTHON_CLIENT_PREALLOCATE": ""
     },
     "environment_kind": "wsl",
     "git": {
-      "commit": "5e1bef0ba378e627a93e8dd36747e8edb998d510"
+      "commit": "ec6227c42b6c055115d746c0fe970e18c2a0e067"
     },
     "jax": {
       "available": true,
-      "backend": "cpu",
+      "backend": "gpu",
       "devices": [
-        "TFRT_CPU_0"
+        "cuda:0"
       ],
       "jax_enable_x64": true,
       "requested_mode": "auto"
@@ -35,7 +35,7 @@
       "version": "3.12.12"
     },
     "repo_root": "/home/phili/projects/arbplusJAX",
-    "timestamp_utc": "2026-03-27T18:12:27Z"
+    "timestamp_utc": "2026-03-28T10:53:09Z"
   },
   "notes": "",
   "records": [
@@ -47,9 +47,9 @@
       "ad_residual": null,
       "benchmark_name": "benchmark_fmpr.py",
       "category": "scalar",
-      "cold_time_s": 0.03271285299996407,
+      "cold_time_s": 0.06780483799957437,
       "concern": "scalar_speed",
-      "device": "cpu",
+      "device": "gpu",
       "dtype": "float64",
       "implementation": "repo_native",
       "measurements": [],
@@ -57,10 +57,10 @@
       "notes": "",
       "operation": "fmpr_mul",
       "python_overhead_s": null,
-      "recompile_time_s": 0.020384930999966855,
+      "recompile_time_s": 0.038083388999439194,
       "residual": null,
       "tags": [],
-      "warm_time_s": 9.344899998116792e-05
+      "warm_time_s": 0.0020432286667831554
     }
   ],
   "schema_version": "v1"

@@ -15,6 +15,18 @@ numerical runtimes in a consistent way.
 This is a standards document, not a contract. Binding runtime/API guarantees
 belong in library-specific contract documents.
 
+Interpret this document in two layers:
+
+- reusable JAX-library rule:
+  the part that should generalize across JAX-first numerical libraries
+- arbPlusJAX specialization:
+  the part that names this repo's concrete surface kinds, folders, helper
+  layers, or rollout choices
+
+Public API surface categories themselves are defined in:
+
+- [api_surface_kinds_standard.md](/docs/standards/api_surface_kinds_standard.md)
+
 ## Scope
 
 Use this standard for libraries that:
@@ -24,6 +36,33 @@ Use this standard for libraries that:
 - need consistent dtype handling across subsystems;
 - return diagnostics or profiling metadata;
 - want low import overhead without hiding the public API.
+
+## Layering Rule
+
+Write runtime policy so the generic JAX rule remains visible first.
+
+That means:
+
+- keep reusable JAX execution principles library-agnostic where possible
+- put repo-specific naming, helper ownership, and family specialization in
+  clearly marked arbPlusJAX mappings or examples
+- do not let one repo's current module layout masquerade as a universal JAX
+  rule
+
+Examples of generic rules:
+
+- continuous values should remain dynamic where possible
+- discrete method choice should remain explicit and compile-relevant
+- diagnostics should be structured and opt-in
+- logging should stay outside the hot kernel
+- compile ownership and reuse boundaries should be explicit
+
+Examples of arbPlusJAX specializations:
+
+- point/basic/adaptive/rigorous mode naming
+- binder and prepare/apply surface names in `api.py`
+- repo-owned metadata fields and generated ledgers
+- current runtime helper placement under `src/arbplusjax/`
 
 ## Core Principles
 
@@ -39,6 +78,17 @@ Use this standard for libraries that:
 - Do not let observability or validation features slow normal numerical evaluation.
 
 ## Public API Shape
+
+General JAX-library rule:
+
+- keep the public boundary explicit
+- do not hide materially different execution paths behind one opaque selector
+
+arbPlusJAX specialization:
+
+- the package root and `api` facade are the main public runtime boundaries
+- the concrete surface-kind taxonomy is owned by
+  [api_surface_kinds_standard.md](/docs/standards/api_surface_kinds_standard.md)
 
 ### Package boundary
 
@@ -63,6 +113,10 @@ Recommended groups:
 - Expose materially different execution paths separately.
 - Do not collapse direct, batched, adaptive, raw, tuned, and policy-driven paths into one opaque selector.
 - High-level auto-routing is allowed, but it does not replace explicit variants.
+
+The canonical names for these categories are owned by:
+
+- [api_surface_kinds_standard.md](/docs/standards/api_surface_kinds_standard.md)
 
 ## Runtime Configuration Standard
 

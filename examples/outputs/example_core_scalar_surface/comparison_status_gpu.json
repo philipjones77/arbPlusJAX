@@ -1,0 +1,14 @@
+[
+  {
+    "script": "benchmarks/compare_arb_core.py",
+    "status": "ok",
+    "stdout": "arb_exp          | ok=True | max_abs_diff=4.547e-13\narb_log          | ok=True | max_abs_diff=5.551e-17\narb_sqrt         | ok=True | max_abs_diff=0.000e+00\narb_sin          | ok=True | max_abs_diff=1.110e-16\narb_cos          | ok=True | max_abs_diff=1.110e-16\narb_tan          | ok=True | max_abs_diff=3.553e-15\narb_sinh         | ok=True | max_abs_diff=2.274e-13\narb_cosh         | ok=True | max_abs_diff=2.274e-13\narb_tanh         | ok=True | max_abs_diff=1.110e-16\n\nresult: PASS\n",
+    "stderr": ""
+  },
+  {
+    "script": "benchmarks/compare_acb_core.py",
+    "status": "ok",
+    "stdout": "acb_exp          | ok=True | max_abs_diff=3.553e-15\nacb_log          | ok=True | max_abs_diff=4.441e-16\nacb_sqrt         | ok=True | max_abs_diff=1.467e-14\nacb_sin          | ok=True | max_abs_diff=7.105e-15\nacb_cos          | ok=True | max_abs_diff=1.421e-14\nacb_tan          | ok=True | max_abs_diff=1.066e-14\nacb_sinh         | ok=True | max_abs_diff=1.421e-14\nacb_cosh         | ok=True | max_abs_diff=1.421e-14\nacb_tanh         | ok=True | max_abs_diff=2.665e-15\n\nresult: PASS\n",
+    "stderr": ""
+  }
+]

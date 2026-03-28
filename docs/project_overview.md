@@ -2,7 +2,7 @@ Last updated: 2026-03-25T00:00:00Z
 
 # Project Overview
 
-arbPlusJAX is the active hardened JAX numerical-kernel workspace. The repository separates runtime code, conformance tests, benchmarks, examples, tooling, contracts, and documentation into stable top-level folders.
+arbPlusJAX is the active hardened JAX numerical-kernel workspace. The repository separates runtime code, conformance tests, benchmarks, examples, tooling, contracts, documentation, and publication manuscripts into stable top-level folders.
 
 ## Repo Root
 
@@ -10,6 +10,7 @@ arbPlusJAX is the active hardened JAX numerical-kernel workspace. The repository
 - `tests/`
 - `benchmarks/`
 - `configs/`
+- `papers/`
 - `tools/`
 - `docs/`
 - `contracts/`

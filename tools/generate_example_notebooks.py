@@ -215,31 +215,40 @@ def _core_scalar_notebook() -> list:
         ),
         *_production_pattern_cells(
             "Production Pattern",
-            "Production use should bind once, keep dtype stable, and pad or chunk batches when repeated calls would otherwise trigger shape churn. "
-            "For helper scalar families, `bind_point_batch()` is the main service-style entrypoint.",
+            "Production use should bind once, keep dtype stable, choose backend policy explicitly, and use padding or shape buckets when repeated calls would otherwise trigger shape churn. "
+            "For helper scalar families, `bind_point_batch()` / `bind_point_batch_with_diagnostics()` are the main service-style entrypoints, and `choose_point_batch_policy()` plus `prewarm_core_point_kernels()` define the intended repeated-call policy.",
             "service_real = jnp.linspace(0.1, 1.0, 7, dtype=jnp.float32)\n"
             "service_complex = jnp.asarray([0.1 + 0.2j, 0.3 - 0.1j, 0.5 + 0.4j], dtype=jnp.complex64)\n"
-            "arf_bound = api.bind_point_batch('arf_add', dtype='float32', pad_to=16, chunk_size=4)\n"
-            "acf_bound = api.bind_point_batch('acf_mul', dtype='float32', pad_to=16, chunk_size=4)\n"
-            "fpwrap_bound = api.bind_point_batch('arb_fpwrap_double_exp', dtype='float32', pad_to=16)\n"
+            "scalar_policy = api.choose_point_batch_policy(batch_size=service_real.shape[0], dtype='float32', backend='auto', shape_bucket_multiple=16, min_gpu_batch_size=64)\n"
+            "api.prewarm_core_point_kernels(names=('arf_add', 'acf_mul', 'arb_fpwrap_double_exp'), dtype='float32', backend='auto', batch_size=16, shape_bucket_multiple=16, min_gpu_batch_size=64)\n"
+            "arf_bound = api.bind_point_batch_with_diagnostics('arf_add', dtype='float32', shape_bucket_multiple=16, chunk_size=4, backend='auto', min_gpu_batch_size=64)\n"
+            "acf_bound = api.bind_point_batch_with_diagnostics('acf_mul', dtype='float32', shape_bucket_multiple=16, chunk_size=4, backend='auto', min_gpu_batch_size=64)\n"
+            "fpwrap_bound = api.bind_point_batch_with_diagnostics('arb_fpwrap_double_exp', dtype='float32', shape_bucket_multiple=16, backend='auto', min_gpu_batch_size=64)\n"
+            "arf_vals, arf_diag = arf_bound(service_real, service_real)\n"
+            "acf_vals, acf_diag = acf_bound(service_complex, service_complex)\n"
+            "fpwrap_vals, fpwrap_diag = fpwrap_bound(service_real)\n"
             "service_results = {\n"
-            "    'arf_bound': arf_bound(service_real, service_real),\n"
-            "    'acf_bound': acf_bound(service_complex, service_complex),\n"
-            "    'fpwrap_bound': fpwrap_bound(service_real),\n"
+            "    'scalar_policy': scalar_policy,\n"
+            "    'arf_bound': arf_vals,\n"
+            "    'arf_diag': arf_diag,\n"
+            "    'acf_bound': acf_vals,\n"
+            "    'acf_diag': acf_diag,\n"
+            "    'fpwrap_bound': fpwrap_vals,\n"
+            "    'fpwrap_diag': fpwrap_diag,\n"
             "}\n"
             "display(service_results)",
             "To benchmark another scalar family, either add another existing benchmark entrypoint to the `bench_dir` loop below or extend the representative operations in "
             "`benchmark_core_scalar_service_api.py` / `benchmark_core_scalar_batch_padding.py` and rerun this notebook."
         ),
         *_fast_jax_pattern_cells(
-            "For the true compiled point path, use `api.bind_point_batch_jit(...)` with stable `dtype` and `pad_to`. "
-            "This is the API-level fast-JAX surface for repeated point evaluation.",
+            "For the true compiled point path, use `api.bind_point_batch_jit(...)` or `api.bind_point_batch_jit_with_diagnostics(...)` with stable `dtype` and `pad_to` or `shape_bucket_multiple`. "
+            "This is the API-level fast-JAX surface for repeated point evaluation, while the diagnostics layer makes the chosen backend and effective padded shape explicit.",
             "import jax\n"
             "fast_real = jnp.linspace(0.1, 1.2, 8, dtype=jnp.float32)\n"
-            "fast_bound = api.bind_point_batch_jit('arb_fpwrap_double_exp', dtype='float32', pad_to=8)\n"
-            "fast_vals = fast_bound(fast_real)\n"
+            "fast_bound = api.bind_point_batch_jit_with_diagnostics('arb_fpwrap_double_exp', dtype='float32', shape_bucket_multiple=8, backend='auto', min_gpu_batch_size=64)\n"
+            "fast_vals, fast_diag = fast_bound(fast_real)\n"
             "fast_vmap = jax.vmap(lambda t: api.eval_point('arb_fpwrap_double_exp', t, dtype='float32'))(fast_real)\n"
-            "display({'jit_shape': fast_vals.shape, 'jit_dtype': fast_vals.dtype, 'jit_matches_vmap': bool(jnp.allclose(fast_vals, fast_vmap))})"
+            "display({'jit_shape': fast_vals.shape, 'jit_dtype': fast_vals.dtype, 'jit_matches_vmap': bool(jnp.allclose(fast_vals, fast_vmap)), 'jit_diag': fast_diag})"
         ),
         *_ad_pattern_cells(
             "AD should be shown in both directions on the production-facing scalar surface: through the main value argument and through the family parameter. "
@@ -324,6 +333,7 @@ def _core_scalar_notebook() -> list:
             "run([PYTHON, 'benchmarks/benchmark_acf.py', '--samples', '4096', '--which', 'mul', '--runs', '3', '--output', str(bench_dir / 'benchmark_acf.json')])\n"
             "run([PYTHON, 'benchmarks/benchmark_fmpr.py', '--samples', '4096', '--which', 'mul', '--runs', '3', '--output', str(bench_dir / 'benchmark_fmpr.json')])\n"
             "run([PYTHON, 'benchmarks/benchmark_fmpzi.py', '--samples', '4096', '--which', 'add', '--runs', '3', '--output', str(bench_dir / 'benchmark_fmpzi.json')])\n"
+            "run([PYTHON, 'benchmarks/benchmark_core_scalar_service_api.py', '--samples', '4099', '--pad-multiple', '128', '--iterations', '3', '--backend', JAX_MODE if JAX_MODE in ('cpu', 'gpu') else 'auto', '--startup-prewarm', '--output', str(bench_dir / 'benchmark_core_scalar_service_api.json')])\n"
             "run([PYTHON, 'benchmarks/benchmark_core_scalar_batch_padding.py', '--samples', '4099', '--pad-multiple', '128', '--runs', '3', '--output', str(bench_dir / 'benchmark_core_scalar_batch_padding.json')])\n"
             "bench_payloads = []\n"
             "for path in sorted(bench_dir.glob('*.json')):\n"
@@ -336,13 +346,16 @@ def _core_scalar_notebook() -> list:
         ),
         nbf.v4.new_markdown_cell(
             "## Batch Padding Speed\n\n"
-            "Measure padded versus unpadded API batch execution separately. "
+            "Measure padded versus unpadded API batch execution separately, and keep the backend-policy diagnostics visible. "
             "This is distinct from the correctness or containment sweeps."
         ),
         nbf.v4.new_code_cell(
-            "batch_padding_df = bench_df[bench_df['implementation'].isin(['api_batch_unpadded', 'api_batch_padded'])].copy()\n"
+            "batch_padding_df = bench_df[bench_df['implementation'].isin(['api_batch_unpadded', 'api_batch_padded', 'service_api_unpadded', 'service_api_padded', 'service_api_bucketed'])].copy()\n"
             "batch_padding_df.to_csv(EXAMPLE_OUTPUT_ROOT / f'batch_padding_summary_{JAX_MODE}.csv', index=False)\n"
-            "display(batch_padding_df[['operation', 'implementation', 'warm_time_s', 'recompile_time_s']])"
+            "cols = ['operation', 'implementation', 'warm_time_s', 'recompile_time_s']\n"
+            "if 'measurements' in batch_padding_df.columns:\n"
+            "    pass\n"
+            "display(batch_padding_df[cols])"
         ),
         nbf.v4.new_markdown_cell(
             "## Comparison Summary\n\n"
@@ -387,7 +400,8 @@ def _core_scalar_notebook() -> list:
         ),
         nbf.v4.new_code_cell(
             "if not batch_padding_df.empty:\n"
-            "    pad_pivot = batch_padding_df.pivot(index='operation', columns='implementation', values='warm_time_s')\n"
+            "    pad_grouped = batch_padding_df.groupby(['operation', 'implementation'], as_index=False)['warm_time_s'].mean()\n"
+            "    pad_pivot = pad_grouped.pivot(index='operation', columns='implementation', values='warm_time_s')\n"
             "    ax = pad_pivot.plot(kind='bar', figsize=(10, 4), title='Batch Padding Warm Time')\n"
             "    ax.set_ylabel('warm_time_s')\n"
             "    plt.tight_layout()\n"
@@ -478,15 +492,19 @@ def _api_surface_notebook() -> list:
             "Keep matrix plans cached when an operation supports prepare/apply separation.",
             "real_batch = jnp.asarray([0.5, 1.0, 1.5, 2.0, 2.5], dtype=jnp.float64)\n"
             "gamma_bound = api.bind_point_batch('incomplete_gamma_upper', dtype='float64', pad_to=8, method='quadrature', regularized=True)\n"
-            "solve_bound = api.bind_interval_batch('arb_mat_solve', mode='basic', dtype='float64', pad_to=4, prec_bits=53)\n"
+            "interval_policy = api.choose_interval_batch_policy(batch_size=2, dtype='float64', mode='basic', backend='auto', shape_bucket_multiple=4, min_gpu_batch_size=16)\n"
+            "solve_bound = api.bind_interval_batch_jit_with_diagnostics('arb_mat_solve', mode='basic', dtype='float64', shape_bucket_multiple=4, prec_bits=53, backend='auto', min_gpu_batch_size=16)\n"
             "a_batch = di.interval(jnp.stack([a_mid, a_mid], axis=0), jnp.stack([a_mid, a_mid], axis=0))\n"
             "rhs_batch = di.interval(jnp.stack([rhs_mid, rhs_mid], axis=0), jnp.stack([rhs_mid, rhs_mid], axis=0))\n"
             "vec_mid = jnp.array([1.0, 2.0], dtype=jnp.float64)\n"
             "vec = di.interval(vec_mid, vec_mid)\n"
             "cached_plan = api.eval_point('arb_mat_matvec_cached_prepare', a)\n"
+            "solve_out, solve_diag = solve_bound(a_batch, rhs_batch)\n"
             "api_service_results = {\n"
             "    'gamma_bound': gamma_bound(real_batch, jnp.asarray([1.0, 1.1, 1.2, 1.3, 1.4], dtype=jnp.float64)),\n"
-            "    'solve_bound': solve_bound(a_batch, rhs_batch),\n"
+            "    'interval_policy_backend': interval_policy.chosen_backend,\n"
+            "    'solve_bound': solve_out,\n"
+            "    'solve_diag_backend': solve_diag.chosen_backend,\n"
             "    'cached_matvec': api.eval_point('arb_mat_matvec_cached_apply', cached_plan, vec),\n"
             "}\n"
             "display(api_service_results)",
@@ -1475,10 +1493,12 @@ def _gamma_family_surface_notebook() -> list:
             "Gamma-family service calls should bind the method and precision policy up front and then reuse the bound callable over stable batch shapes. "
             "Diagnostics are optional but should be sampled in staging so fallback behavior is visible before deployment.",
             "gamma_bound = api.bind_point_batch('incomplete_gamma_upper', dtype='float64', pad_to=8, method='quadrature', regularized=True)\n"
-            "gamma_interval_bound = api.bind_interval_batch('incomplete_gamma_upper', mode='basic', dtype='float64', pad_to=8, prec_bits=53, method='quadrature', regularized=True)\n"
+            "gamma_interval_bound = api.bind_interval_batch_with_diagnostics('incomplete_gamma_upper', mode='basic', dtype='float64', shape_bucket_multiple=8, prec_bits=53, method='quadrature', regularized=True, backend='auto', min_gpu_batch_size=16)\n"
+            "gamma_interval_out, gamma_interval_diag = gamma_interval_bound(s, z)\n"
             "gamma_service = {\n"
             "    'point_bound': gamma_bound(s, z),\n"
-            "    'interval_bound': gamma_interval_bound(s, z),\n"
+            "    'interval_bound': gamma_interval_out,\n"
+            "    'interval_diag_backend': gamma_interval_diag.chosen_backend,\n"
             "}\n"
             "display(gamma_service)",
             "To benchmark more gamma-family functions, extend the representative operation list in `benchmark_special_function_service_api.py` or add a dedicated comparison/benchmark entrypoint if the function has special reference needs."
@@ -1740,14 +1760,14 @@ def _hypgeom_family_surface_notebook() -> list:
             "a_iv = di.interval(a, a + 0.01)\n"
             "b_iv = di.interval(b, b + 0.01)\n"
             "z_iv = di.interval(z, z + 0.01)\n"
-            "interval_bound = api.bind_interval_batch('hypgeom.arb_hypgeom_1f1', mode='rigorous', dtype='float64', pad_to=8, prec_bits=53)\n"
+            "interval_bound = api.bind_interval_batch_jit_with_diagnostics('hypgeom.arb_hypgeom_1f1', mode='rigorous', dtype='float64', shape_bucket_multiple=8, prec_bits=53, backend='auto', min_gpu_batch_size=16)\n"
             "s = di.interval(jnp.asarray([1.2, 1.25], dtype=jnp.float64), jnp.asarray([1.25, 1.3], dtype=jnp.float64))\n"
             "x = di.interval(jnp.asarray([0.3, 0.35], dtype=jnp.float64), jnp.asarray([0.35, 0.4], dtype=jnp.float64))\n"
             "sc = acb_core.acb_box(di.interval(jnp.float64(1.2), jnp.float64(1.25)), di.interval(jnp.float64(-0.05), jnp.float64(0.05)))\n"
             "zc = acb_core.acb_box(di.interval(jnp.float64(0.3), jnp.float64(0.35)), di.interval(jnp.float64(-0.02), jnp.float64(0.02)))\n"
             "direct_results = {\n"
             "    'onef1_point': point_bound(a, b, z),\n"
-            "    'onef1_rigorous': interval_bound(a_iv, b_iv, z_iv),\n"
+            "    'onef1_rigorous': interval_bound(a_iv, b_iv, z_iv)[0],\n"
             "    'gamma_lower_regularized': hypgeom_wrappers.arb_hypgeom_gamma_lower_batch_mode_padded(s, x, pad_to=4, impl='rigorous', prec_bits=53, regularized=True),\n"
             "    'gamma_upper_regularized': hypgeom_wrappers.arb_hypgeom_gamma_upper_batch_mode_padded(s, x, pad_to=4, impl='adaptive', prec_bits=53, regularized=True),\n"
             "    'complex_gamma_lower': hypgeom_wrappers.acb_hypgeom_gamma_lower_mode(sc, zc, impl='rigorous', prec_bits=53, regularized=True),\n"
@@ -1759,10 +1779,12 @@ def _hypgeom_family_surface_notebook() -> list:
             "Production Pattern",
             "Hypergeom production usage should keep family ownership explicit: use the compiled point binder for repeated point traffic, keep `pad_to` fixed, and use the family-owned mode batch wrappers or interval binder for tighter interval traffic.",
             "onef1_service = api.bind_point_batch_jit('hypgeom.arb_hypgeom_1f1', dtype='float64', pad_to=8)\n"
-            "onef1_interval_service = api.bind_interval_batch('hypgeom.arb_hypgeom_1f1', mode='rigorous', dtype='float64', pad_to=8, prec_bits=53)\n"
+            "onef1_interval_service = api.bind_interval_batch_jit_with_diagnostics('hypgeom.arb_hypgeom_1f1', mode='rigorous', dtype='float64', shape_bucket_multiple=8, prec_bits=53, backend='auto', min_gpu_batch_size=16)\n"
+            "interval_out, interval_diag = onef1_interval_service(a_iv, b_iv, z_iv)\n"
             "service_results = {\n"
             "    'point_reuse': onef1_service(a, b, z),\n"
-            "    'interval_reuse': onef1_interval_service(a_iv, b_iv, z_iv),\n"
+            "    'interval_reuse': interval_out,\n"
+            "    'interval_diag_backend': interval_diag.chosen_backend,\n"
             "    'family_mode_wrapper': hypgeom_wrappers.arb_hypgeom_gamma_upper_batch_mode_padded(s, x, pad_to=4, impl='adaptive', prec_bits=53, regularized=True),\n"
             "}\n"
             "display(service_results)",
