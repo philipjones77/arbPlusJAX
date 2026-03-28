@@ -111,33 +111,33 @@ CURVATURE_EVIDENCE = {
 
 FAMILY_AD_EVIDENCE: dict[str, dict[str, tuple[str, ...]] | str] = {
     "core": {
-        "tests": ("tests/test_parameterized_family_ad_directions.py",),
+        "tests": ("tests/test_parameterized_family_ad_directions.py", "tests/test_parameterized_public_ad_audit.py"),
         "benchmarks": ("benchmarks/public_surface_ad_benchmark.py",),
         "notebooks": ("examples/example_core_scalar_surface.ipynb", "examples/example_api_surface.ipynb"),
     },
     "bessel": {
-        "tests": ("tests/test_special_function_ad_directions.py",),
+        "tests": ("tests/test_special_function_ad_directions.py", "tests/test_parameterized_public_ad_audit.py"),
         "benchmarks": ("benchmarks/special_function_ad_benchmark.py",),
         "notebooks": ("examples/example_bessel_modes_sweep.ipynb",),
     },
     "gamma": {
-        "tests": ("tests/test_special_function_ad_directions.py",),
+        "tests": ("tests/test_special_function_ad_directions.py", "tests/test_parameterized_public_ad_audit.py"),
         "benchmarks": ("benchmarks/special_function_ad_benchmark.py",),
         "notebooks": ("examples/example_gamma_family_surface.ipynb",),
     },
     "hypergeometric": {
-        "tests": ("tests/test_special_function_ad_directions.py",),
+        "tests": ("tests/test_special_function_ad_directions.py", "tests/test_parameterized_public_ad_audit.py"),
         "benchmarks": ("benchmarks/special_function_ad_benchmark.py",),
         "notebooks": ("examples/example_hypgeom_family_surface.ipynb",),
     },
     "barnes": {
-        "tests": ("tests/test_special_function_ad_directions.py",),
+        "tests": ("tests/test_special_function_ad_directions.py", "tests/test_parameterized_public_ad_audit.py"),
         "benchmarks": ("benchmarks/special_function_ad_benchmark.py",),
         "notebooks": ("examples/example_barnes_double_gamma_surface.ipynb",),
     },
     "integration": "n/a_non_parameterized",
     "matrix": {
-        "tests": ("tests/test_parameterized_family_ad_directions.py",),
+        "tests": ("tests/test_parameterized_family_ad_directions.py", "tests/test_parameterized_public_ad_audit.py"),
         "benchmarks": ("benchmarks/public_surface_ad_benchmark.py",),
         "notebooks": (
             "examples/example_dense_matrix_surface.ipynb",

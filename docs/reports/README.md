@@ -32,6 +32,7 @@ Current reports:
 - [matrix_free_krylov_benchmark.md](/docs/reports/matrix_free_krylov_benchmark.md)
 - [matrix_surface_workbook.md](/docs/reports/matrix_surface_workbook.md)
 - [new_functions.md](/docs/reports/new_functions.md)
+- [parameterized_ad_verification.md](/docs/reports/parameterized_ad_verification.md)
 - [point_basic_function_verification.md](/docs/reports/point_basic_function_verification.md)
 - [point_basic_surface_status.md](/docs/reports/point_basic_surface_status.md)
 - [point_fast_jax_category_matrix.md](/docs/reports/point_fast_jax_category_matrix.md)

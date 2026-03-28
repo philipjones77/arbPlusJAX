@@ -419,8 +419,7 @@ def arb_mat_is_finite_point(a: jax.Array) -> jax.Array:
 
 
 def arb_mat_is_exact_point(a: jax.Array) -> jax.Array:
-    del a
-    return jnp.asarray(True)
+    return jnp.ones(_arb_mat_point_matrix(a).shape[:-2], dtype=bool)
 
 
 def arb_mat_dense_lu_solve_plan_prepare_point(a: jax.Array) -> mat_common.DenseLUSolvePlan:
@@ -467,6 +466,11 @@ def arb_mat_lu_solve_point(plan: mat_common.DenseLUSolvePlan | tuple[jax.Array, 
     )
     out = lax.linalg.triangular_solve(u_mid, y, left_side=True, lower=False, unit_diagonal=False)
     return out[..., 0] if vector_rhs else out
+
+
+@partial(jax.jit, static_argnames=("r0", "r1", "c0", "c1"))
+def arb_mat_submatrix_api_point(a: jax.Array, *, r0: int, r1: int, c0: int, c1: int) -> jax.Array:
+    return arb_mat_submatrix_point(a, r0, r1, c0, c1)
 
 
 def arb_mat_dense_lu_solve_plan_apply_point(plan: mat_common.DenseLUSolvePlan | tuple[jax.Array, jax.Array, jax.Array], b: jax.Array) -> jax.Array:
@@ -985,8 +989,7 @@ def acb_mat_is_finite_point(a: jax.Array) -> jax.Array:
 
 
 def acb_mat_is_exact_point(a: jax.Array) -> jax.Array:
-    del a
-    return jnp.asarray(True)
+    return jnp.ones(_acb_mat_point_matrix(a).shape[:-2], dtype=bool)
 
 
 def acb_mat_is_real_point(a: jax.Array) -> jax.Array:
@@ -1091,6 +1094,11 @@ def acb_mat_lu_solve_point(plan: mat_common.DenseLUSolvePlan | tuple[jax.Array, 
     )
     out = lax.linalg.triangular_solve(u_mid, y, left_side=True, lower=False, unit_diagonal=False)
     return out[..., 0] if vector_rhs else out
+
+
+@partial(jax.jit, static_argnames=("r0", "r1", "c0", "c1"))
+def acb_mat_submatrix_api_point(a: jax.Array, *, r0: int, r1: int, c0: int, c1: int) -> jax.Array:
+    return acb_mat_submatrix_point(a, r0, r1, c0, c1)
 
 
 def acb_mat_dense_lu_solve_plan_apply_point(plan: mat_common.DenseLUSolvePlan | tuple[jax.Array, jax.Array, jax.Array], b: jax.Array) -> jax.Array:

@@ -28,6 +28,7 @@ GENERATED_BY = {
     "docs/reports/point_fast_jax_category_matrix.md": "python tools/point_fast_jax_category_report.py",
     "docs/reports/point_fast_jax_function_inventory.md": "python tools/point_fast_jax_function_report.py",
     "docs/reports/point_fast_jax_verification.md": "python tools/point_fast_jax_verification_report.py",
+    "docs/reports/parameterized_ad_verification.md": "python tools/parameterized_ad_verification_report.py",
     "docs/reports/point_basic_surface_status.md": "python tools/point_basic_surface_report.py",
     "docs/reports/point_basic_function_verification.md": "python tools/point_basic_function_verification_report.py",
     "docs/reports/repo_standards_verification.md": "python tools/repo_standards_verification_report.py",

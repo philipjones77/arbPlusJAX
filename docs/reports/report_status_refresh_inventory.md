@@ -35,6 +35,7 @@ Policy:
 | [docs/reports/matrix_free_krylov_benchmark.md](/docs/reports/matrix_free_krylov_benchmark.md) | `manual-authoritative` | `update the owning source document directly` |
 | [docs/reports/matrix_surface_workbook.md](/docs/reports/matrix_surface_workbook.md) | `generated` | `python benchmarks/matrix_surface_workbook.py --n 4 --warmup 0 --runs 1 --steps 4` |
 | [docs/reports/new_functions.md](/docs/reports/new_functions.md) | `generated` | `python tools/function_provenance_report.py` |
+| [docs/reports/parameterized_ad_verification.md](/docs/reports/parameterized_ad_verification.md) | `generated` | `python tools/parameterized_ad_verification_report.py` |
 | [docs/reports/point_basic_function_verification.md](/docs/reports/point_basic_function_verification.md) | `generated` | `python tools/point_basic_function_verification_report.py` |
 | [docs/reports/point_basic_surface_status.md](/docs/reports/point_basic_surface_status.md) | `generated` | `python tools/point_basic_surface_report.py` |
 | [docs/reports/point_fast_jax_category_matrix.md](/docs/reports/point_fast_jax_category_matrix.md) | `generated` | `python tools/point_fast_jax_category_report.py` |

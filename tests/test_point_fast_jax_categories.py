@@ -4,6 +4,7 @@ import jax
 import jax.numpy as jnp
 
 from arbplusjax import api
+from arbplusjax import acb_core
 from arbplusjax import double_interval as di
 from arbplusjax import jrb_mat
 from arbplusjax import srb_mat
@@ -11,6 +12,11 @@ from arbplusjax import srb_mat
 
 def _real_interval_batch(values: jax.Array) -> jax.Array:
     return di.interval(values, values)
+
+
+def _complex_box_batch(values: jax.Array) -> jax.Array:
+    vv = jnp.asarray(values)
+    return acb_core.acb_box(di.interval(jnp.real(vv), jnp.real(vv)), di.interval(jnp.imag(vv), jnp.imag(vv)))
 
 
 def test_core_scalar_point_fast_jax_surface_has_compiled_batch_and_vmap_parity() -> None:
@@ -250,6 +256,87 @@ def test_complex_batch_helper_and_barnes_fastpaths_have_compiled_batch_parity() 
     assert jnp.allclose(got_elliptic_helper, ref_elliptic_helper)
     assert jnp.allclose(got_barnes, ref_barnes)
     assert jnp.allclose(got_log_barnes, ref_log_barnes)
+
+
+def test_matrix_residual_fastpaths_have_compiled_batch_parity() -> None:
+    ar = jnp.asarray(
+        [
+            [[2.0, 0.0], [0.0, 3.0]],
+            [[3.0, 1.0], [1.0, 2.0]],
+            [[1.5, 0.25], [0.25, 2.5]],
+            [[4.0, -0.5], [-0.5, 2.5]],
+        ],
+        dtype=jnp.float64,
+    )
+    br = jnp.asarray(
+        [
+            [[1.0, 0.5], [0.5, 1.5]],
+            [[0.5, 0.0], [0.0, 0.5]],
+            [[0.25, 0.25], [0.25, 0.25]],
+            [[0.75, 0.1], [0.1, 0.75]],
+        ],
+        dtype=jnp.float64,
+    )
+    ai = _real_interval_batch(ar)
+    bi = _real_interval_batch(br)
+    vr = _real_interval_batch(jnp.asarray([[1.0, 2.0], [0.5, -1.0], [1.5, 0.25], [-0.5, 1.25]], dtype=jnp.float64))
+
+    ac = jnp.asarray(
+        [
+            [[2.0 + 0.0j, 0.0 + 0.0j], [0.0 + 0.0j, 3.0 + 0.0j]],
+            [[3.0 + 0.0j, 1.0 + 0.2j], [1.0 - 0.2j, 2.0 + 0.0j]],
+            [[1.5 + 0.0j, 0.25 + 0.1j], [0.25 - 0.1j, 2.5 + 0.0j]],
+            [[4.0 + 0.0j, -0.5 + 0.15j], [-0.5 - 0.15j, 2.5 + 0.0j]],
+        ],
+        dtype=jnp.complex128,
+    )
+    bc = jnp.asarray(
+        [
+            [[1.0 + 0.0j, 0.5 + 0.1j], [0.5 - 0.1j, 1.5 + 0.0j]],
+            [[0.5 + 0.0j, 0.0 + 0.0j], [0.0 + 0.0j, 0.5 + 0.0j]],
+            [[0.25 + 0.0j, 0.25 + 0.05j], [0.25 - 0.05j, 0.25 + 0.0j]],
+            [[0.75 + 0.0j, 0.1 + 0.05j], [0.1 - 0.05j, 0.75 + 0.0j]],
+        ],
+        dtype=jnp.complex128,
+    )
+    aci = _complex_box_batch(ac)
+    bci = _complex_box_batch(bc)
+    vc = _complex_box_batch(jnp.asarray([[1.0 + 0.0j, 2.0 + 0.0j], [0.5 + 0.0j, -1.0 + 0.0j], [1.5 + 0.0j, 0.25 + 0.0j], [-0.5 + 0.0j, 1.25 + 0.0j]], dtype=jnp.complex128))
+
+    bound_real_exp = api.bind_point_batch_jit("arb_mat_exp", dtype="float64", pad_to=4)
+    bound_real_charpoly = api.bind_point_batch_jit("arb_mat_charpoly", dtype="float64", pad_to=4)
+    bound_real_solve = api.bind_point_batch_jit("arb_mat_mat_solve", dtype="float64", pad_to=4)
+    bound_real_flag = api.bind_point_batch_jit("arb_mat_is_diag", dtype="float64", pad_to=4)
+    bound_complex_exp = api.bind_point_batch_jit("acb_mat_exp", pad_to=4)
+    bound_complex_charpoly = api.bind_point_batch_jit("acb_mat_charpoly", pad_to=4)
+    bound_complex_solve = api.bind_point_batch_jit("acb_mat_mat_solve", pad_to=4)
+    bound_complex_conjugate = api.bind_point_batch_jit("acb_mat_conjugate", pad_to=4)
+
+    got_real_exp = bound_real_exp(ai)
+    ref_real_exp = jax.vmap(lambda a: api.eval_point("arb_mat_exp", a, dtype="float64"))(ai)
+    got_real_charpoly = bound_real_charpoly(ai)
+    ref_real_charpoly = jax.vmap(lambda a: api.eval_point("arb_mat_charpoly", a, dtype="float64"))(ai)
+    got_real_solve = bound_real_solve(ai, bi)
+    ref_real_solve = jax.vmap(lambda a, b: api.eval_point("arb_mat_mat_solve", a, b, dtype="float64"))(ai, bi)
+    got_real_flag = bound_real_flag(ai)
+    ref_real_flag = jax.vmap(lambda a: api.eval_point("arb_mat_is_diag", a, dtype="float64"))(ai)
+    got_complex_exp = bound_complex_exp(aci)
+    ref_complex_exp = jax.vmap(lambda a: api.eval_point("acb_mat_exp", a))(aci)
+    got_complex_charpoly = bound_complex_charpoly(aci)
+    ref_complex_charpoly = jax.vmap(lambda a: api.eval_point("acb_mat_charpoly", a))(aci)
+    got_complex_solve = bound_complex_solve(aci, bci)
+    ref_complex_solve = jax.vmap(lambda a, b: api.eval_point("acb_mat_mat_solve", a, b))(aci, bci)
+    got_complex_conjugate = bound_complex_conjugate(aci)
+    ref_complex_conjugate = jax.vmap(lambda a: api.eval_point("acb_mat_conjugate", a))(aci)
+
+    assert jnp.allclose(got_real_exp, ref_real_exp)
+    assert jnp.allclose(got_real_charpoly, ref_real_charpoly)
+    assert jnp.allclose(got_real_solve, ref_real_solve)
+    assert jnp.allclose(got_real_flag, ref_real_flag)
+    assert jnp.allclose(got_complex_exp, ref_complex_exp)
+    assert jnp.allclose(got_complex_charpoly, ref_complex_charpoly)
+    assert jnp.allclose(got_complex_solve, ref_complex_solve)
+    assert jnp.allclose(got_complex_conjugate, ref_complex_conjugate)
 
 
 def test_interval_precision_point_fast_jax_surface_has_compiled_batch_and_basic_containment() -> None:

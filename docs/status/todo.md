@@ -1,4 +1,4 @@
-Last updated: 2026-03-25T00:00:00Z
+Last updated: 2026-03-27T00:00:00Z
 
 # TODO
 
@@ -20,7 +20,7 @@ Status legend:
 
 Current phase snapshot:
 - Tier 0 architecture/API: `in_progress`
-- point-fast JAX conversion of public point mode across all six categories: `in_progress`
+- point-fast JAX conversion of public point mode across all six categories: `done`
 - Tier 1 core special-function hardening: `in_progress`
 - Tier 2 general incomplete-tail engine: `in_progress`
 - Tier 3 incomplete Bessel specialization: `in_progress`
@@ -119,28 +119,34 @@ Status: `in_progress`
     [point_fast_jax_category_matrix.md](/docs/reports/point_fast_jax_category_matrix.md)
   - all public point functions now have compiled single-call, compiled batch,
     and family-owned direct batch public surfaces; see
-    and a mix of direct family-owned fastpaths plus compiled API fallback
-    status; see
     [point_fast_jax_function_inventory.md](/docs/reports/point_fast_jax_function_inventory.md)
   - a joined family-level point/basic verification ledger now exists in
     [point_basic_surface_status.md](/docs/reports/point_basic_surface_status.md),
     covering the seven public point/basic function families plus the
     `curvature` cross-helper layer
-  - parameterized-family AD direction evidence now belongs in that same ledger,
-    so family status can distinguish argument-direction from parameter-direction
-    proof
+  - an explicit parameterized public AD proof ledger now exists in
+    [parameterized_ad_verification.md](/docs/reports/parameterized_ad_verification.md),
+    covering production-facing parameterized cases across `core`, `bessel`,
+    `gamma`, `barnes`, `hypergeometric`, and `matrix`/`curvature`
+  - parameterized-family AD direction evidence now belongs in both the
+    family-level ledger and the explicit parameterized-AD ledger, so status can
+    distinguish argument-direction from parameter-direction proof
   - family-level direct-batch proof coverage now exists for the previously
     generic-batch incomplete-tail set:
     `incomplete_gamma_upper`, `incomplete_gamma_lower`,
     `incomplete_bessel_i`, `incomplete_bessel_k`, and
     `laplace_bessel_k_tail`
+  - a traced-parameter AD bug in
+    [curvature/composition.py](/src/arbplusjax/curvature/composition.py)
+    is fixed: posterior-precision `damping` / `jitter` are now JAX-traceable
+    instead of forcing Python `float(...)`
 - `in_progress`
-  - refine the new family-level point/basic ledger into the per-category and
-    per-function audit that classifies current surfaces as `direct_fast`,
-    `recurrence_fast`, `approx_fast`, or `precise_only_for_now`
   - widen the now-landed category and incomplete-tail proof slices into deeper
     family-by-family numerical proof coverage across the remaining large public
     matrix/core/hypergeometric surfaces
+  - keep the parameterized-AD audit widened as new public parameterized
+    families or helper surfaces are added, especially when new continuous
+    controls appear on matrix-free or curvature helpers
   - refactor point kernels so Python control flow, dynamic shapes, Arb objects,
     and precise fallback logic remain outside the hot path
   - build shared point-fast infrastructure for logspace, recurrence,

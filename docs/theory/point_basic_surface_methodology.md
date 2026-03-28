@@ -12,6 +12,7 @@ It is the theory/methodology companion to:
 - [point_surface_standard.md](/docs/standards/point_surface_standard.md)
 - [point_fast_jax_standard.md](/docs/standards/point_fast_jax_standard.md)
 - [point_basic_surface_status.md](/docs/reports/point_basic_surface_status.md)
+- [parameterized_ad_verification.md](/docs/reports/parameterized_ad_verification.md)
 
 ## Surface Semantics
 
@@ -73,6 +74,15 @@ backed by:
 - benchmarks
 - canonical notebook sections
 
+The repo now also keeps a practical runtime audit layer for the production
+parameterized surfaces themselves:
+
+- [parameterized_ad_verification.md](/docs/reports/parameterized_ad_verification.md)
+
+That ledger is not a family summary. It is a checked list of actual public
+surfaces and helper entrypoints whose argument-direction and
+family-parameter-direction gradients are executed in pytest.
+
 ## Family-Level Interpretation
 
 Current public behavior is not uniform across all families:
@@ -92,6 +102,14 @@ This is why the family-level verification ledger is needed:
 
 It records not just whether a family has point/basic exposure, but also whether
 tests, benchmarks, notebooks, and diagnostics-bearing helper surfaces exist.
+
+This is also why the runtime AD audit ledger is needed:
+
+- [parameterized_ad_verification.md](/docs/reports/parameterized_ad_verification.md)
+
+It records which production-facing parameterized surfaces are actually executed
+through both AD directions, including matrix/operator helper layers and the
+curvature posterior-precision helper surface.
 
 ## Numerical Regimes
 

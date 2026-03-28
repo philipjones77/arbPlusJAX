@@ -6,6 +6,13 @@ from .base import CurvatureOperator, make_curvature_operator
 from .types import CurvatureSpec
 
 
+def _metadata_scalar(value):
+    try:
+        return float(value)
+    except Exception:
+        return "traced"
+
+
 def _dense_solve_fn(dense_fn):
     return lambda b, **kwargs: jnp.linalg.solve(dense_fn(), jnp.asarray(b))
 
@@ -53,7 +60,7 @@ def add_jitter(curv_op: CurvatureOperator, jitter: float) -> CurvatureOperator:
         solve_fn=_dense_solve_fn(dense_fn) if dense_fn is not None else None,
         logdet_fn=_dense_logdet_fn(dense_fn) if dense_fn is not None else None,
         inverse_diagonal_fn=_dense_inverse_diagonal_fn(dense_fn) if dense_fn is not None else None,
-        metadata={**curv_op.metadata, "jitter": float(jitter)},
+        metadata={**curv_op.metadata, "jitter": _metadata_scalar(jitter)},
     )
 
 
@@ -84,7 +91,9 @@ def make_posterior_precision_operator(
     jitter: float = 0.0,
     spec: CurvatureSpec | None = None,
 ) -> CurvatureOperator:
-    total_shift = float(damping) + float(jitter)
+    damping_value = jnp.asarray(damping, dtype=prior_precision.dtype)
+    jitter_value = jnp.asarray(jitter, dtype=prior_precision.dtype)
+    total_shift = damping_value + jitter_value
     dense_fn = None
     if prior_precision.to_dense_fn is not None and likelihood_curvature.to_dense_fn is not None:
         dense_fn = (
@@ -109,8 +118,8 @@ def make_posterior_precision_operator(
             "kind": "posterior_precision",
             "symmetric": bool(prior_precision.is_symmetric() and likelihood_curvature.is_symmetric()),
             "psd": True if prior_precision.is_psd() and likelihood_curvature.is_psd() else None,
-            "damping": damping,
-            "jitter": jitter,
+            "damping": _metadata_scalar(damping),
+            "jitter": _metadata_scalar(jitter),
         },
         spec=spec,
     )

@@ -557,6 +557,18 @@ def _module_point_batch_padded(module_name: str, attr_name: str, *args, pad_to: 
     return fn(*call_args, **kwargs)
 
 
+def _named_point_batch_fixed(name: str, *args, **kwargs):
+    fn = _resolve_point_fn(name)
+    return fn(*args, **kwargs)
+
+
+def _named_point_batch_padded(name: str, *args, pad_to: int, **kwargs):
+    fn = _resolve_point_fn(name)
+    call_args, trim_n = pad_mixed_batch_args_repeat_last(args, pad_to=pad_to)
+    out = fn(*call_args, **kwargs)
+    return trim_batch_out(out, trim_n)
+
+
 def _normalize_hypgeom_name(name: str) -> str:
     if name.startswith("hypgeom."):
         return name.split(".", 1)[1]
@@ -1076,6 +1088,10 @@ _POINT_FUNCS.update(
         "acb_mat_2x2_trace": _lazy_attr("point_wrappers_matrix", "acb_mat_2x2_trace_point"),
         "acb_mat_2x2_det_batch": _lazy_attr("point_wrappers_matrix", "acb_mat_2x2_det_batch_point"),
         "acb_mat_2x2_trace_batch": _lazy_attr("point_wrappers_matrix", "acb_mat_2x2_trace_batch_point"),
+        "arb_mat_lu_solve": _lazy_attr("point_wrappers_matrix", "arb_mat_solve_lu_point"),
+        "acb_mat_lu_solve": _lazy_attr("point_wrappers_matrix", "acb_mat_solve_lu_point"),
+        "arb_mat_submatrix": _lazy_attr("point_wrappers_matrix", "arb_mat_submatrix_api_point"),
+        "acb_mat_submatrix": _lazy_attr("point_wrappers_matrix", "acb_mat_submatrix_api_point"),
     }
 )
 
@@ -1299,6 +1315,95 @@ for _name in _POINT_HYPGEOM_NAMES:
     _POINT_FUNCS.setdefault(f"hypgeom.{_name}", _lazy_attr("point_wrappers_hypgeom", f"{_name}_point"))
     _DIRECT_POINT_BATCH_FASTPATHS[_name] = _entry
     _DIRECT_POINT_BATCH_FASTPATHS[f"hypgeom.{_name}"] = _entry
+
+
+_STATIC_PUBLIC_METADATA = tuple(_public_metadata_module().load_public_metadata_registry().values())
+_STATIC_PUBLIC_METADATA_NAMES = frozenset(entry.name for entry in _STATIC_PUBLIC_METADATA)
+
+
+for _meta in _STATIC_PUBLIC_METADATA:
+    _name = _meta.name
+    if not _meta.point_support or _name in _DIRECT_POINT_BATCH_FASTPATHS:
+        continue
+    if _name.endswith("_batch_fixed"):
+        _padded = _name[:-len("_batch_fixed")] + "_batch_padded"
+        _DIRECT_POINT_BATCH_FASTPATHS[_name] = (
+            partial(_named_point_batch_fixed, _name),
+            partial(_named_point_batch_padded, _padded if _padded in _STATIC_PUBLIC_METADATA_NAMES else _name),
+        )
+    elif _name.endswith("_batch_padded"):
+        _fixed = _name[:-len("_batch_padded")] + "_batch_fixed"
+        _DIRECT_POINT_BATCH_FASTPATHS[_name] = (
+            partial(_named_point_batch_fixed, _fixed if _fixed in _STATIC_PUBLIC_METADATA_NAMES else _name),
+            partial(_named_point_batch_padded, _name),
+        )
+
+
+for _name in (
+    "arb_mat_charpoly",
+    "arb_mat_eigh",
+    "arb_mat_eigvalsh",
+    "arb_mat_exp",
+    "arb_mat_is_diag",
+    "arb_mat_is_exact",
+    "arb_mat_is_finite",
+    "arb_mat_is_tril",
+    "arb_mat_is_triu",
+    "arb_mat_is_zero",
+    "arb_mat_lu_solve",
+    "arb_mat_mat_solve",
+    "arb_mat_mat_solve_transpose",
+    "arb_mat_mul_entrywise",
+    "arb_mat_neg",
+    "arb_mat_permutation_matrix",
+    "arb_mat_pow_ui",
+    "arb_mat_rmatvec",
+    "arb_mat_rmatvec_cached_prepare",
+    "arb_mat_solve_add",
+    "arb_mat_solve_lu",
+    "arb_mat_solve_transpose",
+    "arb_mat_solve_transpose_add",
+    "arb_mat_solve_tril",
+    "arb_mat_solve_triu",
+    "arb_mat_sub",
+    "arb_mat_submatrix",
+    "acb_mat_charpoly",
+    "acb_mat_conjugate",
+    "acb_mat_eigh",
+    "acb_mat_eigvalsh",
+    "acb_mat_exp",
+    "acb_mat_is_diag",
+    "acb_mat_is_exact",
+    "acb_mat_is_finite",
+    "acb_mat_is_real",
+    "acb_mat_is_tril",
+    "acb_mat_is_triu",
+    "acb_mat_is_zero",
+    "acb_mat_lu_solve",
+    "acb_mat_mat_solve",
+    "acb_mat_mat_solve_transpose",
+    "acb_mat_mul_entrywise",
+    "acb_mat_neg",
+    "acb_mat_permutation_matrix",
+    "acb_mat_pow_ui",
+    "acb_mat_rmatvec",
+    "acb_mat_rmatvec_cached_prepare",
+    "acb_mat_solve_add",
+    "acb_mat_solve_lu",
+    "acb_mat_solve_transpose",
+    "acb_mat_solve_transpose_add",
+    "acb_mat_solve_tril",
+    "acb_mat_solve_triu",
+    "acb_mat_sub",
+    "acb_mat_submatrix",
+):
+    _DIRECT_POINT_BATCH_FASTPATHS.setdefault(
+        _name,
+        (
+            partial(_named_point_batch_fixed, _name),
+            partial(_named_point_batch_padded, _name),
+        ),
+    )
 
 
 # Use the generic vmapped batch path for scalar incomplete-tail kernels.

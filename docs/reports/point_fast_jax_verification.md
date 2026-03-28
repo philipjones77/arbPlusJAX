@@ -18,7 +18,7 @@ Verification rule:
 - benchmark and canonical notebook evidence exists for the category
 
 Total public point functions: `958`
-Direct family-owned point batch fastpaths: `560`
+Direct family-owned point batch fastpaths: `958`
 
 ## Family Counts
 

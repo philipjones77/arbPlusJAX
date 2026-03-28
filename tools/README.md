@@ -1,4 +1,4 @@
-Last updated: 2026-03-22T00:00:00Z
+Last updated: 2026-03-27T00:00:00Z
 
 # Tools
 
@@ -45,6 +45,8 @@ scripts. Those belong under `benchmarks/`.
   - `python tools/point_basic_function_verification_report.py`
 - regenerate point-only fast-JAX verification inventory:
   - `python tools/point_fast_jax_verification_report.py`
+- regenerate parameterized public AD verification inventory:
+  - `python tools/parameterized_ad_verification_report.py`
 - regenerate repo standards verification map:
   - `python tools/repo_standards_verification_report.py`
 - regenerate example notebooks:
@@ -101,6 +103,10 @@ scripts. Those belong under `benchmarks/`.
 - `point_fast_jax_verification_report.py`
   - Writes the point-only fast-JAX verification report under `docs/reports/`.
   - Use after changing point batch fastpaths, category-owned point-fast tests, or the canonical point-fast benchmark/notebook evidence.
+
+- `parameterized_ad_verification_report.py`
+  - Writes the audited parameterized public AD verification ledger under `docs/reports/`.
+  - Use after changing two-direction AD coverage on public parameterized point/helper surfaces, especially for special-function families, matrix/operator helpers, or curvature helper controls.
 
 - `repo_standards_verification_report.py`
   - Writes the repo-level standards verification map under `docs/reports/`.

@@ -24,17 +24,17 @@ Current repo-wide public-surface status:
   `api.eval_point(..., jit=True)`
 - all public point functions now have a compiled public batch surface through
   `api.bind_point_batch_jit(...)`
-- a large subset of public point functions now have a family-owned direct batch
-  kernel registered in the point-batch API layer, while the remaining public
-  surfaces still satisfy the compiled contract through the generic API batch
-  layer
+- all public point functions now have a direct registered point-batch route in
+  the point-batch API layer; the public point-fast coverage gap is `0`
 - a family-level point/basic verification ledger now exists in
   [point_basic_surface_status.md](/docs/reports/point_basic_surface_status.md)
-- parameterized-family AD direction evidence is expected to be tracked in that
-  ledger as argument-direction plus parameter-direction proof
-- remaining work is deeper per-function numerical proof coverage, continued
-  family-level hardening beyond the public API contract, and broader public
-  `basic` exposure outside the currently enclosure-oriented families
+- an explicit parameterized public AD audit now exists in
+  [parameterized_ad_verification.md](/docs/reports/parameterized_ad_verification.md)
+  and complements the family-level ledger with checked runtime proof cases
+- remaining work is deeper numerical/performance proof coverage, continued
+  family-level hardening beyond the public API contract, broader public
+  `basic` exposure outside the currently enclosure-oriented families, and
+  machine-readable capability classification of the landed point-fast set
 
 The governing standard is:
 
@@ -69,10 +69,13 @@ cross-category smoke file.
 ## Immediate Next Step
 
 Use the living audit layer in
-[point_basic_surface_status.md](/docs/reports/point_basic_surface_status.md)
-to widen the representative six-category proof tranche into broader
-per-family and per-function coverage, and keep the registry classifying
-existing point-mode surfaces as:
+[point_basic_surface_status.md](/docs/reports/point_basic_surface_status.md),
+the per-function ledger in
+[point_basic_function_verification.md](/docs/reports/point_basic_function_verification.md),
+and the parameterized public AD audit in
+[parameterized_ad_verification.md](/docs/reports/parameterized_ad_verification.md)
+to keep widening proof quality beyond public-surface availability, and keep the
+registry classifying existing point-mode surfaces as:
 
 - `direct_fast`
 - `recurrence_fast`

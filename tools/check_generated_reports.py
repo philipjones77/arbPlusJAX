@@ -25,6 +25,7 @@ def main() -> None:
     _run([PYTHON, "tools/point_fast_jax_category_report.py"])
     _run([PYTHON, "tools/point_fast_jax_function_report.py"])
     _run([PYTHON, "tools/point_fast_jax_verification_report.py"])
+    _run([PYTHON, "tools/parameterized_ad_verification_report.py"])
     _run([PYTHON, "tools/point_basic_surface_report.py"])
     _run([PYTHON, "tools/point_basic_function_verification_report.py"])
     _run([PYTHON, "tools/repo_standards_verification_report.py"])
@@ -51,6 +52,7 @@ def main() -> None:
             "tests/test_point_fast_jax_docs_contracts.py",
             "tests/test_point_fast_jax_function_report.py",
             "tests/test_point_fast_jax_verification_report.py",
+            "tests/test_parameterized_public_ad_audit.py",
             "tests/test_point_basic_surface_report.py",
             "tests/test_point_basic_function_verification_report.py",
             "tests/test_repo_standards_verification_report.py",

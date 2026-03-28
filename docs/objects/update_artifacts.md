@@ -1,4 +1,4 @@
-Last updated: 2026-03-26T00:00:00Z
+Last updated: 2026-03-27T00:00:00Z
 
 # Update Artifacts
 
@@ -26,6 +26,7 @@ the checked-in repository state current.
 | [docs/reports/point_fast_jax_function_inventory.md](/docs/reports/point_fast_jax_function_inventory.md) | `generated-authoritative` | `tools/point_fast_jax_function_report.py` | `python tools/point_fast_jax_function_report.py` | `python -m pytest -q tests/test_point_fast_jax_function_report.py` |
 | [docs/reports/point_fast_jax_category_matrix.md](/docs/reports/point_fast_jax_category_matrix.md) | `generated-authoritative` | `tools/point_fast_jax_category_report.py` | `python tools/point_fast_jax_category_report.py` | `python -m pytest -q tests/test_point_fast_jax_docs_contracts.py` |
 | [docs/reports/point_fast_jax_verification.md](/docs/reports/point_fast_jax_verification.md) | `generated-authoritative` | `tools/point_fast_jax_verification_report.py` | `python tools/point_fast_jax_verification_report.py` | `python -m pytest -q tests/test_point_fast_jax_verification_report.py` |
+| [docs/reports/parameterized_ad_verification.md](/docs/reports/parameterized_ad_verification.md) | `generated-authoritative` | `tools/parameterized_ad_verification_report.py` | `python tools/parameterized_ad_verification_report.py` | `python -m pytest -q tests/test_parameterized_public_ad_audit.py` |
 | [docs/reports/point_basic_surface_status.md](/docs/reports/point_basic_surface_status.md) | `generated-authoritative` | `tools/point_basic_surface_report.py` | `python tools/point_basic_surface_report.py` | `python -m pytest -q tests/test_point_basic_surface_report.py` |
 | [docs/reports/point_basic_function_verification.md](/docs/reports/point_basic_function_verification.md) | `generated-authoritative` | `tools/point_basic_function_verification_report.py` | `python tools/point_basic_function_verification_report.py` | `python -m pytest -q tests/test_point_basic_function_verification_report.py` |
 | [docs/reports/repo_standards_verification.md](/docs/reports/repo_standards_verification.md) | `generated-authoritative` | `tools/repo_standards_verification_report.py` | `python tools/repo_standards_verification_report.py` | `python -m pytest -q tests/test_repo_standards_verification_report.py` |

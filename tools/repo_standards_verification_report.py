@@ -16,12 +16,14 @@ ROWS = (
         ),
         "reports": (
             "docs/reports/function_capability_registry.json",
+            "docs/reports/parameterized_ad_verification.md",
             "docs/reports/point_basic_surface_status.md",
             "docs/reports/point_basic_function_verification.md",
         ),
         "tests": (
             "tests/test_function_provenance_reports.py",
             "tests/test_parameterized_family_ad_directions.py",
+            "tests/test_parameterized_public_ad_audit.py",
             "tests/test_special_function_ad_directions.py",
             "tests/test_point_basic_function_verification_report.py",
         ),
