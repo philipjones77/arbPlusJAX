@@ -115,6 +115,7 @@ Consolidation note:
 - [point_surface_standard.md](/docs/standards/point_surface_standard.md)
 - [precision_standard.md](/docs/standards/precision_standard.md)
 - [pytest_test_naming_standard.md](/docs/standards/pytest_test_naming_standard.md)
+- [release_execution_checklist_standard.md](/docs/standards/release_execution_checklist_standard.md)
 - [repo_standards.md](/docs/standards/repo_standards.md)
 - [report_standard.md](/docs/standards/report_standard.md)
 - [special_function_ad_standard.md](/docs/standards/special_function_ad_standard.md)

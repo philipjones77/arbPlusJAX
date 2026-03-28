@@ -521,6 +521,102 @@ def test_implicit_krylov_solve_midpoint_uses_custom_linear_solve_for_general_ope
     assert meta.transpose_preconditioner is not None
 
 
+def test_fp64_dot_test_for_general_operator_transpose_plan():
+    dense = jnp.asarray([[4.0, 1.5], [0.25, 2.0]], dtype=jnp.float64)
+    operator = mfc.dense_operator_plan(dense, orientation="forward", algebra="jrb")
+    transpose = mfc.operator_transpose_plan(operator, conjugate=False)
+    v = jnp.asarray([1.25, -0.75], dtype=jnp.float64)
+    w = jnp.asarray([-0.5, 2.0], dtype=jnp.float64)
+
+    av = mfc.operator_apply_midpoint(
+        operator,
+        v,
+        midpoint_vector=_midpoint_vector,
+        sparse_bcoo_matvec=_sparse_bcoo_matvec,
+        dtype=jnp.float64,
+    )
+    atw = mfc.operator_apply_midpoint(
+        transpose,
+        w,
+        midpoint_vector=_midpoint_vector,
+        sparse_bcoo_matvec=_sparse_bcoo_matvec,
+        dtype=jnp.float64,
+    )
+
+    lhs = jnp.vdot(av, w)
+    rhs = jnp.vdot(v, atw)
+    assert jnp.allclose(lhs, rhs, rtol=1e-10, atol=1e-10)
+
+
+def test_fp64_dot_test_for_oriented_shell_preconditioner_transpose_plan():
+    preconditioner = mfc.oriented_shell_preconditioner_plan(
+        context={
+            "forward_callback": lambda v, ctx: ctx["mat"] @ v,
+            "transpose_callback": lambda v, ctx: ctx["mat_t"] @ v,
+            "mat": jnp.asarray([[2.0, 1.0], [0.0, 3.0]], dtype=jnp.float64),
+            "mat_t": jnp.asarray([[2.0, 0.0], [1.0, 3.0]], dtype=jnp.float64),
+        },
+        algebra="jrb",
+        orientation="forward",
+        forward_callback=lambda v, ctx: ctx["mat"] @ v,
+        transpose_callback=lambda v, ctx: ctx["mat_t"] @ v,
+    )
+    transpose = mfc.preconditioner_transpose_plan(preconditioner)
+    assert transpose is not None
+    v = jnp.asarray([1.0, -0.25], dtype=jnp.float64)
+    w = jnp.asarray([0.5, 2.0], dtype=jnp.float64)
+
+    mv = mfc.preconditioner_plan_apply(
+        preconditioner,
+        v,
+        midpoint_vector=_midpoint_vector,
+        sparse_bcoo_matvec=_sparse_bcoo_matvec,
+        dtype=jnp.float64,
+    )
+    mtw = mfc.preconditioner_plan_apply(
+        transpose,
+        w,
+        midpoint_vector=_midpoint_vector,
+        sparse_bcoo_matvec=_sparse_bcoo_matvec,
+        dtype=jnp.float64,
+    )
+    lhs = jnp.vdot(mv, w)
+    rhs = jnp.vdot(v, mtw)
+    assert jnp.allclose(lhs, rhs, rtol=1e-10, atol=1e-10)
+
+
+def test_custom_linear_solve_general_operator_jvp_vjp_identity():
+    dense = jnp.asarray([[4.0, 1.0], [0.5, 2.5]], dtype=jnp.float64)
+    rhs = jnp.asarray([2.0, -1.0], dtype=jnp.float64)
+
+    def solve_use(scale):
+        operator = mfc.dense_operator_plan(scale * dense, orientation="forward", algebra="jrb")
+        solved, _, _, _, meta = mfc.implicit_krylov_solve_midpoint(
+            operator,
+            rhs,
+            solver="gmres",
+            structured="general",
+            midpoint_vector=_midpoint_vector,
+            lift_vector=_identity_point_from_midpoint,
+            sparse_bcoo_matvec=_sparse_bcoo_matvec,
+            dtype=jnp.float64,
+        )
+        assert meta.implicit_adjoint
+        return 0.5 * jnp.sum(solved * solved)
+
+    scale = jnp.asarray(1.2, dtype=jnp.float64)
+    tangent = jnp.asarray(0.4, dtype=jnp.float64)
+    cotangent = jnp.asarray(1.0, dtype=jnp.float64)
+
+    _, tangent_out = jax.jvp(solve_use, (scale,), (tangent,))
+    _, vjp = jax.vjp(solve_use, scale)
+    (pulled_back,) = vjp(cotangent)
+
+    lhs = jnp.vdot(cotangent, tangent_out)
+    rhs_dot = jnp.vdot(pulled_back, tangent)
+    assert jnp.allclose(lhs, rhs_dot, rtol=1e-8, atol=1e-8)
+
+
 def test_orthogonal_probe_block_helpers_return_orthonormal_midpoints():
     key = jnp.asarray([0, 321], dtype=jnp.uint32)
 

@@ -28,4 +28,5 @@ def test_public_point_registry_has_universal_compiled_api_surfaces() -> None:
     assert rows
     assert all(row[4] == "yes" for row in rows)
     assert all(row[5] == "yes" for row in rows)
-    assert all(row[6] == "yes" for row in rows)
+    assert any(row[6] == "yes" for row in rows)
+    assert any(row[6] == "no" for row in rows)

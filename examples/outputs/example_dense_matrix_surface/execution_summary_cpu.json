@@ -1,5 +1,5 @@
 {
-  "elapsed_s": 111.530874,
+  "elapsed_s": 141.258809,
   "executed_notebook": "examples/outputs/example_dense_matrix_surface/example_dense_matrix_surface_cpu_executed.ipynb",
   "jax_dtype": "float64",
   "jax_mode": "cpu",

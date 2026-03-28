@@ -12,7 +12,7 @@
     },
     "environment_kind": "wsl",
     "git": {
-      "commit": "591217612238e41941ea34b9b29762473bb1e147"
+      "commit": "5e1bef0ba378e627a93e8dd36747e8edb998d510"
     },
     "jax": {
       "available": true,
@@ -35,7 +35,7 @@
       "version": "3.12.12"
     },
     "repo_root": "/home/phili/projects/arbplusJAX",
-    "timestamp_utc": "2026-03-26T21:34:13Z"
+    "timestamp_utc": "2026-03-27T18:16:37Z"
   },
   "notes": "Dense matrix benchmark. Stdout preserves metric-style lines for notebook/report compatibility.",
   "records": [
@@ -91,7 +91,7 @@
       "recompile_time_s": null,
       "residual": null,
       "tags": [],
-      "warm_time_s": 9.301950001372461e-05
+      "warm_time_s": 8.231949999526478e-05
     },
     {
       "accuracy_abs": null,
@@ -145,7 +145,7 @@
       "recompile_time_s": null,
       "residual": null,
       "tags": [],
-      "warm_time_s": 0.0002894689999948241
+      "warm_time_s": 0.0002785200000516852
     },
     {
       "accuracy_abs": null,
@@ -199,7 +199,7 @@
       "recompile_time_s": null,
       "residual": null,
       "tags": [],
-      "warm_time_s": 0.002510339999957978
+      "warm_time_s": 0.004625424500034114
     },
     {
       "accuracy_abs": null,
@@ -253,7 +253,7 @@
       "recompile_time_s": null,
       "residual": null,
       "tags": [],
-      "warm_time_s": 0.016938225999979295
+      "warm_time_s": 0.026160575999995217
     },
     {
       "accuracy_abs": null,
@@ -307,7 +307,7 @@
       "recompile_time_s": null,
       "residual": null,
       "tags": [],
-      "warm_time_s": 0.00010104149998824141
+      "warm_time_s": 0.00020270099997787838
     },
     {
       "accuracy_abs": null,
@@ -361,7 +361,7 @@
       "recompile_time_s": null,
       "residual": null,
       "tags": [],
-      "warm_time_s": 0.0001517834999731349
+      "warm_time_s": 0.0002596369999992021
     },
     {
       "accuracy_abs": null,
@@ -415,7 +415,7 @@
       "recompile_time_s": null,
       "residual": null,
       "tags": [],
-      "warm_time_s": 1.9425499999670137e-05
+      "warm_time_s": 1.972049994947156e-05
     },
     {
       "accuracy_abs": null,
@@ -469,7 +469,7 @@
       "recompile_time_s": null,
       "residual": null,
       "tags": [],
-      "warm_time_s": 2.3097500047697395e-05
+      "warm_time_s": 5.132199999025033e-05
     },
     {
       "accuracy_abs": null,
@@ -523,7 +523,7 @@
       "recompile_time_s": null,
       "residual": null,
       "tags": [],
-      "warm_time_s": 1.729050006815669e-05
+      "warm_time_s": 2.4476499959291687e-05
     },
     {
       "accuracy_abs": null,
@@ -577,7 +577,7 @@
       "recompile_time_s": null,
       "residual": null,
       "tags": [],
-      "warm_time_s": 0.00021579750000455533
+      "warm_time_s": 0.00013984849999815196
     },
     {
       "accuracy_abs": null,
@@ -631,7 +631,7 @@
       "recompile_time_s": null,
       "residual": null,
       "tags": [],
-      "warm_time_s": 0.00029548650002197974
+      "warm_time_s": 0.0001997174999814888
     },
     {
       "accuracy_abs": null,
@@ -685,7 +685,7 @@
       "recompile_time_s": null,
       "residual": null,
       "tags": [],
-      "warm_time_s": 0.00017718000003696943
+      "warm_time_s": 9.02779999591985e-05
     },
     {
       "accuracy_abs": null,
@@ -739,7 +739,7 @@
       "recompile_time_s": null,
       "residual": null,
       "tags": [],
-      "warm_time_s": 6.63314999655995e-05
+      "warm_time_s": 0.00011605800000324962
     },
     {
       "accuracy_abs": null,
@@ -793,7 +793,7 @@
       "recompile_time_s": null,
       "residual": null,
       "tags": [],
-      "warm_time_s": 0.0001259729999674164
+      "warm_time_s": 0.0001624750000246422
     },
     {
       "accuracy_abs": null,
@@ -847,7 +847,7 @@
       "recompile_time_s": null,
       "residual": null,
       "tags": [],
-      "warm_time_s": 0.00013338149994979176
+      "warm_time_s": 0.0001707060000057936
     },
     {
       "accuracy_abs": null,
@@ -901,7 +901,7 @@
       "recompile_time_s": null,
       "residual": null,
       "tags": [],
-      "warm_time_s": 6.535950001307356e-05
+      "warm_time_s": 0.0001823059999992438
     },
     {
       "accuracy_abs": null,
@@ -955,7 +955,7 @@
       "recompile_time_s": null,
       "residual": null,
       "tags": [],
-      "warm_time_s": 0.00013215199999194738
+      "warm_time_s": 0.00037925899999891044
     },
     {
       "accuracy_abs": null,
@@ -1009,7 +1009,7 @@
       "recompile_time_s": null,
       "residual": null,
       "tags": [],
-      "warm_time_s": 0.00024618949998966855
+      "warm_time_s": 0.00025335800000902964
     },
     {
       "accuracy_abs": null,
@@ -1063,7 +1063,7 @@
       "recompile_time_s": null,
       "residual": null,
       "tags": [],
-      "warm_time_s": 4.766849997395184e-05
+      "warm_time_s": 6.827350000548904e-05
     },
     {
       "accuracy_abs": null,
@@ -1117,7 +1117,7 @@
       "recompile_time_s": null,
       "residual": null,
       "tags": [],
-      "warm_time_s": 0.00019379100001515326
+      "warm_time_s": 0.0003572610000333043
     },
     {
       "accuracy_abs": null,
@@ -1171,7 +1171,7 @@
       "recompile_time_s": null,
       "residual": null,
       "tags": [],
-      "warm_time_s": 2.505300005850586e-05
+      "warm_time_s": 0.00023018300004196135
     },
     {
       "accuracy_abs": null,
@@ -1225,7 +1225,7 @@
       "recompile_time_s": null,
       "residual": null,
       "tags": [],
-      "warm_time_s": 1.7297499994128884e-05
+      "warm_time_s": 1.975300000367497e-05
     },
     {
       "accuracy_abs": null,
@@ -1279,7 +1279,7 @@
       "recompile_time_s": null,
       "residual": null,
       "tags": [],
-      "warm_time_s": 8.463699998628726e-05
+      "warm_time_s": 0.00010238100003334694
     },
     {
       "accuracy_abs": null,
@@ -1333,7 +1333,7 @@
       "recompile_time_s": null,
       "residual": null,
       "tags": [],
-      "warm_time_s": 0.0002763425000011921
+      "warm_time_s": 0.0006621945000233609
     },
     {
       "accuracy_abs": null,
@@ -1387,7 +1387,7 @@
       "recompile_time_s": null,
       "residual": null,
       "tags": [],
-      "warm_time_s": 0.0028285910000249714
+      "warm_time_s": 0.0036254430000326465
     },
     {
       "accuracy_abs": null,
@@ -1441,7 +1441,7 @@
       "recompile_time_s": null,
       "residual": null,
       "tags": [],
-      "warm_time_s": 0.0045323624999582535
+      "warm_time_s": 0.008283480500040241
     },
     {
       "accuracy_abs": null,
@@ -1495,7 +1495,7 @@
       "recompile_time_s": null,
       "residual": null,
       "tags": [],
-      "warm_time_s": 0.00023422200001732563
+      "warm_time_s": 0.0005584750000480199
     },
     {
       "accuracy_abs": null,
@@ -1549,7 +1549,7 @@
       "recompile_time_s": null,
       "residual": null,
       "tags": [],
-      "warm_time_s": 0.000404645999992681
+      "warm_time_s": 0.0001601495000045361
     },
     {
       "accuracy_abs": null,
@@ -1603,7 +1603,7 @@
       "recompile_time_s": null,
       "residual": null,
       "tags": [],
-      "warm_time_s": 3.739150008641445e-05
+      "warm_time_s": 3.678050001099109e-05
     },
     {
       "accuracy_abs": null,
@@ -1657,7 +1657,7 @@
       "recompile_time_s": null,
       "residual": null,
       "tags": [],
-      "warm_time_s": 2.009599995744793e-05
+      "warm_time_s": 2.4269499988349708e-05
     },
     {
       "accuracy_abs": null,
@@ -1711,7 +1711,7 @@
       "recompile_time_s": null,
       "residual": null,
       "tags": [],
-      "warm_time_s": 5.831500004660484e-05
+      "warm_time_s": 0.0002663150000330461
     },
     {
       "accuracy_abs": null,
@@ -1765,7 +1765,7 @@
       "recompile_time_s": null,
       "residual": null,
       "tags": [],
-      "warm_time_s": 0.00014830650002295442
+      "warm_time_s": 0.00014974600003370142
     },
     {
       "accuracy_abs": null,
@@ -1819,7 +1819,7 @@
       "recompile_time_s": null,
       "residual": null,
       "tags": [],
-      "warm_time_s": 4.566850009268819e-05
+      "warm_time_s": 5.098449997831267e-05
     },
     {
       "accuracy_abs": null,
@@ -1873,7 +1873,7 @@
       "recompile_time_s": null,
       "residual": null,
       "tags": [],
-      "warm_time_s": 0.00012385999991693097
+      "warm_time_s": 0.0002193770000076256
     },
     {
       "accuracy_abs": null,
@@ -1927,7 +1927,7 @@
       "recompile_time_s": null,
       "residual": null,
       "tags": [],
-      "warm_time_s": 3.422849999878963e-05
+      "warm_time_s": 4.882999996880244e-05
     },
     {
       "accuracy_abs": null,
@@ -1981,7 +1981,7 @@
       "recompile_time_s": null,
       "residual": null,
       "tags": [],
-      "warm_time_s": 6.519199996546376e-05
+      "warm_time_s": 0.00011379299996860937
     },
     {
       "accuracy_abs": null,
@@ -2035,7 +2035,7 @@
       "recompile_time_s": null,
       "residual": null,
       "tags": [],
-      "warm_time_s": 4.7934999997778505e-05
+      "warm_time_s": 3.888650002181748e-05
     },
     {
       "accuracy_abs": null,
@@ -2089,7 +2089,7 @@
       "recompile_time_s": null,
       "residual": null,
       "tags": [],
-      "warm_time_s": 9.313900000051945e-05
+      "warm_time_s": 0.000353637000046092
     },
     {
       "accuracy_abs": null,
@@ -2143,7 +2143,7 @@
       "recompile_time_s": null,
       "residual": null,
       "tags": [],
-      "warm_time_s": 3.071800006182457e-05
+      "warm_time_s": 4.5325500025228393e-05
     },
     {
       "accuracy_abs": null,
@@ -2197,7 +2197,7 @@
       "recompile_time_s": null,
       "residual": null,
       "tags": [],
-      "warm_time_s": 0.0002812994999885632
+      "warm_time_s": 6.947800000034476e-05
     },
     {
       "accuracy_abs": null,
@@ -2251,7 +2251,7 @@
       "recompile_time_s": null,
       "residual": null,
       "tags": [],
-      "warm_time_s": 5.953049992513115e-05
+      "warm_time_s": 4.809050000176285e-05
     },
     {
       "accuracy_abs": null,
@@ -2305,7 +2305,7 @@
       "recompile_time_s": null,
       "residual": null,
       "tags": [],
-      "warm_time_s": 0.000476474500032964
+      "warm_time_s": 0.0001449934999868674
     },
     {
       "accuracy_abs": null,
@@ -2359,7 +2359,7 @@
       "recompile_time_s": null,
       "residual": null,
       "tags": [],
-      "warm_time_s": 2.360450002925063e-05
+      "warm_time_s": 6.218300001137322e-05
     }
   ],
   "schema_version": "v1"

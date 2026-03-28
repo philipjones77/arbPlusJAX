@@ -9,8 +9,9 @@ from jax import core as jax_core
 from jax import lax
 import jax.numpy as jnp
 
+from ... import acb_core
 from ... import barnesg
-from ... import point_wrappers
+from ... import double_interval as di
 
 
 _MIN_M = 64
@@ -58,12 +59,28 @@ def _choose_m_base(tau: float, dps: int) -> int:
     return max(_MIN_M, int(math.ceil(2.0 * float(dps) * max(1.0, scale))))
 
 
+def _exact_real_acb(x: jax.Array) -> jax.Array:
+    xx = jnp.asarray(x, dtype=jnp.float64)
+    zeros = jnp.zeros_like(xx)
+    return acb_core.acb_box(di.interval(xx, xx), di.interval(zeros, zeros))
+
+
 def _real_point_digamma(x: jax.Array) -> jax.Array:
-    return jnp.real(point_wrappers.acb_digamma_point(jnp.asarray(x, dtype=_complex_dtype())))
+    xx = jnp.asarray(x, dtype=jnp.float64)
+    if xx.ndim == 0:
+        return jnp.real(acb_core.acb_midpoint(acb_core.acb_digamma_prec(_exact_real_acb(xx))))
+    flat = xx.reshape(-1)
+    vals = jax.vmap(lambda t: jnp.real(acb_core.acb_midpoint(acb_core.acb_digamma_prec(_exact_real_acb(t)))))(flat)
+    return vals.reshape(xx.shape)
 
 
 def _real_point_polygamma(n: int, x: jax.Array) -> jax.Array:
-    return jnp.real(point_wrappers.acb_polygamma_point(n, jnp.asarray(x, dtype=_complex_dtype())))
+    xx = jnp.asarray(x, dtype=jnp.float64)
+    if xx.ndim == 0:
+        return jnp.real(acb_core.acb_midpoint(acb_core.acb_polygamma_prec(n, _exact_real_acb(xx))))
+    flat = xx.reshape(-1)
+    vals = jax.vmap(lambda t: jnp.real(acb_core.acb_midpoint(acb_core.acb_polygamma_prec(n, _exact_real_acb(t)))))(flat)
+    return vals.reshape(xx.shape)
 
 
 def _masked_real_sum(values: jax.Array, mask: jax.Array) -> jax.Array:

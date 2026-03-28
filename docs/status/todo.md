@@ -75,6 +75,12 @@ Status: `in_progress`
   - a dedicated sparse-matrix harness profile exists in
     [run_test_harness.py](/tools/run_test_harness.py) on top of the landed
     sparse point layer
+  - a single repo-facing execution checklist now exists in
+    [release_execution_checklist_standard.md](/docs/standards/release_execution_checklist_standard.md)
+    and
+    [release_execution_checklist.md](/docs/implementation/release_execution_checklist.md),
+    naming the minimum CPU, startup/import, benchmark, example, and
+    generated-artifact slices required for a release-quality change
 - `in_progress`
   - unify long-run benchmark scheduling and report collection behind a single
     environment manifest and execution policy
@@ -94,8 +100,6 @@ Status: `in_progress`
   - continue turning theory coverage into first-class tranche status rather than
     leaving methodology gaps implicit
 - `planned`
-  - add a single repo-facing execution checklist that names the minimum CPU,
-    parity, GPU, and benchmark slices required for a release-quality change
   - retain a broader periodic CPU validation slice for the newest matrix-free
     estimator and contour-action tranches once the heavier test/runtime slices
     settle
@@ -115,15 +119,25 @@ Status: `in_progress`
     [point_fast_jax_category_matrix.md](/docs/reports/point_fast_jax_category_matrix.md)
   - all public point functions now have compiled single-call, compiled batch,
     and family-owned direct batch public surfaces; see
+    and a mix of direct family-owned fastpaths plus compiled API fallback
+    status; see
     [point_fast_jax_function_inventory.md](/docs/reports/point_fast_jax_function_inventory.md)
+  - a joined family-level point/basic verification ledger now exists in
+    [point_basic_surface_status.md](/docs/reports/point_basic_surface_status.md),
+    covering the seven public point/basic function families plus the
+    `curvature` cross-helper layer
+  - parameterized-family AD direction evidence now belongs in that same ledger,
+    so family status can distinguish argument-direction from parameter-direction
+    proof
   - family-level direct-batch proof coverage now exists for the previously
     generic-batch incomplete-tail set:
     `incomplete_gamma_upper`, `incomplete_gamma_lower`,
     `incomplete_bessel_i`, `incomplete_bessel_k`, and
     `laplace_bessel_k_tail`
 - `in_progress`
-  - create the per-category point-mode audit that classifies current surfaces as
-    `direct_fast`, `recurrence_fast`, `approx_fast`, or `precise_only_for_now`
+  - refine the new family-level point/basic ledger into the per-category and
+    per-function audit that classifies current surfaces as `direct_fast`,
+    `recurrence_fast`, `approx_fast`, or `precise_only_for_now`
   - widen the now-landed category and incomplete-tail proof slices into deeper
     family-by-family numerical proof coverage across the remaining large public
     matrix/core/hypergeometric surfaces

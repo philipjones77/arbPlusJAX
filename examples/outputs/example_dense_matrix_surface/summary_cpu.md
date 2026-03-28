@@ -5,9 +5,9 @@
 
 ## Comparison Slice
 
-- `acb` / `dense_plan_prepare`: warm=2.30975e-05s
-- `arb` / `dense_plan_prepare`: warm=3.73915e-05s
-- `arb` / `direct_solve`: warm=5.8315e-05s
-- `acb` / `cached_matvec`: warm=0.000101041s
-- `acb` / `direct_solve`: warm=0.000215798s
-- `arb` / `cached_matvec`: warm=0.000234222s
+- `arb` / `dense_plan_prepare`: warm=3.67805e-05s
+- `acb` / `dense_plan_prepare`: warm=5.1322e-05s
+- `acb` / `direct_solve`: warm=0.000139848s
+- `acb` / `cached_matvec`: warm=0.000202701s
+- `arb` / `direct_solve`: warm=0.000266315s
+- `arb` / `cached_matvec`: warm=0.000558475s

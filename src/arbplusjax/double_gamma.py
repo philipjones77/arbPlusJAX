@@ -311,6 +311,64 @@ def ifj_barnesdoublegamma_diagnostics(
     )
 
 
+@partial(jax.jit, static_argnames=("dps", "max_m_cap"))
+def ifj_log_barnesdoublegamma_batch_fixed_point(
+    z: jax.Array,
+    tau: jax.Array,
+    *,
+    dps: int = 50,
+    max_m_cap: int = 1024,
+) -> jax.Array:
+    zz = jnp.asarray(z)
+    tt = jnp.asarray(tau)
+    bz, bt = jnp.broadcast_arrays(zz, tt)
+    flat_z = jnp.ravel(bz)
+    flat_t = jnp.ravel(bt)
+    out = jax.vmap(lambda a, b: ifj_log_barnesdoublegamma(a, b, dps=dps, max_m_cap=max_m_cap))(flat_z, flat_t)
+    return out.reshape(bz.shape)
+
+
+def ifj_log_barnesdoublegamma_batch_padded_point(
+    z: jax.Array,
+    tau: jax.Array,
+    *,
+    pad_to: int,
+    dps: int = 50,
+    max_m_cap: int = 1024,
+) -> jax.Array:
+    call_args, _ = _pad_point_batch_last((z, tau), pad_to)
+    return ifj_log_barnesdoublegamma_batch_fixed_point(*call_args, dps=dps, max_m_cap=max_m_cap)
+
+
+@partial(jax.jit, static_argnames=("dps", "max_m_cap"))
+def ifj_barnesdoublegamma_batch_fixed_point(
+    z: jax.Array,
+    tau: jax.Array,
+    *,
+    dps: int = 50,
+    max_m_cap: int = 1024,
+) -> jax.Array:
+    zz = jnp.asarray(z)
+    tt = jnp.asarray(tau)
+    bz, bt = jnp.broadcast_arrays(zz, tt)
+    flat_z = jnp.ravel(bz)
+    flat_t = jnp.ravel(bt)
+    out = jax.vmap(lambda a, b: ifj_barnesdoublegamma(a, b, dps=dps, max_m_cap=max_m_cap))(flat_z, flat_t)
+    return out.reshape(bz.shape)
+
+
+def ifj_barnesdoublegamma_batch_padded_point(
+    z: jax.Array,
+    tau: jax.Array,
+    *,
+    pad_to: int,
+    dps: int = 50,
+    max_m_cap: int = 1024,
+) -> jax.Array:
+    call_args, _ = _pad_point_batch_last((z, tau), pad_to)
+    return ifj_barnesdoublegamma_batch_fixed_point(*call_args, dps=dps, max_m_cap=max_m_cap)
+
+
 def bdg_double_sine(z: jax.Array, b: jax.Array, prec_bits: int = di.DEFAULT_PREC_BITS) -> jax.Array:
     cdt = el.complex_dtype_from(z, b)
     rdt = el.real_dtype_from_complex_dtype(cdt)
@@ -750,7 +808,11 @@ __all__ = [
     "bdg_log_normalizeddoublegamma",
     "bdg_normalizeddoublegamma",
     "ifj_log_barnesdoublegamma",
+    "ifj_log_barnesdoublegamma_batch_fixed_point",
+    "ifj_log_barnesdoublegamma_batch_padded_point",
     "ifj_barnesdoublegamma",
+    "ifj_barnesdoublegamma_batch_fixed_point",
+    "ifj_barnesdoublegamma_batch_padded_point",
     "ifj_barnesdoublegamma_diagnostics",
     "bdg_double_sine",
     "bdg_complex_log_barnesdoublegamma",

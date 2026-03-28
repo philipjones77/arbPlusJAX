@@ -1,0 +1,98 @@
+{
+  "benchmark_name": "benchmark_acb_dirichlet.py",
+  "category": "special",
+  "concern": "scalar_speed",
+  "environment": {
+    "env": {
+      "ARB_C_REF_DIR": "",
+      "JAX_PLATFORMS": "cpu",
+      "PYTHONPATH": "/home/phili/projects/arbplusJAX/src:/home/phili/projects/arbplusJAX/src:",
+      "XLA_PYTHON_CLIENT_MEM_FRACTION": "",
+      "XLA_PYTHON_CLIENT_PREALLOCATE": ""
+    },
+    "environment_kind": "wsl",
+    "git": {
+      "commit": "5e1bef0ba378e627a93e8dd36747e8edb998d510"
+    },
+    "jax": {
+      "available": true,
+      "backend": "cpu",
+      "devices": [
+        "TFRT_CPU_0"
+      ],
+      "jax_enable_x64": true,
+      "requested_mode": "cpu"
+    },
+    "os": {
+      "machine": "x86_64",
+      "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+      "release": "6.6.87.2-microsoft-standard-WSL2",
+      "system": "Linux",
+      "version": "#1 SMP PREEMPT_DYNAMIC Thu Jun  5 18:30:46 UTC 2025"
+    },
+    "python": {
+      "executable": "/home/phili/miniforge3/envs/jax/bin/python",
+      "version": "3.12.12"
+    },
+    "repo_root": "/home/phili/projects/arbplusJAX",
+    "timestamp_utc": "2026-03-27T18:20:51Z"
+  },
+  "notes": "Complex dirichlet benchmark with explicit dtype and requested runtime mode controls.",
+  "records": [
+    {
+      "accuracy_abs": null,
+      "accuracy_rel": null,
+      "ad_backward_time_s": null,
+      "ad_forward_time_s": null,
+      "ad_residual": null,
+      "benchmark_name": "benchmark_acb_dirichlet.py",
+      "category": "special",
+      "cold_time_s": null,
+      "concern": "scalar_speed",
+      "device": "cpu",
+      "dtype": "complex128",
+      "implementation": "acb_dirichlet",
+      "measurements": [
+        {
+          "name": "samples",
+          "notes": "",
+          "unit": "rows",
+          "value": 512
+        },
+        {
+          "name": "terms",
+          "notes": "",
+          "unit": "",
+          "value": 48
+        },
+        {
+          "name": "requested_dtype",
+          "notes": "",
+          "unit": "",
+          "value": "float64"
+        },
+        {
+          "name": "which",
+          "notes": "",
+          "unit": "",
+          "value": "zeta"
+        },
+        {
+          "name": "smoke",
+          "notes": "",
+          "unit": "",
+          "value": false
+        }
+      ],
+      "memory_bytes": null,
+      "notes": "Legacy acb_dirichlet benchmark normalized onto the shared benchmark schema; stdout remains summary-style for notebook compatibility.",
+      "operation": "zeta_batch",
+      "python_overhead_s": null,
+      "recompile_time_s": null,
+      "residual": null,
+      "tags": [],
+      "warm_time_s": 0.001250192000043171
+    }
+  ],
+  "schema_version": "v1"
+}

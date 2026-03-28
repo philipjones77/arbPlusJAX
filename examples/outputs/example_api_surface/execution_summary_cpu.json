@@ -1,5 +1,5 @@
 {
-  "elapsed_s": 26.590508,
+  "elapsed_s": 24.350416,
   "executed_notebook": "examples/outputs/example_api_surface/example_api_surface_cpu_executed.ipynb",
   "jax_dtype": "float64",
   "jax_mode": "cpu",

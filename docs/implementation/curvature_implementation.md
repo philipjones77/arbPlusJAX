@@ -225,6 +225,15 @@ That means near-term curvature work should align with:
 - posterior-precision composition
 - inverse-diagonal and selected-inverse estimation
 
+Reviewed 2026 note:
+
+- distance-`k` graph-coloring probe estimators belong in the curvature layer for
+  sparse inverse-diagonal and posterior-marginal summaries
+- transpose-correctness and JVP/VJP identity checks should be treated as part
+  of the curvature solve-validation toolkit
+- see
+  [matrix_free_estimator_review_2026.md](/docs/implementation/matrix_free_estimator_review_2026.md)
+
 ## Development Order
 
 ### Phase 1
@@ -251,6 +260,12 @@ That means near-term curvature work should align with:
 - `lanczos_approximation`
 - `posterior_marginal_variances`
 - custom VJP/JVP support
+
+Additional reviewed candidates for the Phase 2/3 boundary:
+
+- colored sparse inverse-diagonal estimators
+- shared-basis multi-shift reuse for repeated sparse/operator-backed summaries
+- richer SLQ stopping diagnostics using nested truncation-gap indicators
 
 ### Phase 4
 

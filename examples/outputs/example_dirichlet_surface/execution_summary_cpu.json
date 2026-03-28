@@ -1,0 +1,8 @@
+{
+  "elapsed_s": 48.822418,
+  "executed_notebook": "examples/outputs/example_dirichlet_surface/example_dirichlet_surface_cpu_executed.ipynb",
+  "jax_dtype": "float64",
+  "jax_mode": "cpu",
+  "notebook": "example_dirichlet_surface.ipynb",
+  "output_root": "examples/outputs/example_dirichlet_surface"
+}

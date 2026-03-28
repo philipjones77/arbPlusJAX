@@ -404,6 +404,8 @@ _DIRECT_POINT_BATCH_FASTPATHS = {
     "acb_elliptic_e": _lazy_pair("point_wrappers_elliptic", "acb_elliptic_e_batch_fixed_point", "acb_elliptic_e_batch_padded_point"),
     "bdg_log_barnesdoublegamma": _lazy_pair("double_gamma", "bdg_log_barnesdoublegamma_batch_fixed_point", "bdg_log_barnesdoublegamma_batch_padded_point"),
     "bdg_barnesdoublegamma": _lazy_pair("double_gamma", "bdg_barnesdoublegamma_batch_fixed_point", "bdg_barnesdoublegamma_batch_padded_point"),
+    "ifj_log_barnesdoublegamma": _lazy_pair("double_gamma", "ifj_log_barnesdoublegamma_batch_fixed_point", "ifj_log_barnesdoublegamma_batch_padded_point"),
+    "ifj_barnesdoublegamma": _lazy_pair("double_gamma", "ifj_barnesdoublegamma_batch_fixed_point", "ifj_barnesdoublegamma_batch_padded_point"),
     "bdg_log_barnesgamma2": _lazy_pair("double_gamma", "bdg_log_barnesgamma2_batch_fixed_point", "bdg_log_barnesgamma2_batch_padded_point"),
     "bdg_barnesgamma2": _lazy_pair("double_gamma", "bdg_barnesgamma2_batch_fixed_point", "bdg_barnesgamma2_batch_padded_point"),
     "bdg_log_normalizeddoublegamma": _lazy_pair("double_gamma", "bdg_log_normalizeddoublegamma_batch_fixed_point", "bdg_log_normalizeddoublegamma_batch_padded_point"),
@@ -528,6 +530,17 @@ def _direct_point_batch_fixed(fn: Callable, *args, **kwargs):
 
 
 def _direct_point_batch_padded(fn: Callable, *args, pad_to: int, **kwargs):
+    call_args, _ = pad_mixed_batch_args_repeat_last(args, pad_to=pad_to)
+    return fn(*call_args, **kwargs)
+
+
+def _module_point_batch_fixed(module_name: str, attr_name: str, *args, **kwargs):
+    fn = _resolve_lazy_callable(_lazy_attr(module_name, attr_name))
+    return fn(*args, **kwargs)
+
+
+def _module_point_batch_padded(module_name: str, attr_name: str, *args, pad_to: int, **kwargs):
+    fn = _resolve_lazy_callable(_lazy_attr(module_name, attr_name))
     call_args, _ = pad_mixed_batch_args_repeat_last(args, pad_to=pad_to)
     return fn(*call_args, **kwargs)
 
@@ -1079,23 +1092,119 @@ _DIRECT_POINT_BATCH_FASTPATHS.update(
         "arb_mat_matmul": _lazy_pair("point_wrappers_matrix_dense", "arb_mat_matmul_batch_fixed_point", "arb_mat_matmul_batch_padded_point"),
         "arb_mat_matvec": _lazy_pair("point_wrappers_matrix_dense", "arb_mat_matvec_batch_fixed_point", "arb_mat_matvec_batch_padded_point"),
         "arb_mat_matvec_cached_apply": _lazy_pair("point_wrappers_matrix_plans", "arb_mat_matvec_cached_apply_batch_fixed_point", "arb_mat_matvec_cached_apply_batch_padded_point"),
+        "arb_mat_dense_matvec_plan_prepare": _lazy_pair("point_wrappers", "arb_mat_dense_matvec_plan_prepare_batch_fixed_point", "arb_mat_dense_matvec_plan_prepare_batch_padded_point"),
+        "arb_mat_dense_matvec_plan_apply": _lazy_pair("point_wrappers", "arb_mat_dense_matvec_plan_apply_batch_fixed_point", "arb_mat_dense_matvec_plan_apply_batch_padded_point"),
+        "arb_mat_dense_lu_solve_plan_prepare": _lazy_pair("point_wrappers", "arb_mat_dense_lu_solve_plan_prepare_batch_fixed_point", "arb_mat_dense_lu_solve_plan_prepare_batch_padded_point"),
+        "arb_mat_dense_lu_solve_plan_apply": _lazy_pair("point_wrappers", "arb_mat_dense_lu_solve_plan_apply_batch_fixed_point", "arb_mat_dense_lu_solve_plan_apply_batch_padded_point"),
+        "arb_mat_dense_spd_solve_plan_prepare": _lazy_pair("point_wrappers", "arb_mat_dense_spd_solve_plan_prepare_batch_fixed_point", "arb_mat_dense_spd_solve_plan_prepare_batch_padded_point"),
+        "arb_mat_dense_spd_solve_plan_apply": _lazy_pair("point_wrappers", "arb_mat_dense_spd_solve_plan_apply_batch_fixed_point", "arb_mat_dense_spd_solve_plan_apply_batch_padded_point"),
         "arb_mat_det": _lazy_pair("point_wrappers_matrix_dense", "arb_mat_det_batch_fixed_point", "arb_mat_det_batch_padded_point"),
         "arb_mat_trace": _lazy_pair("point_wrappers_matrix_dense", "arb_mat_trace_batch_fixed_point", "arb_mat_trace_batch_padded_point"),
         "arb_mat_sqr": _lazy_pair("point_wrappers_matrix_dense", "arb_mat_sqr_batch_fixed_point", "arb_mat_sqr_batch_padded_point"),
         "arb_mat_norm_fro": _lazy_pair("point_wrappers_matrix_dense", "arb_mat_norm_fro_batch_fixed_point", "arb_mat_norm_fro_batch_padded_point"),
         "arb_mat_norm_1": _lazy_pair("point_wrappers_matrix_dense", "arb_mat_norm_1_batch_fixed_point", "arb_mat_norm_1_batch_padded_point"),
         "arb_mat_norm_inf": _lazy_pair("point_wrappers_matrix_dense", "arb_mat_norm_inf_batch_fixed_point", "arb_mat_norm_inf_batch_padded_point"),
+        "arb_mat_banded_matvec": _lazy_pair("point_wrappers", "arb_mat_banded_matvec_batch_fixed_point", "arb_mat_banded_matvec_batch_padded_point"),
+        "arb_mat_cho": _lazy_pair("point_wrappers", "arb_mat_cho_batch_fixed_point", "arb_mat_cho_batch_padded_point"),
+        "arb_mat_diag": _lazy_pair("point_wrappers", "arb_mat_diag_batch_fixed_point", "arb_mat_diag_batch_padded_point"),
+        "arb_mat_diag_matrix": _lazy_pair("point_wrappers", "arb_mat_diag_matrix_batch_fixed_point", "arb_mat_diag_matrix_batch_padded_point"),
+        "arb_mat_is_spd": _lazy_pair("point_wrappers", "arb_mat_is_spd_batch_fixed_point", "arb_mat_is_spd_batch_padded_point"),
+        "arb_mat_is_symmetric": _lazy_pair("point_wrappers", "arb_mat_is_symmetric_batch_fixed_point", "arb_mat_is_symmetric_batch_padded_point"),
+        "arb_mat_ldl": _lazy_pair("point_wrappers", "arb_mat_ldl_batch_fixed_point", "arb_mat_ldl_batch_padded_point"),
+        "arb_mat_rmatvec_cached_apply": _lazy_pair("point_wrappers", "arb_mat_rmatvec_cached_apply_batch_fixed_point", "arb_mat_rmatvec_cached_apply_batch_padded_point"),
+        "arb_mat_spd_inv": _lazy_pair("point_wrappers", "arb_mat_spd_inv_batch_fixed_point", "arb_mat_spd_inv_batch_padded_point"),
+        "arb_mat_spd_solve": _lazy_pair("point_wrappers", "arb_mat_spd_solve_batch_fixed_point", "arb_mat_spd_solve_batch_padded_point"),
+        "arb_mat_symmetric_part": _lazy_pair("point_wrappers", "arb_mat_symmetric_part_batch_fixed_point", "arb_mat_symmetric_part_batch_padded_point"),
+        "arb_mat_transpose": _lazy_pair("point_wrappers", "arb_mat_transpose_batch_fixed_point", "arb_mat_transpose_batch_padded_point"),
         "acb_mat_matmul": _lazy_pair("point_wrappers_matrix_dense", "acb_mat_matmul_batch_fixed_point", "acb_mat_matmul_batch_padded_point"),
         "acb_mat_matvec": _lazy_pair("point_wrappers_matrix_dense", "acb_mat_matvec_batch_fixed_point", "acb_mat_matvec_batch_padded_point"),
         "acb_mat_matvec_cached_apply": _lazy_pair("point_wrappers_matrix_plans", "acb_mat_matvec_cached_apply_batch_fixed_point", "acb_mat_matvec_cached_apply_batch_padded_point"),
+        "acb_mat_dense_matvec_plan_prepare": _lazy_pair("point_wrappers", "acb_mat_dense_matvec_plan_prepare_batch_fixed_point", "acb_mat_dense_matvec_plan_prepare_batch_padded_point"),
+        "acb_mat_dense_matvec_plan_apply": _lazy_pair("point_wrappers", "acb_mat_dense_matvec_plan_apply_batch_fixed_point", "acb_mat_dense_matvec_plan_apply_batch_padded_point"),
+        "acb_mat_dense_lu_solve_plan_prepare": _lazy_pair("point_wrappers", "acb_mat_dense_lu_solve_plan_prepare_batch_fixed_point", "acb_mat_dense_lu_solve_plan_prepare_batch_padded_point"),
+        "acb_mat_dense_lu_solve_plan_apply": _lazy_pair("point_wrappers", "acb_mat_dense_lu_solve_plan_apply_batch_fixed_point", "acb_mat_dense_lu_solve_plan_apply_batch_padded_point"),
+        "acb_mat_dense_hpd_solve_plan_prepare": _lazy_pair("point_wrappers", "acb_mat_dense_hpd_solve_plan_prepare_batch_fixed_point", "acb_mat_dense_hpd_solve_plan_prepare_batch_padded_point"),
+        "acb_mat_dense_hpd_solve_plan_apply": _lazy_pair("point_wrappers", "acb_mat_dense_hpd_solve_plan_apply_batch_fixed_point", "acb_mat_dense_hpd_solve_plan_apply_batch_padded_point"),
         "acb_mat_det": _lazy_pair("point_wrappers_matrix_dense", "acb_mat_det_batch_fixed_point", "acb_mat_det_batch_padded_point"),
         "acb_mat_trace": _lazy_pair("point_wrappers_matrix_dense", "acb_mat_trace_batch_fixed_point", "acb_mat_trace_batch_padded_point"),
         "acb_mat_sqr": _lazy_pair("point_wrappers_matrix_dense", "acb_mat_sqr_batch_fixed_point", "acb_mat_sqr_batch_padded_point"),
         "acb_mat_norm_fro": _lazy_pair("point_wrappers_matrix_dense", "acb_mat_norm_fro_batch_fixed_point", "acb_mat_norm_fro_batch_padded_point"),
         "acb_mat_norm_1": _lazy_pair("point_wrappers_matrix_dense", "acb_mat_norm_1_batch_fixed_point", "acb_mat_norm_1_batch_padded_point"),
         "acb_mat_norm_inf": _lazy_pair("point_wrappers_matrix_dense", "acb_mat_norm_inf_batch_fixed_point", "acb_mat_norm_inf_batch_padded_point"),
+        "acb_mat_banded_matvec": _lazy_pair("point_wrappers", "acb_mat_banded_matvec_batch_fixed_point", "acb_mat_banded_matvec_batch_padded_point"),
+        "acb_mat_cho": _lazy_pair("point_wrappers", "acb_mat_cho_batch_fixed_point", "acb_mat_cho_batch_padded_point"),
+        "acb_mat_conjugate_transpose": _lazy_pair("point_wrappers", "acb_mat_conjugate_transpose_batch_fixed_point", "acb_mat_conjugate_transpose_batch_padded_point"),
+        "acb_mat_diag": _lazy_pair("point_wrappers", "acb_mat_diag_batch_fixed_point", "acb_mat_diag_batch_padded_point"),
+        "acb_mat_diag_matrix": _lazy_pair("point_wrappers", "acb_mat_diag_matrix_batch_fixed_point", "acb_mat_diag_matrix_batch_padded_point"),
+        "acb_mat_hermitian_part": _lazy_pair("point_wrappers", "acb_mat_hermitian_part_batch_fixed_point", "acb_mat_hermitian_part_batch_padded_point"),
+        "acb_mat_hpd_inv": _lazy_pair("point_wrappers", "acb_mat_hpd_inv_batch_fixed_point", "acb_mat_hpd_inv_batch_padded_point"),
+        "acb_mat_hpd_solve": _lazy_pair("point_wrappers", "acb_mat_hpd_solve_batch_fixed_point", "acb_mat_hpd_solve_batch_padded_point"),
+        "acb_mat_is_hermitian": _lazy_pair("point_wrappers", "acb_mat_is_hermitian_batch_fixed_point", "acb_mat_is_hermitian_batch_padded_point"),
+        "acb_mat_is_hpd": _lazy_pair("point_wrappers", "acb_mat_is_hpd_batch_fixed_point", "acb_mat_is_hpd_batch_padded_point"),
+        "acb_mat_ldl": _lazy_pair("point_wrappers", "acb_mat_ldl_batch_fixed_point", "acb_mat_ldl_batch_padded_point"),
+        "acb_mat_rmatvec_cached_apply": _lazy_pair("point_wrappers", "acb_mat_rmatvec_cached_apply_batch_fixed_point", "acb_mat_rmatvec_cached_apply_batch_padded_point"),
+        "acb_mat_transpose": _lazy_pair("point_wrappers", "acb_mat_transpose_batch_fixed_point", "acb_mat_transpose_batch_padded_point"),
     }
 )
+
+for _module_name, _public_names in {
+    "point_wrappers_core": (
+        "arb_abs",
+        "arb_add",
+        "arb_cosh",
+        "arb_bessel_i",
+        "arb_bessel_j",
+        "arb_bessel_k",
+        "arb_bessel_y",
+        "arb_cos",
+        "arb_div",
+        "arb_exp",
+        "arb_gamma",
+        "arb_inv",
+        "arb_lgamma",
+        "arb_log",
+        "arb_mul",
+        "arb_rgamma",
+        "arb_sin",
+        "arb_sinh",
+        "arb_sqrt",
+        "arb_sub",
+        "arb_tan",
+        "arb_tanh",
+        "acb_abs",
+        "acb_add",
+        "acb_cosh",
+        "acb_cos",
+        "acb_digamma",
+        "acb_div",
+        "acb_exp",
+        "acb_gamma",
+        "acb_inv",
+        "acb_lgamma",
+        "acb_log",
+        "acb_mul",
+        "acb_polygamma",
+        "acb_rgamma",
+        "acb_sin",
+        "acb_sinh",
+        "acb_sqrt",
+        "acb_sub",
+        "acb_tan",
+        "acb_tanh",
+    ),
+    "point_wrappers_matrix": (
+        "arb_mat_add",
+        "acb_mat_add",
+    ),
+}.items():
+    for _public_name in _public_names:
+        _DIRECT_POINT_BATCH_FASTPATHS.setdefault(
+            _public_name,
+            (
+                partial(_module_point_batch_fixed, _module_name, f"{_public_name}_point"),
+                partial(_module_point_batch_padded, _module_name, f"{_public_name}_point"),
+            ),
+        )
 
 for _name, _fn in _POINT_FUNCS.items():
     _DIRECT_POINT_BATCH_FASTPATHS.setdefault(_name, _fn)

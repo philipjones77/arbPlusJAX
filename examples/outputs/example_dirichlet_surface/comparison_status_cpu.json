@@ -1,0 +1,14 @@
+[
+  {
+    "script": "benchmarks/compare_dirichlet.py",
+    "returncode": 1,
+    "stdout": "Reference libraries not found. Build C reference libraries in the Arb workspace first.\n",
+    "stderr": ""
+  },
+  {
+    "script": "benchmarks/compare_acb_dirichlet.py",
+    "returncode": 1,
+    "stdout": "Reference libraries not found. Build C reference libraries in the Arb workspace first.\n",
+    "stderr": ""
+  }
+]

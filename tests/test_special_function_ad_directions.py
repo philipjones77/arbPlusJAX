@@ -45,6 +45,31 @@ def test_hypgeom_u_supports_argument_and_parameter_ad_in_stable_regime() -> None
     assert jnp.isfinite(dz)
 
 
+def test_hypgeom_2f1_supports_argument_and_parameter_ad() -> None:
+    a = jnp.float64(0.5)
+    b = jnp.float64(1.0)
+    c = jnp.float64(1.5)
+    z = jnp.float64(0.2)
+
+    da = jax.grad(lambda av: api.eval_point("hypgeom.arb_hypgeom_2f1", av, b, c, z))(a)
+    dz = jax.grad(lambda zv: api.eval_point("hypgeom.arb_hypgeom_2f1", a, b, c, zv))(z)
+
+    assert jnp.isfinite(da)
+    assert jnp.isfinite(dz)
+
+
+def test_hypgeom_pfq_supports_argument_and_parameter_ad() -> None:
+    a = jnp.asarray([0.5, 1.0], dtype=jnp.float64)
+    b = jnp.asarray([1.5], dtype=jnp.float64)
+    z = jnp.float64(0.1)
+
+    da = jax.grad(lambda av: api.eval_point("hypgeom.arb_hypgeom_pfq", av, b, z)[()])(a)
+    dz = jax.grad(lambda zv: api.eval_point("hypgeom.arb_hypgeom_pfq", a, b, zv)[()])(z)
+
+    assert jnp.all(jnp.isfinite(da))
+    assert jnp.isfinite(dz)
+
+
 def test_barnes_ifj_supports_argument_and_tau_ad() -> None:
     z = jnp.asarray(1.1 + 0.05j, dtype=jnp.complex128)
     tau = jnp.float64(1.0)
@@ -64,6 +89,18 @@ def test_bessel_point_kernel_supports_argument_and_order_ad() -> None:
 
     dnu = jax.grad(lambda nv: bk.real_bessel_eval_j(nv, z))(nu)
     dz = jax.grad(lambda zv: bk.real_bessel_eval_j(nu, zv))(z)
+
+    assert jnp.isfinite(dnu)
+    assert jnp.isfinite(dz)
+
+
+def test_incomplete_bessel_k_supports_argument_and_order_ad() -> None:
+    nu = jnp.float64(0.6)
+    z = jnp.float64(1.8)
+    lower = jnp.float64(0.4)
+
+    dnu = jax.grad(lambda nv: api.incomplete_bessel_k(nv, z, lower, mode="point", method="quadrature"))(nu)
+    dz = jax.grad(lambda zv: api.incomplete_bessel_k(nu, zv, lower, mode="point", method="quadrature"))(z)
 
     assert jnp.isfinite(dnu)
     assert jnp.isfinite(dz)

@@ -1,13 +1,17 @@
+import jax
 import jax.numpy as jnp
 
 from arbplusjax import acb_core
 from arbplusjax import api
+from arbplusjax import curvature
 from arbplusjax import double_interval as di
 from arbplusjax import jcb_mat
 from arbplusjax import jrb_mat
 from arbplusjax import mat_common
 from arbplusjax import mat_wrappers
+from arbplusjax import matrix_free_core
 from arbplusjax import scb_mat
+from arbplusjax import sparse_common
 from arbplusjax import srb_mat
 
 from tests._test_checks import _check
@@ -277,6 +281,461 @@ def test_sparse_operator_plan_specialization_uses_native_storage_for_coo_and_csr
         _check(bool(jnp.allclose(acb_core.acb_midpoint(hpd_out), complex_dense @ cv, rtol=1e-8, atol=1e-8)))
 
 
+def test_sparse_slq_heat_trace_and_spectral_density_jit_match_plan_surface():
+    real_dense = jnp.array([[4.0, 1.0], [1.0, 3.0]], dtype=jnp.float64)
+    complex_base = jnp.array(
+        [
+            [2.0 + 0.0j, 1.0 - 0.25j],
+            [0.5 + 0.25j, 1.75 + 0.0j],
+        ],
+        dtype=jnp.complex128,
+    )
+    complex_dense = jnp.conj(complex_base.T) @ complex_base + jnp.eye(2, dtype=jnp.complex128)
+    real_probes = jnp.stack(
+        [
+            di.interval(jnp.asarray([1.0, 1.0], dtype=jnp.float64), jnp.asarray([1.0, 1.0], dtype=jnp.float64)),
+            di.interval(jnp.asarray([1.0, -1.0], dtype=jnp.float64), jnp.asarray([1.0, -1.0], dtype=jnp.float64)),
+        ],
+        axis=0,
+    )
+    complex_probes = jnp.stack(
+        [
+            acb_core.acb_box(
+                di.interval(jnp.asarray([1.0, 1.0], dtype=jnp.float64), jnp.asarray([1.0, 1.0], dtype=jnp.float64)),
+                di.interval(jnp.zeros((2,), dtype=jnp.float64), jnp.zeros((2,), dtype=jnp.float64)),
+            ),
+            acb_core.acb_box(
+                di.interval(jnp.asarray([1.0, -1.0], dtype=jnp.float64), jnp.asarray([1.0, -1.0], dtype=jnp.float64)),
+                di.interval(jnp.zeros((2,), dtype=jnp.float64), jnp.zeros((2,), dtype=jnp.float64)),
+            ),
+        ],
+        axis=0,
+    )
+    real_bins = jnp.asarray([2.5, 3.5, 4.5], dtype=jnp.float64)
+    complex_bins = jnp.asarray([1.5, 3.0, 6.0], dtype=jnp.float64)
+
+    for storage, sparse in _real_formats(real_dense).items():
+        plan = jrb_mat.jrb_mat_spd_operator_plan_prepare(sparse)
+        _check(plan.kind == ("sparse_bcoo" if storage == "bcoo" else "shell"))
+        eager_heat = jrb_mat.jrb_mat_heat_trace_slq_point(plan, real_probes, 2, time=jnp.asarray(0.5, dtype=jnp.float64))
+        compiled_heat = jrb_mat.jrb_mat_heat_trace_slq_point_jit(plan, real_probes, 2, time=jnp.asarray(0.5, dtype=jnp.float64))
+        eager_density = jrb_mat.jrb_mat_spectral_density_slq_point(plan, real_probes, 2, bin_edges=real_bins, normalize=True)
+        compiled_density = jrb_mat.jrb_mat_spectral_density_slq_point_jit(
+            plan,
+            real_probes,
+            2,
+            bin_edges=real_bins,
+            normalize=True,
+        )
+        _check(bool(jnp.allclose(compiled_heat, eager_heat, rtol=1e-6, atol=1e-6)))
+        _check(bool(jnp.allclose(compiled_density, eager_density, rtol=1e-6, atol=1e-6)))
+
+    for storage, sparse in _complex_formats(complex_dense).items():
+        plan = jcb_mat.jcb_mat_hpd_operator_plan_prepare(sparse)
+        _check(plan.kind == ("sparse_bcoo" if storage == "bcoo" else "shell"))
+        eager_heat = jcb_mat.jcb_mat_heat_trace_slq_hermitian_point(plan, complex_probes, 2, time=jnp.asarray(0.5, dtype=jnp.float64))
+        compiled_heat = jcb_mat.jcb_mat_heat_trace_slq_hermitian_point_jit(
+            plan,
+            complex_probes,
+            2,
+            time=jnp.asarray(0.5, dtype=jnp.float64),
+        )
+        eager_density = jcb_mat.jcb_mat_spectral_density_slq_hermitian_point(
+            plan,
+            complex_probes,
+            2,
+            bin_edges=complex_bins,
+            normalize=True,
+        )
+        compiled_density = jcb_mat.jcb_mat_spectral_density_slq_hermitian_point_jit(
+            plan,
+            complex_probes,
+            2,
+            bin_edges=complex_bins,
+            normalize=True,
+        )
+        _check(bool(jnp.allclose(compiled_heat, eager_heat, rtol=1e-6, atol=1e-6)))
+        _check(bool(jnp.allclose(compiled_density, eager_density, rtol=1e-6, atol=1e-6)))
+
+
+def test_sparse_slq_logdet_det_and_metadata_surfaces_match_plan_surface():
+    real_dense = jnp.array([[4.0, 1.0], [1.0, 3.0]], dtype=jnp.float64)
+    complex_base = jnp.array(
+        [
+            [2.0 + 0.0j, 1.0 - 0.25j],
+            [0.5 + 0.25j, 1.75 + 0.0j],
+        ],
+        dtype=jnp.complex128,
+    )
+    complex_dense = jnp.conj(complex_base.T) @ complex_base + jnp.eye(2, dtype=jnp.complex128)
+    real_probes = jnp.stack(
+        [
+            di.interval(jnp.asarray([1.0, 1.0], dtype=jnp.float64), jnp.asarray([1.0, 1.0], dtype=jnp.float64)),
+            di.interval(jnp.asarray([1.0, -1.0], dtype=jnp.float64), jnp.asarray([1.0, -1.0], dtype=jnp.float64)),
+        ],
+        axis=0,
+    )
+    complex_probes = jnp.stack(
+        [
+            acb_core.acb_box(
+                di.interval(jnp.asarray([1.0, 1.0], dtype=jnp.float64), jnp.asarray([1.0, 1.0], dtype=jnp.float64)),
+                di.interval(jnp.zeros((2,), dtype=jnp.float64), jnp.zeros((2,), dtype=jnp.float64)),
+            ),
+            acb_core.acb_box(
+                di.interval(jnp.asarray([1.0, -1.0], dtype=jnp.float64), jnp.asarray([1.0, -1.0], dtype=jnp.float64)),
+                di.interval(jnp.zeros((2,), dtype=jnp.float64), jnp.zeros((2,), dtype=jnp.float64)),
+            ),
+        ],
+        axis=0,
+    )
+
+    for storage, sparse in _real_formats(real_dense).items():
+        plan = jrb_mat.jrb_mat_spd_operator_plan_prepare(sparse)
+        _check(plan.kind == ("sparse_bcoo" if storage == "bcoo" else "shell"))
+        eager_logdet = jrb_mat.jrb_mat_logdet_slq_point(plan, real_probes, 2)
+        compiled_logdet = jrb_mat.jrb_mat_logdet_slq_point_jit(plan, real_probes, 2)
+        eager_det = jrb_mat.jrb_mat_det_slq_point(plan, real_probes, 2)
+        compiled_det = jrb_mat.jrb_mat_det_slq_point_jit(plan, real_probes, 2)
+        diag_value, diag = jrb_mat.jrb_mat_logdet_slq_with_diagnostics_point(plan, real_probes, 2)
+        det_diag_value, det_diag = jrb_mat.jrb_mat_det_slq_with_diagnostics_point(plan, real_probes, 2)
+        metadata = jrb_mat.jrb_mat_slq_prepare_point(
+            plan,
+            real_probes,
+            2,
+            target_stderr=1e-4,
+            min_probes=2,
+            max_probes=8,
+            block_size=2,
+        )
+        _check(bool(jnp.allclose(compiled_logdet, eager_logdet, rtol=1e-6, atol=1e-6)))
+        _check(bool(jnp.allclose(compiled_det, eager_det, rtol=1e-6, atol=1e-6)))
+        _check(bool(jnp.allclose(diag_value, eager_logdet, rtol=1e-6, atol=1e-6)))
+        _check(bool(jnp.allclose(det_diag_value, eager_det, rtol=1e-6, atol=1e-6)))
+        _check(bool(jnp.allclose(metadata.statistics.mean, eager_logdet, rtol=1e-6, atol=1e-6)))
+        _check(int(metadata.statistics.recommended_probe_count) % 2 == 0)
+        _check(bool(jnp.isfinite(diag.tail_norm)))
+        _check(bool(jnp.isfinite(det_diag.tail_norm)))
+
+    for storage, sparse in _complex_formats(complex_dense).items():
+        plan = jcb_mat.jcb_mat_hpd_operator_plan_prepare(sparse)
+        _check(plan.kind == ("sparse_bcoo" if storage == "bcoo" else "shell"))
+        eager_logdet = jcb_mat.jcb_mat_logdet_slq_point(plan, complex_probes, 2, plan)
+        compiled_logdet = jcb_mat.jcb_mat_logdet_slq_point_jit(plan, complex_probes, 2)
+        eager_det = jcb_mat.jcb_mat_det_slq_point(plan, complex_probes, 2, plan)
+        compiled_det = jcb_mat.jcb_mat_det_slq_point_jit(plan, complex_probes, 2)
+        diag_value, diag = jcb_mat.jcb_mat_logdet_slq_with_diagnostics_point(plan, complex_probes, 2, plan)
+        det_diag_value, det_diag = jcb_mat.jcb_mat_det_slq_with_diagnostics_point(plan, complex_probes, 2, plan)
+        metadata = jcb_mat.jcb_mat_slq_prepare_hermitian_point(
+            plan,
+            complex_probes,
+            2,
+            target_stderr=1e-4,
+            min_probes=2,
+            max_probes=8,
+            block_size=2,
+        )
+        _check(bool(jnp.allclose(compiled_logdet, eager_logdet, rtol=1e-6, atol=1e-6)))
+        _check(bool(jnp.allclose(compiled_det, eager_det, rtol=1e-6, atol=1e-6)))
+        _check(bool(jnp.allclose(diag_value, eager_logdet, rtol=1e-6, atol=1e-6)))
+        _check(bool(jnp.allclose(det_diag_value, eager_det, rtol=1e-6, atol=1e-6)))
+        _check(bool(jnp.allclose(metadata.statistics.mean, jcb_mat.jcb_mat_logdet_slq_hermitian_point(plan, complex_probes, 2), rtol=1e-6, atol=1e-6)))
+        _check(int(metadata.statistics.recommended_probe_count) % 2 == 0)
+        _check(bool(jnp.isfinite(diag.tail_norm)))
+        _check(bool(jnp.isfinite(det_diag.tail_norm)))
+
+
+def test_sparse_hutchpp_and_rational_hutchpp_match_prepared_plan_surface():
+    real_dense = jnp.diag(jnp.asarray([2.0, 3.0], dtype=jnp.float64))
+    complex_dense = jnp.diag(jnp.asarray([2.0 + 0.0j, 3.0 + 0.0j], dtype=jnp.complex128))
+    real_sketch = jnp.stack(
+        [di.interval(jnp.asarray([1.0, 0.0], dtype=jnp.float64), jnp.asarray([1.0, 0.0], dtype=jnp.float64))],
+        axis=0,
+    )
+    real_residual = jnp.stack(
+        [di.interval(jnp.asarray([0.0, 1.0], dtype=jnp.float64), jnp.asarray([0.0, 1.0], dtype=jnp.float64))],
+        axis=0,
+    )
+    complex_sketch = jnp.stack(
+        [
+            acb_core.acb_box(
+                di.interval(jnp.asarray([1.0, 0.0], dtype=jnp.float64), jnp.asarray([1.0, 0.0], dtype=jnp.float64)),
+                di.interval(jnp.zeros((2,), dtype=jnp.float64), jnp.zeros((2,), dtype=jnp.float64)),
+            )
+        ],
+        axis=0,
+    )
+    complex_residual = jnp.stack(
+        [
+            acb_core.acb_box(
+                di.interval(jnp.asarray([0.0, 1.0], dtype=jnp.float64), jnp.asarray([0.0, 1.0], dtype=jnp.float64)),
+                di.interval(jnp.zeros((2,), dtype=jnp.float64), jnp.zeros((2,), dtype=jnp.float64)),
+            )
+        ],
+        axis=0,
+    )
+    real_coeffs = jnp.asarray(
+        [
+            jnp.log(jnp.asarray(2.0, dtype=jnp.float64)) - 2.0 * jnp.log(jnp.asarray(3.0 / 2.0, dtype=jnp.float64)),
+            jnp.log(jnp.asarray(3.0 / 2.0, dtype=jnp.float64)),
+        ],
+        dtype=jnp.float64,
+    )
+    complex_coeffs = jnp.asarray(
+        [
+            jnp.log(jnp.asarray(2.0 + 0.0j, dtype=jnp.complex128))
+            - 2.0 * jnp.log(jnp.asarray(3.0 / 2.0 + 0.0j, dtype=jnp.complex128)),
+            jnp.log(jnp.asarray(3.0 / 2.0 + 0.0j, dtype=jnp.complex128)),
+        ],
+        dtype=jnp.complex128,
+    )
+    exact_real = jnp.log(2.0) + jnp.log(3.0)
+    exact_complex = jnp.log(2.0 + 0.0j) + jnp.log(3.0 + 0.0j)
+
+    for storage, sparse in _real_formats(real_dense).items():
+        plan = jrb_mat.jrb_mat_spd_operator_plan_prepare(sparse)
+        _check(plan.kind == ("sparse_bcoo" if storage == "bcoo" else "shell"))
+        hutch = jrb_mat.jrb_mat_hutchpp_trace_with_metadata_point(
+            lambda v: jrb_mat.jrb_mat_log_action_lanczos_point(plan, v, 2),
+            real_sketch,
+            real_residual,
+            target_stderr=1e-4,
+            min_probes=1,
+            max_probes=4,
+            block_size=1,
+        )
+        hutch_value = jrb_mat.jrb_mat_hutchpp_trace_estimate_point(
+            lambda v: jrb_mat.jrb_mat_log_action_lanczos_point(plan, v, 2),
+            real_sketch,
+            real_residual,
+        )
+        deflation = jrb_mat.jrb_mat_deflated_operator_prepare_point(
+            lambda v: jrb_mat.jrb_mat_log_action_lanczos_point(plan, v, 2),
+            real_sketch,
+        )
+        deflated = jrb_mat.jrb_mat_trace_estimate_deflated_point(
+            lambda v: jrb_mat.jrb_mat_log_action_lanczos_point(plan, v, 2),
+            deflation,
+            real_residual,
+            target_stderr=1e-4,
+            min_probes=1,
+            max_probes=4,
+            block_size=1,
+        )
+        metadata = jrb_mat.jrb_mat_logdet_rational_hutchpp_prepare_point(
+            plan,
+            real_sketch,
+            shifts=jnp.zeros((0,), dtype=jnp.float64),
+            weights=jnp.zeros((0,), dtype=jnp.float64),
+            polynomial_coefficients=real_coeffs,
+            target_stderr=1e-4,
+            min_probes=1,
+            max_probes=4,
+            block_size=1,
+        )
+        cached = jrb_mat.jrb_mat_logdet_rational_hutchpp_from_metadata_point(metadata, real_residual)
+        direct = jrb_mat.jrb_mat_logdet_rational_hutchpp_point(
+            plan,
+            real_sketch,
+            real_residual,
+            shifts=jnp.zeros((0,), dtype=jnp.float64),
+            weights=jnp.zeros((0,), dtype=jnp.float64),
+            polynomial_coefficients=real_coeffs,
+        )
+        _check(bool(jnp.allclose(hutch.low_rank_trace + hutch.residual_trace, hutch_value, rtol=1e-6, atol=1e-6)))
+        _check(bool(jnp.allclose(deflated.low_rank_trace + deflated.residual_trace, hutch_value, rtol=1e-6, atol=1e-6)))
+        _check(bool(jnp.allclose(matrix_free_core.hutchpp_trace_from_metadata(cached), exact_real, rtol=1e-6, atol=1e-6)))
+        _check(bool(jnp.allclose(direct, exact_real, rtol=1e-6, atol=1e-6)))
+
+    for storage, sparse in _complex_formats(complex_dense).items():
+        plan = jcb_mat.jcb_mat_hpd_operator_plan_prepare(sparse)
+        _check(plan.kind == ("sparse_bcoo" if storage == "bcoo" else "shell"))
+        hutch = jcb_mat.jcb_mat_hutchpp_trace_with_metadata_point(
+            lambda v: jcb_mat.jcb_mat_log_action_hermitian_point(plan, v, 2),
+            complex_sketch,
+            complex_residual,
+            target_stderr=1e-4,
+            min_probes=1,
+            max_probes=4,
+            block_size=1,
+        )
+        hutch_value = jcb_mat.jcb_mat_hutchpp_trace_estimate_point(
+            lambda v: jcb_mat.jcb_mat_log_action_hermitian_point(plan, v, 2),
+            complex_sketch,
+            complex_residual,
+        )
+        deflation = jcb_mat.jcb_mat_deflated_operator_prepare_point(
+            lambda v: jcb_mat.jcb_mat_log_action_hermitian_point(plan, v, 2),
+            complex_sketch,
+        )
+        deflated = jcb_mat.jcb_mat_trace_estimate_deflated_point(
+            lambda v: jcb_mat.jcb_mat_log_action_hermitian_point(plan, v, 2),
+            deflation,
+            complex_residual,
+            target_stderr=1e-4,
+            min_probes=1,
+            max_probes=4,
+            block_size=1,
+        )
+        metadata = jcb_mat.jcb_mat_logdet_rational_hutchpp_prepare_point(
+            plan,
+            complex_sketch,
+            shifts=jnp.zeros((0,), dtype=jnp.complex128),
+            weights=jnp.zeros((0,), dtype=jnp.complex128),
+            polynomial_coefficients=complex_coeffs,
+            hermitian=True,
+            target_stderr=1e-4,
+            min_probes=1,
+            max_probes=4,
+            block_size=1,
+        )
+        cached = jcb_mat.jcb_mat_logdet_rational_hutchpp_from_metadata_point(metadata, complex_residual)
+        direct = jcb_mat.jcb_mat_logdet_rational_hutchpp_point(
+            plan,
+            complex_sketch,
+            complex_residual,
+            shifts=jnp.zeros((0,), dtype=jnp.complex128),
+            weights=jnp.zeros((0,), dtype=jnp.complex128),
+            polynomial_coefficients=complex_coeffs,
+            hermitian=True,
+        )
+        _check(bool(jnp.allclose(hutch.low_rank_trace + hutch.residual_trace, hutch_value, rtol=1e-6, atol=1e-6)))
+        _check(bool(jnp.allclose(deflated.low_rank_trace + deflated.residual_trace, hutch_value, rtol=1e-6, atol=1e-6)))
+        _check(bool(jnp.allclose(matrix_free_core.hutchpp_trace_from_metadata(cached), exact_complex, rtol=1e-6, atol=1e-6)))
+        _check(bool(jnp.allclose(direct, exact_complex, rtol=1e-6, atol=1e-6)))
+
+
+def test_sparse_curvature_selected_inverse_and_posterior_summaries_match_dense_reference():
+    real_dense = jnp.array([[4.0, 1.0], [1.0, 3.0]], dtype=jnp.float64)
+    complex_dense = jnp.diag(jnp.asarray([2.0 + 0.0j, 3.0 + 0.0j], dtype=jnp.complex128))
+    probes_r = jnp.stack(
+        [
+            di.interval(jnp.asarray([1.0, 1.0], dtype=jnp.float64), jnp.asarray([1.0, 1.0], dtype=jnp.float64)),
+            di.interval(jnp.asarray([1.0, -1.0], dtype=jnp.float64), jnp.asarray([1.0, -1.0], dtype=jnp.float64)),
+        ],
+        axis=0,
+    )
+    probes_c = jnp.stack(
+        [
+            acb_core.acb_box(
+                di.interval(jnp.asarray([1.0, 1.0], dtype=jnp.float64), jnp.asarray([1.0, 1.0], dtype=jnp.float64)),
+                di.interval(jnp.zeros((2,), dtype=jnp.float64), jnp.zeros((2,), dtype=jnp.float64)),
+            ),
+            acb_core.acb_box(
+                di.interval(jnp.asarray([1.0, -1.0], dtype=jnp.float64), jnp.asarray([1.0, -1.0], dtype=jnp.float64)),
+                di.interval(jnp.zeros((2,), dtype=jnp.float64), jnp.zeros((2,), dtype=jnp.float64)),
+            ),
+        ],
+        axis=0,
+    )
+    idx = jnp.asarray([[0, 0], [1, 1]], dtype=jnp.int32)
+    dense_real_inv = jnp.linalg.inv(real_dense)
+    dense_complex_inv = jnp.linalg.inv(complex_dense)
+
+    for storage, sparse in _real_formats(real_dense).items():
+        del storage, sparse
+        bcoo = sparse_common.dense_to_sparse_bcoo(real_dense, algebra="jrb")
+        op = curvature.make_jrb_sparse_curvature_operator(bcoo, probes=probes_r, steps=2, symmetric=True)
+        selected = curvature.selected_inverse(op, index_set=idx, overlap=0, block_size=1, correction_probes=0)
+        marg = curvature.posterior_marginal_variances(op, overlap=0, block_size=1, correction_probes=0)
+        pushed = curvature.covariance_pushforward(op, jnp.eye(2, dtype=jnp.float64))
+        _check(bool(jnp.allclose(selected, jnp.diag(dense_real_inv), rtol=1e-6, atol=1e-6)))
+        _check(bool(jnp.allclose(marg, jnp.diag(dense_real_inv), rtol=1e-6, atol=1e-6)))
+        _check(bool(jnp.allclose(pushed, dense_real_inv, rtol=1e-6, atol=1e-6)))
+
+    for storage, sparse in _complex_formats(complex_dense).items():
+        del storage, sparse
+        bcoo = sparse_common.dense_to_sparse_bcoo(complex_dense, algebra="jcb")
+        op = curvature.make_jcb_sparse_curvature_operator(bcoo, probes=probes_c, steps=2, hermitian=True)
+        selected = curvature.selected_inverse(op, index_set=idx)
+        marg = curvature.posterior_marginal_variances(op)
+        pushed = curvature.covariance_pushforward(op, jnp.eye(2, dtype=jnp.complex128))
+        _check(bool(jnp.allclose(selected, jnp.diag(dense_complex_inv), rtol=1e-6, atol=1e-6)))
+        _check(bool(jnp.allclose(marg, jnp.diag(dense_complex_inv), rtol=1e-6, atol=1e-6)))
+        _check(bool(jnp.allclose(pushed, dense_complex_inv, rtol=1e-6, atol=1e-6)))
+
+
+def test_sparse_colored_inverse_diagonal_estimator_and_diagnostics():
+    real_dense = jnp.array(
+        [
+            [4.0, 1.0, 0.0],
+            [1.0, 3.0, 1.0],
+            [0.0, 1.0, 2.0],
+        ],
+        dtype=jnp.float64,
+    )
+    complex_dense = jnp.diag(jnp.asarray([2.0 + 0.0j, 3.0 + 0.0j, 5.0 + 0.0j], dtype=jnp.complex128))
+    probes_r = jnp.stack(
+        [
+            di.interval(jnp.asarray([1.0, 1.0, 1.0], dtype=jnp.float64), jnp.asarray([1.0, 1.0, 1.0], dtype=jnp.float64)),
+            di.interval(jnp.asarray([1.0, -1.0, 1.0], dtype=jnp.float64), jnp.asarray([1.0, -1.0, 1.0], dtype=jnp.float64)),
+        ],
+        axis=0,
+    )
+    probes_c = jnp.stack(
+        [
+            acb_core.acb_box(
+                di.interval(jnp.asarray([1.0, 1.0, 1.0], dtype=jnp.float64), jnp.asarray([1.0, 1.0, 1.0], dtype=jnp.float64)),
+                di.interval(jnp.zeros((3,), dtype=jnp.float64), jnp.zeros((3,), dtype=jnp.float64)),
+            ),
+            acb_core.acb_box(
+                di.interval(jnp.asarray([1.0, -1.0, 1.0], dtype=jnp.float64), jnp.asarray([1.0, -1.0, 1.0], dtype=jnp.float64)),
+                di.interval(jnp.zeros((3,), dtype=jnp.float64), jnp.zeros((3,), dtype=jnp.float64)),
+            ),
+        ],
+        axis=0,
+    )
+    exact_real = jnp.diag(jnp.linalg.inv(real_dense))
+    exact_complex = jnp.diag(jnp.linalg.inv(complex_dense))
+
+    sparse_r = sparse_common.dense_to_sparse_bcoo(real_dense, algebra="jrb")
+    op_r = curvature.make_jrb_sparse_curvature_operator(sparse_r, probes=probes_r, steps=3, symmetric=True)
+    colored_r, diag_r = curvature.colored_inverse_diagonal_with_diagnostics(
+        op_r,
+        overlap=1,
+        block_size=2,
+        correction_probes=2,
+        key=jax.random.PRNGKey(0),
+    )
+    selected_r = curvature.selected_inverse(
+        op_r,
+        index_set=jnp.asarray([[0, 0], [1, 1], [2, 2]], dtype=jnp.int32),
+        overlap=1,
+        block_size=2,
+        correction_probes=2,
+        key=jax.random.PRNGKey(0),
+    )
+    marg_r = curvature.posterior_marginal_variances(
+        op_r,
+        overlap=1,
+        block_size=2,
+        correction_probes=2,
+        key=jax.random.PRNGKey(0),
+    )
+    _check(bool(jnp.allclose(colored_r, exact_real, rtol=1e-6, atol=1e-6)))
+    _check(bool(jnp.allclose(selected_r, exact_real, rtol=1e-6, atol=1e-6)))
+    _check(bool(jnp.allclose(marg_r, exact_real, rtol=1e-6, atol=1e-6)))
+    _check(diag_r.distance_k == 2)
+    _check(diag_r.color_count == 3)
+    _check(diag_r.block_size == 2)
+    _check(diag_r.correction_probes == 2)
+    _check(diag_r.color_sizes.shape == (3,))
+    _check(diag_r.stderr.shape == (3,))
+
+    sparse_c = sparse_common.dense_to_sparse_bcoo(complex_dense, algebra="jcb")
+    op_c = curvature.make_jcb_sparse_curvature_operator(sparse_c, probes=probes_c, steps=3, hermitian=True)
+    colored_c, diag_c = curvature.colored_inverse_diagonal_with_diagnostics(
+        op_c,
+        overlap=0,
+        block_size=2,
+        correction_probes=1,
+        key=jax.random.PRNGKey(1),
+    )
+    _check(bool(jnp.allclose(colored_c, exact_complex, rtol=1e-6, atol=1e-6)))
+    _check(diag_c.distance_k == 1)
+    _check(diag_c.color_count == 1)
+    _check(diag_c.stderr.shape == (3,))
+
+
 def test_sparse_preconditioner_and_multi_shift_plan_specialization():
     real_dense = jnp.diag(jnp.asarray([2.0, 4.0, 8.0], dtype=jnp.float64))
     complex_dense = jnp.diag(jnp.asarray([2.0 + 0.0j, 4.0 + 0.0j, 8.0 + 0.0j], dtype=jnp.complex128))
@@ -504,19 +963,21 @@ def test_sparse_native_policy_diagnostics_expose_dense_lift_vs_sparse_native_pat
     sreal = srb_mat.srb_mat_from_dense_csr(real_dense)
     scomplex = scb_mat.scb_mat_from_dense_csr(complex_dense)
 
+    _, charpoly_diag_r = srb_mat.srb_mat_charpoly_with_diagnostics(sreal)
     _, pow_diag_r = srb_mat.srb_mat_pow_ui_with_diagnostics(sreal, 2)
     _, exp_diag_r = srb_mat.srb_mat_exp_with_diagnostics(sreal)
     _, eigval_diag_r = srb_mat.srb_mat_eigvalsh_with_diagnostics(sreal)
     _, eigh_diag_r = srb_mat.srb_mat_eigh_with_diagnostics(sreal)
     _, eigsh_diag_r = srb_mat.srb_mat_eigsh_with_diagnostics(sreal, k=2, which="largest", steps=2)
 
+    _, charpoly_diag_c = scb_mat.scb_mat_charpoly_with_diagnostics(scomplex)
     _, pow_diag_c = scb_mat.scb_mat_pow_ui_with_diagnostics(scomplex, 2)
     _, exp_diag_c = scb_mat.scb_mat_exp_with_diagnostics(scomplex)
     _, eigval_diag_c = scb_mat.scb_mat_eigvalsh_with_diagnostics(scomplex)
     _, eigh_diag_c = scb_mat.scb_mat_eigh_with_diagnostics(scomplex)
     _, eigsh_diag_c = scb_mat.scb_mat_eigsh_with_diagnostics(scomplex, k=2, which="largest", steps=2)
 
-    for diag in (pow_diag_r, exp_diag_r, eigval_diag_r, eigh_diag_r, pow_diag_c, exp_diag_c, eigval_diag_c, eigh_diag_c):
+    for diag in (charpoly_diag_r, pow_diag_r, exp_diag_r, eigval_diag_r, eigh_diag_r, charpoly_diag_c, pow_diag_c, exp_diag_c, eigval_diag_c, eigh_diag_c):
         _check(not bool(diag.dense_lift_used))
         _check(bool(diag.sparse_native))
         _check(not bool(diag.preserves_sparse_output))
@@ -528,6 +989,26 @@ def test_sparse_native_policy_diagnostics_expose_dense_lift_vs_sparse_native_pat
         _check(bool(diag.structured_input_required))
 
     for diag in (eigsh_diag_r, eigsh_diag_c):
+        _check(bool(diag.sparse_native))
+        _check(not bool(diag.dense_lift_used))
+        _check(not bool(diag.preserves_sparse_output))
+
+
+def test_sparse_charpoly_policy_diagnostics_and_exports_are_present():
+    real_dense = jnp.diag(jnp.asarray([2.0, 3.0], dtype=jnp.float64))
+    complex_dense = jnp.diag(jnp.asarray([2.0, 3.0], dtype=jnp.float64)).astype(jnp.complex128)
+
+    sreal = srb_mat.srb_mat_from_dense_csr(real_dense)
+    scomplex = scb_mat.scb_mat_from_dense_csr(complex_dense)
+
+    coeffs_r, diag_r = srb_mat.srb_mat_charpoly_with_diagnostics(sreal)
+    coeffs_c, diag_c = scb_mat.scb_mat_charpoly_with_diagnostics(scomplex)
+
+    _check("srb_mat_charpoly_with_diagnostics" in srb_mat.__all__)
+    _check("scb_mat_charpoly_with_diagnostics" in scb_mat.__all__)
+    _check(bool(jnp.allclose(coeffs_r, srb_mat.srb_mat_charpoly(sreal), rtol=1e-8, atol=1e-8)))
+    _check(bool(jnp.allclose(coeffs_c, scb_mat.scb_mat_charpoly(scomplex), rtol=1e-8, atol=1e-8)))
+    for diag in (diag_r, diag_c):
         _check(bool(diag.sparse_native))
         _check(not bool(diag.dense_lift_used))
         _check(not bool(diag.preserves_sparse_output))

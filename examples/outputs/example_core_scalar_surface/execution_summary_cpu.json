@@ -1,5 +1,5 @@
 {
-  "elapsed_s": 55.60344,
+  "elapsed_s": 35.942335,
   "executed_notebook": "examples/outputs/example_core_scalar_surface/example_core_scalar_surface_cpu_executed.ipynb",
   "jax_dtype": "float64",
   "jax_mode": "cpu",

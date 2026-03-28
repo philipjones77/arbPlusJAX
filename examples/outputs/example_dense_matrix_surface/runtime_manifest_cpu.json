@@ -1,5 +1,5 @@
 {
-  "timestamp_utc": "2026-03-26T21:32:21Z",
+  "timestamp_utc": "2026-03-27T18:23:31Z",
   "repo_root": "/home/phili/projects/arbplusJAX",
   "environment_kind": "wsl",
   "os": {
@@ -14,7 +14,7 @@
     "version": "3.12.12"
   },
   "git": {
-    "commit": "591217612238e41941ea34b9b29762473bb1e147"
+    "commit": "5e1bef0ba378e627a93e8dd36747e8edb998d510"
   },
   "jax": {
     "requested_mode": "cpu",

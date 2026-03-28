@@ -21,15 +21,18 @@ from benchmarks.schema import write_benchmark_report
 from tools.runtime_manifest import collect_runtime_manifest
 
 api = None
+stable_kernels = None
 
 
 def _load_special_api():
-    global api
+    global api, stable_kernels
     if api is not None:
         return
     from arbplusjax import api as _api
+    from arbplusjax import stable_kernels as _stable_kernels
 
     api = _api
+    stable_kernels = _stable_kernels
 
 
 def _block(x):
@@ -84,11 +87,22 @@ def _bessel_case(samples: int, dtype: str) -> tuple[jax.Array, jax.Array, jax.Ar
     )
 
 
+def _barnes_case(samples: int, dtype: str) -> tuple[jax.Array, jax.Array]:
+    rng = np.random.default_rng(3207)
+    real_dt = jnp.float32 if dtype == "float32" else jnp.float64
+    complex_dt = jnp.complex64 if dtype == "float32" else jnp.complex128
+    z_re = jnp.asarray(rng.uniform(1.1, 2.2, size=samples), dtype=real_dt)
+    z_im = jnp.asarray(rng.uniform(0.02, 0.2, size=samples), dtype=real_dt)
+    tau = jnp.asarray(rng.uniform(0.4, 0.8, size=samples), dtype=real_dt)
+    return z_re.astype(complex_dt) + 1j * z_im.astype(complex_dt), tau
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Benchmark repeated service-style calls through representative special-function public APIs.")
     parser.add_argument("--samples", type=int, default=4099)
     parser.add_argument("--pad-multiple", type=int, default=128)
     parser.add_argument("--iterations", type=int, default=20)
+    parser.add_argument("--startup-prewarm", action="store_true")
     parser.add_argument(
         "--output",
         type=Path,
@@ -97,11 +111,15 @@ def main() -> int:
     args = parser.parse_args()
     _load_special_api()
 
+    if args.startup_prewarm:
+        stable_kernels.warm_special_function_point_kernels(dtype="float64", pad_to=_next_multiple(max(8, args.samples // 32), 8))
+
     pad_to = _next_multiple(args.samples, args.pad_multiple)
     alt_n = max(8, args.samples // 2 + 3)
     records: list[BenchmarkRecord] = []
 
     cases: list[tuple[str, str, str, object, tuple[object, ...], tuple[object, ...], dict[str, object]]] = []
+    service_cases: list[tuple[str, str, str, object, tuple[object, ...], tuple[object, ...], dict[str, object]]] = []
     for dtype in ("float32", "float64"):
         s, z = _positive_case(args.samples, dtype)
         ss, zz = s[:alt_n], z[:alt_n]
@@ -151,6 +169,30 @@ def main() -> int:
                 {"method": "quadrature", "prec_bits": 53},
             )
         )
+        bz, btau = _barnes_case(args.samples, dtype)
+        bbz, bbtau = bz[:alt_n], btau[:alt_n]
+        service_cases.append(
+            (
+                "point",
+                "provider_barnesdoublegamma",
+                dtype,
+                stable_kernels.provider_barnesdoublegamma_batch,
+                (bz, btau),
+                (bbz, bbtau),
+                {"pad_to": None, "dps": 60},
+            )
+        )
+        service_cases.append(
+            (
+                "point",
+                "provider_log_barnesdoublegamma",
+                dtype,
+                stable_kernels.provider_log_barnesdoublegamma_batch,
+                (bz, btau),
+                (bbz, bbtau),
+                {"pad_to": None, "dps": 60},
+            )
+        )
 
     for mode, name, dtype, binder, call_args, alt_args, extra_kwargs in cases:
         for implementation, pad_target in (("service_api_unpadded", None), ("service_api_padded", pad_to)):
@@ -181,6 +223,37 @@ def main() -> int:
                         BenchmarkMeasurement(name="p99_latency_s", value=_percentile(steady, 99), unit="s"),
                     ),
                     notes="Public API service-style repeated-call benchmark through bind_point_batch/bind_interval_batch for representative special functions.",
+                )
+            )
+
+    for mode, name, dtype, fn, call_args, alt_args, extra_kwargs in service_cases:
+        for implementation, pad_target in (("service_api_unpadded", None), ("service_api_padded", pad_to)):
+            kwargs = dict(extra_kwargs)
+            kwargs["pad_to"] = pad_target
+            bound = lambda *aa, _fn=fn, _kwargs=kwargs: _fn(*aa, dtype=dtype, **_kwargs)
+            stats, steady = _profile(bound, call_args, alt_args, iterations=args.iterations)
+            records.append(
+                BenchmarkRecord(
+                    benchmark_name="benchmark_special_function_service_api.py",
+                    concern="service_api_speed",
+                    category="special",
+                    implementation=implementation,
+                    operation=name,
+                    device=jax.default_backend(),
+                    dtype=dtype,
+                    cold_time_s=stats["cold_time_s"],
+                    warm_time_s=stats["warm_time_s"],
+                    recompile_time_s=stats["recompile_time_s"],
+                    measurements=(
+                        BenchmarkMeasurement(name="mode", value=mode),
+                        BenchmarkMeasurement(name="samples", value=args.samples, unit="rows"),
+                        BenchmarkMeasurement(name="pad_to", value=pad_target if pad_target is not None else 0, unit="rows"),
+                        BenchmarkMeasurement(name="iterations", value=args.iterations, unit="calls"),
+                        BenchmarkMeasurement(name="p50_latency_s", value=_percentile(steady, 50), unit="s"),
+                        BenchmarkMeasurement(name="p95_latency_s", value=_percentile(steady, 95), unit="s"),
+                        BenchmarkMeasurement(name="p99_latency_s", value=_percentile(steady, 99), unit="s"),
+                    ),
+                    notes="Service-facing stable-kernel benchmark for Barnes provider batch surfaces.",
                 )
             )
 

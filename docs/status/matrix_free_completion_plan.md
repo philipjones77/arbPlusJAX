@@ -224,6 +224,12 @@ Required matrix-free policy categories:
   - general nonsymmetric paths should use shared-basis GMRES / Arnoldi-style recycling
 - design AD around plan objects and implicit adjoint solves, not one-off callable closures
 
+Reviewed 2026 note:
+
+- reusable Krylov bases for multi-shift batched solves are now explicitly
+  accepted as a planned matrix-free substrate feature; see
+  [matrix_free_estimator_review_2026.md](/docs/implementation/matrix_free_estimator_review_2026.md)
+
 ## 9. Estimator And Contour Extensions
 
 - extend the contour-integral public surface beyond the now-landed
@@ -235,6 +241,16 @@ Required matrix-free policy categories:
   behavior
 - broaden probe-budget and stopping contracts from the newer lightweight slice
   into the heavier chassis and benchmark-owned estimator paths
+
+Reviewed 2026 note:
+
+- SLQ Gauss-Radau / Kronrod-like stopping and truncation-gap diagnostics should
+  be added as the next diagnostics upgrade
+- Léja-Hutch++ logdet and PEXSI-like contour/pole-expansion logdet belong in
+  the repo as experimental estimator families, but should remain benchmark-first
+  rather than becoming the default path immediately
+- see
+  [matrix_free_estimator_review_2026.md](/docs/implementation/matrix_free_estimator_review_2026.md)
 
 ## PETSc Reference Points
 

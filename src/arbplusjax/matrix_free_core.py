@@ -82,12 +82,13 @@ class ShiftedSolvePlan:
     operator: object
     shifts: object
     preconditioner: object | None
+    recycled_state: object | None
     solver: str
     algebra: str
     structured: str
 
     def tree_flatten(self):
-        children = (self.operator, self.shifts, self.preconditioner)
+        children = (self.operator, self.shifts, self.preconditioner, self.recycled_state)
         aux = {
             "solver": self.solver,
             "algebra": self.algebra,
@@ -97,11 +98,12 @@ class ShiftedSolvePlan:
 
     @classmethod
     def tree_unflatten(cls, aux_data, children):
-        operator, shifts, preconditioner = children
+        operator, shifts, preconditioner, recycled_state = children
         return cls(
             operator=operator,
             shifts=shifts,
             preconditioner=preconditioner,
+            recycled_state=recycled_state,
             solver=aux_data["solver"],
             algebra=aux_data["algebra"],
             structured=aux_data["structured"],
@@ -1221,6 +1223,7 @@ def make_shifted_solve_plan(
     shifts,
     *,
     preconditioner=None,
+    recycled_state=None,
     solver: str,
     algebra: str,
     structured: str = "general",
@@ -1230,6 +1233,7 @@ def make_shifted_solve_plan(
         operator,
         shifts,
         preconditioner=preconditioner,
+        recycled_state=recycled_state,
         solver=solver,
         algebra=algebra,
         structured=structured,
@@ -1775,69 +1779,6 @@ def restarted_subspace_iteration_point(
     return basis
 
 
-def contour_quadrature_nodes(center, radius, *, quadrature_order: int):
-    if quadrature_order <= 0:
-        raise ValueError("quadrature_order must be > 0")
-    theta = (2.0 * jnp.pi / quadrature_order) * (jnp.arange(quadrature_order, dtype=jnp.float64) + 0.5)
-    unit = jnp.exp(1j * theta)
-    center_arr = jnp.asarray(center, dtype=jnp.complex128)
-    radius_arr = jnp.asarray(radius, dtype=jnp.complex128)
-    nodes = center_arr + radius_arr * unit
-    # Trapezoidal rule on a circular contour: dz = i r e^{i theta} dtheta and
-    # dtheta = 2 pi / quadrature_order for the equally spaced nodes here.
-    weights = (
-        (2.0j * jnp.pi) * radius_arr * unit
-    ) / jnp.asarray(quadrature_order, dtype=jnp.complex128)
-    return nodes, weights
-
-
-def contour_filter_subspace_point(
-    solve_shifted_block,
-    basis: jax.Array,
-    *,
-    center,
-    radius,
-    quadrature_order: int,
-) -> jax.Array:
-    nodes, weights = contour_quadrature_nodes(center, radius, quadrature_order=quadrature_order)
-    init = jnp.zeros_like(jnp.asarray(basis), dtype=jnp.complex128)
-
-    def body(acc, nw):
-        node, weight = nw
-        return acc + weight * solve_shifted_block(node, basis), None
-
-    filtered, _ = lax.scan(body, init, (nodes, weights))
-    return orthonormalize_columns(filtered)
-
-
-def contour_integral_action_point(
-    solve_shifted,
-    x: jax.Array,
-    *,
-    center,
-    radius,
-    quadrature_order: int,
-    node_weight_fn=None,
-) -> jax.Array:
-    effective_order = max(int(quadrature_order), 64)
-    nodes, weights = contour_quadrature_nodes(center, radius, quadrature_order=effective_order)
-    vector = jnp.asarray(x)
-    out_dtype = jnp.result_type(vector.dtype, jnp.complex128)
-    init = jnp.zeros_like(vector, dtype=out_dtype)
-
-    def body(acc, nw):
-        node, weight = nw
-        kernel = jnp.asarray(1.0 if node_weight_fn is None else node_weight_fn(node), dtype=out_dtype)
-        value = jnp.asarray(solve_shifted(node, vector), dtype=out_dtype)
-        # Public matrix-free action surfaces use solves of the form
-        # (A - z I)^{-1} v, while the contour formula is typically written with
-        # (z I - A)^{-1}. Account for that shared sign convention here.
-        return acc - jnp.asarray(weight, dtype=out_dtype) * kernel * value, None
-
-    value, _ = lax.scan(body, init, (nodes, weights))
-    return value
-
-
 def polynomial_spectral_action_midpoint(
     apply_operator,
     x_mid: jax.Array,
@@ -2270,124 +2211,6 @@ def orthogonal_normal_probe_block_complex(point_from_midpoint, length: int, *, k
     return jax.vmap(point_from_midpoint)(mids)
 
 
-def probe_sample_statistics(samples: jax.Array) -> tuple[jax.Array, jax.Array, jax.Array]:
-    values = jnp.asarray(samples)
-    if values.ndim == 0:
-        raise ValueError("samples must have at least one probe axis")
-    count = values.shape[0]
-    if count <= 0:
-        raise ValueError("samples must contain at least one probe")
-    mean = jnp.mean(values, axis=0)
-    centered = values - mean
-    sq_norm = jnp.real(centered * jnp.conjugate(centered))
-    variance = jnp.mean(sq_norm, axis=0) if count == 1 else jnp.sum(sq_norm, axis=0) / jnp.asarray(count - 1, dtype=jnp.float64)
-    stderr = jnp.sqrt(variance / jnp.asarray(count, dtype=jnp.float64))
-    return mean, variance, stderr
-
-
-def make_probe_estimate_statistics(
-    samples: jax.Array,
-    *,
-    target_stderr: float | None = None,
-    min_probes: int | None = None,
-    max_probes: int | None = None,
-    block_size: int = 1,
-) -> ProbeEstimateStatistics:
-    values = jnp.asarray(samples)
-    mean, variance, stderr = probe_sample_statistics(values)
-    probe_count = jnp.asarray(values.shape[0], dtype=jnp.int32)
-    if target_stderr is None:
-        recommended = probe_count
-    else:
-        recommended = adaptive_probe_count_from_pilot(
-            values,
-            target_stderr=target_stderr,
-            min_probes=min_probes,
-            max_probes=max_probes,
-            block_size=block_size,
-        )
-    return ProbeEstimateStatistics(
-        mean=mean,
-        variance=variance,
-        stderr=stderr,
-        probe_count=probe_count,
-        recommended_probe_count=jnp.asarray(recommended, dtype=jnp.int32),
-    )
-
-
-def adaptive_probe_count_from_pilot(
-    pilot_samples: jax.Array,
-    *,
-    target_stderr: float,
-    min_probes: int | None = None,
-    max_probes: int | None = None,
-    block_size: int = 1,
-) -> jax.Array:
-    values = jnp.asarray(pilot_samples)
-    if values.ndim == 0:
-        raise ValueError("pilot_samples must have a probe axis")
-    count = int(values.shape[0])
-    if count <= 0:
-        raise ValueError("pilot_samples must contain at least one probe")
-    if block_size <= 0:
-        raise ValueError("block_size must be > 0")
-    _, _, stderr = probe_sample_statistics(values)
-    stderr_scalar = jnp.max(jnp.asarray(stderr, dtype=jnp.float64))
-    target = jnp.maximum(jnp.asarray(target_stderr, dtype=jnp.float64), jnp.asarray(1e-30, dtype=jnp.float64))
-    required = jnp.ceil((stderr_scalar / target) ** 2 * jnp.asarray(count, dtype=jnp.float64)).astype(jnp.int32)
-    required = jnp.maximum(required, jnp.asarray(count if min_probes is None else min_probes, dtype=jnp.int32))
-    if max_probes is not None:
-        required = jnp.minimum(required, jnp.asarray(max_probes, dtype=jnp.int32))
-    block = jnp.asarray(block_size, dtype=jnp.int32)
-    rounded = block * ((required + block - 1) // block)
-    if max_probes is not None:
-        rounded = jnp.minimum(rounded, jnp.asarray(max_probes, dtype=jnp.int32))
-    return rounded
-
-
-def probe_statistics_target_met(
-    statistics: ProbeEstimateStatistics,
-    *,
-    target_stderr: float,
-) -> jax.Array:
-    target = jnp.asarray(target_stderr, dtype=jnp.float64)
-    return jnp.asarray(jnp.max(jnp.asarray(statistics.stderr, dtype=jnp.float64)) <= target)
-
-
-def probe_statistics_should_stop(
-    statistics: ProbeEstimateStatistics,
-    *,
-    target_stderr: float,
-    max_probes: int | None = None,
-) -> jax.Array:
-    met = probe_statistics_target_met(statistics, target_stderr=target_stderr)
-    if max_probes is None:
-        return met
-    return jnp.asarray(met | (jnp.asarray(statistics.probe_count, dtype=jnp.int32) >= jnp.asarray(max_probes, dtype=jnp.int32)))
-
-
-def probe_statistics_probe_deficit(statistics: ProbeEstimateStatistics) -> jax.Array:
-    recommended = jnp.asarray(statistics.recommended_probe_count, dtype=jnp.int32)
-    current = jnp.asarray(statistics.probe_count, dtype=jnp.int32)
-    return jnp.maximum(recommended - current, jnp.asarray(0, dtype=jnp.int32))
-
-
-def probe_statistics_next_probe_count(
-    statistics: ProbeEstimateStatistics,
-    *,
-    block_size: int | None = None,
-    max_probes: int | None = None,
-) -> jax.Array:
-    current = jnp.asarray(statistics.probe_count, dtype=jnp.int32)
-    next_count = jnp.maximum(current, jnp.asarray(statistics.recommended_probe_count, dtype=jnp.int32))
-    if block_size is not None:
-        block = jnp.asarray(block_size, dtype=jnp.int32)
-        next_count = block * ((next_count + block - 1) // block)
-    if max_probes is not None:
-        next_count = jnp.minimum(next_count, jnp.asarray(max_probes, dtype=jnp.int32))
-    return next_count
-
-
 def expand_subspace_with_corrections(
     basis: jax.Array,
     vecs: jax.Array,
@@ -2437,482 +2260,69 @@ def expand_subspace_with_corrections(
     return basis_next[:, :target_cols]
 
 
-def apply_action_over_probe_block_point(
-    action_fn,
-    probes: jax.Array,
-    *,
-    coerce_probes,
-    midpoint_value,
-) -> jax.Array:
-    coerced = coerce_probes(probes)
-    outputs = jax.vmap(action_fn)(coerced)
-    return midpoint_value(outputs)
+def _matrix_free_estimators():
+    return importlib.import_module(".matrix_free_estimators", __package__)
 
 
-def hutchpp_trace_with_metadata_projected_point(
-    action_fn,
-    sketch_probes: jax.Array,
-    residual_probes: jax.Array,
-    *,
-    coerce_probes,
-    midpoint_value,
-    point_from_midpoint,
-    basis_dtype,
-    trace_inner,
-    residual_project,
-    quadratic_reduce,
-    zero_scalar,
-    target_stderr: float | None = None,
-    min_probes: int | None = None,
-    max_probes: int | None = None,
-    block_size: int = 1,
-) -> HutchppTraceMetadata:
-    sketch = coerce_probes(sketch_probes)
-    residual = coerce_probes(residual_probes)
-    n = int(sketch.shape[-2] if sketch.shape[0] > 0 else residual.shape[-2])
-
-    if sketch.shape[0] > 0:
-        y_cols = jnp.swapaxes(
-            apply_action_over_probe_block_point(
-                action_fn,
-                sketch,
-                coerce_probes=coerce_probes,
-                midpoint_value=midpoint_value,
-            ),
-            0,
-            1,
-        )
-        q, _ = jnp.linalg.qr(y_cols, mode="reduced")
-        fq_cols = jnp.swapaxes(
-            apply_action_over_probe_block_point(
-                action_fn,
-                jax.vmap(point_from_midpoint)(q.T),
-                coerce_probes=coerce_probes,
-                midpoint_value=midpoint_value,
-            ),
-            0,
-            1,
-        )
-        trace_lr = trace_inner(q, fq_cols)
-    else:
-        q = jnp.zeros((n, 0), dtype=basis_dtype)
-        trace_lr = zero_scalar
-
-    if residual.shape[0] > 0:
-        z = midpoint_value(residual)
-        z_proj = residual_project(z, q)
-        hz = apply_action_over_probe_block_point(
-            action_fn,
-            jax.vmap(point_from_midpoint)(z_proj),
-            coerce_probes=coerce_probes,
-            midpoint_value=midpoint_value,
-        )
-        residual_samples = quadratic_reduce(z_proj, hz)
-    else:
-        residual_samples = jnp.zeros((1,), dtype=jnp.asarray(zero_scalar).dtype)
-
-    return make_hutchpp_trace_metadata(
-        basis=q,
-        low_rank_trace=trace_lr,
-        residual_samples=residual_samples,
-        target_stderr=target_stderr,
-        min_probes=min_probes,
-        max_probes=max_probes,
-        block_size=block_size,
-    )
+def _matrix_free_contour():
+    return importlib.import_module(".matrix_free_contour", __package__)
 
 
-def make_deflated_operator_metadata(
-    *,
-    basis: jax.Array,
-    image: jax.Array,
-    low_rank_trace,
-) -> DeflatedOperatorMetadata:
-    return DeflatedOperatorMetadata(
-        basis=jnp.asarray(basis),
-        image=jnp.asarray(image),
-        low_rank_trace=low_rank_trace,
-    )
+def _estimator_export(name: str):
+    def _wrapped(*args, **kwargs):
+        return getattr(_matrix_free_estimators(), name)(*args, **kwargs)
+
+    _wrapped.__name__ = name
+    return _wrapped
 
 
-def make_rational_hutchpp_metadata(
-    *,
-    operator,
-    deflation: DeflatedOperatorMetadata,
-    shifts: jax.Array,
-    weights: jax.Array,
-    polynomial_coefficients: jax.Array | None = None,
-    preconditioner=None,
-    tol: float = 1e-8,
-    atol: float = 0.0,
-    target_stderr: float | None = None,
-    min_probes: int | None = None,
-    max_probes: int | None = None,
-    block_size: int = 1,
-    gradient_supported: bool = True,
-    implicit_adjoint: bool = False,
-    structured: str,
-    algebra: str,
-    maxiter: int | None = None,
-) -> RationalHutchppMetadata:
-    transpose_preconditioner = None
-    if implicit_adjoint:
-        transpose_preconditioner = preconditioner_transpose_plan(
-            preconditioner,
-            algebra=algebra,
-            conjugate=(structured == "hermitian"),
-        )
-    cached_adjoint_supported = bool(
-        gradient_supported and implicit_adjoint and (preconditioner is None or transpose_preconditioner is not None)
-    )
-    return RationalHutchppMetadata(
-        operator=operator,
-        deflation=deflation,
-        shifts=jnp.asarray(shifts),
-        weights=jnp.asarray(weights),
-        polynomial_coefficients=None if polynomial_coefficients is None else jnp.asarray(polynomial_coefficients),
-        preconditioner=preconditioner,
-        transpose_preconditioner=transpose_preconditioner,
-        tol=jnp.asarray(tol),
-        atol=jnp.asarray(atol),
-        target_stderr=None if target_stderr is None else jnp.asarray(target_stderr, dtype=jnp.float64),
-        min_probes=None if min_probes is None else jnp.asarray(min_probes, dtype=jnp.int32),
-        max_probes=None if max_probes is None else jnp.asarray(max_probes, dtype=jnp.int32),
-        block_size=jnp.asarray(block_size, dtype=jnp.int32),
-        gradient_supported=jnp.asarray(gradient_supported),
-        implicit_adjoint=jnp.asarray(implicit_adjoint),
-        cached_adjoint_supported=jnp.asarray(cached_adjoint_supported),
-        structured=structured,
-        algebra=algebra,
-        maxiter=maxiter,
-    )
+def _contour_export(name: str):
+    def _wrapped(*args, **kwargs):
+        return getattr(_matrix_free_contour(), name)(*args, **kwargs)
+
+    _wrapped.__name__ = name
+    return _wrapped
 
 
-def prepare_deflated_operator_metadata_point(
-    action_fn,
-    sketch_probes: jax.Array,
-    *,
-    coerce_probes,
-    midpoint_value,
-    point_from_midpoint,
-    basis_dtype,
-    trace_inner,
-) -> DeflatedOperatorMetadata:
-    sketch = coerce_probes(sketch_probes)
-    n = int(sketch.shape[-2])
-    if sketch.shape[0] == 0:
-        empty = jnp.zeros((n, 0), dtype=basis_dtype)
-        return make_deflated_operator_metadata(
-            basis=empty,
-            image=empty,
-            low_rank_trace=jnp.asarray(0.0, dtype=basis_dtype),
-        )
-    y_cols = jnp.swapaxes(
-        apply_action_over_probe_block_point(
-            action_fn,
-            sketch,
-            coerce_probes=coerce_probes,
-            midpoint_value=midpoint_value,
-        ),
-        0,
-        1,
-    )
-    q, _ = jnp.linalg.qr(y_cols, mode="reduced")
-    aq = jnp.swapaxes(
-        apply_action_over_probe_block_point(
-            action_fn,
-            jax.vmap(point_from_midpoint)(q.T),
-            coerce_probes=coerce_probes,
-            midpoint_value=midpoint_value,
-        ),
-        0,
-        1,
-    )
-    return make_deflated_operator_metadata(
-        basis=q,
-        image=aq,
-        low_rank_trace=trace_inner(q, aq),
-    )
-
-
-def deflated_operator_apply_midpoint(
-    x_mid: jax.Array,
-    *,
-    deflation: DeflatedOperatorMetadata,
-    apply_operator_midpoint,
-    conjugate_inner: bool = False,
-) -> jax.Array:
-    x_arr = jnp.asarray(x_mid)
-    ax = jnp.asarray(apply_operator_midpoint(x_arr))
-    basis = jnp.asarray(deflation.basis)
-    if basis.shape[1] == 0:
-        return ax
-    if conjugate_inner:
-        coeffs = jnp.conjugate(basis).T @ x_arr
-    else:
-        coeffs = basis.T @ x_arr
-    return ax - jnp.asarray(deflation.image) @ coeffs
-
-
-def deflated_trace_estimate_from_metadata_point(
-    action_fn,
-    deflation: DeflatedOperatorMetadata,
-    residual_probes: jax.Array,
-    *,
-    coerce_probes,
-    midpoint_value,
-    point_from_midpoint,
-    residual_project,
-    quadratic_reduce,
-    target_stderr: float | None = None,
-    min_probes: int | None = None,
-    max_probes: int | None = None,
-    block_size: int = 1,
-) -> HutchppTraceMetadata:
-    residual = coerce_probes(residual_probes)
-    if residual.shape[0] > 0:
-        z = midpoint_value(residual)
-        z_proj = residual_project(z, jnp.asarray(deflation.basis))
-        hz = apply_action_over_probe_block_point(
-            lambda probe: point_from_midpoint(
-                deflated_operator_apply_midpoint(
-                    midpoint_value(probe),
-                    deflation=deflation,
-                    apply_operator_midpoint=lambda v_mid: midpoint_value(action_fn(point_from_midpoint(v_mid))),
-                    conjugate_inner=jnp.iscomplexobj(jnp.asarray(deflation.basis)),
-                )
-            ),
-            jax.vmap(point_from_midpoint)(z_proj),
-            coerce_probes=coerce_probes,
-            midpoint_value=midpoint_value,
-        )
-        residual_samples = quadratic_reduce(z_proj, hz)
-    else:
-        residual_samples = jnp.zeros((1,), dtype=jnp.asarray(deflation.low_rank_trace).dtype)
-    return make_hutchpp_trace_metadata(
-        basis=deflation.basis,
-        low_rank_trace=deflation.low_rank_trace,
-        residual_samples=residual_samples,
-        target_stderr=target_stderr,
-        min_probes=min_probes,
-        max_probes=max_probes,
-        block_size=block_size,
-    )
-
-
-def slq_nodes_weights(projected: jax.Array, beta0, *, hermitian: bool) -> tuple[jax.Array, jax.Array]:
-    projected_arr = jnp.asarray(projected)
-    beta0_arr = jnp.asarray(beta0)
-    if hermitian:
-        nodes, vecs = jnp.linalg.eigh(projected_arr)
-        first_row = vecs[0, :]
-        weights = (jnp.real(beta0_arr * jnp.conjugate(beta0_arr)) * jnp.real(first_row * jnp.conjugate(first_row))).astype(jnp.float64)
-        return jnp.asarray(nodes), weights
-    nodes, vecs = jnp.linalg.eig(projected_arr)
-    first_row = vecs[0, :]
-    weights = (beta0_arr * jnp.conjugate(beta0_arr)) * (first_row * jnp.conjugate(first_row))
-    return jnp.asarray(nodes), jnp.asarray(weights)
-
-
-def slq_scalar_quadrature(nodes: jax.Array, weights: jax.Array, scalar_fun, *, scalar_postprocess=None):
-    values = weights * scalar_fun(nodes)
-    total = jnp.sum(values)
-    return total if scalar_postprocess is None else scalar_postprocess(total)
-
-
-def slq_heat_trace(nodes: jax.Array, weights: jax.Array, time):
-    time_value = jnp.asarray(time)
-    return slq_scalar_quadrature(
-        nodes,
-        weights,
-        lambda vals: jnp.exp(-time_value * vals),
-    )
-
-
-def slq_spectral_density(nodes: jax.Array, weights: jax.Array, bin_edges: jax.Array, *, normalize: bool = False) -> jax.Array:
-    edges = jnp.asarray(bin_edges)
-    vals = jnp.asarray(nodes)
-    coeffs = jnp.real(jnp.asarray(weights, dtype=jnp.complex128))
-    left = vals[:, None] >= edges[:-1][None, :]
-    right = vals[:, None] < edges[1:][None, :]
-    last_edge = edges[-1]
-    last_bin = vals[:, None] == last_edge
-    mask = (left & right) | (last_bin & (jnp.arange(edges.shape[0] - 1) == edges.shape[0] - 2)[None, :])
-    hist = jnp.sum(jnp.where(mask, coeffs[:, None], 0.0), axis=0)
-    if normalize:
-        total = jnp.sum(hist)
-        hist = jnp.where(total > 0, hist / total, hist)
-    return hist
-
-
-def slq_functional_statistics_from_metadata(
-    metadata: SlqQuadratureMetadata,
-    scalar_function,
-) -> ProbeEstimateStatistics:
-    values = jax.vmap(lambda nodes, weights: scalar_function(nodes, weights))(metadata.nodes, metadata.weights)
-    return make_probe_estimate_statistics(values)
-
-
-def slq_functional_mean_from_metadata(
-    metadata: SlqQuadratureMetadata,
-    scalar_function,
-):
-    return slq_functional_statistics_from_metadata(metadata, scalar_function).mean
-
-
-def slq_heat_trace_from_metadata(metadata: SlqQuadratureMetadata, time):
-    return slq_functional_mean_from_metadata(
-        metadata,
-        lambda nodes, weights: slq_heat_trace(nodes, weights, time),
-    )
-
-
-def slq_spectral_density_from_metadata(
-    metadata: SlqQuadratureMetadata,
-    bin_edges: jax.Array,
-    *,
-    normalize: bool = False,
-) -> jax.Array:
-    return jnp.mean(
-        jax.vmap(lambda nodes, weights: slq_spectral_density(nodes, weights, bin_edges, normalize=normalize))(metadata.nodes, metadata.weights),
-        axis=0,
-    )
-
-
-def hutchpp_trace_from_metadata(metadata: HutchppTraceMetadata):
-    return metadata.low_rank_trace + metadata.residual_trace
-
-
-def rational_hutchpp_probe_deficit(
-    metadata: RationalHutchppMetadata,
-    estimate: HutchppTraceMetadata,
-) -> jax.Array:
-    del metadata
-    return probe_statistics_probe_deficit(estimate.statistics)
-
-
-def rational_hutchpp_next_probe_count(
-    metadata: RationalHutchppMetadata,
-    estimate: HutchppTraceMetadata,
-) -> jax.Array:
-    max_probes = None if metadata.max_probes is None else int(jnp.asarray(metadata.max_probes))
-    return probe_statistics_next_probe_count(
-        estimate.statistics,
-        block_size=int(jnp.asarray(metadata.block_size)),
-        max_probes=max_probes,
-    )
-
-
-def rational_hutchpp_should_stop(
-    metadata: RationalHutchppMetadata,
-    estimate: HutchppTraceMetadata,
-) -> jax.Array:
-    if metadata.target_stderr is None:
-        if metadata.max_probes is None:
-            return jnp.asarray(False)
-        return jnp.asarray(
-            jnp.asarray(estimate.statistics.probe_count, dtype=jnp.int32)
-            >= jnp.asarray(metadata.max_probes, dtype=jnp.int32)
-        )
-    return probe_statistics_should_stop(
-        estimate.statistics,
-        target_stderr=float(jnp.asarray(metadata.target_stderr)),
-        max_probes=None if metadata.max_probes is None else int(jnp.asarray(metadata.max_probes)),
-    )
-
-
-def slq_prepare_metadata_point(
-    lanczos_tridiag,
-    probes: jax.Array,
-    steps: int,
-    *,
-    coerce_probes,
-    hermitian: bool,
-    scalar_fun,
-    scalar_postprocess=None,
-    target_stderr: float | None = None,
-    min_probes: int | None = None,
-    max_probes: int | None = None,
-    block_size: int = 1,
-) -> SlqQuadratureMetadata:
-    coerced = coerce_probes(probes)
-    projected, beta0 = jax.vmap(lambda v: lanczos_tridiag(v, steps)[1:])(coerced)
-    sample_values = jax.vmap(
-        lambda proj, beta: slq_scalar_quadrature(
-            *slq_nodes_weights(proj, beta, hermitian=hermitian),
-            scalar_fun,
-            scalar_postprocess=scalar_postprocess,
-        )
-    )(projected, beta0)
-    return make_slq_quadrature_metadata(
-        projected,
-        beta0,
-        sample_values,
-        hermitian=hermitian,
-        target_stderr=target_stderr,
-        min_probes=min_probes,
-        max_probes=max_probes,
-        block_size=block_size,
-    )
-
-
-def make_slq_quadrature_metadata(
-    projected: jax.Array,
-    beta0,
-    sample_values: jax.Array,
-    *,
-    hermitian: bool,
-    target_stderr: float | None = None,
-    min_probes: int | None = None,
-    max_probes: int | None = None,
-    block_size: int = 1,
-) -> SlqQuadratureMetadata:
-    nodes, weights = jax.vmap(lambda proj, beta: slq_nodes_weights(proj, beta, hermitian=hermitian))(jnp.asarray(projected), jnp.asarray(beta0))
-    stats = make_probe_estimate_statistics(
-        sample_values,
-        target_stderr=target_stderr,
-        min_probes=min_probes,
-        max_probes=max_probes,
-        block_size=block_size,
-    )
-    return SlqQuadratureMetadata(
-        projected=projected,
-        beta0=beta0,
-        nodes=nodes,
-        weights=weights,
-        statistics=stats,
-        steps=jnp.asarray(jnp.asarray(projected).shape[-1], dtype=jnp.int32),
-        hermitian=jnp.asarray(hermitian),
-    )
-
-
-def make_hutchpp_trace_metadata(
-    *,
-    basis: jax.Array,
-    low_rank_trace,
-    residual_samples: jax.Array,
-    target_stderr: float | None = None,
-    min_probes: int | None = None,
-    max_probes: int | None = None,
-    block_size: int = 1,
-) -> HutchppTraceMetadata:
-    stats = make_probe_estimate_statistics(
-        residual_samples,
-        target_stderr=target_stderr,
-        min_probes=min_probes,
-        max_probes=max_probes,
-        block_size=block_size,
-    )
-    return HutchppTraceMetadata(
-        basis=basis,
-        low_rank_trace=low_rank_trace,
-        residual_trace=stats.mean,
-        statistics=stats,
-    )
+contour_quadrature_nodes = _contour_export("contour_quadrature_nodes")
+contour_filter_subspace_point = _contour_export("contour_filter_subspace_point")
+contour_integral_action_point = _contour_export("contour_integral_action_point")
+rational_spectral_action_midpoint = _estimator_export("rational_spectral_action_midpoint")
+probe_sample_statistics = _estimator_export("probe_sample_statistics")
+make_probe_estimate_statistics = _estimator_export("make_probe_estimate_statistics")
+adaptive_probe_count_from_pilot = _estimator_export("adaptive_probe_count_from_pilot")
+probe_statistics_target_met = _estimator_export("probe_statistics_target_met")
+probe_statistics_should_stop = _estimator_export("probe_statistics_should_stop")
+probe_statistics_probe_deficit = _estimator_export("probe_statistics_probe_deficit")
+probe_statistics_next_probe_count = _estimator_export("probe_statistics_next_probe_count")
+apply_action_over_probe_block_point = _estimator_export("apply_action_over_probe_block_point")
+hutchpp_trace_with_metadata_projected_point = _estimator_export("hutchpp_trace_with_metadata_projected_point")
+make_deflated_operator_metadata = _estimator_export("make_deflated_operator_metadata")
+make_rational_hutchpp_metadata = _estimator_export("make_rational_hutchpp_metadata")
+prepare_deflated_operator_metadata_point = _estimator_export("prepare_deflated_operator_metadata_point")
+deflated_operator_apply_midpoint = _estimator_export("deflated_operator_apply_midpoint")
+deflated_trace_estimate_from_metadata_point = _estimator_export("deflated_trace_estimate_from_metadata_point")
+slq_nodes_weights = _estimator_export("slq_nodes_weights")
+slq_scalar_quadrature = _estimator_export("slq_scalar_quadrature")
+slq_heat_trace = _estimator_export("slq_heat_trace")
+slq_spectral_density = _estimator_export("slq_spectral_density")
+slq_functional_statistics_from_metadata = _estimator_export("slq_functional_statistics_from_metadata")
+slq_functional_mean_from_metadata = _estimator_export("slq_functional_mean_from_metadata")
+slq_heat_trace_from_metadata = _estimator_export("slq_heat_trace_from_metadata")
+slq_spectral_density_from_metadata = _estimator_export("slq_spectral_density_from_metadata")
+hutchpp_trace_from_metadata = _estimator_export("hutchpp_trace_from_metadata")
+rational_hutchpp_probe_deficit = _estimator_export("rational_hutchpp_probe_deficit")
+rational_hutchpp_next_probe_count = _estimator_export("rational_hutchpp_next_probe_count")
+rational_hutchpp_should_stop = _estimator_export("rational_hutchpp_should_stop")
+slq_prepare_metadata_point = _estimator_export("slq_prepare_metadata_point")
+make_slq_quadrature_metadata = _estimator_export("make_slq_quadrature_metadata")
+make_hutchpp_trace_metadata = _estimator_export("make_hutchpp_trace_metadata")
 
 
 _LAZY_MODULE_ATTRS = {
     "matfree_adjoints": (".matfree_adjoints", None),
+    "matfree_adjoints_decompositions": (".matfree_adjoints_decompositions", None),
+    "matfree_adjoints_estimators": (".matfree_adjoints_estimators", None),
 }
 
 
@@ -2945,6 +2355,8 @@ __all__ = [
     "structure_code",
     "solver_code",
     "matfree_adjoints",
+    "matfree_adjoints_decompositions",
+    "matfree_adjoints_estimators",
     "dense_operator",
     "dense_operator_adjoint",
     "dense_operator_rmatvec",

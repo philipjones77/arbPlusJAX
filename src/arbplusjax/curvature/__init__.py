@@ -15,7 +15,14 @@ from .fisher import fisher_matvec, make_fisher_operator
 from .ggn import ggn_matvec, make_ggn_operator
 from .hessian import hessian_blocks, hessian_dense, make_hessian_operator
 from .hvp import batched_hvp, hvp, linearize_hvp, make_hvp_operator
-from .inverse import covariance_pushforward, inverse_diagonal_estimate, posterior_marginal_variances, selected_inverse
+from .inverse import (
+    colored_inverse_diagonal_estimate,
+    colored_inverse_diagonal_with_diagnostics,
+    covariance_pushforward,
+    inverse_diagonal_estimate,
+    posterior_marginal_variances,
+    selected_inverse,
+)
 from .solvers import damped_newton_step, newton_step, solve
 from .types import CurvatureSpec
 
@@ -226,7 +233,7 @@ def make_jcb_sparse_curvature_operator(
         trace_fn=lambda: jnp.trace(dense),
         solve_fn=base.solve_fn,
         logdet_fn=base.logdet_fn,
-        metadata=base.metadata,
+        metadata={**base.metadata, "sparse_bcoo": sparse_bcoo},
     )
 
 
@@ -258,6 +265,8 @@ __all__ = [
     "ensure_psd",
     "add_jitter",
     "inverse_diagonal_estimate",
+    "colored_inverse_diagonal_estimate",
+    "colored_inverse_diagonal_with_diagnostics",
     "selected_inverse",
     "posterior_marginal_variances",
     "covariance_pushforward",

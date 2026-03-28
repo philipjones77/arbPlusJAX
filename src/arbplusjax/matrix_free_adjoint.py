@@ -40,8 +40,11 @@ def implicit_krylov_solve_midpoint(
         transpose_operator = operator_transpose_plan(operator, conjugate=conjugate)
     if transpose_preconditioner is None:
         transpose_preconditioner = preconditioner_transpose_plan(preconditioner, conjugate=conjugate)
+    sparse_factor_preconditioner = getattr(preconditioner, "kind", None) in {"sparse_lu_solve", "sparse_cholesky_solve"}
     if use_implicit_adjoint is None:
         use_implicit_adjoint = structured in {"symmetric", "spd", "hermitian", "hpd"} or transpose_operator is not None
+    if sparse_factor_preconditioner and structured not in {"symmetric", "spd", "hermitian", "hpd"}:
+        use_implicit_adjoint = False
 
     def mv(v):
         return operator_apply_midpoint(

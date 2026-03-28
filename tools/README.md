@@ -39,6 +39,14 @@ scripts. Those belong under `benchmarks/`.
   - `python tools/entry_script_startup_report.py`
 - regenerate matrix-free first-use inventory:
   - `python tools/matrix_free_first_use_report.py`
+- regenerate point/basic family status inventory:
+  - `python tools/point_basic_surface_report.py`
+- regenerate point/basic per-function verification inventory:
+  - `python tools/point_basic_function_verification_report.py`
+- regenerate point-only fast-JAX verification inventory:
+  - `python tools/point_fast_jax_verification_report.py`
+- regenerate repo standards verification map:
+  - `python tools/repo_standards_verification_report.py`
 - regenerate example notebooks:
   - `python tools/generate_example_notebooks.py`
 - regenerate static public metadata registry:
@@ -81,6 +89,22 @@ scripts. Those belong under `benchmarks/`.
 - `matrix_free_first_use_report.py`
   - Writes the representative first-use module inventory for matrix-free operator construction, primitive apply, Krylov solve, and implicit-adjoint solve under `docs/reports/`.
   - Use after changing matrix-free runtime boundaries or matrix-free import budgets.
+
+- `point_basic_surface_report.py`
+  - Writes the joined public point/basic family status report under `docs/reports/`.
+  - Use after changing public metadata, point/basic ownership, canonical tests, benchmarks, or notebooks for the seven public function families and the curvature helper layer.
+
+- `point_basic_function_verification_report.py`
+  - Writes the per-function point/basic verification ledger under `docs/reports/`.
+  - Use after changing public metadata, direct target coverage, or the mapped benchmark/notebook evidence for point/basic families.
+
+- `point_fast_jax_verification_report.py`
+  - Writes the point-only fast-JAX verification report under `docs/reports/`.
+  - Use after changing point batch fastpaths, category-owned point-fast tests, or the canonical point-fast benchmark/notebook evidence.
+
+- `repo_standards_verification_report.py`
+  - Writes the repo-level standards verification map under `docs/reports/`.
+  - Use after changing the owning runtime/cache/startup/release standards, their generated inventories, or the tests that enforce them.
 
 - `hypgeom_status_report.py`
   - Writes the hypergeometric status report under `docs/reports/`.

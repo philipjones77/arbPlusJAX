@@ -1,0 +1,329 @@
+.F.......F...................                                            [100%]
+=================================== FAILURES ===================================
+___________________ test_complex_matrix_free_basic_contracts ___________________
+
+>   apply_point = jrb_mat.jrb_mat_operator_apply_point(plan, x)
+
+tests/test_matrix_free_basic.py:54: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/arbplusjax/jrb_mat.py:1650: in jrb_mat_operator_apply_point
+    return matrix_free_core.operator_apply_point(
+src/arbplusjax/matrix_free_core.py:1949: in operator_apply_point
+    out = point_from_midpoint(y)
+src/arbplusjax/jrb_mat.py:141: in _jrb_point_interval
+    return di.interval(di._below(x), di._above(x))
+src/arbplusjax/double_interval.py:76: in _below
+    return jnp.where(x <= huge, finite_branch, overflow_branch)
+../../miniforge3/envs/jax/lib/python3.12/site-packages/jax/_src/numpy/lax_numpy.py:2785: in where
+    return util._where(condition, x, y)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+>   return lax.select(condition, x_arr, y_arr) if not is_always_empty else x_arr
+E   jax._src.source_info_util.JaxStackTraceBeforeTransformation: AssertionError
+E   
+E   The preceding stack trace is the source of the JAX operation that, once transformed by JAX, triggered the following exception.
+E   
+E   --------------------
+
+../../miniforge3/envs/jax/lib/python3.12/site-packages/jax/_src/numpy/util.py:304: JaxStackTraceBeforeTransformation
+
+The above exception was the direct cause of the following exception:
+
+    def test_complex_matrix_free_basic_contracts():
+        a = _cmat2(2.0 + 0.0j, 0.0 + 0.0j, 0.0 + 0.0j, 3.0 + 1.0j)
+        x = _cvec2(1.0 + 1.0j, -2.0 + 0.5j)
+        plan = jcb_mat.jcb_mat_dense_operator_plan_prepare(a)
+        adj_plan = jcb_mat.jcb_mat_dense_operator_adjoint_plan_prepare(a)
+        probes = jnp.stack([x, _cvec2(1.0 + 0.0j, 1.0 + 0.0j)], axis=0)
+    
+        apply_point = jcb_mat.jcb_mat_operator_apply_point(plan, x)
+        apply_basic = jcb_mat.jcb_mat_operator_apply_basic(plan, x)
+        _check(bool(jnp.all(di.contains(acb_core.acb_real(apply_basic), acb_core.acb_real(apply_point)))))
+        _check(bool(jnp.all(di.contains(acb_core.acb_imag(apply_basic), acb_core.acb_imag(apply_point)))))
+    
+        coeffs = jnp.asarray([1.0 + 0.0j, 2.0 - 1.0j], dtype=jnp.complex128)
+        poly_point = jcb_mat.jcb_mat_poly_action_point(plan, x, coeffs)
+        poly_basic = jcb_mat.jcb_mat_poly_action_basic(plan, x, coeffs)
+        _check(bool(jnp.all(di.contains(acb_core.acb_real(poly_basic), acb_core.acb_real(poly_point)))))
+        _check(bool(jnp.all(di.contains(acb_core.acb_imag(poly_basic), acb_core.acb_imag(poly_point)))))
+    
+        expm_point = jcb_mat.jcb_mat_expm_action_point(plan, x, terms=8)
+        expm_basic = jcb_mat.jcb_mat_expm_action_basic(plan, x, terms=8)
+        _check(bool(jnp.all(di.contains(acb_core.acb_real(expm_basic), acb_core.acb_real(expm_point)))))
+        _check(bool(jnp.all(di.contains(acb_core.acb_imag(expm_basic), acb_core.acb_imag(expm_point)))))
+    
+        log_point = jcb_mat.jcb_mat_log_action_arnoldi_point(plan, x, steps=2, adjoint_matvec=adj_plan)
+        log_basic = jcb_mat.jcb_mat_log_action_arnoldi_basic(plan, x, steps=2, adjoint_matvec=adj_plan)
+        herm_point = jcb_mat.jcb_mat_log_action_hermitian_point(plan, x, steps=2, adjoint_matvec=adj_plan)
+        herm_basic = jcb_mat.jcb_mat_log_action_hermitian_basic(plan, x, steps=2, adjoint_matvec=adj_plan)
+        _check(bool(jnp.all(di.contains(acb_core.acb_real(log_basic), acb_core.acb_real(log_point)))))
+        _check(bool(jnp.all(di.contains(acb_core.acb_imag(log_basic), acb_core.acb_imag(log_point)))))
+        _check(bool(jnp.all(di.contains(acb_core.acb_real(herm_basic), acb_core.acb_real(herm_point)))))
+        _check(bool(jnp.all(di.contains(acb_core.acb_imag(herm_basic), acb_core.acb_imag(herm_point)))))
+    
+>       solve_point = jcb_mat.jcb_mat_solve_action_point(plan, x, hermitian=False, maxiter=8)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_matrix_free_basic.py:157: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/arbplusjax/jcb_mat.py:882: in jcb_mat_solve_action_point
+    value, _ = jcb_mat_solve_action_with_diagnostics_point(
+src/arbplusjax/jcb_mat.py:945: in jcb_mat_solve_action_with_diagnostics_point
+    x_mid, info, residual, rhs_norm, solve_meta = matrix_free_core.implicit_krylov_solve_midpoint(
+src/arbplusjax/matrix_free_core.py:1468: in implicit_krylov_solve_midpoint
+    return impl(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+operator = OperatorPlan(kind='dense', payload=Array([[2.+0.j, 0.+0.j],
+       [0.+0.j, 3.+1.j]], dtype=complex128), orientation='forward', algebra='jcb')
+rhs = Array([[ 1. ,  1. ,  1. ,  1. ],
+       [-2. , -2. ,  0.5,  0.5]], dtype=float64)
+
+    def implicit_krylov_solve_midpoint(
+        operator,
+        rhs: jax.Array,
+        *,
+        x0: jax.Array | None = None,
+        tol: float = 1e-8,
+        atol: float = 0.0,
+        maxiter: int | None = None,
+        preconditioner=None,
+        solver: str,
+        structured: str,
+        midpoint_vector,
+        lift_vector,
+        sparse_bcoo_matvec,
+        dtype,
+        transpose_operator=None,
+        transpose_preconditioner=None,
+        use_implicit_adjoint: bool | None = None,
+    ):
+        rhs_mid = midpoint_vector(rhs)
+        x0_mid = None if x0 is None else midpoint_vector(x0)
+        conjugate = jnp.issubdtype(jnp.asarray(rhs_mid).dtype, jnp.complexfloating)
+        if transpose_operator is None:
+            transpose_operator = operator_transpose_plan(operator, conjugate=conjugate)
+        if transpose_preconditioner is None:
+            transpose_preconditioner = preconditioner_transpose_plan(preconditioner, conjugate=conjugate)
+        if use_implicit_adjoint is None:
+            use_implicit_adjoint = structured in {"symmetric", "spd", "hermitian", "hpd"} or transpose_operator is not None
+    
+        def mv(v):
+            return operator_apply_midpoint(
+                operator,
+                lift_vector(v),
+                midpoint_vector=midpoint_vector,
+                sparse_bcoo_matvec=sparse_bcoo_matvec,
+                dtype=dtype,
+            )
+    
+        def build_preconditioner(plan):
+            if plan is None:
+                return None
+            return lambda v: preconditioner_apply_midpoint(
+                plan,
+                lift_vector(v),
+                midpoint_vector=midpoint_vector,
+                sparse_bcoo_matvec=sparse_bcoo_matvec,
+                dtype=dtype,
+            )
+    
+        def solve_impl(matvec_fn, rhs_value, *, preconditioner_plan):
+            precond = build_preconditioner(preconditioner_plan)
+            if solver == "cg":
+                return iterative_solvers.cg(matvec_fn, rhs_value, x0=x0_mid, tol=tol, atol=atol, maxiter=maxiter, M=precond)
+            if solver == "gmres":
+                return iterative_solvers.gmres(matvec_fn, rhs_value, x0=x0_mid, tol=tol, atol=atol, maxiter=maxiter, M=precond)
+            if solver == "minres":
+                return iterative_solvers.minres(matvec_fn, rhs_value, x0=x0_mid, tol=tol, atol=atol, maxiter=maxiter, M=precond)
+            raise ValueError(f"unsupported Krylov solver: {solver}")
+    
+        transpose_structured = structured in {"symmetric", "spd", "hermitian", "hpd"}
+        transpose_supported = transpose_structured or transpose_operator is not None
+    
+        def transpose_mv(v):
+            if transpose_operator is None:
+                raise ValueError("transpose solve requested without a transpose/adjoint operator.")
+            return operator_apply_midpoint(
+                transpose_operator,
+                lift_vector(v),
+                midpoint_vector=midpoint_vector,
+                sparse_bcoo_matvec=sparse_bcoo_matvec,
+                dtype=dtype,
+            )
+    
+        if use_implicit_adjoint and transpose_supported:
+            transpose_solve = None if transpose_structured else (
+                lambda matvec_fn, rhs_value: solve_impl(transpose_mv, rhs_value, preconditioner_plan=transpose_preconditioner)
+            )
+>           x_mid, info = lax.custom_linear_solve(
+                mv,
+                rhs_mid,
+                lambda matvec_fn, rhs_value: solve_impl(matvec_fn, rhs_value, preconditioner_plan=preconditioner),
+                transpose_solve=transpose_solve,
+                symmetric=transpose_structured,
+                has_aux=True,
+            )
+E           AssertionError
+E           --------------------
+E           For simplicity, JAX has removed its internal frames from the traceback of the following exception. Set JAX_TRACEBACK_FILTERING=off to include these.
+
+src/arbplusjax/matrix_free_adjoint.py:94: AssertionError
+__ test_complex_basic_logdet_surfaces_inflate_by_reported_scalar_uncertainty ___
+
+>   apply_point = jrb_mat.jrb_mat_operator_apply_point(plan, x)
+
+tests/test_matrix_free_basic.py:54: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/arbplusjax/jrb_mat.py:1650: in jrb_mat_operator_apply_point
+    return matrix_free_core.operator_apply_point(
+src/arbplusjax/matrix_free_core.py:1949: in operator_apply_point
+    out = point_from_midpoint(y)
+src/arbplusjax/jrb_mat.py:141: in _jrb_point_interval
+    return di.interval(di._below(x), di._above(x))
+src/arbplusjax/double_interval.py:76: in _below
+    return jnp.where(x <= huge, finite_branch, overflow_branch)
+../../miniforge3/envs/jax/lib/python3.12/site-packages/jax/_src/numpy/lax_numpy.py:2785: in where
+    return util._where(condition, x, y)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+>   return lax.select(condition, x_arr, y_arr) if not is_always_empty else x_arr
+E   jax._src.source_info_util.JaxStackTraceBeforeTransformation: AssertionError
+E   
+E   The preceding stack trace is the source of the JAX operation that, once transformed by JAX, triggered the following exception.
+E   
+E   --------------------
+
+../../miniforge3/envs/jax/lib/python3.12/site-packages/jax/_src/numpy/util.py:304: JaxStackTraceBeforeTransformation
+
+The above exception was the direct cause of the following exception:
+
+    def test_complex_basic_logdet_surfaces_inflate_by_reported_scalar_uncertainty():
+        a = _cmat2(2.0 + 0.0j, 0.0 + 0.0j, 0.0 + 0.0j, 3.0 + 1.0j)
+        x = _cvec2(1.0 + 1.0j, -2.0 + 0.5j)
+        plan = jcb_mat.jcb_mat_dense_operator_plan_prepare(a)
+        adj_plan = jcb_mat.jcb_mat_dense_operator_adjoint_plan_prepare(a)
+        probes = jnp.stack([x, _cvec2(1.0 + 0.0j, 1.0 + 0.0j)], axis=0)
+    
+        logdet_basic, logdet_diag = jcb_mat.jcb_mat_logdet_slq_with_diagnostics_basic(plan, probes, 2, adj_plan)
+>       bundle = jcb_mat.jcb_mat_logdet_solve_basic(plan, x, probes, 2, adj_plan, hermitian=False, maxiter=8)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_matrix_free_basic.py:370: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+src/arbplusjax/jcb_mat.py:4973: in jcb_mat_logdet_solve_basic
+    result = jcb_mat_logdet_solve_point(
+src/arbplusjax/jcb_mat.py:4934: in jcb_mat_logdet_solve_point
+    return matrix_free_core.combine_logdet_solve_point(
+src/arbplusjax/matrix_free_core.py:1306: in combine_logdet_solve_point
+    return impl(
+src/arbplusjax/matrix_free_krylov.py:165: in combine_logdet_solve_point
+    solve_value, solve_diag = solve_with_diagnostics(operator, rhs)
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src/arbplusjax/jcb_mat.py:4939: in <lambda>
+    solve_with_diagnostics=lambda operator, rhs_value: jcb_mat_solve_action_with_diagnostics_point(
+src/arbplusjax/jcb_mat.py:945: in jcb_mat_solve_action_with_diagnostics_point
+    x_mid, info, residual, rhs_norm, solve_meta = matrix_free_core.implicit_krylov_solve_midpoint(
+src/arbplusjax/matrix_free_core.py:1468: in implicit_krylov_solve_midpoint
+    return impl(
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+operator = OperatorPlan(kind='dense', payload=Array([[2.+0.j, 0.+0.j],
+       [0.+0.j, 3.+1.j]], dtype=complex128), orientation='forward', algebra='jcb')
+rhs = Array([[ 1. ,  1. ,  1. ,  1. ],
+       [-2. , -2. ,  0.5,  0.5]], dtype=float64)
+
+    def implicit_krylov_solve_midpoint(
+        operator,
+        rhs: jax.Array,
+        *,
+        x0: jax.Array | None = None,
+        tol: float = 1e-8,
+        atol: float = 0.0,
+        maxiter: int | None = None,
+        preconditioner=None,
+        solver: str,
+        structured: str,
+        midpoint_vector,
+        lift_vector,
+        sparse_bcoo_matvec,
+        dtype,
+        transpose_operator=None,
+        transpose_preconditioner=None,
+        use_implicit_adjoint: bool | None = None,
+    ):
+        rhs_mid = midpoint_vector(rhs)
+        x0_mid = None if x0 is None else midpoint_vector(x0)
+        conjugate = jnp.issubdtype(jnp.asarray(rhs_mid).dtype, jnp.complexfloating)
+        if transpose_operator is None:
+            transpose_operator = operator_transpose_plan(operator, conjugate=conjugate)
+        if transpose_preconditioner is None:
+            transpose_preconditioner = preconditioner_transpose_plan(preconditioner, conjugate=conjugate)
+        if use_implicit_adjoint is None:
+            use_implicit_adjoint = structured in {"symmetric", "spd", "hermitian", "hpd"} or transpose_operator is not None
+    
+        def mv(v):
+            return operator_apply_midpoint(
+                operator,
+                lift_vector(v),
+                midpoint_vector=midpoint_vector,
+                sparse_bcoo_matvec=sparse_bcoo_matvec,
+                dtype=dtype,
+            )
+    
+        def build_preconditioner(plan):
+            if plan is None:
+                return None
+            return lambda v: preconditioner_apply_midpoint(
+                plan,
+                lift_vector(v),
+                midpoint_vector=midpoint_vector,
+                sparse_bcoo_matvec=sparse_bcoo_matvec,
+                dtype=dtype,
+            )
+    
+        def solve_impl(matvec_fn, rhs_value, *, preconditioner_plan):
+            precond = build_preconditioner(preconditioner_plan)
+            if solver == "cg":
+                return iterative_solvers.cg(matvec_fn, rhs_value, x0=x0_mid, tol=tol, atol=atol, maxiter=maxiter, M=precond)
+            if solver == "gmres":
+                return iterative_solvers.gmres(matvec_fn, rhs_value, x0=x0_mid, tol=tol, atol=atol, maxiter=maxiter, M=precond)
+            if solver == "minres":
+                return iterative_solvers.minres(matvec_fn, rhs_value, x0=x0_mid, tol=tol, atol=atol, maxiter=maxiter, M=precond)
+            raise ValueError(f"unsupported Krylov solver: {solver}")
+    
+        transpose_structured = structured in {"symmetric", "spd", "hermitian", "hpd"}
+        transpose_supported = transpose_structured or transpose_operator is not None
+    
+        def transpose_mv(v):
+            if transpose_operator is None:
+                raise ValueError("transpose solve requested without a transpose/adjoint operator.")
+            return operator_apply_midpoint(
+                transpose_operator,
+                lift_vector(v),
+                midpoint_vector=midpoint_vector,
+                sparse_bcoo_matvec=sparse_bcoo_matvec,
+                dtype=dtype,
+            )
+    
+        if use_implicit_adjoint and transpose_supported:
+            transpose_solve = None if transpose_structured else (
+                lambda matvec_fn, rhs_value: solve_impl(transpose_mv, rhs_value, preconditioner_plan=transpose_preconditioner)
+            )
+>           x_mid, info = lax.custom_linear_solve(
+                mv,
+                rhs_mid,
+                lambda matvec_fn, rhs_value: solve_impl(matvec_fn, rhs_value, preconditioner_plan=preconditioner),
+                transpose_solve=transpose_solve,
+                symmetric=transpose_structured,
+                has_aux=True,
+            )
+E           AssertionError
+E           --------------------
+E           For simplicity, JAX has removed its internal frames from the traceback of the following exception. Set JAX_TRACEBACK_FILTERING=off to include these.
+
+src/arbplusjax/matrix_free_adjoint.py:94: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_matrix_free_basic.py::test_complex_matrix_free_basic_contracts
+FAILED tests/test_matrix_free_basic.py::test_complex_basic_logdet_surfaces_inflate_by_reported_scalar_uncertainty
+2 failed, 27 passed in 83.85s (0:01:23)

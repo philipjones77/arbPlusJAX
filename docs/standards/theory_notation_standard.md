@@ -1,4 +1,4 @@
-Last updated: 2026-03-23T00:00:00Z
+Last updated: 2026-03-27T00:00:00Z
 
 # Theory And Notation Standard
 
@@ -54,6 +54,8 @@ They should reference, where relevant:
 - the owning implementation family
 - the exposed public API or wrapper surface
 - the diagnostics or metadata terms used in reports/examples
+- the current family-level verification ledger when the note is about public
+  point/basic surfaces or diagnostics-bearing helper layers
 
 ## Notation Placement Rule
 
@@ -73,6 +75,10 @@ Notation should be:
 - stable across theory, examples, and reports
 - explicit about code-name versus math-name differences
 - updated when public terminology changes materially
+- explicit about point/basic surface terminology, diagnostics payload names, and
+  the verification-ledger terms used in reports and notebooks
+- explicit about the distinction between evaluation-variable AD and
+  family-parameter AD for parameterized families
 
 Do not let notebooks, reports, and theory notes silently drift into different
 names for the same public concept.
@@ -91,8 +97,15 @@ Examples:
 - `prec_bits` versus precision-in-bits
 - mode names such as `point`, `basic`, `rigorous`, `adaptive`
 - dense/sparse/block/vblock/matrix-free operator terminology
+- point/basic surface notation such as `S_point(f)` and `S_basic(f)`
+- diagnostics payload notation such as `D_f`
 
 ## Reports And Status Rule
 
 Current theory coverage inventories belong in `docs/reports/`.
 Theory backlog and missing methodology coverage belong in `docs/status/`.
+Public point/basic theory and notation changes should keep the linked
+verification and status artifacts current, especially:
+
+- [point_basic_surface_status.md](/docs/reports/point_basic_surface_status.md)
+- [point_fast_jax_plan.md](/docs/status/point_fast_jax_plan.md)

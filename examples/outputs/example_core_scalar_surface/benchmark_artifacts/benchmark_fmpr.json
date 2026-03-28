@@ -12,7 +12,7 @@
     },
     "environment_kind": "wsl",
     "git": {
-      "commit": "591217612238e41941ea34b9b29762473bb1e147"
+      "commit": "5e1bef0ba378e627a93e8dd36747e8edb998d510"
     },
     "jax": {
       "available": true,
@@ -35,7 +35,7 @@
       "version": "3.12.12"
     },
     "repo_root": "/home/phili/projects/arbplusJAX",
-    "timestamp_utc": "2026-03-26T21:28:21Z"
+    "timestamp_utc": "2026-03-27T18:12:27Z"
   },
   "notes": "",
   "records": [
@@ -47,7 +47,7 @@
       "ad_residual": null,
       "benchmark_name": "benchmark_fmpr.py",
       "category": "scalar",
-      "cold_time_s": 0.04243418399994425,
+      "cold_time_s": 0.03271285299996407,
       "concern": "scalar_speed",
       "device": "cpu",
       "dtype": "float64",
@@ -57,10 +57,10 @@
       "notes": "",
       "operation": "fmpr_mul",
       "python_overhead_s": null,
-      "recompile_time_s": 0.032641052999906606,
+      "recompile_time_s": 0.020384930999966855,
       "residual": null,
       "tags": [],
-      "warm_time_s": 0.00017011866664991734
+      "warm_time_s": 9.344899998116792e-05
     }
   ],
   "schema_version": "v1"

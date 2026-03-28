@@ -1,0 +1,8 @@
+{
+  "elapsed_s": 125.748013,
+  "executed_notebook": "examples/outputs/example_matrix_free_operator_surface/example_matrix_free_operator_surface_cpu_executed.ipynb",
+  "jax_dtype": "float64",
+  "jax_mode": "cpu",
+  "notebook": "example_matrix_free_operator_surface.ipynb",
+  "output_root": "examples/outputs/example_matrix_free_operator_surface"
+}

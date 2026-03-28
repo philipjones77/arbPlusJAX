@@ -130,20 +130,21 @@ def test_matrix_free_core_shifted_and_recycled_plan_pytrees():
     dense_r = arb_mat.arb_mat_identity(3)
     op = jrb_mat.jrb_mat_dense_operator_plan_prepare(dense_r)
     prec = matrix_free_core.identity_preconditioner_plan(size=3, dtype=jnp.float64, algebra="jrb")
-    shifted = matrix_free_core.make_shifted_solve_plan(
-        op,
-        jnp.asarray([0.1, 0.2], dtype=jnp.float64),
-        preconditioner=prec,
-        solver="cg",
-        algebra="jrb",
-        structured="spd",
-    )
     recycled = matrix_free_core.make_recycled_krylov_state(
         basis=jnp.eye(3, dtype=jnp.float64),
         projected=jnp.eye(3, dtype=jnp.float64),
         residual=jnp.zeros((3,), dtype=jnp.float64),
         preconditioner=prec,
         algorithm="lanczos",
+        algebra="jrb",
+        structured="spd",
+    )
+    shifted = matrix_free_core.make_shifted_solve_plan(
+        op,
+        jnp.asarray([0.1, 0.2], dtype=jnp.float64),
+        preconditioner=prec,
+        recycled_state=recycled,
+        solver="cg",
         algebra="jrb",
         structured="spd",
     )
@@ -154,6 +155,8 @@ def test_matrix_free_core_shifted_and_recycled_plan_pytrees():
     assert rebuilt_shifted.algebra == "jrb"
     assert rebuilt_shifted.structured == "spd"
     assert jnp.allclose(rebuilt_shifted.shifts, jnp.asarray([0.1, 0.2], dtype=jnp.float64))
+    assert rebuilt_shifted.recycled_state is not None
+    assert rebuilt_shifted.recycled_state.algorithm == "lanczos"
 
     recycled_leaves, recycled_treedef = jax.tree_util.tree_flatten(recycled)
     rebuilt_recycled = jax.tree_util.tree_unflatten(recycled_treedef, recycled_leaves)
@@ -175,6 +178,35 @@ def test_matrix_free_core_multi_shift_solve_identity_case():
         structured="spd",
     )
     rhs = di.interval(jnp.asarray([1.0, 2.0, 3.0]), jnp.asarray([1.0, 2.0, 3.0]))
+    out = matrix_free_core.multi_shift_solve_point(
+        shifted,
+        rhs,
+        apply_operator=jrb_mat.iterative_solvers,
+        midpoint_vector=di.midpoint,
+        sparse_bcoo_matvec=jrb_mat.sparse_common.sparse_bcoo_matvec,
+        dtype=jnp.float64,
+        tol=1e-10,
+    )
+    assert out.shape == (2, 3)
+    assert jnp.allclose(out[0], jnp.asarray([1.0, 2.0, 3.0]), rtol=1e-6, atol=1e-6)
+    assert jnp.allclose(out[1], jnp.asarray([0.5, 1.0, 1.5]), rtol=1e-6, atol=1e-6)
+
+
+def test_matrix_free_core_multi_shift_solve_recycled_identity_case():
+    dense_r = arb_mat.arb_mat_identity(3)
+    op = jrb_mat.jrb_mat_dense_operator_plan_prepare(dense_r)
+    prec = matrix_free_core.identity_preconditioner_plan(size=3, dtype=jnp.float64, algebra="jrb")
+    rhs = di.interval(jnp.asarray([1.0, 2.0, 3.0]), jnp.asarray([1.0, 2.0, 3.0]))
+    recycled = jrb_mat.jrb_mat_multi_shift_recycled_state_prepare(op, rhs, 1, preconditioner=prec, symmetric=True)
+    shifted = matrix_free_core.make_shifted_solve_plan(
+        op,
+        jnp.asarray([0.0, 1.0], dtype=jnp.float64),
+        preconditioner=prec,
+        recycled_state=recycled,
+        solver="cg",
+        algebra="jrb",
+        structured="spd",
+    )
     out = matrix_free_core.multi_shift_solve_point(
         shifted,
         rhs,

@@ -1,4 +1,4 @@
-Last updated: 2026-03-23T00:00:00Z
+Last updated: 2026-03-27T00:00:00Z
 
 # Notation
 
@@ -88,6 +88,24 @@ Examples:
   - `ascii_name`: `mode="basic"`
   - `meaning`: baseline enclosure/tightening mode
 
+- `symbol`: $\mathcal{S}_{\mathrm{point}}(f)$
+  - `ascii_name`: `point surface of f`
+  - `meaning`: the public point-mode evaluation surface exposed for a function or family
+
+- `symbol`: $\mathcal{S}_{\mathrm{basic}}(f)$
+  - `ascii_name`: `basic surface of f`
+  - `meaning`: the public baseline enclosure/tightening surface exposed for a function or family
+
+- `symbol`: $\mathcal{D}_f$
+  - `ascii_name`: `diagnostics payload`
+  - `meaning`: optional diagnostics object or metadata-bearing helper surface attached to a public function family
+  - `notes`: used in reports, notebooks, and theory notes when a public family exposes `*_with_diagnostics` or named diagnostics records
+
+- `symbol`: $\partial_x f,\ \partial_\theta f$
+  - `ascii_name`: `argument-direction AD`, `parameter-direction AD`
+  - `meaning`: differentiation through the main evaluation variable and through a continuous family parameter, respectively
+  - `notes`: both directions are tracked separately in the repo’s AD audits, benchmarks, and notebooks
+
 - `symbol`: `adaptive`
   - `ascii_name`: `mode="adaptive"`
   - `meaning`: mode that may increase work or inflation policy based on the local regime
@@ -137,6 +155,11 @@ Examples:
 - `symbol`: $\tau_{\mathrm{cold}}, \tau_{\mathrm{warm}}, \tau_{\mathrm{recompile}}$
   - `ascii_name`: `cold_time_s`, `warm_time_s`, `recompile_time_s`
   - `meaning`: benchmark timings for first call, steady-state execution, and changed-shape/static-control recompilation
+
+- `symbol`: $\mathcal{V}_{\mathrm{pb}}$
+  - `ascii_name`: `point/basic verification ledger`
+  - `meaning`: the checked-in family-level report that records point/basic surface counts and attached tests, benchmarks, notebooks, and diagnostics evidence
+  - `notes`: in the current repo this is [point_basic_surface_status.md](/docs/reports/point_basic_surface_status.md)
 
 ## 4. Matrix and Operator Notation
 

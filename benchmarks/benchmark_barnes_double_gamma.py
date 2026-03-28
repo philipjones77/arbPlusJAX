@@ -23,20 +23,23 @@ acb_core = None
 barnesg = None
 double_gamma = None
 di = None
+stable_kernels = None
 
 
 def _load_barnes_modules():
-    global acb_core, barnesg, double_gamma, di
+    global acb_core, barnesg, double_gamma, di, stable_kernels
     if acb_core is None:
         from arbplusjax import acb_core as _acb_core
         from arbplusjax import barnesg as _barnesg
         from arbplusjax import double_gamma as _double_gamma
         from arbplusjax import double_interval as _di
+        from arbplusjax import stable_kernels as _stable_kernels
 
         acb_core = _acb_core
         barnesg = _barnesg
         double_gamma = _double_gamma
         di = _di
+        stable_kernels = _stable_kernels
 
 
 def _time_call(fn, *args, iters: int = 1) -> float:
@@ -55,7 +58,12 @@ def _legacy_vector(zs: jax.Array, tau: float) -> jax.Array:
 
 def _ifj_vector(zs: jax.Array, tau: float) -> jax.Array:
     _load_barnes_modules()
-    return double_gamma.ifj_barnesdoublegamma(zs, tau, dps=60)
+    return double_gamma.ifj_barnesdoublegamma_batch_fixed_point(zs, jnp.full(zs.shape, tau, dtype=jnp.float64), dps=60)
+
+
+def _provider_vector(zs: jax.Array, tau: float) -> jax.Array:
+    _load_barnes_modules()
+    return stable_kernels.provider_barnesdoublegamma_batch(zs, jnp.full(zs.shape, tau, dtype=jnp.float64), dps=60)
 
 
 def main() -> int:
@@ -94,7 +102,8 @@ def main() -> int:
     legacy_scalar_s = _time_call(lambda z: double_gamma.bdg_barnesdoublegamma(z, tau, prec_bits=args.prec_bits), z_scalar, iters=effective_iters)
     ifj_scalar_s = _time_call(lambda z: double_gamma.ifj_barnesdoublegamma(z, tau, dps=args.dps), z_scalar, iters=effective_iters)
     legacy_vector_s = _time_call(_legacy_vector, zs, tau, iters=effective_iters)
-    ifj_vector_s = _time_call(lambda arr, t: double_gamma.ifj_barnesdoublegamma(arr, t, dps=args.dps), zs, tau, iters=effective_iters)
+    ifj_vector_s = _time_call(_ifj_vector, zs, tau, iters=effective_iters)
+    provider_vector_s = _time_call(_provider_vector, zs, tau, iters=effective_iters)
 
     legacy_shift = double_gamma.bdg_barnesdoublegamma(z_scalar + 1.0, tau, prec_bits=args.prec_bits) / double_gamma.bdg_barnesdoublegamma(z_scalar, tau, prec_bits=args.prec_bits)
     ifj_shift = double_gamma.ifj_barnesdoublegamma(z_scalar + 1.0, tau, dps=args.dps) / double_gamma.ifj_barnesdoublegamma(z_scalar, tau, dps=args.dps)
@@ -119,6 +128,7 @@ def main() -> int:
         "ifj_scalar_s": float(ifj_scalar_s),
         "legacy_vector_s": float(legacy_vector_s),
         "ifj_vector_s": float(ifj_vector_s),
+        "provider_vector_s": float(provider_vector_s),
         "legacy_shift_err_abs": float(legacy_shift_err),
         "ifj_shift_err_abs": float(ifj_shift_err),
         "legacy_tau1_anchor_max_abs_err": float(legacy_anchor_err),
@@ -199,6 +209,21 @@ def main() -> int:
                         BenchmarkMeasurement(name="m_used", value=float(diagnostics.m_used)),
                     ),
                     notes="IFJ vectorized Barnes/double-gamma path.",
+                ),
+                BenchmarkRecord(
+                    benchmark_name="benchmark_barnes_double_gamma.py",
+                    concern="special_speed",
+                    category="special",
+                    implementation="provider_batch",
+                    operation="barnes_double_gamma_vector",
+                    device=jax.default_backend(),
+                    dtype="complex128" if args.dtype == "float64" else "complex64",
+                    warm_time_s=float(provider_vector_s),
+                    measurements=(
+                        BenchmarkMeasurement(name="iters", value=effective_iters, unit="calls"),
+                        BenchmarkMeasurement(name="requested_dtype", value=args.dtype),
+                    ),
+                    notes="Provider-facing batch Barnes/double-gamma path through the stable service wrapper.",
                 ),
             )
         )

@@ -24,6 +24,10 @@ def main() -> None:
     _run([PYTHON, "tools/matrix_free_first_use_report.py"])
     _run([PYTHON, "tools/point_fast_jax_category_report.py"])
     _run([PYTHON, "tools/point_fast_jax_function_report.py"])
+    _run([PYTHON, "tools/point_fast_jax_verification_report.py"])
+    _run([PYTHON, "tools/point_basic_surface_report.py"])
+    _run([PYTHON, "tools/point_basic_function_verification_report.py"])
+    _run([PYTHON, "tools/repo_standards_verification_report.py"])
     _run([PYTHON, "tools/special_function_status_report.py"])
     _run([PYTHON, "tools/generate_public_metadata_registry.py"])
     _run([PYTHON, "tools/report_status_refresh_inventory.py"])
@@ -46,6 +50,10 @@ def main() -> None:
             "tests/test_special_function_status_report.py",
             "tests/test_point_fast_jax_docs_contracts.py",
             "tests/test_point_fast_jax_function_report.py",
+            "tests/test_point_fast_jax_verification_report.py",
+            "tests/test_point_basic_surface_report.py",
+            "tests/test_point_basic_function_verification_report.py",
+            "tests/test_repo_standards_verification_report.py",
             "tests/test_public_metadata_contracts.py",
             "tests/test_report_status_refresh_inventory.py",
             "tests/test_docs_indexes.py",

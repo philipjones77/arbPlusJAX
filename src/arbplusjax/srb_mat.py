@@ -603,6 +603,17 @@ def srb_mat_charpoly_basic(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO) -> ja
     return mat_common.interval_from_point(srb_mat_charpoly(x))
 
 
+def srb_mat_charpoly_with_diagnostics(
+    x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO,
+) -> tuple[jax.Array, sparse_core.SparseNativePolicyDiagnostics]:
+    return srb_mat_charpoly(x), sparse_core.sparse_native_policy_diagnostics(
+        x,
+        sparse_native=True,
+        dense_lift_used=False,
+        preserves_sparse_output=False,
+    )
+
+
 def srb_mat_pow_ui(x: sc.SparseCOO | sc.SparseCSR | sc.SparseBCOO, n: int) -> jax.Array:
     return sparse_core.sparse_dense_power_ui(
         x,
@@ -1661,6 +1672,7 @@ __all__ = [
     "srb_mat_ldl_basic",
     "srb_mat_charpoly",
     "srb_mat_charpoly_basic",
+    "srb_mat_charpoly_with_diagnostics",
     "srb_mat_pow_ui",
     "srb_mat_pow_ui_basic",
     "srb_mat_pow_ui_with_diagnostics",

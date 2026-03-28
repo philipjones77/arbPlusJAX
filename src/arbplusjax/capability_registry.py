@@ -57,7 +57,7 @@ DOWNSTREAM_KERNELS: dict[str, dict[str, object]] = {
     "provider_barnesdoublegamma": {
         "public_name": "ifj_barnesdoublegamma",
         "family": "barnes",
-        "notes": "Explicit downstream provider surface for Barnes double-gamma with diagnostics-aware IFJ routing through the public API.",
+        "notes": "Explicit downstream provider surface for Barnes double-gamma; service-facing wrappers may choose provider-backed routing while preserving the canonical Barnes public capability contract.",
     },
     "log_barnesdoublegamma": {
         "public_name": "ifj_log_barnesdoublegamma",
@@ -67,7 +67,7 @@ DOWNSTREAM_KERNELS: dict[str, dict[str, object]] = {
     "provider_log_barnesdoublegamma": {
         "public_name": "ifj_log_barnesdoublegamma",
         "family": "barnes",
-        "notes": "Explicit downstream provider surface for log Barnes double-gamma with diagnostics-aware IFJ routing through the public API.",
+        "notes": "Explicit downstream provider surface for log Barnes double-gamma; service-facing wrappers may choose provider-backed routing while preserving the canonical Barnes public capability contract.",
     },
     "fragile_regime_promotion_gamma_upper": {
         "public_name": "incomplete_gamma_upper",

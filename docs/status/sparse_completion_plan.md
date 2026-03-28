@@ -85,18 +85,19 @@ The first completion pass lands:
 
 ## Remaining Sparse Completion Work
 
-### Immediate Sparse-Native Tranche
+### Landed Sparse-Native Tranche
 
-The next sparse-native tranche should be:
+The first sparse-native tranche is now landed in code:
 
-1. symmetric / Hermitian `eigvalsh` and `eigh` via a Lanczos-style sparse spectral path
-2. `pow_ui` via sparse repeated squaring and sparse matmul
-3. `exp` via a sparse action-first policy, only materializing a full matrix when explicitly requested
-4. `charpoly` via either:
-   - an explicit tiny dense-only policy, or
-   - a sparse Hessenberg / trace-based policy
-   but not silent densification
-5. `basic` built on a sparse interval/box substrate rather than dense lifting
+1. symmetric / Hermitian `eigvalsh` and `eigh` route through sparse spectral surfaces
+2. `pow_ui` uses sparse repeated squaring and sparse sparse-matmul
+3. `exp` has an explicit sparse action-first / dense-output policy surface
+4. `charpoly` uses a sparse trace-based policy instead of silent densification
+5. higher sparse functions now expose policy diagnostics showing sparse-native routing and whether sparse output is preserved
+
+The remaining open item from that original list is:
+
+6. `basic` built on a sparse interval/box substrate rather than dense lifting
 
 ### Policy Notes
 
@@ -107,12 +108,13 @@ The next sparse-native tranche should be:
 
 ### Follow-On Tranche
 
-1. sparse structured diagnostics and benchmarks
+1. sparse structured diagnostics and benchmarks beyond the current policy diagnostics
 2. sparse symmetric / Hermitian cached operator plans beyond plain `matvec`
 3. deeper sparse eigenspectrum / structured spectral surfaces
 4. deeper sparse selected-inverse and trace-inverse surfaces
 5. algorithm-level deduplication between dense and sparse where the numerical kernels genuinely overlap
 6. structured sparse plans beyond solve/matvec
+7. sparse `basic` interval/box semantics without dense lifting
 
 ### Krylov Reuse And Shifted-Solve TODOs
 

@@ -1,0 +1,8 @@
+{
+  "elapsed_s": 43.065279,
+  "executed_notebook": "examples/outputs/example_fft_nufft_surface/example_fft_nufft_surface_cpu_executed.ipynb",
+  "jax_dtype": "float64",
+  "jax_mode": "cpu",
+  "notebook": "example_fft_nufft_surface.ipynb",
+  "output_root": "examples/outputs/example_fft_nufft_surface"
+}

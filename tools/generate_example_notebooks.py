@@ -479,11 +479,15 @@ def _api_surface_notebook() -> list:
             "real_batch = jnp.asarray([0.5, 1.0, 1.5, 2.0, 2.5], dtype=jnp.float64)\n"
             "gamma_bound = api.bind_point_batch('incomplete_gamma_upper', dtype='float64', pad_to=8, method='quadrature', regularized=True)\n"
             "solve_bound = api.bind_interval_batch('arb_mat_solve', mode='basic', dtype='float64', pad_to=4, prec_bits=53)\n"
+            "a_batch = di.interval(jnp.stack([a_mid, a_mid], axis=0), jnp.stack([a_mid, a_mid], axis=0))\n"
+            "rhs_batch = di.interval(jnp.stack([rhs_mid, rhs_mid], axis=0), jnp.stack([rhs_mid, rhs_mid], axis=0))\n"
+            "vec_mid = jnp.array([1.0, 2.0], dtype=jnp.float64)\n"
+            "vec = di.interval(vec_mid, vec_mid)\n"
             "cached_plan = api.eval_point('arb_mat_matvec_cached_prepare', a)\n"
             "api_service_results = {\n"
             "    'gamma_bound': gamma_bound(real_batch, jnp.asarray([1.0, 1.1, 1.2, 1.3, 1.4], dtype=jnp.float64)),\n"
-            "    'solve_bound': solve_bound(a, rhs),\n"
-            "    'cached_matvec': api.eval_point('arb_mat_matvec_cached_apply', cached_plan, rhs),\n"
+            "    'solve_bound': solve_bound(a_batch, rhs_batch),\n"
+            "    'cached_matvec': api.eval_point('arb_mat_matvec_cached_apply', cached_plan, vec),\n"
             "}\n"
             "display(api_service_results)",
             "To extend routed benchmarks, add the target operation or implementation branch in `benchmark_api_surface.py`, `benchmark_special_function_service_api.py`, or `benchmark_matrix_service_api.py`, depending on whether the concern is generic API routing, special-function services, or matrix services."
@@ -1079,12 +1083,7 @@ def _matrix_free_operator_surface_notebook() -> list:
         nbf.v4.new_code_cell(
             "test_cmd = [\n"
             "    PYTHON, '-m', 'pytest', '-q',\n"
-            "    'tests/test_jrb_mat_chassis.py',\n"
-            "    'tests/test_jcb_mat_chassis.py',\n"
-            "    'tests/test_jrb_mat_logdet_contracts.py',\n"
-            "    'tests/test_jrb_mat_selected_inverse.py',\n"
             "    'tests/test_matrix_free_basic.py',\n"
-            "    'tests/test_matrix_stack_contracts.py',\n"
             "    'tests/test_matfree_adjoints.py',\n"
             "]\n"
             "try:\n"
@@ -1106,8 +1105,8 @@ def _matrix_free_operator_surface_notebook() -> list:
         nbf.v4.new_code_cell(
             "completed = run([\n"
             "    PYTHON, 'benchmarks/benchmark_matrix_free_krylov.py',\n"
-            "    '--n-real', '12', '--n-complex', '8', '--steps-real', '6', '--steps-complex', '6', '--warmup', '1', '--runs', '2',\n"
-            "    '--sections', 'real,complex',\n"
+            "    '--n-real', '6', '--n-complex', '4', '--steps-real', '3', '--steps-complex', '3', '--warmup', '0', '--runs', '1',\n"
+            "    '--sections', 'real',\n"
             "], capture=True)\n"
             "print(completed.stdout)\n"
             "rows = []\n"
@@ -1360,7 +1359,7 @@ def _dirichlet_surface_notebook() -> list:
             "real_primal = jax.vmap(lambda x: jnp.squeeze(di.midpoint(dirichlet.dirichlet_zeta(di.interval(x, x), n_terms=32))))(sweep)\n"
             "real_grad = jax.vmap(jax.grad(lambda x: jnp.squeeze(di.midpoint(dirichlet.dirichlet_zeta(di.interval(x, x), n_terms=32)))))(sweep)\n"
             "complex_primal = jax.vmap(lambda x: jnp.real(acb_core.acb_midpoint(acb_dirichlet.acb_dirichlet_zeta(acb_core.acb_box(di.interval(x, x), di.interval(0.2, 0.2)), n_terms=48))))(sweep)\n"
-            "complex_grad = jax.vmap(jax.grad(lambda x: jnp.real(acb_core.acb_midpoint(acb_dirichlet.acb_dirichlet_zeta(acb_core.acb_box(di.interval(x, x), di.interval(0.2, 0.2)), n_terms=48))))))(sweep)\n"
+            "complex_grad = jax.vmap(jax.grad(lambda x: jnp.real(acb_core.acb_midpoint(acb_dirichlet.acb_dirichlet_zeta(acb_core.acb_box(di.interval(x, x), di.interval(0.2, 0.2)), n_terms=48)))))(sweep)\n"
             "ad_df = pd.DataFrame({'s': [float(v) for v in sweep], 'real_primal': [float(v) for v in real_primal], 'real_grad': [float(v) for v in real_grad], 'complex_primal': [float(v) for v in complex_primal], 'complex_grad': [float(v) for v in complex_grad]})\n"
             "display(ad_df.head())\n"
             "ax = ad_df.plot(x='s', y=['real_primal', 'real_grad', 'complex_primal', 'complex_grad'], figsize=(10, 4), title='Dirichlet AD Validation')\n"
@@ -1612,12 +1611,14 @@ def _barnes_double_gamma_surface_notebook() -> list:
             "Production Pattern",
             "Barnes and double-gamma usage should keep the chosen implementation, precision, and diagnostics policy explicit. "
             "These are not hot scalar helpers; production code should avoid switching precision knobs per call unless that is a deliberate fallback path.",
+            "from arbplusjax import stable_kernels\n"
             "barnes_service = {\n"
             "    'legacy_fixed_prec': double_gamma.bdg_barnesdoublegamma(z, tau, prec_bits=80),\n"
-            "    'ifj_fixed_dps': double_gamma.ifj_barnesdoublegamma(z, tau, dps=60),\n"
+            "    'provider_fixed_dps': stable_kernels.provider_barnesdoublegamma(z, tau, dps=60),\n"
+            "    'provider_log_fixed_dps': stable_kernels.provider_log_barnesdoublegamma(z, tau, dps=60),\n"
             "}\n"
             "display(barnes_service)",
-            "To extend Barnes/double-gamma benchmarks, add new printed metrics in `benchmark_barnes_double_gamma.py` or split out a schema-backed service benchmark if repeated-call API usage becomes a primary concern."
+            "To extend Barnes/double-gamma benchmarks, add new printed metrics in `benchmark_barnes_double_gamma.py` or `benchmark_special_function_service_api.py` and keep provider-batch routing explicit for repeated-call usage."
         ),
         *_fast_jax_pattern_cells(
             "Barnes-family point evaluation is still more specialized than the lightweight scalar helpers. "

@@ -1,4 +1,4 @@
-Last updated: 2026-03-23T00:00:00Z
+Last updated: 2026-03-27T00:00:00Z
 
 # Point Fast JAX Plan
 
@@ -24,10 +24,17 @@ Current repo-wide public-surface status:
   `api.eval_point(..., jit=True)`
 - all public point functions now have a compiled public batch surface through
   `api.bind_point_batch_jit(...)`
-- all public point functions now have a family-owned direct batch kernel
-  registered in the point-batch API layer
-- remaining work is deeper per-function numerical proof coverage and continued
-  family-level hardening beyond the public API contract
+- a large subset of public point functions now have a family-owned direct batch
+  kernel registered in the point-batch API layer, while the remaining public
+  surfaces still satisfy the compiled contract through the generic API batch
+  layer
+- a family-level point/basic verification ledger now exists in
+  [point_basic_surface_status.md](/docs/reports/point_basic_surface_status.md)
+- parameterized-family AD direction evidence is expected to be tracked in that
+  ledger as argument-direction plus parameter-direction proof
+- remaining work is deeper per-function numerical proof coverage, continued
+  family-level hardening beyond the public API contract, and broader public
+  `basic` exposure outside the currently enclosure-oriented families
 
 The governing standard is:
 
@@ -61,9 +68,11 @@ cross-category smoke file.
 
 ## Immediate Next Step
 
-Expand the representative six-category proof tranche into broader per-family
-coverage and keep a living audit/registry that classifies existing point-mode
-surfaces as:
+Use the living audit layer in
+[point_basic_surface_status.md](/docs/reports/point_basic_surface_status.md)
+to widen the representative six-category proof tranche into broader
+per-family and per-function coverage, and keep the registry classifying
+existing point-mode surfaces as:
 
 - `direct_fast`
 - `recurrence_fast`

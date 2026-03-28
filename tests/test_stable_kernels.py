@@ -49,3 +49,18 @@ def test_stable_incomplete_kernel_wrappers_match_api():
     )
     assert jnp.allclose(sk.incomplete_bessel_i(nu, z, upper), api.incomplete_bessel_i(nu, z, upper))
     assert jnp.allclose(sk.incomplete_bessel_k(nu, z, lower), api.incomplete_bessel_k(nu, z, lower))
+
+
+def test_stable_special_batch_wrappers_support_pad_to() -> None:
+    s = jnp.asarray([1.5, 2.0, 2.5], dtype=jnp.float64)
+    z = jnp.asarray([0.2, 0.4, 0.6], dtype=jnp.float64)
+    nu = jnp.asarray([0.5, 0.75, 1.0], dtype=jnp.float64)
+    lower = jnp.asarray([0.2, 0.3, 0.4], dtype=jnp.float64)
+
+    gamma_batch = sk.incomplete_gamma_upper_batch(s, z, mode="point", regularized=True, method="quadrature", pad_to=8)
+    bessel_batch = sk.incomplete_bessel_k_batch(nu, z, lower, mode="point", method="quadrature", pad_to=8)
+
+    assert gamma_batch.shape[0] == 3
+    assert bessel_batch.shape[0] == 3
+    assert jnp.allclose(gamma_batch[:3], api.incomplete_gamma_upper_batch(s, z, mode="point", regularized=True, method="quadrature"))
+    assert jnp.allclose(bessel_batch[:3], api.incomplete_bessel_k_batch(nu, z, lower, mode="point", method="quadrature"))

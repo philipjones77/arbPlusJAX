@@ -82,6 +82,7 @@ def make_shifted_solve_plan(
     shifts,
     *,
     preconditioner=None,
+    recycled_state=None,
     solver: str,
     algebra: str,
     structured: str = "general",
@@ -90,6 +91,7 @@ def make_shifted_solve_plan(
         operator=operator,
         shifts=jnp.asarray(shifts),
         preconditioner=preconditioner,
+        recycled_state=recycled_state,
         solver=solver,
         algebra=algebra,
         structured=structured,
@@ -261,6 +263,20 @@ def multi_shift_solve_point(
     maxiter: int | None = None,
 ):
     rhs_mid = midpoint_vector(rhs)
+
+    if plan.recycled_state is not None:
+        basis = jnp.asarray(plan.recycled_state.basis, dtype=dtype)
+        projected = jnp.asarray(plan.recycled_state.projected, dtype=dtype)
+        beta0 = jnp.linalg.norm(rhs_mid)
+        e1 = jnp.zeros((projected.shape[0],), dtype=dtype).at[0].set(jnp.asarray(beta0, dtype=dtype))
+        eye = jnp.eye(projected.shape[0], dtype=dtype)
+
+        def projected_solve_one(shift):
+            shift_arr = jnp.asarray(shift, dtype=dtype)
+            coeffs = jnp.linalg.solve(projected + shift_arr * eye, e1)
+            return coeffs @ basis
+
+        return jax.vmap(projected_solve_one)(jnp.asarray(plan.shifts))
 
     def solve_one(shift):
         shift_arr = jnp.asarray(shift, dtype=dtype)
