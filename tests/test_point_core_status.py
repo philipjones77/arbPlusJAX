@@ -31,7 +31,15 @@ def _core_surface(path: Path, prefix: str) -> list[str]:
 
 
 def test_every_core_surface_function_has_a_point_wrapper():
-    point_defs = _public_defs(SRC / "point_wrappers.py", "")
+    point_defs: set[str] = set()
+    for path in (
+        SRC / "point_wrappers.py",
+        SRC / "point_wrappers_core.py",
+        SRC / "point_wrappers_barnes.py",
+        SRC / "point_wrappers_dirichlet_modular.py",
+        SRC / "point_wrappers_elliptic.py",
+    ):
+        point_defs |= _public_defs(path, "")
     missing: list[str] = []
     for module_name, prefix in (("arb_core", "arb_"), ("acb_core", "acb_")):
         for name in _core_surface(SRC / f"{module_name}.py", prefix):
@@ -97,9 +105,9 @@ def test_new_complex_point_wrappers_smoke():
     _check(bool(jnp.all(jnp.isfinite(jnp.real(point_wrappers.acb_pow_fmpz_point(w, jnp.asarray(3.0)))))))
     _check(bool(jnp.all(jnp.isfinite(jnp.real(point_wrappers.acb_sqr_point(w))))))
     _check(bool(jnp.all(jnp.isfinite(jnp.real(point_wrappers.acb_root_ui_point(w, 3))))))
-    _check(bool(jnp.all(jnp.isfinite(jnp.real(point_wrappers.acb_polygamma_point(1, w))))))
-    _check(bool(jnp.all(jnp.isfinite(jnp.real(point_wrappers.acb_bernoulli_poly_ui_point(3, w))))))
-    _check(bool(jnp.all(jnp.isfinite(jnp.real(point_wrappers.acb_polylog_si_point(2, u))))))
+    _check(bool(jnp.all(jnp.isfinite(jnp.real(point_wrappers.acb_polygamma_point(w, 1))))))
+    _check(bool(jnp.all(jnp.isfinite(jnp.real(point_wrappers.acb_bernoulli_poly_ui_point(w, 3))))))
+    _check(bool(jnp.all(jnp.isfinite(jnp.real(point_wrappers.acb_polylog_si_point(u, 2))))))
 
     ex, invex = point_wrappers.acb_exp_invexp_point(z)
     _check(bool(jnp.isfinite(jnp.real(ex))))

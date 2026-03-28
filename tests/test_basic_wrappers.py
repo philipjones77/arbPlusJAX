@@ -192,8 +192,8 @@ def test_api_complex_core_helper_point_batch_stays_on_point_kernels():
         name, args = entry[0], entry[1]
         kwargs = entry[2] if len(entry) > 2 else {}
         if name == "acb_polylog_si":
-            expected = pw.acb_polylog_si_point(kwargs["s"], *args)
-            out = pw.acb_polylog_si_point(kwargs["s"], *args)
+            expected = pw.acb_polylog_si_point(*args, kwargs["s"])
+            out = pw.acb_polylog_si_point(*args, kwargs["s"])
         else:
             expected = api.eval_point(name, *args, dtype="float32")
             out = api.eval_point_batch(name, *args, dtype="float32", pad_to=8)

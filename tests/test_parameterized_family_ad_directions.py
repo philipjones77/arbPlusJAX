@@ -20,6 +20,19 @@ def test_core_scalar_pow_supports_value_and_parameter_ad() -> None:
     assert jnp.isfinite(dy)
 
 
+def test_complex_hurwitz_zeta_supports_value_and_parameter_ad() -> None:
+    s = jnp.complex128(2.2 + 0.1j)
+    a = jnp.complex128(0.6 + 0.15j)
+
+    ds = jax.grad(lambda sv: jnp.real(api.eval_point("acb_hurwitz_zeta", sv, a)))(s)
+    da = jax.grad(lambda av: jnp.real(api.eval_point("acb_hurwitz_zeta", s, av)))(a)
+
+    assert jnp.isfinite(jnp.real(ds))
+    assert jnp.isfinite(jnp.imag(ds))
+    assert jnp.isfinite(jnp.real(da))
+    assert jnp.isfinite(jnp.imag(da))
+
+
 def test_dense_operator_surface_supports_vector_and_scale_ad() -> None:
     base = jnp.array([[4.0, 1.0, 0.0], [2.0, 3.0, 1.0], [0.0, 1.0, 2.0]], dtype=jnp.float64)
     vec_mid = jnp.array([1.0, -0.5, 0.25], dtype=jnp.float64)

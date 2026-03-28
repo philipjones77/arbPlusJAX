@@ -759,12 +759,12 @@ def acb_hurwitz_zeta_point(s: jax.Array, a: jax.Array) -> jax.Array:
 
 
 @partial(jax.jit, static_argnames=("n",))
-def acb_polygamma_point(n: int, x: jax.Array) -> jax.Array:
+def acb_polygamma_point(x: jax.Array, n: int) -> jax.Array:
     return _vectorize_complex_scalar(partial(_complex_polygamma_scalar, n), x)
 
 
 @partial(jax.jit, static_argnames=("n",))
-def acb_bernoulli_poly_ui_point(n: int, x: jax.Array) -> jax.Array:
+def acb_bernoulli_poly_ui_point(x: jax.Array, n: int) -> jax.Array:
     return _vectorize_complex_scalar(partial(_complex_bernoulli_poly_ui_scalar, n), x)
 
 
@@ -772,7 +772,7 @@ acb_polylog_point = scalarize_binary_complex(_complex_polylog_scalar)
 
 
 @partial(jax.jit, static_argnames=("s",))
-def acb_polylog_si_point(s: int, z: jax.Array) -> jax.Array:
+def acb_polylog_si_point(z: jax.Array, s: int) -> jax.Array:
     return _vectorize_complex_scalar(partial(_complex_polylog_si_scalar, s), z)
 
 
