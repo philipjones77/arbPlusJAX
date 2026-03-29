@@ -61,9 +61,8 @@ At minimum:
 
 ## Representative Probes In This Repo
 
-- [hypgeom_point_startup_probe.py](/home/phili/projects/arbplusJAX/benchmarks/hypgeom_point_startup_probe.py)
-- [matrix_point_startup_probe.py](/home/phili/projects/arbplusJAX/benchmarks/matrix_point_startup_probe.py)
-- [dirichlet_point_startup_probe.py](/home/phili/projects/arbplusJAX/benchmarks/dirichlet_point_startup_probe.py)
-- [sparse_cached_apply_startup_probe.py](/home/phili/projects/arbplusJAX/benchmarks/sparse_cached_apply_startup_probe.py)
-- [double_gamma_point_startup_probe.py](/home/phili/projects/arbplusJAX/benchmarks/double_gamma_point_startup_probe.py)
-
+- [hypgeom_point_startup_probe.py](/benchmarks/hypgeom_point_startup_probe.py)
+- [matrix_point_startup_probe.py](/benchmarks/matrix_point_startup_probe.py)
+- [dirichlet_point_startup_probe.py](/benchmarks/dirichlet_point_startup_probe.py)
+- [sparse_cached_apply_startup_probe.py](/benchmarks/sparse_cached_apply_startup_probe.py)
+- [double_gamma_point_startup_probe.py](/benchmarks/double_gamma_point_startup_probe.py)

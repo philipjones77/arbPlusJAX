@@ -6,7 +6,7 @@ This report is the audited proof ledger for production-facing parameterized fami
 
 Policy references:
 - [special_function_ad_standard.md](/docs/standards/special_function_ad_standard.md)
-- [point_surface_standard.md](/docs/standards/point_surface_standard.md)
+- [operational_jax_standard.md](/docs/standards/operational_jax_standard.md)
 - [implicit_adjoint_operator_solve_standard.md](/docs/standards/implicit_adjoint_operator_solve_standard.md)
 
 Audited parameterized cases: `22`

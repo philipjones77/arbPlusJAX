@@ -31,6 +31,7 @@ Current reports:
 - [hypgeom_status.md](/docs/reports/hypgeom_status.md)
 - [matrix_free_first_use_inventory.md](/docs/reports/matrix_free_first_use_inventory.md)
 - [matrix_free_krylov_benchmark.md](/docs/reports/matrix_free_krylov_benchmark.md)
+- [matrix_free_operator_status.md](/docs/reports/matrix_free_operator_status.md)
 - [matrix_surface_workbook.md](/docs/reports/matrix_surface_workbook.md)
 - [new_functions.md](/docs/reports/new_functions.md)
 - [parameterized_ad_verification.md](/docs/reports/parameterized_ad_verification.md)
@@ -39,7 +40,52 @@ Current reports:
 - [point_fast_jax_category_matrix.md](/docs/reports/point_fast_jax_category_matrix.md)
 - [point_fast_jax_function_inventory.md](/docs/reports/point_fast_jax_function_inventory.md)
 - [point_fast_jax_verification.md](/docs/reports/point_fast_jax_verification.md)
+- [production_readiness.md](/docs/reports/production_readiness.md)
 - [repo_organization_by_coverage_categories.md](/docs/reports/repo_organization_by_coverage_categories.md)
 - [repo_standards_verification.md](/docs/reports/repo_standards_verification.md)
 - [report_status_refresh_inventory.md](/docs/reports/report_status_refresh_inventory.md)
+- [sparse_matrix_status.md](/docs/reports/sparse_matrix_status.md)
 - [special_function_status.md](/docs/reports/special_function_status.md)
+
+```{toctree}
+:maxdepth: 2
+:hidden:
+
+alternative_functions
+api_cold_path_inventory
+api_first_use_inventory
+api_surface_structure
+arb_like_functions
+benchmark_group_inventory
+cache_aware_surface_inventory
+comparison_backend_defaults
+core_numeric_scalars_status
+cpu_validation_profiles
+current_repo_mapping
+dense_matrix_engineering_status
+dense_matrix_surface_benchmark
+entry_script_startup_inventory
+environment_portability_inventory
+example_notebook_inventory
+function_engineering_status
+function_implementation_index
+function_provenance_registry
+hypgeom_status
+matrix_free_first_use_inventory
+matrix_free_krylov_benchmark
+matrix_free_operator_status
+matrix_surface_workbook
+new_functions
+parameterized_ad_verification
+point_basic_function_verification
+point_basic_surface_status
+point_fast_jax_category_matrix
+point_fast_jax_function_inventory
+point_fast_jax_verification
+production_readiness
+repo_organization_by_coverage_categories
+repo_standards_verification
+report_status_refresh_inventory
+sparse_matrix_status
+special_function_status
+```

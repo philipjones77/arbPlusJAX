@@ -273,14 +273,24 @@ Recommended fields include:
 - Serialized payloads should include source and filter context so generated reports remain auditable.
 - Metadata serialization belongs in the API/report layer, not in hot numerical kernels.
 
-## Logging Standard
+## Error Handling And Logging Companions
 
-- Logging is opt-in.
-- Logging should be hook-based or callback-based, not implicit global printing from numerical kernels.
-- Logging payloads should be structured records, not formatted prose strings.
-- Logging should layer on top of explicit metadata rather than replacing returned diagnostics.
-- If a subsystem needs runtime logs, accept hooks such as `log_hook` and optional tags such as `log_tag`.
-- Logging must not become a default side effect on performance-sensitive numerical paths.
+This document owns the high-level runtime rule that diagnostics, logging, and
+runtime status stay structured and off the hot path.
+
+The detailed enforceable companions are:
+
+- [error_handling_standard.md](/docs/standards/error_handling_standard.md)
+- [logging_standard.md](/docs/standards/logging_standard.md)
+
+Use those documents for:
+
+- hard contract errors versus numerical-status failures
+- fallback visibility
+- shared status codes
+- diagnostics level versus error policy
+- log levels and structured log records
+- the rule that logging must not slow hot numerical execution
 
 ## Lazy Loading Standard
 
@@ -340,6 +350,9 @@ Use these names consistently where they fit:
 - `full_output` for quadrature-style value-plus-metadata outputs
 - `log_hook` for explicit logging callbacks
 - `log_tag` for caller-supplied log record labeling
+- `error_policy` for explicit numerical-failure handling policy
+- `diagnostics_level` for compact versus richer diagnostics selection
+- `log_level` for host-side logging verbosity
 
 ## What Other Libraries Need To Know
 

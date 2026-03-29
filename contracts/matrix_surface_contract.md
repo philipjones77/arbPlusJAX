@@ -1,10 +1,13 @@
-Last updated: 2026-03-20T00:00:00Z
+Last updated: 2026-03-29T00:00:00Z
 
 # Matrix Surface Contract
 
 ## Scope
 
-This contract covers the dense, sparse, and matrix-free matrix families in `arbplusjax`, including their execution-strategy split, JAX compilation expectations, AD expectations, and benchmark/report obligations.
+This contract covers the dense, sparse, block-sparse / variable-block sparse,
+and matrix-free matrix families in `arbplusjax`, including their matrix-kind
+split, structure-subtype interpretation, execution-route split, JAX compilation
+expectations, AD expectations, and benchmark/report obligations.
 
 ## Families
 
@@ -14,14 +17,45 @@ The governed matrix families are:
 - `acb_mat`: dense complex box matrices
 - `srb_mat`: sparse real matrices
 - `scb_mat`: sparse complex matrices
+- `srb_block_mat`: real fixed-block sparse matrices
+- `scb_block_mat`: complex fixed-block sparse matrices
+- `srb_vblock_mat`: real variable-block sparse matrices
+- `scb_vblock_mat`: complex variable-block sparse matrices
 - `jrb_mat`: real matrix-free operators
 - `jcb_mat`: complex matrix-free operators
 
 Optional external matrix/eigensolver backends such as PETSc/SLEPc are not part of the governed JAX matrix-family ownership split. When present, they belong under `src/arbplusjax/backends/` and must not silently replace the JAX-governed `jrb_mat` / `jcb_mat` operator layer.
 
-Block and variable-block sparse families follow the same sparse strategy rules when they expose analogous surfaces, including `matvec`, cached `matvec`, `rmatvec`, cached `rmatvec`, and operator-layer adapter coverage when those representations participate in matrix-free workflows.
+Block and variable-block sparse families are governed matrix families in their
+own right, but they follow the same sparse strategy rules when they expose
+analogous surfaces, including `matvec`, cached `matvec`, `rmatvec`, cached
+`rmatvec`, and operator-layer adapter coverage when those representations
+participate in matrix-free workflows.
 
-## Execution strategy taxonomy
+## Matrix interpretation axes
+
+The stable matrix interpretation contract is three-axis:
+
+- matrix kind:
+  - dense
+  - sparse
+  - block-sparse / variable-block sparse
+  - matrix-free / operator
+- structure subtype:
+  - symmetric / Hermitian
+  - SPD / HPD
+  - triangular / banded / related structure flags
+- execution route:
+  - direct
+  - cached / prepared
+  - factorized
+  - operator-plan
+  - diagnostics-bearing / policy-helper route where exposed
+
+Downstream callers should be able to tell all three from the public surface,
+metadata, or canonical notebook guidance.
+
+## Execution route taxonomy
 
 The stable execution-strategy vocabulary for matrix APIs is:
 
@@ -34,6 +68,13 @@ The stable execution-strategy vocabulary for matrix APIs is:
 
 Algorithmic method selection and execution strategy are separate concerns. For example, Krylov restart count or stochastic logdet estimator choice is not the same axis as `cached` versus `operator_plan`.
 
+Execution route is also separate from matrix kind and structure subtype. For
+example:
+
+- sparse vs dense is a matrix-kind choice
+- SPD vs Hermitian is a structure choice
+- cached vs operator-plan is an execution-route choice
+
 ## JAX compilation contract
 
 - Matrix entry points are expected to remain pure-JAX and traceable.
@@ -43,6 +84,9 @@ Algorithmic method selection and execution strategy are separate concerns. For e
 - Reusable preconditioner plans must also be JAX pytrees when they participate in plan-native solve or eigensolver paths.
 - Point-mode hot paths must remain the primary optimized execution engine. Wrapper layers must not force point-mode calls through avoidable boxing or non-shape-stable detours.
 - Sparse families, including block and variable-block sparse families when they expose those routes, must treat `matvec`, cached `matvec`, `rmatvec`, and cached `rmatvec` as first-class optimized execution strategies rather than secondary compatibility helpers.
+- Matrix-family notebooks and practical docs must show the efficient repeated-call
+  route explicitly; a prepared/cached route must not be left discoverable only
+  through tests or metadata.
 - Structured sparse symmetric/Hermitian point paths must not silently downgrade to dense reconstruction for symmetry checks, Cholesky, or LDL factorization.
 - Sparse partial Hermitian/symmetric spectral routines such as `eigsh` must be owned by the matrix-free/operator layer and reached from sparse families through operator-plan delegation rather than dense midpoint reconstruction.
 - Matrix-free solve and partial-spectrum surfaces may advertise reusable preconditioner-plan, multi-shift, and restarted/block Krylov variants, but those variants must remain plan-reuse friendly and benchmarked as compile-vs-execute claims rather than one-off wrappers.
@@ -108,6 +152,14 @@ The sparse `basic` contract covers the operational matrix surface:
   - `eigh`
   - `eigsh`
 
+For the operational apply subset specifically:
+
+- point/basic `matvec`
+- point/basic `rmatvec`
+- point/basic cached `prepare/apply`
+
+the route is governed as sparse-native and should not silently densify.
+
 ## Matrix-Free Plan Contract
 
 For `jrb_mat` and `jcb_mat`, the governed matrix-free repeated-use surface includes:
@@ -172,6 +224,17 @@ Tests should enforce both sides of this contract:
 - governed sparse matrix operations must have `basic` coverage through mode wrappers or explicit `*_basic` functions
 - point-only constructor and conversion helpers must not accidentally grow `basic` mode wrappers without an explicit contract update
 
+## Block And Variable-Block Sparse Contract
+
+For block-sparse and variable-block sparse families:
+
+- they remain inside the sparse matrix category, not a separate dense or
+  operator category
+- notebooks and practical docs should contrast them explicitly with main sparse
+  and dense families
+- when a cached / repeated-call route exists, that route should be taught as the
+  production pattern
+
 ## Source of truth
 
 - `src/arbplusjax/arb_mat.py`
@@ -184,5 +247,9 @@ Tests should enforce both sides of this contract:
 - `docs/implementation/slepc_inspired_jax_implementation.md`
 - `benchmarks/benchmark_dense_matrix_surface.py`
 - `benchmarks/benchmark_sparse_matrix_surface.py`
+- `benchmarks/benchmark_sparse_operational_surface.py`
 - `benchmarks/benchmark_matrix_free_krylov.py`
 - `benchmarks/benchmark_matrix_stack_diagnostics.py`
+- `docs/specs/dense_matrix_functionality_spec.md`
+- `docs/specs/sparse_block_vblock_functionality_spec.md`
+- `docs/specs/matrix_free_operator_functionality_spec.md`

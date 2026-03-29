@@ -30,7 +30,7 @@ def test_generators_do_not_embed_machine_specific_repo_paths() -> None:
         REPO_ROOT / "tools" / "function_provenance_report.py",
         REPO_ROOT / "tools" / "hypgeom_status_report.py",
         REPO_ROOT / "tools" / "generate_example_notebooks.py",
-        REPO_ROOT / "tools" / "update_docs_indexes.py",
+        REPO_ROOT / "tools" / "generate_tools_readme.py",
         REPO_ROOT / "src" / "arbplusjax" / "function_provenance.py",
         REPO_ROOT / "benchmarks" / "matrix_surface_workbook.py",
         REPO_ROOT / "benchmarks" / "benchmark_matrix_suite.py",

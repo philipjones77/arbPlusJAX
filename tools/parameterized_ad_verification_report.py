@@ -435,7 +435,7 @@ def render() -> str:
         "",
         "Policy references:",
         "- [special_function_ad_standard.md](/docs/standards/special_function_ad_standard.md)",
-        "- [point_surface_standard.md](/docs/standards/point_surface_standard.md)",
+        "- [operational_jax_standard.md](/docs/standards/operational_jax_standard.md)",
         "- [implicit_adjoint_operator_solve_standard.md](/docs/standards/implicit_adjoint_operator_solve_standard.md)",
         "",
         f"Audited parameterized cases: `{len(rows)}`",

@@ -6,6 +6,10 @@ Last updated: 2026-03-17T00:00:00Z
 
 This standard applies to canonical Arb-like functions, alternative implementations, and repo-defined mathematical families.
 
+Code-local documentation quality for those surfaces is governed by:
+
+- [code_documentation_standard.md](/docs/standards/code_documentation_standard.md)
+
 ## Engineering contract
 
 - Public functions should expose the expected mode surface for their family (`point`, `basic`, and where appropriate `adaptive` / `rigorous`).
@@ -20,6 +24,9 @@ This standard applies to canonical Arb-like functions, alternative implementatio
 - Automatic differentiation compatibility is a target, but current status must be reported honestly per implementation family.
 - Tightening and hardening status should be tracked separately from provenance and naming.
 - Production-facing families should expose metadata and diagnostics that make method selection, execution strategy, parameterization, and current hardening level inspectable from the public surface.
+- Public hand-written surfaces should also satisfy the code-local documentation
+  rules for module docstrings, public function docstrings, and non-obvious
+  inline comments.
 
 ## Production calling contract
 

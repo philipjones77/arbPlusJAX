@@ -12,7 +12,7 @@ Related startup compile guidance:
 
 - [startup_compile_standard.md](/docs/standards/startup_compile_standard.md)
 - [startup_compile_rollout_implementation.md](/docs/implementation/startup_compile_rollout_implementation.md)
-- [point_fast_jax_standard.md](/docs/standards/point_fast_jax_standard.md)
+- [fast_jax_standard.md](/docs/standards/fast_jax_standard.md)
 - [point_fast_jax_implementation.md](/docs/implementation/point_fast_jax_implementation.md)
 
 ## Minimum checks

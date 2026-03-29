@@ -57,9 +57,9 @@ standard.
 
 ## Current Runtime Path
 
-- Runtime loader: [`public_metadata.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/public_metadata.py)
-- Static artifact: [`public_metadata_registry.json`](/home/phili/projects/arbplusJAX/src/arbplusjax/public_metadata_registry.json)
-- Public API consumer: [`api.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/api.py)
+- Runtime loader: [`public_metadata.py`](/src/arbplusjax/public_metadata.py)
+- Static artifact: [`public_metadata_registry.json`](/src/arbplusjax/public_metadata_registry.json)
+- Public API consumer: [`api.py`](/src/arbplusjax/api.py)
 
 ## Enforcement
 
@@ -71,9 +71,9 @@ The repo must keep tests that verify:
 
 Required tooling path:
 
-- [generate_public_metadata_registry.py](/home/phili/projects/arbplusJAX/tools/generate_public_metadata_registry.py)
+- [generate_public_metadata_registry.py](/tools/generate_public_metadata_registry.py)
 
 Required regression tests include:
 
-- [test_public_metadata_contracts.py](/home/phili/projects/arbplusJAX/tests/test_public_metadata_contracts.py)
-- [test_api_metadata.py](/home/phili/projects/arbplusJAX/tests/test_api_metadata.py)
+- [test_public_metadata_contracts.py](/tests/test_public_metadata_contracts.py)
+- [test_api_metadata.py](/tests/test_api_metadata.py)

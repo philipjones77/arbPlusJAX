@@ -43,3 +43,45 @@ Current documents:
 - [special_bessel_implementation.md](/docs/implementation/modules/special_bessel_implementation.md)
 - [srb_block_mat_implementation.md](/docs/implementation/modules/srb_block_mat_implementation.md)
 - [srb_mat_implementation.md](/docs/implementation/modules/srb_mat_implementation.md)
+
+```{toctree}
+:maxdepth: 2
+:hidden:
+
+acb_calc_implementation
+acb_core_implementation
+acb_dirichlet_implementation
+acb_elliptic_implementation
+acb_mat_implementation
+acb_modular_implementation
+acb_poly_implementation
+acf_implementation
+arb_calc_implementation
+arb_core_implementation
+arb_fmpz_poly_implementation
+arb_fpwrap_implementation
+arb_mat_implementation
+arb_poly_implementation
+arf_implementation
+bernoulli_implementation
+bool_mat_implementation
+dft_implementation
+dirichlet_implementation
+dlog_implementation
+double_gamma_implementation
+fmpr_implementation
+fmpz_extras_implementation
+fmpzi_implementation
+hypgeom_implementation
+jcb_mat_implementation
+jrb_mat_implementation
+mag_implementation
+nufft_implementation
+partitions_implementation
+scb_block_mat_implementation
+scb_mat_implementation
+shahen_double_gamma_implementation
+special_bessel_implementation
+srb_block_mat_implementation
+srb_mat_implementation
+```

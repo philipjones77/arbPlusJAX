@@ -112,6 +112,35 @@ class IntervalBatchCallDiagnostics:
     prewarmed: bool
 
 
+@dataclass(frozen=True)
+class MatrixFreePlanPolicy:
+    requested_backend: str
+    chosen_backend: str
+    algebra: str
+    plan_kind: str
+    problem_size: int | None
+    steps: int | None
+    probe_count: int | None
+    min_gpu_size_dense: int
+    min_gpu_size_sparse_real: int
+    min_gpu_size_sparse_complex: int
+    prewarm: bool
+
+
+@dataclass(frozen=True)
+class MatrixFreePlanCallDiagnostics:
+    operation: str
+    requested_backend: str
+    chosen_backend: str
+    algebra: str
+    plan_kind: str
+    problem_size: int | None
+    steps: int | None
+    probe_count: int | None
+    compiled_this_call: bool
+    prewarmed: bool
+
+
 def _resolve_lazy_callable(entry: object) -> Callable:
     return resolve_lazy_callable(entry, package=__package__)
 
@@ -345,6 +374,60 @@ def _interval_batch_policy_for_args(
         chunk_size=chunk_size,
         min_gpu_batch_size=min_gpu_batch_size,
         prewarm=prewarm,
+    )
+
+
+def choose_matrix_free_plan_policy(
+    *,
+    algebra: str,
+    plan_kind: str,
+    problem_size: int | None = None,
+    steps: int | None = None,
+    probe_count: int | None = None,
+    backend: str = "auto",
+    min_gpu_size_dense: int = 256,
+    min_gpu_size_sparse_real: int = 512,
+    min_gpu_size_sparse_complex: int = 32,
+    prewarm: bool = False,
+) -> MatrixFreePlanPolicy:
+    requested_backend = _normalize_backend_name(backend)
+    kind = str(plan_kind)
+    alg = str(algebra)
+    size = None if problem_size is None else int(problem_size)
+    if requested_backend == "auto":
+        chosen_backend = "cpu"
+        available = set(_available_backends())
+        if "gpu" in available and size is not None:
+            if kind == "dense":
+                threshold = int(min_gpu_size_dense)
+                if alg == "jcb":
+                    threshold = max(64, threshold // 2)
+                if size >= threshold:
+                    chosen_backend = "gpu"
+            elif kind in {"sparse_bcoo", "shell", "block_sparse", "vblock_sparse"}:
+                threshold = int(min_gpu_size_sparse_complex if alg == "jcb" else min_gpu_size_sparse_real)
+                if size >= threshold:
+                    chosen_backend = "gpu"
+            else:
+                chosen_backend = "cpu"
+    else:
+        chosen_backend = _choose_effective_backend(
+            requested_backend=requested_backend,
+            batch_size=size,
+            min_gpu_batch_size=min_gpu_size_sparse_complex if alg == "jcb" else min_gpu_size_dense,
+        )
+    return MatrixFreePlanPolicy(
+        requested_backend=requested_backend,
+        chosen_backend=chosen_backend,
+        algebra=alg,
+        plan_kind=kind,
+        problem_size=size,
+        steps=None if steps is None else int(steps),
+        probe_count=None if probe_count is None else int(probe_count),
+        min_gpu_size_dense=int(min_gpu_size_dense),
+        min_gpu_size_sparse_real=int(min_gpu_size_sparse_real),
+        min_gpu_size_sparse_complex=int(min_gpu_size_sparse_complex),
+        prewarm=bool(prewarm),
     )
 
 
@@ -3253,6 +3336,199 @@ def _dummy_interval_batch_args(
     return (xv, yv)
 
 
+@lru_cache(maxsize=1)
+def _matrix_free_modules():
+    return (
+        importlib.import_module(".acb_core", package=__package__),
+        importlib.import_module(".double_interval", package=__package__),
+        importlib.import_module(".jcb_mat", package=__package__),
+        importlib.import_module(".jrb_mat", package=__package__),
+        importlib.import_module(".sparse_common", package=__package__),
+    )
+
+
+def _matrix_free_real_dense_payload(
+    problem_size: int,
+    *,
+    backend: str,
+    probe_count: int,
+):
+    _, di_mod, _, _, _ = _matrix_free_modules()
+    device = _backend_device(backend)
+    vals = jnp.linspace(1.5, 2.5, problem_size, dtype=jnp.float64)
+    dense_mid = jnp.diag(vals)
+    vec_mid = jnp.linspace(0.25, 1.0, problem_size, dtype=jnp.float64)
+    dense = di_mod.interval(dense_mid, dense_mid)
+    vec = di_mod.interval(vec_mid, vec_mid)
+    probes = jnp.stack([vec] * max(int(probe_count), 1), axis=0)
+    shifts = jnp.asarray([0.0, 0.5], dtype=jnp.float64)
+    return (
+        jax.device_put(dense, device),
+        jax.device_put(vec, device),
+        jax.device_put(probes, device),
+        jax.device_put(shifts, device),
+        jax.device_put(dense_mid, device),
+    )
+
+
+def _matrix_free_complex_box_payload(
+    problem_size: int,
+    *,
+    backend: str,
+    probe_count: int,
+):
+    acb_core_mod, di_mod, _, _, _ = _matrix_free_modules()
+    device = _backend_device(backend)
+    re_vals = jnp.linspace(1.5, 2.5, problem_size, dtype=jnp.float64)
+    im_vals = 0.2 * jnp.linspace(-1.0, 1.0, problem_size, dtype=jnp.float64)
+    dense_mid = jnp.diag(re_vals + 1j * im_vals)
+    vec_mid = jnp.linspace(0.25, 1.0, problem_size, dtype=jnp.float64) + 0.1j * jnp.linspace(
+        -0.5, 0.5, problem_size, dtype=jnp.float64
+    )
+    dense = acb_core_mod.acb_box(
+        di_mod.interval(jnp.real(dense_mid), jnp.real(dense_mid)),
+        di_mod.interval(jnp.imag(dense_mid), jnp.imag(dense_mid)),
+    )
+    vec = acb_core_mod.acb_box(
+        di_mod.interval(jnp.real(vec_mid), jnp.real(vec_mid)),
+        di_mod.interval(jnp.imag(vec_mid), jnp.imag(vec_mid)),
+    )
+    probes = jnp.stack([vec] * max(int(probe_count), 1), axis=0)
+    shifts = jnp.asarray([0.0, 0.5], dtype=jnp.float64)
+    return (
+        jax.device_put(dense, device),
+        jax.device_put(vec, device),
+        jax.device_put(probes, device),
+        jax.device_put(shifts, device),
+        jax.device_put(dense_mid, device),
+    )
+
+
+def _matrix_free_operation(
+    algebra: str,
+    plan_kind: str,
+    operation: str,
+    *,
+    problem_size: int,
+    steps: int,
+    probe_count: int,
+    backend: str,
+) -> tuple[Callable[[], object], int | None]:
+    _, _, jcb_mat_mod, jrb_mat_mod, sparse_common_mod = _matrix_free_modules()
+    if algebra == "jrb":
+        dense, vec, probes, shifts, dense_mid = _matrix_free_real_dense_payload(
+            problem_size,
+            backend=backend,
+            probe_count=probe_count,
+        )
+        if plan_kind == "dense":
+            plan = jrb_mat_mod.jrb_mat_dense_operator_plan_prepare(dense)
+            rplan = jrb_mat_mod.jrb_mat_dense_operator_rmatvec_plan_prepare(dense)
+            precond = jrb_mat_mod.jrb_mat_jacobi_preconditioner_plan_prepare(plan)
+        elif plan_kind == "sparse_bcoo":
+            sparse = sparse_common_mod.dense_to_sparse_bcoo(dense_mid, algebra="jrb")
+            plan = jrb_mat_mod.jrb_mat_bcoo_operator_plan_prepare(sparse)
+            rplan = jrb_mat_mod.jrb_mat_bcoo_operator_rmatvec_plan_prepare(sparse)
+            precond = jrb_mat_mod.jrb_mat_jacobi_preconditioner_plan_prepare(plan)
+        else:
+            raise ValueError("plan_kind must be one of: 'dense', 'sparse_bcoo'")
+
+        if operation == "apply":
+            return (lambda: jrb_mat_mod.jrb_mat_operator_plan_apply(plan, vec)), problem_size
+        if operation in {"rapply", "adjoint_apply"}:
+            return (lambda: jrb_mat_mod.jrb_mat_operator_plan_apply(rplan, vec)), problem_size
+        if operation == "solve":
+            return (lambda: jrb_mat_mod.jrb_mat_solve_action_point_jit(plan, vec, symmetric=True)), problem_size
+        if operation == "inverse":
+            return (lambda: jrb_mat_mod.jrb_mat_inverse_action_point_jit(plan, vec, symmetric=True)), problem_size
+        if operation == "logdet":
+            return (lambda: jrb_mat_mod.jrb_mat_logdet_slq_point_jit(plan, probes, steps)), probe_count
+        if operation == "logdet_solve":
+            return (
+                lambda: jrb_mat_mod.jrb_mat_logdet_solve_point_jit(
+                    plan,
+                    vec,
+                    probes,
+                    steps=steps,
+                    symmetric=True,
+                    tol=1e-7,
+                    maxiter=max(int(steps) * 4, 8),
+                )
+            ), probe_count
+        if operation == "multi_shift":
+            return (
+                lambda: jrb_mat_mod.jrb_mat_multi_shift_solve_point_jit(
+                    plan,
+                    vec,
+                    shifts,
+                    symmetric=True,
+                    preconditioner=precond,
+                    tol=1e-7,
+                    maxiter=max(int(steps) * 4, 8),
+                )
+            ), problem_size
+        raise ValueError(f"unsupported matrix-free operation {operation!r}")
+
+    if algebra != "jcb":
+        raise ValueError("algebra must be one of: 'jrb', 'jcb'")
+
+    dense, vec, probes, shifts, dense_mid = _matrix_free_complex_box_payload(
+        problem_size,
+        backend=backend,
+        probe_count=probe_count,
+    )
+    if plan_kind == "dense":
+        plan = jcb_mat_mod.jcb_mat_dense_operator_plan_prepare(dense)
+        rplan = jcb_mat_mod.jcb_mat_dense_operator_rmatvec_plan_prepare(dense)
+        aplan = jcb_mat_mod.jcb_mat_dense_operator_adjoint_plan_prepare(dense)
+        precond = jcb_mat_mod.jcb_mat_jacobi_preconditioner_plan_prepare(plan)
+    elif plan_kind == "sparse_bcoo":
+        sparse = sparse_common_mod.dense_to_sparse_bcoo(dense_mid, algebra="jcb")
+        plan = jcb_mat_mod.jcb_mat_bcoo_operator_plan_prepare(sparse)
+        rplan = jcb_mat_mod.jcb_mat_bcoo_operator_rmatvec_plan_prepare(sparse)
+        aplan = jcb_mat_mod.jcb_mat_bcoo_operator_adjoint_plan_prepare(sparse)
+        precond = jcb_mat_mod.jcb_mat_jacobi_preconditioner_plan_prepare(plan)
+    else:
+        raise ValueError("plan_kind must be one of: 'dense', 'sparse_bcoo'")
+
+    if operation == "apply":
+        return (lambda: jcb_mat_mod.jcb_mat_operator_plan_apply(plan, vec)), problem_size
+    if operation == "rapply":
+        return (lambda: jcb_mat_mod.jcb_mat_operator_plan_apply(rplan, vec)), problem_size
+    if operation == "adjoint_apply":
+        return (lambda: jcb_mat_mod.jcb_mat_operator_plan_apply(aplan, vec)), problem_size
+    if operation == "solve":
+        return (lambda: jcb_mat_mod.jcb_mat_solve_action_point_jit(plan, vec)), problem_size
+    if operation == "inverse":
+        return (lambda: jcb_mat_mod.jcb_mat_inverse_action_point_jit(plan, vec)), problem_size
+    if operation == "logdet":
+        return (lambda: jcb_mat_mod.jcb_mat_logdet_slq_point_jit(plan, probes, steps)), probe_count
+    if operation == "logdet_solve":
+        return (
+            lambda: jcb_mat_mod.jcb_mat_logdet_solve_point_jit(
+                plan,
+                vec,
+                probes,
+                steps=steps,
+                hermitian=(plan_kind == "dense"),
+                tol=1e-7,
+                maxiter=max(int(steps) * 4, 8),
+            )
+        ), probe_count
+    if operation == "multi_shift":
+        return (
+            lambda: jcb_mat_mod.jcb_mat_multi_shift_solve_point_jit(
+                plan,
+                vec,
+                shifts,
+                preconditioner=precond,
+                tol=1e-7,
+                maxiter=max(int(steps) * 4, 8),
+            )
+        ), problem_size
+    raise ValueError(f"unsupported matrix-free operation {operation!r}")
+
+
 def _prewarm_point_batch_binding(
     fn: Callable,
     *,
@@ -3366,6 +3642,81 @@ def prewarm_interval_mode_kernels(
     return out
 
 
+_MATRIX_FREE_PREWARM_DEFAULTS = (
+    ("jrb", "dense", "apply"),
+    ("jrb", "dense", "rapply"),
+    ("jrb", "dense", "solve"),
+    ("jrb", "dense", "logdet"),
+    ("jrb", "dense", "logdet_solve"),
+    ("jrb", "dense", "multi_shift"),
+    ("jcb", "dense", "apply"),
+    ("jcb", "dense", "adjoint_apply"),
+    ("jcb", "dense", "solve"),
+    ("jcb", "dense", "logdet"),
+    ("jcb", "dense", "logdet_solve"),
+    ("jcb", "sparse_bcoo", "apply"),
+    ("jcb", "sparse_bcoo", "adjoint_apply"),
+    ("jcb", "sparse_bcoo", "solve"),
+    ("jcb", "sparse_bcoo", "logdet"),
+    ("jcb", "sparse_bcoo", "logdet_solve"),
+)
+
+
+def prewarm_matrix_free_kernels(
+    cases: tuple[tuple[str, str, str], ...] | None = None,
+    *,
+    backend: str = "auto",
+    dense_problem_size: int = 32,
+    sparse_problem_size: int = 48,
+    steps: int = 8,
+    probe_count: int = 2,
+    min_gpu_size_dense: int = 256,
+    min_gpu_size_sparse_real: int = 512,
+    min_gpu_size_sparse_complex: int = 32,
+) -> dict[str, MatrixFreePlanCallDiagnostics]:
+    chosen_cases = _MATRIX_FREE_PREWARM_DEFAULTS if cases is None else tuple(cases)
+    out: dict[str, MatrixFreePlanCallDiagnostics] = {}
+    for algebra, plan_kind, operation in chosen_cases:
+        problem_size = int(dense_problem_size if plan_kind == "dense" else sparse_problem_size)
+        policy = choose_matrix_free_plan_policy(
+            algebra=algebra,
+            plan_kind=plan_kind,
+            problem_size=problem_size,
+            steps=steps,
+            probe_count=probe_count,
+            backend=backend,
+            min_gpu_size_dense=min_gpu_size_dense,
+            min_gpu_size_sparse_real=min_gpu_size_sparse_real,
+            min_gpu_size_sparse_complex=min_gpu_size_sparse_complex,
+            prewarm=True,
+        )
+        fn, effective_probe_count = _matrix_free_operation(
+            algebra,
+            plan_kind,
+            operation,
+            problem_size=problem_size,
+            steps=max(int(steps), 2),
+            probe_count=max(int(probe_count), 1),
+            backend=policy.chosen_backend,
+        )
+        out_obj = fn()
+        jax.block_until_ready(out_obj)
+        key = f"{algebra}:{plan_kind}:{operation}"
+        out[key] = MatrixFreePlanCallDiagnostics(
+            operation=operation,
+            requested_backend=policy.requested_backend,
+            chosen_backend=policy.chosen_backend,
+            algebra=policy.algebra,
+            plan_kind=policy.plan_kind,
+            problem_size=policy.problem_size,
+            steps=policy.steps,
+            probe_count=effective_probe_count,
+            compiled_this_call=True,
+            prewarmed=True,
+        )
+    return out
+
+
 @lru_cache(maxsize=None)
 def _interval_jit_fn(name: str, mode: str, prec_bits: int | None, dps: int | None):
     fn = _bound_interval_fn(name, mode, prec_bits, dps)
@@ -3453,8 +3804,10 @@ __all__ = [
     "bind_interval_batch_jit_with_diagnostics",
     "choose_point_batch_policy",
     "choose_interval_batch_policy",
+    "choose_matrix_free_plan_policy",
     "prewarm_core_point_kernels",
     "prewarm_interval_mode_kernels",
+    "prewarm_matrix_free_kernels",
     "list_public_functions",
     "list_point_functions",
     "list_interval_functions",
@@ -3466,6 +3819,8 @@ __all__ = [
     "PointBatchCallDiagnostics",
     "IntervalBatchPolicy",
     "IntervalBatchCallDiagnostics",
+    "MatrixFreePlanPolicy",
+    "MatrixFreePlanCallDiagnostics",
     "TailDerivativeMetadata",
     "TailEvaluationDiagnostics",
     "TailIntegralProblem",

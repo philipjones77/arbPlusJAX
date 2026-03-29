@@ -28,7 +28,7 @@ benchmark artifacts, and notebook guidance.
 It is a companion to:
 
 - [api_surface_kinds_standard.md](/docs/standards/api_surface_kinds_standard.md)
-- [point_fast_jax_standard.md](/docs/standards/point_fast_jax_standard.md)
+- [fast_jax_standard.md](/docs/standards/fast_jax_standard.md)
 - [startup_compile_standard.md](/docs/standards/startup_compile_standard.md)
 - [caching_recompilation_standard.md](/docs/standards/caching_recompilation_standard.md)
 - [benchmark_validation_policy_standard.md](/docs/standards/benchmark_validation_policy_standard.md)

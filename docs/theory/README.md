@@ -24,4 +24,26 @@ Current methodology notes:
 - [sparse_symmetric_leja_hutchpp_logdet.md](/docs/theory/sparse_symmetric_leja_hutchpp_logdet.md)
 - [transform_fft_nufft_methodology.md](/docs/theory/transform_fft_nufft_methodology.md)
 
+```{toctree}
+:maxdepth: 2
+:hidden:
+
+ball_arithmetic_and_modes
+barnes_double_gamma_methodology
+bessel_family_methodology
+core_functions_methodology
+elementary_functions_methodology
+gamma_family_methodology
+hypergeometric_family_methodology
+matrix_free_operator_methodology
+matrix_free_operator_methods
+matrix_interval_and_modes
+point_basic_surface_methodology
+repo_theory_overview
+sparse_block_vblock_methodology
+sparse_selected_inversion_domain_decomposition
+sparse_symmetric_leja_hutchpp_logdet
+transform_fft_nufft_methodology
+```
+
 Current theory status remains `in_progress`: the main interval/core/matrix/transform/gamma foundations are documented, but further methodology notes should continue to be added as new hardened families land.

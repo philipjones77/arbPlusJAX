@@ -24,7 +24,7 @@ Neighboring standards then own:
 - runtime semantics and dtype/AD/diagnostics rules:
   [jax_api_runtime_standard.md](/docs/standards/jax_api_runtime_standard.md)
 - structural fast-JAX requirements for point mode:
-  [point_fast_jax_standard.md](/docs/standards/point_fast_jax_standard.md)
+  [fast_jax_standard.md](/docs/standards/fast_jax_standard.md)
 - backend-realized performance policy:
   [backend_realized_performance_standard.md](/docs/standards/backend_realized_performance_standard.md)
 - practical teaching and canonical use:
@@ -51,8 +51,36 @@ The repo should not blur:
 - execution kind such as direct versus compiled versus prepared
 - observability kind such as plain return versus diagnostics-bearing
 - policy kind such as explicit backend-policy helpers
+- matrix kind such as dense versus sparse versus block-sparse versus
+  matrix-free/operator
+- structure subtype such as symmetric versus Hermitian versus SPD/HPD
 
 These are different axes and should remain different axes.
+
+## Matrix Family Interpretation Rule
+
+For matrix libraries, the public API should be legible across three separate
+questions:
+
+1. matrix kind
+   - dense
+   - sparse
+   - block-sparse / vblock
+   - matrix-free / operator
+2. structure subtype
+   - symmetric / Hermitian
+   - SPD / HPD
+   - triangular / banded / permutation / similar
+3. surface kind
+   - direct
+   - bound service
+   - compiled bound
+   - diagnostics-bearing
+   - prepared / plan
+   - policy helper
+
+The API should not force users to infer all three from one overloaded name or
+one giant auto-routing layer.
 
 ## Canonical Public Surface Kinds
 

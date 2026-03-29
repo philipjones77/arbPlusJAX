@@ -45,6 +45,12 @@ def implicit_krylov_solve_midpoint(
         use_implicit_adjoint = structured in {"symmetric", "spd", "hermitian", "hpd"} or transpose_operator is not None
     if sparse_factor_preconditioner and structured not in {"symmetric", "spd", "hermitian", "hpd"}:
         use_implicit_adjoint = False
+    if conjugate and structured not in {"hermitian", "hpd"}:
+        # The current complex general-operator path still trips an internal
+        # custom_linear_solve assertion under transpose solves. Keep the
+        # explicit transpose/adjoint ownership, but fall back to eager solves
+        # until the non-Hermitian complex implicit-adjoint route is stable.
+        use_implicit_adjoint = False
 
     def mv(v):
         return operator_apply_midpoint(

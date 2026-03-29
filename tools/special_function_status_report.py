@@ -22,13 +22,33 @@ def render() -> str:
     hardening = _load_json(
         "benchmarks/results/special_function_hardening_benchmark/special_function_hardening_benchmark.json"
     )
+    service = _load_json(
+        "benchmarks/results/benchmark_special_function_service_api/benchmark_special_function_service_api_cpu_refresh.json"
+    )
     hypgeom_probe = _load_json("benchmarks/results/hypgeom_point_startup_probe/hypgeom_point_startup_probe.json")
     double_gamma_probe = _load_json(
         "benchmarks/results/double_gamma_point_startup_probe/double_gamma_point_startup_probe.json"
     )
 
     hypgeom_point = hypgeom_probe["arb_hypgeom_1f1_point_path"]
-    double_gamma_point = double_gamma_probe["bdg_barnesgamma2_point_path"]
+    double_gamma_ifj = double_gamma_probe["ifj_barnesdoublegamma_point_path"]
+    double_gamma_provider = double_gamma_probe["provider_barnesdoublegamma_point_path"]
+    double_gamma_legacy = double_gamma_probe["bdg_barnesgamma2_point_path"]
+
+    def _find_warm(operation: str, implementation: str, dtype: str, mode: str | None = None) -> float | None:
+        for row in service.get("records", ()):
+            if row.get("operation") != operation or row.get("implementation") != implementation or row.get("dtype") != dtype:
+                continue
+            if mode is not None:
+                measure_mode = None
+                for measurement in row.get("measurements", ()):
+                    if measurement.get("name") == "mode":
+                        measure_mode = measurement.get("value")
+                        break
+                if measure_mode != mode:
+                    continue
+                return row.get("warm_time_s")
+        return None
     lines = [
         "Last updated: 2026-03-26T00:00:00Z",
         "",
@@ -72,18 +92,30 @@ def render() -> str:
         f"- Hypergeom regularized lower batch: {_fmt_float(hardening['hypgeom']['gamma_lower_regularized_batch_s'])}",
         f"- Hypergeom regularized upper batch: {_fmt_float(hardening['hypgeom']['gamma_upper_regularized_batch_s'])}",
         "",
+        "## Operational Service Snapshot",
+        "",
+        f"- incomplete gamma upper point padded float64 warm: {_fmt_float(_find_warm('incomplete_gamma_upper', 'service_api_padded', 'float64', mode='point'))}",
+        f"- incomplete gamma upper basic padded float64 warm: {_fmt_float(_find_warm('incomplete_gamma_upper', 'service_api_padded', 'float64', mode='basic'))}",
+        f"- incomplete Bessel K point padded float64 warm: {_fmt_float(_find_warm('incomplete_bessel_k', 'service_api_padded', 'float64', mode='point'))}",
+        f"- provider Barnes double-gamma padded float64 warm: {_fmt_float(_find_warm('provider_barnesdoublegamma', 'service_api_padded', 'float64', mode='point'))}",
+        f"- provider log Barnes double-gamma padded float64 warm: {_fmt_float(_find_warm('provider_log_barnesdoublegamma', 'service_api_padded', 'float64', mode='point'))}",
+        "",
         "## Startup Probe Snapshot",
         "",
         f"- [hypgeom_point_startup_probe.json](/benchmarks/results/hypgeom_point_startup_probe/hypgeom_point_startup_probe.json): import={_fmt_float(hypgeom_probe['import_arbplusjax_api']['seconds'])}, compile+first={_fmt_float(hypgeom_point['compile_plus_first_point_batch_s'])}, steady={_fmt_float(hypgeom_point['steady_point_batch_s'])}",
-        f"- [double_gamma_point_startup_probe.json](/benchmarks/results/double_gamma_point_startup_probe/double_gamma_point_startup_probe.json): import={_fmt_float(double_gamma_probe['import_arbplusjax_api']['seconds'])}, compile_error_type=`{double_gamma_point['compile_error_type']}`",
+        f"- [double_gamma_point_startup_probe.json](/benchmarks/results/double_gamma_point_startup_probe/double_gamma_point_startup_probe.json) IFJ: import={_fmt_float(double_gamma_probe['import_arbplusjax_api']['seconds'])}, compile+first={_fmt_float(double_gamma_ifj['compile_plus_first_point_batch_s'])}, steady={_fmt_float(double_gamma_ifj['steady_point_batch_s'])}",
+        f"- provider Barnes startup: compile+first={_fmt_float(double_gamma_provider['compile_plus_first_point_batch_s'])}, steady={_fmt_float(double_gamma_provider['steady_point_batch_s'])}",
+        f"- legacy BDG startup: compile_error_type=`{double_gamma_legacy.get('compile_error_type', 'n/a')}`",
         "",
         "## Notes",
         "",
         "- `special_function_hardening_benchmark.py` is the current cross-family benchmark/diagnostics rollup.",
         "- `special_function_ad_benchmark.py` is the current cross-family argument-vs-parameter AD benchmark rollup.",
+        "- `benchmark_special_function_service_api.py` is the current repeated-call operational benchmark for point/basic service usage.",
         "- `hypgeom_status.md` remains the detailed family-by-family hypergeom engineering inventory.",
         "- The point-surface audit now compares public point wrappers against scalar family-owned exact-input evaluations; current remaining pfq drift is in the batched interval/mode path, not the point wrapper.",
-        "- The Barnes startup probe still records a compile failure on the legacy `bdg_barnesgamma2` point path; the IFJ diagnostics-backed path and provider alias are the currently hardened public route.",
+        "- The Barnes startup probe now records both the supported IFJ/provider startup path and the legacy BDG compile failure so the hardened route stays explicit.",
+        "- Current CPU/GPU closeout for the special-function tranche excludes Barnes IFJ batch throughput; gamma, incomplete Bessel, and hypergeom are the backend-certified focus set.",
         "- Canonical notebook teaching is now split by ownership: gamma/incomplete-tail, Barnes/double-gamma, and hypergeom each have a dedicated example surface.",
     ]
     return "\n".join(lines) + "\n"

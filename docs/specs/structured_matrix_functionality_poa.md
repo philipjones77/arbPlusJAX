@@ -46,6 +46,7 @@ Matrix kinds:
 
 - dense
 - sparse
+- block-sparse
 - diagonal
 - banded
 - block
@@ -56,6 +57,135 @@ Matrix kinds:
 - low-rank
 - structured
 - matrix-free / operator
+
+### Matrix API Axes
+
+For this repository, matrix APIs should be understood as three orthogonal
+choices rather than one overloaded type label.
+
+#### 1. Matrix kind
+
+Primary kind:
+
+- dense
+- sparse
+- block-sparse / variable-block sparse
+- matrix-free / operator
+
+This answers:
+
+- what the fundamental storage or execution model is
+- whether the object is explicit or apply-only
+
+#### 2. Structure subtype
+
+Secondary structural flags:
+
+- symmetric
+- Hermitian
+- SPD
+- HPD
+- triangular
+- diagonal
+- banded
+- permutation
+- low-rank
+- hierarchical / structured
+
+This answers:
+
+- what stronger mathematical promises the object makes
+- which specialized kernels or solver routes are allowed
+
+#### 3. Implementation route
+
+Operational route:
+
+- direct explicit kernel
+- cached / prepared apply
+- solve plan / factor plan
+- operator-plan / matvec-plan
+- compiled batch binder
+- diagnostics-bearing route
+
+This answers:
+
+- how the work is actually executed
+- what should be prepared once and reused
+- what the intended repeated-call path is
+
+These three axes should remain separate in both docs and public API usage.
+
+The API should let a caller answer all three questions clearly:
+
+- what kind of matrix is this?
+- what structural promises does it make?
+- what execution route should I use for this workload?
+
+### Canonical Matrix Family Mapping
+
+Current arbPlusJAX family mapping:
+
+- dense:
+  - `arb_mat`
+  - `acb_mat`
+- sparse:
+  - `srb_mat`
+  - `scb_mat`
+- block-sparse / vblock:
+  - `srb_block_mat`
+  - `scb_block_mat`
+  - `srb_vblock_mat`
+  - `scb_vblock_mat`
+- matrix-free / operator:
+  - `jrb_mat`
+  - `jcb_mat`
+
+The public API should not blur those families into one generic matrix object
+without still exposing the structural and operational choices above.
+
+### Canonical Usage Rule
+
+The efficient public usage pattern should differ by matrix kind:
+
+- dense:
+  prefer explicit kernels, cached `matvec` / `rmatvec`, and prepared solve
+  plans when repeated
+- sparse:
+  prefer sparse-native cached apply or sparse-native prepared solve/factor
+  routes; avoid silent dense fallback on operational paths
+- block-sparse:
+  prefer block-aware apply and cached block-aware routes
+- matrix-free / operator:
+  prefer prepared operator plans, cached transpose/adjoint plans, and stable
+  compiled apply/solve routes
+
+Canonical notebooks should teach these efficient routes explicitly instead of
+only showing direct one-off calls.
+
+### API Expression Rule
+
+The public surface should make the three layers legible through naming and
+prepared usage.
+
+Examples:
+
+- kind:
+  - `srb_mat_*`
+  - `srb_block_mat_*`
+  - `jrb_mat_*`
+- structure:
+  - `*_symmetric_*`
+  - `*_hermitian_*`
+  - `*_spd_*`
+  - `*_hpd_*`
+- implementation route:
+  - `*_cached_prepare`
+  - `*_cached_apply`
+  - `*_plan_prepare`
+  - `*_plan_apply`
+  - `bind_*_jit`
+  - `*_with_diagnostics`
 
 Landing zone:
 
@@ -250,6 +380,24 @@ Landing zone:
 - iterative solvers: `src/arbplusjax/iterative_solvers.py`, `src/arbplusjax/krylov_solvers.py`
 - dense/sparse solve entry points: matrix modules
 - matrix-free solves and adjoints: `jrb_mat`, `jcb_mat`, `matfree_adjoints.py`
+
+### Matrix Notebook Requirement
+
+Canonical matrix notebooks should always show:
+
+- direct surface
+- prepared/cached repeated-call surface
+- structure-specialized surface where relevant
+- point/basic usage where that family supports it
+- CPU/GPU usage guidance
+- AD on the real public surface
+- diagnostics on the real public surface
+
+That requirement applies to:
+
+- dense matrix notebooks
+- sparse and block/vblock notebooks
+- matrix-free/operator notebooks
 
 ### 8. Spectral and Decomposition Methods
 

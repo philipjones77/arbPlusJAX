@@ -1,10 +1,10 @@
 [
   {
-    "elapsed_s": 163.624572,
-    "executed_notebook": "examples/outputs/example_core_scalar_surface/example_core_scalar_surface_gpu_executed.ipynb",
+    "elapsed_s": 275.863166,
+    "executed_notebook": "examples/outputs/example_matrix_free_operator_surface/example_matrix_free_operator_surface_gpu_executed.ipynb",
     "jax_dtype": "float64",
     "jax_mode": "gpu",
-    "notebook": "example_core_scalar_surface.ipynb",
-    "output_root": "examples/outputs/example_core_scalar_surface"
+    "notebook": "example_matrix_free_operator_surface.ipynb",
+    "output_root": "examples/outputs/example_matrix_free_operator_surface"
   }
 ]

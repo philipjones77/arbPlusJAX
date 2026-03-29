@@ -5,7 +5,7 @@ Last updated: 2026-03-23T00:00:00Z
 This report states the required `point fast JAX` coverage across the six top-level repo functionality categories.
 
 Governing documents:
-- [point_fast_jax_standard.md](/docs/standards/point_fast_jax_standard.md)
+- [fast_jax_standard.md](/docs/standards/fast_jax_standard.md)
 - [point_fast_jax_implementation.md](/docs/implementation/point_fast_jax_implementation.md)
 - [point_fast_jax_plan.md](/docs/status/point_fast_jax_plan.md)
 

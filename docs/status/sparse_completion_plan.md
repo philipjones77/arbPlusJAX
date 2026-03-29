@@ -21,6 +21,10 @@ New in the current pass:
 - sparse batch mode fastpaths for LU and SPD/HPD plan-apply surfaces
 - shared sparse batch helper utilities and shared sparse cached-matvec-plan helpers
 - a broad sparse mode surface test and a sparse matrix surface benchmark
+- explicit sparse operational no-dense-fallback coverage for point/basic
+  `matvec`, `rmatvec`, and cached `prepare/apply`
+- a dedicated sparse operational CPU/GPU benchmark for sparse-native
+  point/basic apply surfaces
 
 ## Current Gap Versus Dense
 
@@ -115,6 +119,19 @@ The remaining open item from that original list is:
 5. algorithm-level deduplication between dense and sparse where the numerical kernels genuinely overlap
 6. structured sparse plans beyond solve/matvec
 7. sparse `basic` interval/box semantics without dense lifting
+
+### Operational Sparse-Native Closeout
+
+This sub-tranche is now explicitly closed for:
+
+- sparse real/complex `point/basic` `matvec`
+- sparse real/complex `point/basic` `rmatvec`
+- sparse real/complex `point/basic` cached `prepare/apply`
+- compiled point/basic sparse cached-apply binders
+
+These paths are covered by no-dense-fallback regression tests and a dedicated
+CPU/GPU operational benchmark. The remaining sparse `basic` dense-lifting work
+is in the broader solve/factor layer, not this operational apply layer.
 
 ### Krylov Reuse And Shifted-Solve TODOs
 

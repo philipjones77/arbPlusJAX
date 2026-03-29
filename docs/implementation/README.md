@@ -38,3 +38,36 @@ Implementation notes explain how the code is built and organized. Practical runb
 - [startup_compile_rollout_implementation.md](/docs/implementation/startup_compile_rollout_implementation.md)
 - [testing_harness_implementation.md](/docs/implementation/testing_harness_implementation.md)
 - [update_implementation.md](/docs/implementation/update_implementation.md)
+
+```{toctree}
+:maxdepth: 2
+:hidden:
+
+modules/README
+wrappers/README
+external/README
+api_cold_path_audit
+benchmark_process_implementation
+benchmarks_implementation
+build_implementation
+curvature_implementation
+dense_matrix_tranche_implementation
+jax_setup_implementation
+linux_gpu_colab_implementation
+matfree_adjoints_operator_solve_audit
+matrix_free_estimator_review_2026
+matrix_logdet_landscape_implementation
+matrix_stack_implementation
+point_fast_jax_implementation
+precision_guardrails_gpu_implementation
+release_execution_checklist
+run_platform_implementation
+slepc_inspired_jax_implementation
+soft_ops_optional_implementation
+sparse_matrix_tranche_implementation
+stable_kernel_subset_implementation
+startup_compile_repo_template
+startup_compile_rollout_implementation
+testing_harness_implementation
+update_implementation
+```

@@ -1,4 +1,4 @@
-Last updated: 2026-03-20T00:00:00Z
+Last updated: 2026-03-29T00:00:00Z
 
 # Public API Selection Contract
 
@@ -18,10 +18,30 @@ The public API may expose the following explicit selection axes per function:
 - `method_params`: method- or strategy-specific parameterization dictionary
 - `mode`: point/basic/adaptive/rigorous dispatch mode where supported
 
+For matrix-family APIs, the routed public surface should also keep the following
+conceptually separate even when they are not all carried as one metadata field:
+
+- matrix kind:
+  - dense
+  - sparse
+  - block-sparse / variable-block sparse
+  - matrix-free / operator
+- structure subtype:
+  - symmetric / Hermitian
+  - SPD / HPD
+  - triangular / banded / related structure flags
+- execution route:
+  - direct
+  - cached / prepared
+  - factorized / plan-backed
+  - operator-plan / compiled batch route
+
 ## Selection semantics
 
 - Explicit user selections must be honored exactly or rejected clearly.
 - Unsupported combinations must raise rather than silently downgrade to a different implementation, method, or strategy.
+- Unsupported matrix-kind / structure / execution-route combinations must also
+  raise rather than silently crossing into a different family or route.
 - Default selection may choose canonical implementations or default methods, but that default behavior must remain inspectable through metadata and registry surfaces.
 
 ## Registry contract
@@ -37,12 +57,23 @@ For each public function, the metadata and capability registry should report the
 - `method_parameter_names`
 - `execution_strategies`
 
+When a public function belongs to a matrix family, the metadata layer should
+remain sufficient for a caller to determine at least:
+
+- which matrix family owns the surface
+- whether a cached / prepared / compiled repeated-call route exists
+- whether point/basic coverage is advertised
+- whether diagnostics-bearing or fallback-aware routes exist
+
 ## JAX-first expectation
 
 - The routed API should preserve JAX-friendly calling patterns.
 - Repeated-execution strategies should favor shape stability, plan reuse, and batch-friendly entry points.
 - Selection metadata is meant to help users choose AD-safe and low-recompile routes, not to hide runtime recompilation issues.
 - Tests, benchmarks, and notebooks should execute against the source tree under `src/arbplusjax`, not rely on a separately installed package copy.
+- Canonical notebooks and practical docs should teach the efficient repeated-call
+  route for matrix families rather than leaving callers to infer it from the
+  selection metadata alone.
 
 ## Source of truth
 

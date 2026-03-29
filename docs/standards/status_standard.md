@@ -24,6 +24,9 @@ The status layer may include both:
 
 - a top-level TODO index
 - dedicated subsystem or program TODO/plan files
+- dedicated operational-readiness TODO files for release, docs publishing,
+  security, support, and capability reporting when those programs grow beyond a
+  single subsection
 
 Status is not the place for:
 

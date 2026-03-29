@@ -35,6 +35,22 @@ def _sorted_markdown_files(folder: Path) -> list[Path]:
     )
 
 
+def _append_hidden_toctree(lines: list[str], entries: list[str], *, maxdepth: int = 2) -> None:
+    if not entries:
+        return
+    lines.extend(
+        [
+            "",
+            "```{toctree}",
+            f":maxdepth: {maxdepth}",
+            ":hidden:",
+            "",
+        ]
+    )
+    lines.extend(entries)
+    lines.append("```")
+
+
 def render_root_readme() -> str:
     lines = [
         "# arbPlusJAX",
@@ -66,6 +82,7 @@ def render_root_readme() -> str:
         "",
         "## Documentation Entry Points",
         "",
+        "- docs root: [docs/README.md](/docs/README.md)",
         "- project overview: [docs/project_overview.md](/docs/project_overview.md)",
         "- standards: [docs/standards/README.md](/docs/standards/README.md)",
         "- reports: [docs/reports/README.md](/docs/reports/README.md)",
@@ -122,7 +139,7 @@ def render_project_overview() -> str:
         "data",
     ]
     lines = [
-        "Last updated: 2026-03-25T00:00:00Z",
+        "Last updated: 2026-03-29T00:00:00Z",
         "",
         "# Project Overview",
         "",
@@ -163,6 +180,79 @@ def render_project_overview() -> str:
     return "\n".join(lines) + "\n"
 
 
+def render_docs_readme() -> str:
+    section_paths = [
+        DOCS_ROOT / "project_overview.md",
+        DOCS_ROOT / "governance" / "README.md",
+        DOCS_ROOT / "standards" / "README.md",
+        DOCS_ROOT / "theory" / "README.md",
+        DOCS_ROOT / "practical" / "README.md",
+        REPO_ROOT / "examples" / "README.md",
+        DOCS_ROOT / "implementation" / "README.md",
+        DOCS_ROOT / "reports" / "README.md",
+        DOCS_ROOT / "status" / "README.md",
+        DOCS_ROOT / "objects" / "README.md",
+        DOCS_ROOT / "specs" / "README.md",
+        DOCS_ROOT / "notation" / "README.md",
+    ]
+    lines = [
+        "Last updated: 2026-03-29T00:00:00Z",
+        "",
+        "# Documentation",
+        "",
+        "This folder is the Markdown-first source of truth for active repo documentation.",
+        "It is authored and maintained directly in `docs/`.",
+        "",
+        "When the publication layer is used, Sphinx + MyST renders this same folder into HTML and PDF output.",
+        "That publish layer must adapt to this docs tree rather than requiring a second parallel documentation corpus.",
+        "",
+        "## Contents",
+        "",
+        f"- overview: {_doc_link(DOCS_ROOT / 'project_overview.md')}",
+        f"- governance: {_doc_link(DOCS_ROOT / 'governance' / 'README.md')}",
+        f"- standards: {_doc_link(DOCS_ROOT / 'standards' / 'README.md')}",
+        f"- theory: {_doc_link(DOCS_ROOT / 'theory' / 'README.md')}",
+        f"- practical: {_doc_link(DOCS_ROOT / 'practical' / 'README.md')}",
+        "- examples: [README.md](/examples/README.md)",
+        f"- implementation: {_doc_link(DOCS_ROOT / 'implementation' / 'README.md')}",
+        f"- reports: {_doc_link(DOCS_ROOT / 'reports' / 'README.md')}",
+        f"- status: {_doc_link(DOCS_ROOT / 'status' / 'README.md')}",
+        f"- objects: {_doc_link(DOCS_ROOT / 'objects' / 'README.md')}",
+        f"- specs: {_doc_link(DOCS_ROOT / 'specs' / 'README.md')}",
+        f"- notation: {_doc_link(DOCS_ROOT / 'notation' / 'README.md')}",
+        "",
+        "## Build Model",
+        "",
+        "- source of truth: `docs/`",
+        "- HTML renderer: Sphinx + MyST",
+        "- HTML host: GitHub Pages",
+        "- PDF renderer: Sphinx `latexpdf`/LuaLaTeX lane",
+        "- publication manuscripts: [papers/README.md](/papers/README.md)",
+        "",
+        "## Site Navigation",
+        "",
+        "The publication layer uses this `README.md` as the docs root document.",
+        "",
+        "```{toctree}",
+        ":maxdepth: 2",
+        ":hidden:",
+        "",
+    ]
+    for path in section_paths:
+        if path.is_relative_to(DOCS_ROOT):
+            lines.append(path.relative_to(DOCS_ROOT).as_posix().removesuffix(".md"))
+        else:
+            lines.append(path.relative_to(REPO_ROOT).as_posix().removesuffix(".md"))
+    lines.extend(
+        [
+            "```",
+            "",
+            "This file is generated and should be refreshed through `python tools/generate_docs_indexes.py` before commit/push.",
+        ]
+    )
+    return "\n".join(lines) + "\n"
+
+
 def render_governance_readme() -> str:
     files = _sorted_markdown_files(DOCS_ROOT / "governance")
     lines = [
@@ -175,6 +265,7 @@ def render_governance_readme() -> str:
         "Current documents:",
     ]
     lines.extend(f"- {_doc_link(path)}" for path in files)
+    _append_hidden_toctree(lines, [path.stem for path in files])
     return "\n".join(lines) + "\n"
 
 
@@ -193,7 +284,7 @@ def render_standards_readme() -> str:
         "- arbPlusJAX specialization:",
         "  the repo-specific adaptation, naming, or ownership choice for this library",
         "",
-        "The detailed standards still overlap in a few places, so the practical reading model is concept-first rather than filename-first. The current standards set consolidates into six primary concept groups.",
+        "The detailed standards still overlap in a few places, so the practical reading model is concept-first rather than filename-first. The current standards set consolidates into eight primary concept groups.",
         "",
         "## Reading Rule",
         "",
@@ -222,10 +313,14 @@ def render_standards_readme() -> str:
         "Specialized companion documents:",
         f"- {_doc_link(DOCS_ROOT / 'standards' / 'api_surface_kinds_standard.md')}",
         f"- {_doc_link(DOCS_ROOT / 'standards' / 'engineering_standard.md')}",
+        f"- {_doc_link(DOCS_ROOT / 'standards' / 'backend_realized_performance_standard.md')}",
+        f"- {_doc_link(DOCS_ROOT / 'standards' / 'error_handling_standard.md')}",
         f"- {_doc_link(DOCS_ROOT / 'standards' / 'caching_recompilation_standard.md')}",
         f"- {_doc_link(DOCS_ROOT / 'standards' / 'implicit_adjoint_operator_solve_standard.md')}",
         f"- {_doc_link(DOCS_ROOT / 'standards' / 'jax_surface_policy_standard.md')}",
         f"- {_doc_link(DOCS_ROOT / 'standards' / 'lazy_loading_standard.md')}",
+        f"- {_doc_link(DOCS_ROOT / 'standards' / 'logging_standard.md')}",
+        f"- {_doc_link(DOCS_ROOT / 'standards' / 'metadata_registry_standard.md')}",
         f"- {_doc_link(DOCS_ROOT / 'standards' / 'precision_standard.md')}",
         f"- {_doc_link(DOCS_ROOT / 'standards' / 'configuration_standard.md')}",
         f"- {_doc_link(DOCS_ROOT / 'standards' / 'core_scalar_service_calling_standard.md')}",
@@ -234,13 +329,17 @@ def render_standards_readme() -> str:
         "- treat `jax_api_runtime_standard.md` as the canonical runtime/API contract",
         "- treat `api_surface_kinds_standard.md` as the canonical taxonomy for direct, light-wrapper, bound-service, compiled-bound, diagnostics-bearing, prepared-plan, and policy-helper public surfaces",
         "- treat `engineering_standard.md` as the hardening and status-interpretation overlay",
+        "- treat `backend_realized_performance_standard.md` as the practical backend-performance companion layered on top of structural fast-JAX/runtime readiness",
+        "- treat `error_handling_standard.md` as the canonical hard-failure, numerical-status, fallback, and shared status-code companion",
         "- treat `caching_recompilation_standard.md` as the explicit cache, binder-reuse, prepared-plan, and recompilation-discipline companion",
         "- treat `implicit_adjoint_operator_solve_standard.md` as the operator-first solve, transpose-solve, and implicit-adjoint differentiation companion",
         "- treat `lazy_loading_standard.md` as the canonical import-time load and public lazy-boundary companion",
+        "- treat `logging_standard.md` as the canonical structured logging, verbosity, and off-hot-path emission companion",
+        "- treat `metadata_registry_standard.md` as the canonical public metadata/capability reporting companion",
         "- treat `configuration_standard.md` as the checked-in runtime/optional-backend configuration companion",
         "- treat `core_scalar_service_calling_standard.md` as a tranche-specific specialization, not a second general runtime policy",
-        "- API calling shape, binder reuse, diagnostics payloads, logging hooks, optional backend declaration, and the rule that diagnostics/profiling stay outside the mandatory numeric hot path all belong to this runtime concept",
-        "- `point_fast_jax_standard.md` and `core_scalar_service_calling_standard.md` are arbPlusJAX specialization standards layered on top of the more general runtime and backend-performance owner standards",
+        "- API calling shape, binder reuse, diagnostics payloads, error policy, logging hooks, optional backend declaration, fallback visibility, and the rule that diagnostics/profiling stay outside the mandatory numeric hot path all belong to this runtime concept",
+        "- `fast_jax_standard.md`, `operational_jax_standard.md`, and `core_scalar_service_calling_standard.md` together replace the older point-specific owner standards",
         "",
         "### 2. Validation, Benchmarking, and Executable Examples",
         "",
@@ -260,42 +359,76 @@ def render_standards_readme() -> str:
         "- `api_usability_standard.md` owns the intended public calling pattern and how notebooks/practical docs should teach it",
         "- `api_usability_standard.md` is broadly reusable; notebook-family or tranche-specific usage documents should be treated as specializations",
         "",
-        "### 3. Portability and Run Layout",
+        "### 3. Portability, Startup, and Run Layout",
         "",
         "Primary owners:",
         f"- {_doc_link(DOCS_ROOT / 'standards' / 'environment_portability_standard.md')}",
         f"- {_doc_link(DOCS_ROOT / 'standards' / 'experiment_layout_standard.md')}",
+        f"- {_doc_link(DOCS_ROOT / 'standards' / 'startup_compile_standard.md')}",
+        f"- {_doc_link(DOCS_ROOT / 'standards' / 'startup_import_boundary_standard.md')}",
+        f"- {_doc_link(DOCS_ROOT / 'standards' / 'startup_probe_standard.md')}",
         "",
         "Consolidation note:",
-        "- these documents jointly own where things run and where artifacts live",
+        "- these documents jointly own where things run, how startup/import/compile behavior is governed, and where artifacts live",
         "- GitHub submission, Windows, Linux/WSL, and Colab portability expectations belong here rather than in ad hoc runbook notes",
+        "- the startup standards remain separate because they govern different evidence surfaces: compile budget, import boundary, and startup probes",
         "- repo-root path conventions, retained artifact layout, and checked-in notebook policy are arbPlusJAX specializations of the broader portability/layout layer",
         "",
         "### 4. Contracts And Provider Boundary",
         "",
-        "Primary owner:",
+        "Primary owners:",
         f"- {_doc_link(DOCS_ROOT / 'standards' / 'contract_and_provider_boundary_standard.md')}",
+        f"- {_doc_link(DOCS_ROOT / 'standards' / 'contracts_surface_standard.md')}",
         "",
         "Consolidation note:",
         "- this document consolidates the missing contract-placement and provider-boundary policy into one public-surface concept",
+        "- `contracts_surface_standard.md` owns what belongs in the root `contracts/` layer and how binding guarantees differ from implementation notes or status docs",
         "- downstream-facing API capability contracts, metadata guarantees, and provider-grade surface rules belong here rather than in ad hoc per-family notes",
         "- the generic rule is that libraries should expose stable capability contracts; the arbPlusJAX specialization is which provider and capability terms this repo actually uses",
         "",
-        "### 5. Documentation Outputs And Generated Communication Surfaces",
+        "### 5. Documentation, Implementation, and Generated Communication Surfaces",
         "",
         "Primary owners:",
+        f"- {_doc_link(DOCS_ROOT / 'standards' / 'code_documentation_standard.md')}",
+        f"- {_doc_link(DOCS_ROOT / 'standards' / 'specs_standard.md')}",
+        f"- {_doc_link(DOCS_ROOT / 'standards' / 'objects_standard.md')}",
         f"- {_doc_link(DOCS_ROOT / 'standards' / 'generated_documentation_standard.md')}",
+        f"- {_doc_link(DOCS_ROOT / 'standards' / 'implementation_docs_standard.md')}",
         f"- {_doc_link(DOCS_ROOT / 'standards' / 'report_standard.md')}",
         f"- {_doc_link(DOCS_ROOT / 'standards' / 'status_standard.md')}",
         f"- {_doc_link(DOCS_ROOT / 'standards' / 'repo_standards.md')}",
+        f"- {_doc_link(DOCS_ROOT / 'standards' / 'update_standard.md')}",
         "",
         "Consolidation note:",
+        "- `code_documentation_standard.md` owns code-local docstrings, inline comments, and code-to-doc linkage",
+        "- `specs_standard.md` owns what belongs in `docs/specs/` and how semantic specifications differ from contracts, theory, and status",
+        "- `objects_standard.md` owns what belongs in `docs/objects/` and how catalogs/inventories differ from generated reports",
         "- `generated_documentation_standard.md` owns the shared generation rule",
+        "- `implementation_docs_standard.md` owns what belongs in `docs/implementation/` and how implementation mapping differs from contracts, reports, and status",
         "- `repo_standards.md` owns repo-root communication and placement",
+        "- `update_standard.md` is the operational companion for repo-maintained artifact refresh/update discipline",
         "- the report/status standards remain specialized audience documents under the same documentation-output concept",
-        "- repo communication and generated landing pages are mostly arbPlusJAX-specific, but the split between governance, reports, status, and generated indexes should remain reusable",
+        "- repo communication and generated landing pages are mostly arbPlusJAX-specific, but the split between governance, implementation, reports, status, and generated indexes should remain reusable",
         "",
-        "### 6. Theory, Notation, and Naming Semantics",
+        "### 6. Release, Security, Support, and Capability Governance",
+        "",
+        "Primary owners:",
+        f"- {_doc_link(DOCS_ROOT / 'standards' / 'release_packaging_standard.md')}",
+        f"- {_doc_link(DOCS_ROOT / 'standards' / 'docs_build_standard.md')}",
+        f"- {_doc_link(DOCS_ROOT / 'standards' / 'docs_publishing_standard.md')}",
+        f"- {_doc_link(DOCS_ROOT / 'standards' / 'release_governance_standard.md')}",
+        f"- {_doc_link(DOCS_ROOT / 'standards' / 'security_supply_chain_standard.md')}",
+        f"- {_doc_link(DOCS_ROOT / 'standards' / 'operational_support_standard.md')}",
+        f"- {_doc_link(DOCS_ROOT / 'standards' / 'capability_maturity_standard.md')}",
+        f"- {_doc_link(DOCS_ROOT / 'standards' / 'production_readiness_standard.md')}",
+        "",
+        "Consolidation note:",
+        "- these documents own the missing production-library layer that sits above runtime correctness and beneath public release claims",
+        "- `docs_build_standard.md` owns the Markdown-first source/build/rewrite model for Sphinx/MyST publication",
+        "- `production_readiness_standard.md` owns the Markdown-first governance model that ties standards, status, reports, and automation together",
+        "- release build verification, docs publishing, changelog/support/security entrypoints, and capability reporting should be governed explicitly rather than left as repo folklore",
+        "",
+        "### 7. Theory, Notation, and Naming Semantics",
         "",
         "Primary owners:",
         f"- {_doc_link(DOCS_ROOT / 'standards' / 'theory_notation_standard.md')}",
@@ -309,10 +442,26 @@ def render_standards_readme() -> str:
         "- function naming and test naming remain the explicit naming-policy layer",
         "- mathematical-family naming and point/basic terminology are arbPlusJAX specializations layered on top of more general notation discipline",
         "",
+        "### 8. ArbPlusJAX Specialization Standards",
+        "",
+        "These standards should remain separate from the more reusable owner standards, but they are best read as one specialization layer rather than as many unrelated top-level policies.",
+        "",
+        "Primary specialization documents:",
+        f"- {_doc_link(DOCS_ROOT / 'standards' / 'special_function_ad_standard.md')}",
+        f"- {_doc_link(DOCS_ROOT / 'standards' / 'core_scalar_service_calling_standard.md')}",
+        "",
+        "Consolidation note:",
+        "- these documents are intentionally not merged into the general owner standards because they encode repo-specific tranche rules and family-level calling guidance",
+        "- read them only after the owner standards for runtime, validation, portability/startup, and release governance",
+        "",
         "## Detailed Standards",
         ]
     files = _sorted_markdown_files(DOCS_ROOT / "standards")
     lines.extend(f"- {_doc_link(path)}" for path in files)
+    _append_hidden_toctree(
+        lines,
+        [path.stem for path in files],
+    )
     lines.extend(
         [
             "",
@@ -335,6 +484,7 @@ def render_notation_readme() -> str:
         "Current notation documents:",
     ]
     lines.extend(f"- {_doc_link(path)}" for path in files)
+    _append_hidden_toctree(lines, [path.stem for path in files])
     return "\n".join(lines) + "\n"
 
 
@@ -354,6 +504,7 @@ def render_reports_readme() -> str:
         "Current reports:",
     ]
     lines.extend(f"- {_doc_link(path)}" for path in files)
+    _append_hidden_toctree(lines, [path.stem for path in files])
     return "\n".join(lines) + "\n"
 
 
@@ -381,6 +532,7 @@ def render_status_readme() -> str:
     if extras:
         lines.extend(["", "Other status documents:"])
         lines.extend(f"- {_doc_link(path)}" for path in extras)
+    _append_hidden_toctree(lines, [path.stem for path in files])
     return "\n".join(lines) + "\n"
 
 
@@ -398,6 +550,7 @@ def render_theory_readme() -> str:
         "Current methodology notes:",
     ]
     lines.extend(f"- {_doc_link(path)}" for path in files)
+    _append_hidden_toctree(lines, [path.stem for path in files])
     lines.extend(
         [
             "",
@@ -431,6 +584,13 @@ def render_implementation_readme() -> str:
         "",
     ]
     lines.extend(f"- {_doc_link(path)}" for path in files)
+    toctree_entries = [
+        "modules/README",
+        "wrappers/README",
+        "external/README",
+        *[path.stem for path in files],
+    ]
+    _append_hidden_toctree(lines, toctree_entries)
     return "\n".join(lines) + "\n"
 
 
@@ -453,6 +613,7 @@ def render_implementation_subtree_readme(
         "Current documents:",
     ]
     lines.extend(f"- {_doc_link(path)}" for path in files)
+    _append_hidden_toctree(lines, [path.stem for path in files])
     return "\n".join(lines) + "\n"
 
 
@@ -507,6 +668,7 @@ def render_current_repo_mapping() -> str:
 def generated_docs() -> dict[Path, str]:
     return {
         REPO_ROOT / "README.md": render_root_readme(),
+        DOCS_ROOT / "README.md": render_docs_readme(),
         DOCS_ROOT / "project_overview.md": render_project_overview(),
         DOCS_ROOT / "governance" / "README.md": render_governance_readme(),
         DOCS_ROOT / "implementation" / "README.md": render_implementation_readme(),

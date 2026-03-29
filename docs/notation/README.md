@@ -6,3 +6,10 @@ This section holds authoritative notation conventions, symbol tables, and naming
 
 Current notation documents:
 - [notation.md](/docs/notation/notation.md)
+
+```{toctree}
+:maxdepth: 2
+:hidden:
+
+notation
+```

@@ -13,8 +13,8 @@ Companion standards:
 - [caching_recompilation_standard.md](/docs/standards/caching_recompilation_standard.md)
 - [lazy_loading_standard.md](/docs/standards/lazy_loading_standard.md)
 - [jax_api_runtime_standard.md](/docs/standards/jax_api_runtime_standard.md)
-- [point_fast_jax_standard.md](/docs/standards/point_fast_jax_standard.md)
-- [startup_compile_playbook_standard.md](/docs/standards/startup_compile_playbook_standard.md)
+- [fast_jax_standard.md](/docs/standards/fast_jax_standard.md)
+- [startup_compile_standard.md](/docs/standards/startup_compile_standard.md)
 - [point_fast_jax_implementation.md](/docs/implementation/point_fast_jax_implementation.md)
 
 ## Rollout Goal

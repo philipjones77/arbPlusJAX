@@ -863,29 +863,49 @@ def _sparse_matrix_surface_notebook() -> list:
         ),
         *_production_pattern_cells(
             "Production Pattern",
-            "Sparse production calls should prepare cached plans once and reuse them for repeated apply or solve traffic. "
+            "Sparse production calls should prepare cached plans once and reuse them for repeated apply traffic. "
+            "The sparse-native operational contract in this tranche is point/basic `matvec`, `rmatvec`, and cached prepare/apply with no dense fallback. "
             "If an API-facing service loop feeds variable batch sizes, pad the RHS batch to a stable multiple before calling the padded batch kernels.",
             "import jax\n"
             "rhs_batch = vec_real\n"
+            "service_batch = jnp.stack([\n"
+            "    vec_real[0],\n"
+            "    vec_real[1],\n"
+            "    vec_real[0] + 0.5,\n"
+            "    vec_real[1] - 0.25,\n"
+            "], axis=0)\n"
             "real_cached = api.eval_point('srb_mat_matvec_cached_prepare', sparse_real)\n"
             "real_rcached = api.eval_point('srb_mat_rmatvec_cached_prepare', sparse_real)\n"
+            "basic_cached = api.eval_interval('srb_mat_matvec_cached_prepare', sparse_real, mode='basic', prec_bits=80)\n"
+            "basic_service = api.bind_interval_batch_jit('srb_mat_matvec_cached_apply', mode='basic', dtype='float64', pad_to=4, backend=JAX_MODE)\n"
+            "point_service = api.bind_point_batch_jit('srb_mat_matvec_cached_apply', dtype='float64', pad_to=4, backend=JAX_MODE)\n"
             "sparse_service_results = {\n"
             "    'cached_apply': jax.vmap(lambda row: api.eval_point('srb_mat_matvec_cached_apply', real_cached, row))(rhs_batch),\n"
             "    'cached_rmatvec': jax.vmap(lambda row: api.eval_point('srb_mat_rmatvec_cached_apply', real_rcached, row))(rhs_batch),\n"
+            "    'point_service_cached_apply': point_service(real_cached, service_batch),\n"
+            "    'basic_service_cached_apply': basic_service(basic_cached, service_batch),\n"
             "    'padded_batch_apply': api.eval_point_batch('srb_mat_matvec', sparse_real, rhs_batch, pad_to=8),\n"
             "    'block_sparse_apply': api.eval_point_batch('srb_block_mat_matvec', block_real, rhs_batch),\n"
             "    'vblock_sparse_apply': api.eval_point_batch('srb_vblock_mat_matvec', vblock_real, rhs_batch),\n"
             "}\n"
             "display(sparse_service_results)",
-            "To extend sparse benchmarks, add the target sparse/storage/mode combination inside `benchmark_sparse_matrix_surface.py` and keep the printed metric keys stable so downstream notebook parsing still works."
+            "To extend sparse operational benchmarks, add the target sparse/storage/mode combination inside `benchmark_sparse_operational_surface.py` and keep the printed metric keys stable so downstream notebook parsing still works."
         ),
         *_fast_jax_pattern_cells(
-            "Sparse point-mode fast JAX should use the compiled batch binder on a prepared operator or cached plan, with shape-stable RHS batches.",
+            "Sparse fast JAX should use compiled batch binders on prepared cached plans, with point using `bind_point_batch_jit` and basic using `bind_interval_batch_jit`, both with shape-stable RHS batches.",
             "import jax\n"
+            "service_batch = jnp.stack([\n"
+            "    rhs_batch[0],\n"
+            "    rhs_batch[1],\n"
+            "    rhs_batch[0] + 0.5,\n"
+            "    rhs_batch[1] - 0.25,\n"
+            "], axis=0)\n"
             "sparse_fast = api.bind_point_batch_jit('srb_mat_matvec_cached_apply', dtype='float64', pad_to=4)\n"
-            "sparse_fast_out = sparse_fast(real_cached, rhs_batch)\n"
-            "sparse_vmap = jax.vmap(lambda row: api.eval_point('srb_mat_matvec_cached_apply', real_cached, row, dtype='float64'))(rhs_batch)\n"
-            "display({'jit_shape': sparse_fast_out.shape, 'jit_matches_vmap': bool(jnp.allclose(sparse_fast_out, sparse_vmap))})"
+            "sparse_fast_basic = api.bind_interval_batch_jit('srb_mat_matvec_cached_apply', mode='basic', dtype='float64', pad_to=4, backend=JAX_MODE)\n"
+            "sparse_fast_out = sparse_fast(real_cached, service_batch)\n"
+            "sparse_fast_basic_out = sparse_fast_basic(basic_cached, service_batch)\n"
+            "sparse_vmap = jax.vmap(lambda row: api.eval_point('srb_mat_matvec_cached_apply', real_cached, row, dtype='float64'))(service_batch)\n"
+            "display({'jit_shape': sparse_fast_out.shape, 'basic_jit_shape': sparse_fast_basic_out.shape, 'jit_matches_vmap': bool(jnp.allclose(sparse_fast_out, sparse_vmap))})"
         ),
         *_ad_pattern_cells(
             "Sparse AD should be demonstrated in both directions through stable public operations that are realistically differentiated in downstream models. "
@@ -948,10 +968,10 @@ def _sparse_matrix_surface_notebook() -> list:
         ),
         nbf.v4.new_markdown_cell(
             "## Benchmark Summary\n\n"
-            "Run the sparse surface benchmark and convert the printed metrics into a structured table."
+            "Run the sparse operational benchmark and convert the printed metrics into a structured table."
         ),
         nbf.v4.new_code_cell(
-            "completed = run([PYTHON, 'benchmarks/benchmark_sparse_matrix_surface.py', '--n', '16', '--warmup', '1', '--runs', '2'], capture=True)\n"
+            "completed = run([PYTHON, 'benchmarks/benchmark_sparse_operational_surface.py', '--n', '16', '--warmup', '1', '--runs', '2'], capture=True)\n"
             "print(completed.stdout)\n"
             "rows = []\n"
             "for line in completed.stdout.splitlines():\n"
@@ -1020,21 +1040,25 @@ def _matrix_free_operator_surface_notebook() -> list:
         *_common_setup_cells("example_matrix_free_operator_surface"),
         nbf.v4.new_markdown_cell(
             "## Direct Usage\n\n"
-            "Build a small dense operator plan and exercise matrix-free apply, solve, and logdet-facing paths."
+            "Build a small dense operator plan and exercise matrix-free apply, transpose-apply, solve, and logdet-facing paths."
         ),
         nbf.v4.new_code_cell(
             "import jax.numpy as jnp\n"
-            "from arbplusjax import double_interval as di, jrb_mat\n"
+            "from arbplusjax import api, double_interval as di, jrb_mat\n"
             "\n"
             "diag = jnp.array([2.0, 3.0, 5.0, 7.0], dtype=jnp.float64)\n"
             "a_mid = jnp.diag(diag)\n"
             "a = di.interval(a_mid, a_mid)\n"
             "x = di.interval(jnp.array([1.0, 0.5, -0.25, 0.75], dtype=jnp.float64), jnp.array([1.0, 0.5, -0.25, 0.75], dtype=jnp.float64))\n"
             "plan = jrb_mat.jrb_mat_dense_operator_plan_prepare(a)\n"
+            "rplan = jrb_mat.jrb_mat_dense_operator_rmatvec_plan_prepare(a)\n"
             "sparse_plan = jrb_mat.jrb_mat_sparse_operator_plan_prepare(jrb_mat.sparse_common.dense_to_sparse_bcoo(a_mid, algebra='jrb'))\n"
             "probes = jnp.stack([x, x], axis=0)\n"
+            "mf_policy = api.choose_matrix_free_plan_policy(algebra='jrb', plan_kind='dense', problem_size=int(a_mid.shape[0]), steps=4, probe_count=int(probes.shape[0]), backend='auto')\n"
             "operator_results = {\n"
+            "    'policy': mf_policy,\n"
             "    'apply': jrb_mat.jrb_mat_operator_plan_apply(plan, x),\n"
+            "    'rapply': jrb_mat.jrb_mat_operator_plan_apply(rplan, x),\n"
             "    'sparse_apply': jrb_mat.jrb_mat_operator_plan_apply(sparse_plan, x),\n"
             "    'solve': jrb_mat.jrb_mat_solve_action_point_jit(plan, x, symmetric=True),\n"
             "    'logdet': jrb_mat.jrb_mat_logdet_slq_point(plan, probes, steps=4),\n"
@@ -1046,12 +1070,17 @@ def _matrix_free_operator_surface_notebook() -> list:
             "Matrix-free production use should prepare operator plans once, reuse preconditioners, and keep problem size and Krylov steps stable across service requests where possible. "
             "This reduces recompiles and keeps diagnostics interpretable.",
             "precond = jrb_mat.jrb_mat_jacobi_preconditioner_plan_prepare(plan)\n"
+            "prewarm = api.prewarm_matrix_free_kernels(cases=(('jrb', 'dense', 'apply'), ('jrb', 'dense', 'solve'), ('jrb', 'dense', 'logdet')), backend=JAX_MODE if JAX_MODE in ('cpu', 'gpu') else 'auto', dense_problem_size=int(a_mid.shape[0]), steps=4, probe_count=int(probes.shape[0]))\n"
             "solve_once = lambda rhs: jrb_mat.jrb_mat_solve_action_point_jit(plan, rhs, symmetric=True)\n"
+            "logdet_solve_once = lambda rhs, probe_batch: jrb_mat.jrb_mat_logdet_solve_point_jit(plan, rhs, probe_batch, steps=4, symmetric=True)\n"
             "multi_shift_once = lambda rhs: jrb_mat.jrb_mat_multi_shift_solve_point_jit(plan, rhs, jnp.asarray([0.0, 0.5], dtype=jnp.float64), symmetric=True, preconditioner=precond)\n"
             "matrix_free_service = {\n"
+            "    'prewarm': prewarm,\n"
             "    'operator_plan': jrb_mat.jrb_mat_operator_plan_apply(plan, x),\n"
+            "    'transpose_operator_plan': jrb_mat.jrb_mat_operator_plan_apply(rplan, x),\n"
             "    'sparse_operator_plan': jrb_mat.jrb_mat_operator_plan_apply(sparse_plan, x),\n"
             "    'solve_once': solve_once(x),\n"
+            "    'logdet_solve_once': logdet_solve_once(x, probes),\n"
             "    'multi_shift_once': multi_shift_once(x),\n"
             "}\n"
             "display(matrix_free_service)",
@@ -1123,7 +1152,7 @@ def _matrix_free_operator_surface_notebook() -> list:
         nbf.v4.new_code_cell(
             "completed = run([\n"
             "    PYTHON, 'benchmarks/benchmark_matrix_free_krylov.py',\n"
-            "    '--n-real', '6', '--n-complex', '4', '--steps-real', '3', '--steps-complex', '3', '--warmup', '0', '--runs', '1',\n"
+            "    '--n-real', '6', '--n-complex', '4', '--steps-real', '3', '--steps-complex', '3', '--warmup', '0', '--runs', '1', '--startup-prewarm',\n"
             "    '--sections', 'real',\n"
             "], capture=True)\n"
             "print(completed.stdout)\n"
@@ -1132,7 +1161,7 @@ def _matrix_free_operator_surface_notebook() -> list:
             "    if ': ' not in line:\n"
             "        continue\n"
             "    key, value = line.split(': ', 1)\n"
-            "    if key in {'warmup', 'runs', 'plan_precompile', 'sections'} or key.startswith('[matrix_free_krylov]'):\n"
+            "    if key in {'warmup', 'runs', 'plan_precompile', 'startup_prewarm', 'sections'} or key.startswith('[matrix_free_krylov]'):\n"
             "        continue\n"
             "    try:\n"
             "        rows.append({'metric': key, 'seconds': float(value)})\n"
@@ -1144,17 +1173,37 @@ def _matrix_free_operator_surface_notebook() -> list:
         ),
         nbf.v4.new_markdown_cell(
             "## Comparison / Contrast\n\n"
-            "Compare dense-operator, sparse-operator, and solve/logdet-facing matrix-free usage so callers can decide when to stay dense, when to adapt sparse structure, and when to move fully into operator-free execution."
+            "Compare dense-operator, sparse-operator, and solve/logdet-facing matrix-free usage so callers can decide when to stay dense, when to adapt sparse structure, and when to move fully into operator-free execution. "
+            "For repeated GPU-oriented workflows, prefer fused or bundle surfaces such as `*_logdet_solve_point_jit(...)` over separate solve and logdet calls when the workflow really needs both results."
         ),
         nbf.v4.new_code_cell(
             "compare_df = bench_df[bench_df['metric'].str.contains('solve|matvec|logdet', regex=True, na=False)].copy()\n"
+            "if not compare_df.empty:\n"
+            "    compare_df['category'] = np.where(compare_df['metric'].str.contains('logdet_solve'), 'bundle', np.where(compare_df['metric'].str.contains('logdet'), 'logdet_only', 'solve_or_apply'))\n"
             "display(compare_df.head(20))"
         ),
         nbf.v4.new_markdown_cell(
             "## Diagnostics\n\n"
-            "Matrix-free diagnostics are part of the production surface, so keep a compact summary of compile and execution metrics."
+            "Matrix-free diagnostics are part of the production surface, but should stay off the hot path. Keep compact solver and estimator summaries separate from the repeated `jit` path."
         ),
         nbf.v4.new_code_cell(
+            "solve_value, solve_diag = jrb_mat.jrb_mat_solve_action_with_diagnostics_point(plan, x, symmetric=True)\n"
+            "logdet_value, logdet_diag = jrb_mat.jrb_mat_logdet_slq_with_diagnostics_point(plan, probes, 4)\n"
+            "diag_summary = pd.DataFrame([\n"
+            "    {\n"
+            "        'surface': 'solve',\n"
+            "        'steps': int(solve_diag.steps),\n"
+            "        'converged': bool(solve_diag.converged),\n"
+            "        'metric': float(solve_diag.convergence_metric),\n"
+            "    },\n"
+            "    {\n"
+            "        'surface': 'logdet_slq',\n"
+            "        'steps': int(logdet_diag.steps),\n"
+            "        'converged': bool(logdet_diag.converged),\n"
+            "        'metric': float(logdet_diag.convergence_metric),\n"
+            "    },\n"
+            "])\n"
+            "display(diag_summary)\n"
             "diag_rows = bench_df[bench_df['metric'].str.contains('compile|execute|cold|warm', regex=True, na=False)].head(20)\n"
             "diag_rows.to_csv(EXAMPLE_OUTPUT_ROOT / f'matrix_free_diagnostics_{JAX_MODE}.csv', index=False)\n"
             "display(diag_rows)"
@@ -1632,10 +1681,17 @@ def _barnes_double_gamma_surface_notebook() -> list:
             "Barnes and double-gamma usage should keep the chosen implementation, precision, and diagnostics policy explicit. "
             "These are not hot scalar helpers; production code should avoid switching precision knobs per call unless that is a deliberate fallback path.",
             "from arbplusjax import stable_kernels\n"
+            "z_batch = jnp.asarray([1.1 + 0.05j, 1.35 + 0.08j, 1.6 + 0.1j], dtype=jnp.complex128)\n"
+            "tau_batch = jnp.asarray([0.8, 0.9, 1.0], dtype=jnp.float64)\n"
+            "ifj_bound = api.bind_point_batch_jit_with_diagnostics('ifj_barnesdoublegamma', shape_bucket_multiple=8, dps=60, max_m_cap=128, backend='auto', min_gpu_batch_size=16)\n"
+            "ifj_vals, ifj_diag = ifj_bound(z_batch, tau_batch)\n"
             "barnes_service = {\n"
             "    'legacy_fixed_prec': double_gamma.bdg_barnesdoublegamma(z, tau, prec_bits=80),\n"
             "    'provider_fixed_dps': stable_kernels.provider_barnesdoublegamma(z, tau, dps=60),\n"
             "    'provider_log_fixed_dps': stable_kernels.provider_log_barnesdoublegamma(z, tau, dps=60),\n"
+            "    'ifj_bound': ifj_vals,\n"
+            "    'ifj_diag_backend': ifj_diag.chosen_backend,\n"
+            "    'ifj_diag_pad_to': ifj_diag.effective_pad_to,\n"
             "}\n"
             "display(barnes_service)",
             "To extend Barnes/double-gamma benchmarks, add new printed metrics in `benchmark_barnes_double_gamma.py` or `benchmark_special_function_service_api.py` and keep provider-batch routing explicit for repeated-call usage."
@@ -1696,11 +1752,13 @@ def _barnes_double_gamma_surface_notebook() -> list:
         ),
         nbf.v4.new_markdown_cell(
             "## Benchmark Summary\n\n"
-            "Run the Barnes/double-gamma benchmark and parse the key-value output."
+            "Run the Barnes/double-gamma benchmark and the repeated-call special-function service benchmark."
         ),
         nbf.v4.new_code_cell(
             "completed = run([PYTHON, 'benchmarks/benchmark_barnes_double_gamma.py'], capture=True)\n"
+            "service_completed = run([PYTHON, 'benchmarks/benchmark_special_function_service_api.py', '--samples', '257', '--iterations', '2'], capture=True)\n"
             "print(completed.stdout)\n"
+            "print(service_completed.stdout)\n"
             "rows = []\n"
             "for line in completed.stdout.splitlines():\n"
             "    if ': ' not in line:\n"
@@ -1712,7 +1770,9 @@ def _barnes_double_gamma_surface_notebook() -> list:
             "        rows.append({'metric': key, 'value': value})\n"
             "bench_df = pd.DataFrame(rows)\n"
             "bench_df.to_csv(EXAMPLE_OUTPUT_ROOT / f'barnes_double_gamma_summary_{JAX_MODE}.csv', index=False)\n"
-            "display(bench_df)"
+            "service_tail = service_completed.stdout.splitlines()[-12:]\n"
+            "display(bench_df)\n"
+            "display(pd.DataFrame({'service_tail': service_tail}))"
         ),
         nbf.v4.new_markdown_cell(
             "## Optional Diagnostics\n\n"

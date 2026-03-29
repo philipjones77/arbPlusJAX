@@ -130,6 +130,9 @@ Allowed stable repo-root governance/communication files include:
 - `README.md`
 - `LICENSE`
 - `NOTICE`
+- `SECURITY.md`
+- `CHANGELOG.md`
+- `SUPPORT.md`
 - `AGENTS.md` when present
 
 Allowed stable repo-root structural directories include:

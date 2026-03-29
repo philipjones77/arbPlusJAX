@@ -1,4 +1,4 @@
-Last updated: 2026-03-27T00:00:00Z
+Last updated: 2026-03-29T00:00:00Z
 
 # Tools
 
@@ -12,18 +12,16 @@ Use this directory for:
 - packaging helpers
 - correctness-oriented harness entrypoints
 
-Do not use `tools/` for benchmark implementations or benchmark-specific launch
-scripts. Those belong under `benchmarks/`.
+Do not use `tools/` for benchmark implementations or benchmark-specific launch scripts. Those belong under `benchmarks/`.
 
-## Main Entry Points
-
+## Canonical Entry Points
 - runtime check:
   - `python tools/check_jax_runtime.py --quick-bench`
 - test harness:
   - `python tools/run_test_harness.py --profile chassis --jax-mode cpu`
 - validation wrapper:
   - `python tools/run_validation.py --jax-mode cpu`
-- regenerate reports:
+- refresh generated reports/docs:
   - `python tools/check_generated_reports.py`
 - refresh repo-maintained artifacts:
   - `python tools/update_repo_artifacts.py`
@@ -31,184 +29,127 @@ scripts. Those belong under `benchmarks/`.
   - `python tools/check_repo_update_drift.py`
 - regenerate docs indexes:
   - `python tools/generate_docs_indexes.py`
-- regenerate API cold-path inventory:
-  - `python tools/api_cold_path_report.py`
-- regenerate API first-use inventory:
-  - `python tools/api_first_use_report.py`
-- regenerate entry-script startup inventory:
-  - `python tools/entry_script_startup_report.py`
-- regenerate matrix-free first-use inventory:
-  - `python tools/matrix_free_first_use_report.py`
-- regenerate point/basic family status inventory:
-  - `python tools/point_basic_surface_report.py`
-- regenerate point/basic per-function verification inventory:
-  - `python tools/point_basic_function_verification_report.py`
-- regenerate point-only fast-JAX verification inventory:
-  - `python tools/point_fast_jax_verification_report.py`
-- regenerate parameterized public AD verification inventory:
-  - `python tools/parameterized_ad_verification_report.py`
-- regenerate repo standards verification map:
-  - `python tools/repo_standards_verification_report.py`
+- regenerate tools README:
+  - `python tools/generate_tools_readme.py`
 - regenerate example notebooks:
   - `python tools/generate_example_notebooks.py`
-- regenerate static public metadata registry:
-  - `python tools/generate_public_metadata_registry.py`
+- execute canonical example notebooks:
+  - `python tools/run_example_notebooks.py --jax-mode cpu --jax-dtype float64`
 - package source bundle:
-  - `python tools/MAKE_ZIP.py`
+  - `python tools/make_zip.py`
 
-## Script Map
+## Naming And Consolidation Rules
 
-### Repo maintenance and generation
+Canonical rules:
+- prefer lower-case, descriptive `verb_object.py` or `subject_report.py` names for new Python tools
+- prefer `generate_*` for generators, `check_*` for non-mutating freshness/validation checks, and `run_*` for harness-style execution tools
+- keep shell or PowerShell wrappers only when they add platform-specific value over the canonical Python entrypoint
+- avoid adding new compatibility wrappers when the canonical tool name can be referenced directly
+
+Current compatibility / consolidation notes:
+- `update_docs_indexes.py` has been removed; use `generate_docs_indexes.py` directly.
+- `MAKE_ZIP.py` has been removed; use `make_zip.py` directly.
+
+## Repo Maintenance And Generation
 
 - `check_generated_reports.py`
-  - Regenerates report-style docs and runs the provenance/report freshness test.
-  - Use after changing provenance, capability, or report-generation logic.
-
+  - Canonical umbrella refresh for generated docs/report surfaces and their freshness tests.
 - `update_repo_artifacts.py`
   - Canonical policy-level refresh entrypoint for repo-maintained generated artifacts.
-  - Use when you want the standard update flow instead of calling the lower-level generators directly.
-
 - `check_repo_update_drift.py`
-  - Runs non-mutating freshness checks for repo-maintained generated artifacts.
-  - Use in CI or locally when you need to confirm the checked-in update surface is current without rewriting files.
-
+  - Non-mutating freshness checks for repo-maintained generated artifacts.
+- `generate_docs_indexes.py`
+  - Canonical generator for repo-root and docs subtree indexes.
+- `generate_tools_readme.py`
+  - Canonical generator for `tools/README.md`.
 - `function_provenance_report.py`
-  - Writes the function provenance and implementation registry reports under `docs/reports/`.
-  - Use when public function inventory or provenance metadata changes.
+  - Generates provenance, implementation, and capability reports.
+- `api_surface_structure_report.py`
+  - Generates the consolidated public API surface structure report.
+- `production_readiness_report.py`
+  - Generates the production-readiness governance report.
+- `report_status_refresh_inventory.py`
+  - Generates the refresh map for `docs/reports/` and `docs/status/`.
+- `generate_public_metadata_registry.py`
+  - Regenerates the checked-in static public metadata registry.
+- `generate_example_notebooks.py`
+  - Regenerates managed example notebooks in `examples/`.
+
+## Report Generators
 
 - `api_cold_path_report.py`
-  - Writes the current package-import and `api`-import cold-path inventory under `docs/reports/`.
-  - Use after changing lazy-loading boundaries, `api` imports, or import-tier budgets.
-
+  - Generates the package-import and API cold-path inventory.
 - `api_first_use_report.py`
-  - Writes the representative first-use module inventory for core point, matrix point, and tail surfaces under `docs/reports/`.
-  - Use after changing point/tail lazy boundaries or first-use import budgets.
-
+  - Generates the representative first-use inventory for point/matrix/tail surfaces.
+- `cache_aware_surface_report.py`
+  - Generates the cache-aware surface inventory.
+- `comparison_backend_defaults_report.py`
+  - Generates the comparison-backend defaults report.
 - `entry_script_startup_report.py`
-  - Writes the benchmark/example entry-script startup inventory under `docs/reports/`.
-  - Use after changing benchmark/example import structure or when separating repo import debt from JAX/runtime startup cost.
-
-- `matrix_free_first_use_report.py`
-  - Writes the representative first-use module inventory for matrix-free operator construction, primitive apply, Krylov solve, and implicit-adjoint solve under `docs/reports/`.
-  - Use after changing matrix-free runtime boundaries or matrix-free import budgets.
-
-- `point_basic_surface_report.py`
-  - Writes the joined public point/basic family status report under `docs/reports/`.
-  - Use after changing public metadata, point/basic ownership, canonical tests, benchmarks, or notebooks for the seven public function families and the curvature helper layer.
-
-- `point_basic_function_verification_report.py`
-  - Writes the per-function point/basic verification ledger under `docs/reports/`.
-  - Use after changing public metadata, direct target coverage, or the mapped benchmark/notebook evidence for point/basic families.
-
-- `point_fast_jax_verification_report.py`
-  - Writes the point-only fast-JAX verification report under `docs/reports/`.
-  - Use after changing point batch fastpaths, category-owned point-fast tests, or the canonical point-fast benchmark/notebook evidence.
-
-- `parameterized_ad_verification_report.py`
-  - Writes the audited parameterized public AD verification ledger under `docs/reports/`.
-  - Use after changing two-direction AD coverage on public parameterized point/helper surfaces, especially for special-function families, matrix/operator helpers, or curvature helper controls.
-
-- `repo_standards_verification_report.py`
-  - Writes the repo-level standards verification map under `docs/reports/`.
-  - Use after changing the owning runtime/cache/startup/release standards, their generated inventories, or the tests that enforce them.
-
+  - Generates the entry-script startup inventory.
 - `hypgeom_status_report.py`
-  - Writes the hypergeometric status report under `docs/reports/`.
-  - Use when hypgeom mode/kernel status changes.
-
+  - Generates the hypergeometric status report.
+- `matrix_free_first_use_report.py`
+  - Generates the matrix-free first-use inventory.
+- `parameterized_ad_verification_report.py`
+  - Generates the parameterized public AD verification ledger.
+- `point_basic_surface_report.py`
+  - Generates the joined public point/basic family status report.
+- `point_basic_function_verification_report.py`
+  - Generates the per-function point/basic verification ledger.
+- `point_fast_jax_category_report.py`
+  - Generates the point-fast JAX category matrix.
+- `point_fast_jax_function_report.py`
+  - Generates the point-fast JAX function inventory.
+- `point_fast_jax_verification_report.py`
+  - Generates the point-fast JAX verification report.
+- `repo_standards_verification_report.py`
+  - Generates the repo standards verification map.
 - `special_function_status_report.py`
-  - Writes the cross-family special-function status report under `docs/reports/`.
-  - Use when special-function benchmarks, startup probes, canonical notebooks, or owner tests change.
+  - Generates the cross-family special-function status report.
+- `slq_logdet_contract_report.py`
+  - Generates a JSON contract report for matrix-free SLQ logdet behavior.
 
-- `core_status_report.py`
-  - Generates the canonical core-function implementation status report.
-
-- `point_status_report.py`
-  - Generates point-wrapper availability status for core functions.
-
-- `custom_core_report.py`
-  - Generates the curated custom-core status report layered on top of the core/point status data.
-
-- `generate_docs_indexes.py`
-  - Regenerates the repo-root `README.md`, docs landing pages, and generated section indexes including the implementation subtree indexes.
-  - Use after adding/removing docs, reports, status files, or indexed implementation notes.
-
-- `update_docs_indexes.py`
-  - Legacy compatibility wrapper around `generate_docs_indexes.py`.
-  - Prefer the canonical generator directly in new docs and scripts.
-
-- `generate_example_notebooks.py`
-  - Regenerates the managed example notebooks in `examples/`.
-  - Use after changing notebook standards, benchmark-profile wiring, or default example content.
-
-- `generate_public_metadata_registry.py`
-  - Regenerates the checked-in static public metadata registry used by runtime metadata lookup.
-  - Use after changing public metadata shape, public API inventory, or metadata inference logic.
-
-- `run_example_notebooks.py`
-  - Executes the canonical example notebooks and retains executed notebooks plus runtime/summary artifacts under the owning `examples/outputs/` folders.
-  - Use for CPU/GPU notebook validation runs without opening Jupyter manually.
-
-- `audit_coverage.py`
-  - Audits implementation/test coverage against external/reference surfaces.
-  - Use for coverage gap analysis rather than normal runtime execution.
-
-### Runtime, environment, and portability helpers
+## Runtime, Environment, And Portability Helpers
 
 - `check_jax_runtime.py`
   - Prints runtime/device information and can run a small JIT benchmark.
-  - Use to confirm CPU/GPU backend selection, `x64`, and environment settings.
-
-- `runtime_manifest.py`
-  - Shared runtime manifest collection/writing utilities used by harnesses and benchmark/report flows.
-  - This is a support module, not usually run directly.
-
 - `python_resolver.py`
   - Resolves the preferred Python interpreter and JAX platform environment.
-  - On Linux, the default interpreter policy is the shared `jax` environment unless a caller explicitly overrides it.
-  - This is a support module for harness scripts.
-
+- `runtime_manifest.py`
+  - Shared runtime manifest collection/writing utilities for harnesses and reports.
 - `source_tree_bootstrap.py`
   - Adds repo root and `src/` to `sys.path` from a script anchor path.
-  - Use from repo utilities that need source-tree execution.
-
 - `colab_bootstrap.sh`
-  - Bootstraps a Colab environment for this repo from [requirements-colab.txt](/requirements-colab.txt), with optional GPU and comparison-software toggles.
-  - Intended to be run inside Colab after cloning the repo.
-
+  - Bootstraps a Colab environment from the repo's Colab requirements.
 - `setup_linux_gpu.sh`
-  - Local Linux setup/bootstrap helper for editable installs and optional GPU JAX setup.
-  - Use on Linux workstations or WSL-style environments where that bootstrap model fits.
+  - Local Linux/WSL bootstrap helper for editable installs and optional GPU JAX setup.
 
-### Test and validation harnesses
+## Validation, Execution, And Notebook Harnesses
 
 - `run_test_harness.py`
-  - Canonical correctness-oriented pytest harness with named profiles and runtime manifest output.
-  - Use for portable test runs across local Linux, WSL, and Colab.
-
+  - Canonical correctness-oriented pytest harness with named profiles.
 - `run_validation.py`
-  - Live-status wrapper that runs tests and optional benchmark smoke/profile work with progress output.
-  - Use when you want one higher-level command rather than calling pytest and benchmark runners separately.
-
+  - Higher-level validation wrapper around tests and benchmark smoke/profile work.
 - `run_validation.sh`
   - Shell wrapper for `run_validation.py`.
-
 - `run_validation.ps1`
   - PowerShell wrapper for `run_validation.py`.
-
+- `run_example_notebooks.py`
+  - Executes canonical example notebooks and retains runtime/summary artifacts.
 - `run_notebook_sweeps.py`
   - Runs larger example/notebook-oriented sweep jobs from the command line.
-  - Use when notebook-style sweeps need orchestration without opening the notebooks themselves.
+- `audit_coverage.py`
+  - Audits implementation/test coverage against reference surfaces.
 
-### Packaging and contract helpers
+## Legacy Or Specialized Helpers
 
-- `MAKE_ZIP.py`
-  - Creates a constrained source bundle for the repo with naming validation.
-  - Use when producing a clean source archive for transfer or release packaging.
-
-- `slq_logdet_contract_report.py`
-  - Writes a JSON report for matrix-free `SLQ logdet` contract-style checks.
-  - Use when validating or documenting the current `SLQ logdet` contract behavior.
+- `core_status_report.py`
+  - Legacy core-function status generator; retained while downstream tests/report flows still depend on it.
+- `point_status_report.py`
+  - Legacy point-wrapper availability status generator; retained while dependent status tools still use it.
+- `custom_core_report.py`
+  - Curated custom-core status report layered on top of legacy core/point status helpers.
 
 ## Ownership Boundary
 
@@ -217,5 +158,8 @@ scripts. Those belong under `benchmarks/`.
 - `tests/` owns pytest conformance/regression coverage.
 - `examples/` owns runnable demonstration notebooks and scripts.
 
-If a script primarily exists to benchmark, compare software, or emit benchmark
-artifacts, it should live in `benchmarks/`, not here.
+Related standards and governance:
+- [docs/standards/repo_standards.md](/docs/standards/repo_standards.md)
+- [docs/standards/implementation_docs_standard.md](/docs/standards/implementation_docs_standard.md)
+- [docs/standards/production_readiness_standard.md](/docs/standards/production_readiness_standard.md)
+- [docs/objects/update_artifacts.md](/docs/objects/update_artifacts.md)

@@ -45,7 +45,7 @@ Companion documents:
 
 4. Lazy loading must be centralized.
    Do not create new ad hoc lazy-loader implementations in each module when
-   [lazy_imports.py](/home/phili/projects/arbplusJAX/src/arbplusjax/lazy_imports.py)
+   [lazy_imports.py](/src/arbplusjax/lazy_imports.py)
    can express the same boundary.
 
 5. Provider and fallback modules must load only when selected.
@@ -119,14 +119,14 @@ registration in a startup-sensitive module.
 
 Primary runtime helper:
 
-- [lazy_imports.py](/home/phili/projects/arbplusJAX/src/arbplusjax/lazy_imports.py)
+- [lazy_imports.py](/src/arbplusjax/lazy_imports.py)
 
 Representative tests:
 
-- [test_lazy_import_policy.py](/home/phili/projects/arbplusJAX/tests/test_lazy_import_policy.py)
-- [test_startup_compile_policy.py](/home/phili/projects/arbplusJAX/tests/test_startup_compile_policy.py)
-- [test_api_startup_lazy_loading.py](/home/phili/projects/arbplusJAX/tests/test_api_startup_lazy_loading.py)
-- [test_family_import_boundaries.py](/home/phili/projects/arbplusJAX/tests/test_family_import_boundaries.py)
+- [test_lazy_import_policy.py](/tests/test_lazy_import_policy.py)
+- [test_startup_compile_policy.py](/tests/test_startup_compile_policy.py)
+- [test_api_startup_lazy_loading.py](/tests/test_api_startup_lazy_loading.py)
+- [test_family_import_boundaries.py](/tests/test_family_import_boundaries.py)
 
 ## Consolidation Note
 

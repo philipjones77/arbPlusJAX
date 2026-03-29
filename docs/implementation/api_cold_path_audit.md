@@ -4,7 +4,7 @@ Last updated: 2026-03-26T00:00:00Z
 
 ## Scope
 This audit classifies the imports reachable from
-[`src/arbplusjax/api.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/api.py)
+[`src/arbplusjax/api.py`](/src/arbplusjax/api.py)
 into four buckets:
 
 - required on cold start
@@ -24,15 +24,15 @@ and clean subprocess imports of the major direct `api.py` dependencies.
 
 `api.py` directly imports:
 
-- [`acb_core`](/home/phili/projects/arbplusJAX/src/arbplusjax/acb_core.py)
-- [`double_interval`](/home/phili/projects/arbplusJAX/src/arbplusjax/double_interval.py)
-- [`kernel_helpers`](/home/phili/projects/arbplusJAX/src/arbplusjax/kernel_helpers.py)
-- [`point_wrappers`](/home/phili/projects/arbplusJAX/src/arbplusjax/point_wrappers.py)
-- [`public_metadata`](/home/phili/projects/arbplusJAX/src/arbplusjax/public_metadata.py)
-- [`special.tail_acceleration`](/home/phili/projects/arbplusJAX/src/arbplusjax/special/tail_acceleration/__init__.py)
-- [`special.bessel`](/home/phili/projects/arbplusJAX/src/arbplusjax/special/bessel/__init__.py)
-- [`special.gamma`](/home/phili/projects/arbplusJAX/src/arbplusjax/special/gamma/__init__.py)
-- [`special.laplace_bessel`](/home/phili/projects/arbplusJAX/src/arbplusjax/special/laplace_bessel/__init__.py)
+- [`acb_core`](/src/arbplusjax/acb_core.py)
+- [`double_interval`](/src/arbplusjax/double_interval.py)
+- [`kernel_helpers`](/src/arbplusjax/kernel_helpers.py)
+- [`point_wrappers`](/src/arbplusjax/point_wrappers.py)
+- [`public_metadata`](/src/arbplusjax/public_metadata.py)
+- [`special.tail_acceleration`](/src/arbplusjax/special/tail_acceleration/__init__.py)
+- [`special.bessel`](/src/arbplusjax/special/bessel/__init__.py)
+- [`special.gamma`](/src/arbplusjax/special/gamma/__init__.py)
+- [`special.laplace_bessel`](/src/arbplusjax/special/laplace_bessel/__init__.py)
 
 ## Observed cold-start import set
 
@@ -81,22 +81,22 @@ Observed during `from arbplusjax import api`:
 
 These are legitimate cold-start dependencies for the current `api.py` design.
 
-- [`acb_core.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/acb_core.py)
-- [`double_interval.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/double_interval.py)
-- [`kernel_helpers.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/kernel_helpers.py)
-- [`checks.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/checks.py)
-- [`arb_core.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/arb_core.py)
-- [`elementary.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/elementary.py)
-- [`lazy_jit.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/lazy_jit.py)
-- [`precision.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/precision.py)
-- [`jax_precision.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/jax_precision.py)
+- [`acb_core.py`](/src/arbplusjax/acb_core.py)
+- [`double_interval.py`](/src/arbplusjax/double_interval.py)
+- [`kernel_helpers.py`](/src/arbplusjax/kernel_helpers.py)
+- [`checks.py`](/src/arbplusjax/checks.py)
+- [`arb_core.py`](/src/arbplusjax/arb_core.py)
+- [`elementary.py`](/src/arbplusjax/elementary.py)
+- [`lazy_jit.py`](/src/arbplusjax/lazy_jit.py)
+- [`precision.py`](/src/arbplusjax/precision.py)
+- [`jax_precision.py`](/src/arbplusjax/jax_precision.py)
 
 These are also currently cold-start imports because `api.py` exposes their public functions directly:
 
-- [`special/bessel/__init__.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/special/bessel/__init__.py)
-- [`special/gamma/__init__.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/special/gamma/__init__.py)
-- [`special/laplace_bessel/__init__.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/special/laplace_bessel/__init__.py)
-- [`special/tail_acceleration/__init__.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/special/tail_acceleration/__init__.py)
+- [`special/bessel/__init__.py`](/src/arbplusjax/special/bessel/__init__.py)
+- [`special/gamma/__init__.py`](/src/arbplusjax/special/gamma/__init__.py)
+- [`special/laplace_bessel/__init__.py`](/src/arbplusjax/special/laplace_bessel/__init__.py)
+- [`special/tail_acceleration/__init__.py`](/src/arbplusjax/special/tail_acceleration/__init__.py)
 
 These may still deserve later lazy-boundary work, but under the current API contract they are part of the cold path.
 
@@ -104,27 +104,27 @@ These may still deserve later lazy-boundary work, but under the current API cont
 
 These modules are semantically point-only or point-heavy. They should not all be on the cold path just to import `api`.
 
-- [`point_wrappers.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/point_wrappers.py)
-- [`hypgeom.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/hypgeom.py)
-- [`double_gamma.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/double_gamma.py)
-- [`acb_dirichlet.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/acb_dirichlet.py)
-- [`acb_elliptic.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/acb_elliptic.py)
-- [`acb_modular.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/acb_modular.py)
-- [`barnesg.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/barnesg.py)
-- [`bessel_kernels.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/bessel_kernels.py)
-- [`coeffs.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/coeffs.py)
-- [`core_wrappers.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/core_wrappers.py)
-- [`mat_common.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/mat_common.py)
-- [`sampling_helpers.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/sampling_helpers.py)
-- [`series_missing_impl.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/series_missing_impl.py)
-- [`series_utils.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/series_utils.py)
-- [`wrappers_common.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/wrappers_common.py)
-- [`special/gamma/barnes_double_gamma_ifj.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/special/gamma/barnes_double_gamma_ifj.py)
+- [`point_wrappers.py`](/src/arbplusjax/point_wrappers.py)
+- [`hypgeom.py`](/src/arbplusjax/hypgeom.py)
+- [`double_gamma.py`](/src/arbplusjax/double_gamma.py)
+- [`acb_dirichlet.py`](/src/arbplusjax/acb_dirichlet.py)
+- [`acb_elliptic.py`](/src/arbplusjax/acb_elliptic.py)
+- [`acb_modular.py`](/src/arbplusjax/acb_modular.py)
+- [`barnesg.py`](/src/arbplusjax/barnesg.py)
+- [`bessel_kernels.py`](/src/arbplusjax/bessel_kernels.py)
+- [`coeffs.py`](/src/arbplusjax/coeffs.py)
+- [`core_wrappers.py`](/src/arbplusjax/core_wrappers.py)
+- [`mat_common.py`](/src/arbplusjax/mat_common.py)
+- [`sampling_helpers.py`](/src/arbplusjax/sampling_helpers.py)
+- [`series_missing_impl.py`](/src/arbplusjax/series_missing_impl.py)
+- [`series_utils.py`](/src/arbplusjax/series_utils.py)
+- [`wrappers_common.py`](/src/arbplusjax/wrappers_common.py)
+- [`special/gamma/barnes_double_gamma_ifj.py`](/src/arbplusjax/special/gamma/barnes_double_gamma_ifj.py)
 
 Observed current leak:
 
-- importing [`point_wrappers.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/point_wrappers.py) alone imports `hypgeom`, `double_gamma`, `acb_dirichlet`, `acb_elliptic`, `acb_modular`, and the IFJ Barnes path.
-- importing [`special/laplace_bessel/__init__.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/special/laplace_bessel/__init__.py) also reaches `point_wrappers`, which reaches `hypgeom`.
+- importing [`point_wrappers.py`](/src/arbplusjax/point_wrappers.py) alone imports `hypgeom`, `double_gamma`, `acb_dirichlet`, `acb_elliptic`, `acb_modular`, and the IFJ Barnes path.
+- importing [`special/laplace_bessel/__init__.py`](/src/arbplusjax/special/laplace_bessel/__init__.py) also reaches `point_wrappers`, which reaches `hypgeom`.
 
 This is the main remaining cold-path violation.
 
@@ -132,20 +132,20 @@ This is the main remaining cold-path violation.
 
 These families are currently staying off the `api` cold path and are already behind lazy resolution in `api.py`.
 
-- [`baseline_wrappers.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/baseline_wrappers.py)
-- [`hypgeom_wrappers.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/hypgeom_wrappers.py)
-- [`boost_hypgeom.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/boost_hypgeom.py)
-- [`arb_calc.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/arb_calc.py)
-- [`acb_calc.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/acb_calc.py)
-- [`arb_mat.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/arb_mat.py)
-- [`acb_mat.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/acb_mat.py)
-- [`mat_wrappers.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/mat_wrappers.py)
-- [`srb_mat.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/srb_mat.py)
-- [`srb_block_mat.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/srb_block_mat.py)
-- [`srb_vblock_mat.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/srb_vblock_mat.py)
-- [`scb_mat.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/scb_mat.py)
-- [`scb_block_mat.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/scb_block_mat.py)
-- [`scb_vblock_mat.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/scb_vblock_mat.py)
+- [`baseline_wrappers.py`](/src/arbplusjax/baseline_wrappers.py)
+- [`hypgeom_wrappers.py`](/src/arbplusjax/hypgeom_wrappers.py)
+- [`boost_hypgeom.py`](/src/arbplusjax/boost_hypgeom.py)
+- [`arb_calc.py`](/src/arbplusjax/arb_calc.py)
+- [`acb_calc.py`](/src/arbplusjax/acb_calc.py)
+- [`arb_mat.py`](/src/arbplusjax/arb_mat.py)
+- [`acb_mat.py`](/src/arbplusjax/acb_mat.py)
+- [`mat_wrappers.py`](/src/arbplusjax/mat_wrappers.py)
+- [`srb_mat.py`](/src/arbplusjax/srb_mat.py)
+- [`srb_block_mat.py`](/src/arbplusjax/srb_block_mat.py)
+- [`srb_vblock_mat.py`](/src/arbplusjax/srb_vblock_mat.py)
+- [`scb_mat.py`](/src/arbplusjax/scb_mat.py)
+- [`scb_block_mat.py`](/src/arbplusjax/scb_block_mat.py)
+- [`scb_vblock_mat.py`](/src/arbplusjax/scb_vblock_mat.py)
 
 Verification snapshot from a clean `api` import:
 
@@ -167,7 +167,7 @@ There are no benchmark modules imported during `api` cold start.
 
 However, one docs/introspection-oriented dependency is still on the cold path:
 
-- [`public_metadata.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/public_metadata.py)
+- [`public_metadata.py`](/src/arbplusjax/public_metadata.py)
 
 This is not benchmark code, but it is metadata/rendering support rather than numeric runtime support. It belongs in a future “docs/introspection-only” split so that metadata reporting does not widen runtime startup.
 
@@ -175,7 +175,7 @@ This is not benchmark code, but it is metadata/rendering support rather than num
 
 ### 1. `point_wrappers` is still a mixed surface
 
-`api.py` imports [`point_wrappers.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/point_wrappers.py) directly, and that single import still pulls in:
+`api.py` imports [`point_wrappers.py`](/src/arbplusjax/point_wrappers.py) directly, and that single import still pulls in:
 
 - hypergeom point kernels
 - Barnes/double-gamma point kernels
@@ -193,12 +193,12 @@ The current evidence does not point to `hypgeom_wrappers` or `boost_hypgeom` any
 
 The remaining `arbplusjax.hypgeom` import is reaching cold start through:
 
-- [`point_wrappers.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/point_wrappers.py)
-- and secondarily through [`special/laplace_bessel/__init__.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/special/laplace_bessel/__init__.py), which imports point wrappers
+- [`point_wrappers.py`](/src/arbplusjax/point_wrappers.py)
+- and secondarily through [`special/laplace_bessel/__init__.py`](/src/arbplusjax/special/laplace_bessel/__init__.py), which imports point wrappers
 
 ### 3. `double_gamma` is also still on the cold path
 
-Even after lazy registration in `api.py`, [`double_gamma.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/double_gamma.py) still arrives through the current point-wrapper graph.
+Even after lazy registration in `api.py`, [`double_gamma.py`](/src/arbplusjax/double_gamma.py) still arrives through the current point-wrapper graph.
 
 This should be treated as the same architectural problem as hypergeom: the point surface still mixes too many specialized families into one import boundary.
 
@@ -216,17 +216,17 @@ That means the next tranche should focus on point-surface decomposition, not int
 
 ## Recommended Next Tranche
 
-1. Split [`point_wrappers.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/point_wrappers.py) into:
+1. Split [`point_wrappers.py`](/src/arbplusjax/point_wrappers.py) into:
    - core point wrappers
    - hypergeom point wrappers
    - double-gamma/Barnes point wrappers
    - modular/dirichlet/elliptic point wrappers
 
-2. Change [`api.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/api.py) so the cold path imports only the core point wrapper subset.
+2. Change [`api.py`](/src/arbplusjax/api.py) so the cold path imports only the core point wrapper subset.
 
 3. Keep family-specific point registries behind lazy module descriptors, the same way interval/mode registries are already handled.
 
-4. Move [`public_metadata.py`](/home/phili/projects/arbplusJAX/src/arbplusjax/public_metadata.py) toward a docs/introspection boundary so metadata rendering is not part of the default numeric startup path.
+4. Move [`public_metadata.py`](/src/arbplusjax/public_metadata.py) toward a docs/introspection boundary so metadata rendering is not part of the default numeric startup path.
 
 5. Add a follow-up import-boundary probe specifically for:
    - `api import -> point_wrappers core only`

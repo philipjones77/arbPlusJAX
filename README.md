@@ -27,6 +27,7 @@ Tests, benchmarks, and notebooks are expected to run against the source tree in 
 
 ## Documentation Entry Points
 
+- docs root: [docs/README.md](/docs/README.md)
 - project overview: [docs/project_overview.md](/docs/project_overview.md)
 - standards: [docs/standards/README.md](/docs/standards/README.md)
 - reports: [docs/reports/README.md](/docs/reports/README.md)

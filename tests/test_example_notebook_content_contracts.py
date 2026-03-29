@@ -47,7 +47,7 @@ def test_canonical_notebooks_show_production_controls_or_caching() -> None:
         "example_api_surface.ipynb": ("bind_point_batch", "bind_interval_batch", "bind_interval_batch_jit_with_diagnostics", "choose_interval_batch_policy", "cached_plan"),
         "example_dense_matrix_surface.ipynb": ("cached_matvec", "cached_rmatvec", "operator_plan"),
         "example_sparse_matrix_surface.ipynb": ("cached_prepare", "cached_apply", "pad_to"),
-        "example_matrix_free_operator_surface.ipynb": ("plan_prepare", "preconditioner"),
+        "example_matrix_free_operator_surface.ipynb": ("plan_prepare", "preconditioner", "rapply", "with_diagnostics", "choose_matrix_free_plan_policy", "prewarm_matrix_free_kernels", "logdet_solve_point_jit"),
         "example_fft_nufft_surface.ipynb": ("cached_prepare", "cached_apply"),
         "example_dirichlet_surface.ipynb": ("bind_point_batch_jit", "n_terms", "prec_bits"),
         "example_gamma_family_surface.ipynb": ("bind_point_batch", "bind_interval_batch", "bind_interval_batch_with_diagnostics"),

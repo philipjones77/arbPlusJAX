@@ -5,4 +5,4 @@
 
 ## Notebooks
 
-- `example_core_scalar_surface.ipynb`: elapsed_s=116.959528, executed=examples/outputs/example_core_scalar_surface/example_core_scalar_surface_cpu_executed.ipynb, output_root=examples/outputs/example_core_scalar_surface
+- `example_matrix_free_operator_surface.ipynb`: elapsed_s=122.794802, executed=examples/outputs/example_matrix_free_operator_surface/example_matrix_free_operator_surface_cpu_executed.ipynb, output_root=examples/outputs/example_matrix_free_operator_surface

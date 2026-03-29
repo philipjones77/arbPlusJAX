@@ -137,6 +137,63 @@ They should show:
 The notebook should teach the API a user is supposed to copy, not a hidden
 implementation shortcut.
 
+### 7. Matrix-family notebooks must teach kind, structure, and route
+
+For matrix families, notebooks and practical docs must make three things
+explicit:
+
+- matrix kind:
+  - dense
+  - sparse
+  - block-sparse / vblock
+  - matrix-free / operator
+- structure subtype where relevant:
+  - symmetric / Hermitian
+  - SPD / HPD
+  - triangular / similar
+- execution route:
+  - direct one-off call
+  - cached / prepared repeated-call path
+  - compiled batch binder where relevant
+  - diagnostics-bearing route where relevant
+
+Users should be able to see, from the notebook, which route is the efficient
+one for repeated work.
+
+### 8. Efficient repeated-call route must be the taught default
+
+When a matrix family has both a direct API and a clearly better repeated-call
+route, the repeated-call route must be shown as the default production pattern.
+
+Examples:
+
+- dense:
+  cached `matvec` / `rmatvec`, prepared solve plans
+- sparse:
+  sparse-native cached apply and structure-specialized sparse plans
+- block-sparse:
+  block-aware cached apply
+- matrix-free:
+  prepared operator plans and cached transpose/adjoint routes
+
+The notebook may still show the direct call, but it should not leave users with
+the impression that the one-off call is the preferred high-throughput path.
+
+### 9. Matrix notebooks must contrast families honestly
+
+Canonical matrix notebooks should state what changes when moving between:
+
+- dense and sparse
+- sparse and block-sparse / vblock
+- explicit and matrix-free/operator
+
+That contrast should cover:
+
+- what object the caller constructs
+- which structure flags matter
+- which prepare/bind route is recommended
+- what CPU/GPU claim is actually supported today
+
 ## Relationship To Other Standards
 
 - [jax_api_runtime_standard.md](/docs/standards/jax_api_runtime_standard.md)
@@ -145,7 +202,7 @@ implementation shortcut.
   owns backend-realized performance policy
 - [example_notebook_standard.md](/docs/standards/example_notebook_standard.md)
   owns notebook structure and retained execution rules
-- [point_fast_jax_standard.md](/docs/standards/point_fast_jax_standard.md)
+- [fast_jax_standard.md](/docs/standards/fast_jax_standard.md)
   owns structural fast-JAX readiness, not practical API teaching
 
 ## Repo Mapping
@@ -158,3 +215,10 @@ In arbPlusJAX, this standard applies most directly to:
 - matrix, sparse, and matrix-free prepare/apply surfaces
 - the canonical `example_*.ipynb` notebooks
 - practical run guidance and retained benchmark artifacts
+
+For matrix-family surfaces specifically, it applies to:
+
+- `example_dense_matrix_surface.ipynb`
+- `example_sparse_matrix_surface.ipynb`
+- `example_matrix_free_operator_surface.ipynb`
+- the corresponding practical/status/benchmark docs for those families

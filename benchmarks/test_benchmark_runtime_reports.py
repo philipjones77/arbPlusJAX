@@ -230,6 +230,21 @@ def test_incomplete_bessel_benchmark_writes_shared_schema_report() -> None:
     assert payload["environment"]["jax"]["requested_mode"] == "cpu"
 
 
+def test_special_function_service_api_benchmark_writes_shared_schema_report() -> None:
+    payload = _run_and_load(
+        ["benchmarks/benchmark_special_function_service_api.py", "--samples", "65", "--iterations", "1"],
+        "benchmark_special_function_service_api.json",
+    )
+    assert payload["benchmark_name"] == "benchmark_special_function_service_api.py"
+    assert payload["category"] == "special"
+    assert payload["records"]
+    assert any(row["operation"] == "incomplete_gamma_upper" for row in payload["records"])
+    assert any(row["operation"] == "incomplete_bessel_k" for row in payload["records"])
+    assert any(row["operation"] == "provider_barnesdoublegamma" for row in payload["records"])
+    assert {"float32", "float64"} <= {row["dtype"] for row in payload["records"]}
+    assert payload["environment"]["jax"]["requested_mode"] == "cpu"
+
+
 def test_normalized_benchmark_help_shows_dtype_portability_controls() -> None:
     for script in (
         "benchmarks/benchmark_fft_nufft.py",

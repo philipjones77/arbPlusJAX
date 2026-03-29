@@ -19,10 +19,6 @@ def test_startup_compile_standard_covers_repo_wide_policy_requirements() -> None
     assert "Warmup policy" in text
     assert "Process reuse policy" in text
     assert "Shared playbook and template" in text
-
-
-def test_startup_compile_playbook_standard_exists_as_cross_repo_template_surface() -> None:
-    text = _read("docs/standards/startup_compile_playbook_standard.md")
     assert "shared playbook" in text.lower()
     assert "pad_to" in text
     assert "Centralize JIT ownership" in text

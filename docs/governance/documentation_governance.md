@@ -43,6 +43,7 @@ The current repo mapping should be maintained as a separate report under `docs/r
 Landing pages and section indexes should also be generated rather than hand-maintained:
 
 - `README.md`
+- `docs/README.md`
 - `docs/project_overview.md`
 - `docs/governance/README.md`
 - `docs/implementation/README.md`
@@ -166,13 +167,24 @@ Status subtree structure rule:
 
 The `docs/standards/` folder is the canonical home for cross-library and
 cross-subsystem standards such as documentation placement, naming conventions,
-runtime policy, public API shape, dtype policy, diagnostics policy, and logging
-discipline.
+runtime policy, public API shape, dtype policy, diagnostics policy, error
+handling, fallback semantics, and logging discipline.
+
+The placement and intent of the repo-root `contracts/` layer and the
+`docs/implementation/` subtree are further governed by:
+
+- [specs_standard.md](/docs/standards/specs_standard.md)
+- [objects_standard.md](/docs/standards/objects_standard.md)
+- [contracts_surface_standard.md](/docs/standards/contracts_surface_standard.md)
+- [implementation_docs_standard.md](/docs/standards/implementation_docs_standard.md)
+- [code_documentation_standard.md](/docs/standards/code_documentation_standard.md)
 
 High-level governance entry documents should live under `docs/governance/`. The
-docs-root landing page for the whole documentation tree is
-`docs/project_overview.md`. The current entry documents are:
+docs-root landing page for the whole documentation tree is `docs/README.md`,
+with `docs/project_overview.md` as the overview companion. The current entry
+documents are:
 
+- `docs/README.md`
 - `docs/governance/architecture.md`
 - `docs/governance/documentation_governance.md`
 - `docs/project_overview.md`
@@ -201,7 +213,7 @@ Operational guarantees belong in `contracts/`, not under `docs/`.
 - named runtime catalogs go in `docs/objects/`
 - derivations and explanations go in `docs/theory/`
 - code-structure notes, wrapper or module layout notes, and implementation mapping go in `docs/implementation/`
-- cross-library or cross-subsystem standards for public APIs, runtime config, parameter-change behavior, dtype handling including optional overrides, diagnostics, logging, recompilation policy, and non-intrusive test/benchmark/comparison discipline go in `docs/standards/`
+- cross-library or cross-subsystem standards for public APIs, runtime config, parameter-change behavior, dtype handling including optional overrides, diagnostics, error handling, logging, fallback policy, recompilation policy, and non-intrusive test/benchmark/comparison discipline go in `docs/standards/`
 - workflows, runbooks, benchmarking practice, and numerically informed operating guidance go in `docs/practical/`
 - function catalogs, function lists, repository inventories, and other report-style reference lists go in `docs/reports/`
 - roadmaps, current-state summaries, and active TODOs go in `docs/status/`

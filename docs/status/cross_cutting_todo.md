@@ -45,7 +45,7 @@ Status: `in_progress`
   - a dedicated sparse-matrix harness profile exists in
     [run_test_harness.py](/tools/run_test_harness.py)
   - a single repo-facing execution checklist now exists in
-    [release_execution_checklist_standard.md](/docs/standards/release_execution_checklist_standard.md)
+    [release_governance_standard.md](/docs/standards/release_governance_standard.md)
     and
     [release_execution_checklist.md](/docs/implementation/release_execution_checklist.md)
 - `in_progress`
@@ -75,7 +75,7 @@ Primary plan:
 
 - `done`
   - the repo now has an explicit definition of `fast JAX` for point mode in
-    [point_fast_jax_standard.md](/docs/standards/point_fast_jax_standard.md)
+    [fast_jax_standard.md](/docs/standards/fast_jax_standard.md)
   - all public point functions now have compiled single-call, compiled batch,
     and family-owned direct batch public surfaces; see
     [point_fast_jax_function_inventory.md](/docs/reports/point_fast_jax_function_inventory.md)

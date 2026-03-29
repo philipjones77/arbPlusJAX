@@ -1,0 +1,19 @@
+name: publish-release
+
+on:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Placeholder
+        run: |
+          echo "Publish workflow scaffold present."
+          echo "Implement artifact signing, provenance, and release upload policy before enabling publication."

@@ -15,6 +15,7 @@ def _run(cmd: list[str]) -> None:
 
 def main() -> None:
     _run([PYTHON, "tools/generate_docs_indexes.py"])
+    _run([PYTHON, "tools/generate_tools_readme.py"])
     _run([PYTHON, "tools/generate_example_notebooks.py"])
     _run([PYTHON, "tools/cache_aware_surface_report.py"])
     _run([PYTHON, "tools/comparison_backend_defaults_report.py"])
@@ -29,6 +30,7 @@ def main() -> None:
     _run([PYTHON, "tools/parameterized_ad_verification_report.py"])
     _run([PYTHON, "tools/point_basic_surface_report.py"])
     _run([PYTHON, "tools/point_basic_function_verification_report.py"])
+    _run([PYTHON, "tools/production_readiness_report.py"])
     _run([PYTHON, "tools/repo_standards_verification_report.py"])
     _run([PYTHON, "tools/special_function_status_report.py"])
     _run([PYTHON, "tools/generate_public_metadata_registry.py"])
@@ -57,10 +59,12 @@ def main() -> None:
             "tests/test_parameterized_public_ad_audit.py",
             "tests/test_point_basic_surface_report.py",
             "tests/test_point_basic_function_verification_report.py",
+            "tests/test_production_readiness_report.py",
             "tests/test_repo_standards_verification_report.py",
             "tests/test_public_metadata_contracts.py",
             "tests/test_report_status_refresh_inventory.py",
             "tests/test_docs_indexes.py",
+            "tests/test_tools_readme.py",
             "tests/test_example_notebook_inventory_contracts.py",
             "tests/test_example_notebook_content_contracts.py",
             "tests/test_matrix_surface_workbook_contracts.py",

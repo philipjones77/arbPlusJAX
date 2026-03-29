@@ -23,3 +23,25 @@ Current documents:
 - [runtime_implementation.md](/docs/implementation/wrappers/runtime_implementation.md)
 - [validation_implementation.md](/docs/implementation/wrappers/validation_implementation.md)
 - [wrappers_common_implementation.md](/docs/implementation/wrappers/wrappers_common_implementation.md)
+
+```{toctree}
+:maxdepth: 2
+:hidden:
+
+ball_wrappers_implementation
+baseline_wrappers_implementation
+calc_wrappers_implementation
+core_wrappers_implementation
+dft_wrappers_implementation
+dirichlet_wrappers_implementation
+double_interval_implementation
+double_interval_wrappers_implementation
+hypgeom_wrappers_implementation
+mat_wrappers_implementation
+modular_elliptic_wrappers_implementation
+mp_mode_implementation
+poly_wrappers_implementation
+runtime_implementation
+validation_implementation
+wrappers_common_implementation
+```

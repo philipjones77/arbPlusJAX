@@ -21,8 +21,8 @@ def test_point_fast_jax_category_report_is_current() -> None:
     assert path.read_text(encoding="utf-8") == pfjcr.render()
 
 
-def test_point_fast_jax_standard_covers_all_six_categories() -> None:
-    text = (REPO_ROOT / "docs" / "standards" / "point_fast_jax_standard.md").read_text(encoding="utf-8").lower()
+def test_fast_jax_standard_covers_all_six_categories() -> None:
+    text = (REPO_ROOT / "docs" / "standards" / "fast_jax_standard.md").read_text(encoding="utf-8").lower()
     for category in EXPECTED_CATEGORIES:
         assert category in text
 

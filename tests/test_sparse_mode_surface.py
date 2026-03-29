@@ -76,7 +76,7 @@ def test_srb_sparse_mode_surface_and_api():
 
     _check(bool(jnp.allclose(di.midpoint(api_det), jnp.linalg.det(dense), rtol=1e-8, atol=1e-8)))
     _check(bool(jnp.allclose(di.midpoint(api_solve), expected, rtol=1e-8, atol=1e-8)))
-    _check(api_batch.shape == (4, 3, 2))
+    _check(api_batch.shape == (2, 3, 2))
 
 
 def test_scb_sparse_mode_surface_and_api():
@@ -142,4 +142,4 @@ def test_scb_sparse_mode_surface_and_api():
 
     _check(bool(jnp.allclose(acb_core.acb_midpoint(api_det), jnp.linalg.det(dense), rtol=1e-8, atol=1e-8)))
     _check(bool(jnp.allclose(acb_core.acb_midpoint(api_solve), expected, rtol=1e-8, atol=1e-8)))
-    _check(api_batch.shape == (4, 3, 4))
+    _check(api_batch.shape == (2, 3, 4))

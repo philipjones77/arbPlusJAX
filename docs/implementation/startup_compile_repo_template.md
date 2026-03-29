@@ -8,7 +8,6 @@ policy into another JAX repo.
 Primary policy:
 
 - [startup_compile_standard.md](/docs/standards/startup_compile_standard.md)
-- [startup_compile_playbook_standard.md](/docs/standards/startup_compile_playbook_standard.md)
 
 ## Required Deliverables
 

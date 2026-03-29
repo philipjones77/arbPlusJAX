@@ -5,8 +5,8 @@ Last updated: 2026-03-27T00:00:00Z
 This report verifies the repo-wide `fast JAX` contract for public `point` mode only.
 
 Policy references:
-- [point_surface_standard.md](/docs/standards/point_surface_standard.md)
-- [point_fast_jax_standard.md](/docs/standards/point_fast_jax_standard.md)
+- [operational_jax_standard.md](/docs/standards/operational_jax_standard.md)
+- [fast_jax_standard.md](/docs/standards/fast_jax_standard.md)
 - [point_fast_jax_implementation.md](/docs/implementation/point_fast_jax_implementation.md)
 - [point_fast_jax_plan.md](/docs/status/point_fast_jax_plan.md)
 

@@ -103,6 +103,7 @@ def main() -> int:
     parser.add_argument("--pad-multiple", type=int, default=128)
     parser.add_argument("--iterations", type=int, default=20)
     parser.add_argument("--startup-prewarm", action="store_true")
+    parser.add_argument("--exclude-barnes", action="store_true")
     parser.add_argument(
         "--output",
         type=Path,
@@ -119,7 +120,7 @@ def main() -> int:
     records: list[BenchmarkRecord] = []
 
     cases: list[tuple[str, str, str, object, tuple[object, ...], tuple[object, ...], dict[str, object]]] = []
-    service_cases: list[tuple[str, str, str, object, tuple[object, ...], tuple[object, ...], dict[str, object]]] = []
+    service_cases: list[tuple[str, str, str, str | None, object, tuple[object, ...], tuple[object, ...], dict[str, object]]] = []
     for dtype in ("float32", "float64"):
         s, z = _positive_case(args.samples, dtype)
         ss, zz = s[:alt_n], z[:alt_n]
@@ -169,30 +170,33 @@ def main() -> int:
                 {"method": "quadrature", "prec_bits": 53},
             )
         )
-        bz, btau = _barnes_case(args.samples, dtype)
-        bbz, bbtau = bz[:alt_n], btau[:alt_n]
-        service_cases.append(
-            (
-                "point",
-                "provider_barnesdoublegamma",
-                dtype,
-                stable_kernels.provider_barnesdoublegamma_batch,
-                (bz, btau),
-                (bbz, bbtau),
-                {"pad_to": None, "dps": 60},
+        if not args.exclude_barnes:
+            bz, btau = _barnes_case(args.samples, dtype)
+            bbz, bbtau = bz[:alt_n], btau[:alt_n]
+            service_cases.append(
+                (
+                    "point",
+                    "provider_barnesdoublegamma",
+                    "complex64" if dtype == "float32" else "complex128",
+                    None,
+                    stable_kernels.provider_barnesdoublegamma_batch,
+                    (bz, btau),
+                    (bbz, bbtau),
+                    {"pad_to": None, "dps": 60},
+                )
             )
-        )
-        service_cases.append(
-            (
-                "point",
-                "provider_log_barnesdoublegamma",
-                dtype,
-                stable_kernels.provider_log_barnesdoublegamma_batch,
-                (bz, btau),
-                (bbz, bbtau),
-                {"pad_to": None, "dps": 60},
+            service_cases.append(
+                (
+                    "point",
+                    "provider_log_barnesdoublegamma",
+                    "complex64" if dtype == "float32" else "complex128",
+                    None,
+                    stable_kernels.provider_log_barnesdoublegamma_batch,
+                    (bz, btau),
+                    (bbz, bbtau),
+                    {"pad_to": None, "dps": 60},
+                )
             )
-        )
 
     for mode, name, dtype, binder, call_args, alt_args, extra_kwargs in cases:
         for implementation, pad_target in (("service_api_unpadded", None), ("service_api_padded", pad_to)):
@@ -226,11 +230,14 @@ def main() -> int:
                 )
             )
 
-    for mode, name, dtype, fn, call_args, alt_args, extra_kwargs in service_cases:
+    for mode, name, record_dtype, invoke_dtype, fn, call_args, alt_args, extra_kwargs in service_cases:
         for implementation, pad_target in (("service_api_unpadded", None), ("service_api_padded", pad_to)):
             kwargs = dict(extra_kwargs)
             kwargs["pad_to"] = pad_target
-            bound = lambda *aa, _fn=fn, _kwargs=kwargs: _fn(*aa, dtype=dtype, **_kwargs)
+            if invoke_dtype is None:
+                bound = lambda *aa, _fn=fn, _kwargs=kwargs: _fn(*aa, **_kwargs)
+            else:
+                bound = lambda *aa, _fn=fn, _kwargs=kwargs, _dtype=invoke_dtype: _fn(*aa, dtype=_dtype, **_kwargs)
             stats, steady = _profile(bound, call_args, alt_args, iterations=args.iterations)
             records.append(
                 BenchmarkRecord(
@@ -240,7 +247,7 @@ def main() -> int:
                     implementation=implementation,
                     operation=name,
                     device=jax.default_backend(),
-                    dtype=dtype,
+                    dtype=record_dtype,
                     cold_time_s=stats["cold_time_s"],
                     warm_time_s=stats["warm_time_s"],
                     recompile_time_s=stats["recompile_time_s"],
@@ -266,7 +273,10 @@ def main() -> int:
             Path(__file__).resolve().parents[1],
             jax_mode="gpu" if jax.default_backend() in {"gpu", "cuda"} else "cpu",
         ),
-        notes="Repeated-call public API benchmark for representative special-function families, including padded vs unpadded service use.",
+        notes=(
+            "Repeated-call public API benchmark for representative special-function families, including padded vs unpadded service use."
+            + (" Barnes provider rows excluded." if args.exclude_barnes else "")
+        ),
     )
     path = write_benchmark_report(args.output, report)
     print(f"report: {path}")

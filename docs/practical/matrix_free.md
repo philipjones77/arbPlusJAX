@@ -1,10 +1,17 @@
-Last updated: 2026-03-25T18:05:00Z
+Last updated: 2026-03-29T00:00:00Z
 
 # Matrix-Free Practical Guide
 
 ## Scope
 
 This page is the practical companion to [matrix_free_operator_methods.md](/docs/theory/matrix_free_operator_methods.md). It explains how to use the current point-mode matrix-free surface effectively, where JAX bottlenecks show up, and how to avoid unnecessary recompilation.
+
+The public performance-policy helpers for this layer now live in [api.py](/src/arbplusjax/api.py):
+
+- `choose_matrix_free_plan_policy(...)`
+- `prewarm_matrix_free_kernels(...)`
+
+They are the supported bridge between structural fast-JAX matrix-free kernels and backend-realized CPU/GPU usage.
 
 ## 1. Choose The Right Operator Surface
 
@@ -24,6 +31,37 @@ Use raw callables when:
 
 - the operator is genuinely dynamic each call
 - you need the most flexible AD story through a Python closure
+
+For repeated service-style usage, decide the backend policy first:
+
+```python
+from arbplusjax import api
+
+policy = api.choose_matrix_free_plan_policy(
+    algebra="jrb",
+    plan_kind="dense",
+    problem_size=512,
+    steps=16,
+    probe_count=4,
+    backend="auto",
+)
+```
+
+Then prewarm the exact operator family you intend to serve:
+
+```python
+api.prewarm_matrix_free_kernels(
+    cases=(
+        ("jrb", "dense", "apply"),
+        ("jrb", "dense", "solve"),
+        ("jrb", "dense", "logdet"),
+    ),
+    backend=policy.chosen_backend,
+    dense_problem_size=512,
+    steps=16,
+    probe_count=4,
+)
+```
 
 ## 2. Recompilation Guidance
 
@@ -48,6 +86,12 @@ Reasons:
 - the dedicated `*_point_jit` wrappers avoid ad hoc closure churn
 - the callable path can trigger extra recompiles if the closure shape changes
 
+The second practical trap on GPU is compiling too many distinct Krylov bundles. The main public mitigation is now:
+
+- choose one backend policy for a repeated workload
+- prewarm the exact apply / solve / logdet / multi-shift kernels you intend to reuse
+- avoid mixing dense and sparse plan kinds inside one repeated loop unless the workload genuinely changes
+
 Keep these arguments stable across repeated calls:
 
 - `steps`
@@ -55,6 +99,13 @@ Keep these arguments stable across repeated calls:
 - `restarts`
 - `symmetric` / `hermitian`
 - `tol`, `atol`, `maxiter` when using solve paths
+
+Keep these payloads stable too:
+
+- prepared operator plan type
+- prepared transpose / adjoint plan type
+- preconditioner plan structure
+- probe batch shape for SLQ / Hutch++
 
 ## 3. AD Guidance
 
@@ -101,22 +152,23 @@ Do not route an HPD problem through the general complex interface unless you are
 
 ## 5. Benchmark Findings
 
-`python benchmarks/benchmark_matrix_free_krylov.py` on 2026-03-20 under CPU-only JAX reported:
+`python benchmarks/benchmark_matrix_free_krylov.py` is the retained benchmark owner for:
 
-- real dense action: plan `0.352s` vs callable `0.728s`
-- real dense logdet: plan `0.412s` vs callable `0.506s`
-- sparse real apply: plan `0.157s` vs callable `0.295s`
-- sparse real solve: plan `0.259s` vs callable `0.423s`
-- sparse real logdet: plan `0.544s` vs callable `0.638s`
-- complex dense logdet: plan `0.527s` vs callable `0.738s`
-- sparse complex logdet: plan `0.529s` vs callable `0.594s`
+- dense and sparse apply
+- dense and sparse transpose / adjoint apply
+- dense and sparse action / restarted action
+- solve / inverse / multi-shift operator-plan reuse
+- SLQ logdet / determinant and gradients
+- compile / execute / warm timing splits for the repeated plan-safe surfaces
 
 Interpretation:
 
 - plan reuse helps most when the operator application itself is a meaningful part of the total cost
-- sparse apply and sparse solve benefit strongly from avoiding repeated operator wrapping
+- sparse apply, sparse transpose / adjoint apply, and sparse solve benefit strongly from avoiding repeated operator wrapping
 - restarted actions and some iterative solves show smaller gains because solver iterations dominate
 - complex AD and complex logdet remain materially more expensive than the real symmetric path
+- compile / execute separation is required for honest CPU / GPU interpretation; single cold numbers are not enough
+- `--startup-prewarm` is now available when you want steady-state benchmark runs after intentional kernel warmup
 
 ## 6. Likely Bottlenecks
 
@@ -142,6 +194,7 @@ Those are expected to remain heavier than plain operator apply or plain solve-ac
 For repeated action evaluation:
 
 - prepare an operator plan once
+- prepare transpose / adjoint plans once when you need `A^T v` or `A^* v`
 - keep `steps` and `restarts` fixed across calls
 - use the structured alias where valid
 
@@ -173,12 +226,44 @@ For repeated solve-plus-logdet workloads:
   adjoint path does not need to replay the full primal iteration history
 - keep solver choice, structure flags, and probe shapes fixed if you want
   stable cache reuse
+- they are also the preferred GPU-facing path when the workload genuinely needs
+  both outputs, because one bundle call reduces Python orchestration and avoids
+  paying separate hot-path setup for solve and logdet
+
+For GPU specifically:
+
+- prewarm the exact plan kind you will reuse
+- prefer fused bundle surfaces when you need multiple results from the same
+  Krylov state, for example `*_logdet_solve_point_jit(...)` instead of separate
+  solve and logdet calls
+- keep dense vs sparse plan kind fixed
+- keep `steps`, `probe_count`, `tol`, `maxiter`, and multi-shift count fixed
+- serialize heavy GPU benchmark and notebook runs instead of overlapping them
+- prefer CPU for tiny dense repeated jobs unless benchmarking shows a real crossover
+- prefer GPU first on larger sparse complex operator-plan workloads, where the retained benchmark already shows wins
+
+Current practical crossover summary from the retained benchmark:
+
+- dense real and dense complex repeated plan-safe workloads at small retained
+  sizes are still CPU-favored even after prewarm
+- sparse real is also currently CPU-favored in the retained sweep
+- sparse complex operator-plan apply, adjoint apply, logdet, solve, and inverse
+  are the first matrix-free surfaces where GPU wins appear consistently
+- bundle/fused surfaces are worth preferring on GPU when the workload needs them,
+  but they do not change the basic crossover rule by themselves: small dense
+  jobs still belong on CPU
 
 For repeated solves:
 
 - use `*_solve_action_point_jit` or `*_inverse_action_point_jit`
 - set `symmetric=True` or `hermitian=True` whenever valid
 - keep solver tolerances stable
+
+For diagnostics:
+
+- call `*_with_diagnostics_point` or `*_with_diagnostics_basic` outside the hot repeated loop
+- use the diagnostics path to inspect iterations, residuals, stopping, and structure choices
+- use the plain `*_point_jit` path for the repeated throughput loop once the kernel is validated
 
 ## 8. When Not To Use Matrix-Free
 

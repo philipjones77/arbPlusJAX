@@ -11,6 +11,12 @@ Detailed cross-cutting and specialized backlogs are split into dedicated files:
 - [curvature_todo.md](/docs/status/curvature_todo.md)
 - [special_functions_todo.md](/docs/status/special_functions_todo.md)
 - [api_runtime_todo.md](/docs/status/api_runtime_todo.md)
+- [release_packaging_todo.md](/docs/status/release_packaging_todo.md)
+- [docs_publishing_todo.md](/docs/status/docs_publishing_todo.md)
+- [security_supply_chain_todo.md](/docs/status/security_supply_chain_todo.md)
+- [operational_support_todo.md](/docs/status/operational_support_todo.md)
+- [capability_maturity_todo.md](/docs/status/capability_maturity_todo.md)
+- [production_readiness_todo.md](/docs/status/production_readiness_todo.md)
 
 Organization rule:
 - Sections follow the top-level function and infrastructure categories defined in

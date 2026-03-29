@@ -65,8 +65,8 @@ ROWS = (
     {
         "area": "point-only fast jax",
         "standards": (
-            "docs/standards/point_surface_standard.md",
-            "docs/standards/point_fast_jax_standard.md",
+            "docs/standards/operational_jax_standard.md",
+            "docs/standards/fast_jax_standard.md",
         ),
         "reports": (
             "docs/reports/point_fast_jax_function_inventory.md",
@@ -83,7 +83,7 @@ ROWS = (
     {
         "area": "release/process/bootstrap",
         "standards": (
-            "docs/standards/release_execution_checklist_standard.md",
+            "docs/standards/release_governance_standard.md",
             "docs/standards/environment_portability_standard.md",
         ),
         "reports": ("docs/reports/report_status_refresh_inventory.md",),

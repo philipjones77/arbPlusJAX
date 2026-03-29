@@ -16,7 +16,7 @@ Interpretation:
 - `diagnostics-bearing binder` means the bound surface returns both value and structured diagnostics.
 - `policy helper` means the surface recommends or prepares the repeated-call policy rather than directly evaluating the function.
 
-Total public `api` exports: `69`
+Total public `api` exports: `73`
 
 Section counts:
 - `Unified Routing`: 1
@@ -24,9 +24,9 @@ Section counts:
 - `Specialized Public Function Surfaces`: 30
 - `Bound Service Surfaces`: 6
 - `Compiled And AD Surfaces`: 7
-- `Policy Helpers`: 4
+- `Policy Helpers`: 6
 - `Metadata And Registry Surfaces`: 6
-- `Structured Payload Types`: 9
+- `Structured Payload Types`: 11
 
 ## Common Option Groups
 
@@ -126,8 +126,10 @@ Section counts:
 |---|---|---|
 | `choose_point_batch_policy` | `policy helper` | `(*, batch_size: 'int \| None' = None, dtype: 'str \| jnp.dtype \| None' = None, backend: 'str' = 'auto', pad_to: 'int \| None' = None, shape_bucket_multiple: 'int \| None' = None, chunk_size: 'int \| None' = None, min_gpu_batch_size: 'int' = 2048, prewarm: 'bool' = False) -> 'PointBatchPolicy'` |
 | `choose_interval_batch_policy` | `policy helper` | `(*, batch_size: 'int \| None' = None, dtype: 'str \| jnp.dtype \| None' = None, mode: 'str' = 'basic', prec_bits: 'int \| None' = None, dps: 'int \| None' = None, backend: 'str' = 'auto', pad_to: 'int \| None' = None, shape_bucket_multiple: 'int \| None' = None, chunk_size: 'int \| None' = None, min_gpu_batch_size: 'int' = 2048, prewarm: 'bool' = False) -> 'IntervalBatchPolicy'` |
+| `choose_matrix_free_plan_policy` | `policy helper` | `(*, algebra: 'str', plan_kind: 'str', problem_size: 'int \| None' = None, steps: 'int \| None' = None, probe_count: 'int \| None' = None, backend: 'str' = 'auto', min_gpu_size_dense: 'int' = 256, min_gpu_size_sparse_real: 'int' = 512, min_gpu_size_sparse_complex: 'int' = 32, prewarm: 'bool' = False) -> 'MatrixFreePlanPolicy'` |
 | `prewarm_core_point_kernels` | `policy helper` | `(names: 'tuple[str, ...] \| None' = None, *, dtype: 'str \| jnp.dtype \| None' = 'float64', backend: 'str' = 'auto', batch_size: 'int' = 1024, shape_bucket_multiple: 'int \| None' = 128, min_gpu_batch_size: 'int' = 2048) -> 'dict[str, PointBatchCallDiagnostics]'` |
 | `prewarm_interval_mode_kernels` | `policy helper` | `(names: 'tuple[tuple[str, str], ...] \| None' = None, *, dtype: 'str \| jnp.dtype \| None' = 'float64', prec_bits: 'int \| None' = 53, dps: 'int \| None' = None, backend: 'str' = 'auto', batch_size: 'int' = 256, shape_bucket_multiple: 'int \| None' = 64, min_gpu_batch_size: 'int' = 512) -> 'dict[str, IntervalBatchCallDiagnostics]'` |
+| `prewarm_matrix_free_kernels` | `policy helper` | `(cases: 'tuple[tuple[str, str, str], ...] \| None' = None, *, backend: 'str' = 'auto', dense_problem_size: 'int' = 32, sparse_problem_size: 'int' = 48, steps: 'int' = 8, probe_count: 'int' = 2, min_gpu_size_dense: 'int' = 256, min_gpu_size_sparse_real: 'int' = 512, min_gpu_size_sparse_complex: 'int' = 32) -> 'dict[str, MatrixFreePlanCallDiagnostics]'` |
 
 ## Metadata And Registry Surfaces
 
@@ -149,6 +151,8 @@ Section counts:
 | `PointBatchCallDiagnostics` | `structured payload` | `(name: 'str', requested_backend: 'str', chosen_backend: 'str', batch_size: 'int \| None', dtype: 'str \| None', pad_to: 'int \| None', shape_bucket_multiple: 'int \| None', effective_pad_to: 'int \| None', chunk_size: 'int \| None', jit_enabled: 'bool', compiled_this_call: 'bool', prewarmed: 'bool') -> None` |
 | `IntervalBatchPolicy` | `structured payload` | `(requested_backend: 'str', chosen_backend: 'str', batch_size: 'int \| None', dtype: 'str \| None', mode: 'str', prec_bits: 'int \| None', dps: 'int \| None', pad_to: 'int \| None', shape_bucket_multiple: 'int \| None', effective_pad_to: 'int \| None', chunk_size: 'int \| None', min_gpu_batch_size: 'int', prewarm: 'bool') -> None` |
 | `IntervalBatchCallDiagnostics` | `structured payload` | `(name: 'str', requested_backend: 'str', chosen_backend: 'str', batch_size: 'int \| None', dtype: 'str \| None', mode: 'str', prec_bits: 'int \| None', dps: 'int \| None', pad_to: 'int \| None', shape_bucket_multiple: 'int \| None', effective_pad_to: 'int \| None', chunk_size: 'int \| None', jit_enabled: 'bool', compiled_this_call: 'bool', prewarmed: 'bool') -> None` |
+| `MatrixFreePlanPolicy` | `structured payload` | `(requested_backend: 'str', chosen_backend: 'str', algebra: 'str', plan_kind: 'str', problem_size: 'int \| None', steps: 'int \| None', probe_count: 'int \| None', min_gpu_size_dense: 'int', min_gpu_size_sparse_real: 'int', min_gpu_size_sparse_complex: 'int', prewarm: 'bool') -> None` |
+| `MatrixFreePlanCallDiagnostics` | `structured payload` | `(operation: 'str', requested_backend: 'str', chosen_backend: 'str', algebra: 'str', plan_kind: 'str', problem_size: 'int \| None', steps: 'int \| None', probe_count: 'int \| None', compiled_this_call: 'bool', prewarmed: 'bool') -> None` |
 | `TailDerivativeMetadata` | `structured payload` | `(argument_derivative: 'bool' = False, lower_limit_derivative: 'bool' = False, parameter_derivative: 'bool' = False, note: 'str' = '') -> None` |
 | `TailEvaluationDiagnostics` | `structured payload` | `(method: 'str', chunk_count: 'int', panel_count: 'int', recurrence_steps: 'int', estimated_tail_remainder: 'float', instability_flags: 'tuple[str, ...]' = (), fallback_used: 'bool' = False, precision_warning: 'bool' = False, note: 'str' = '') -> None` |
 | `TailIntegralProblem` | `structured payload` | `(integrand: 'Callable[[jax.Array], jax.Array]', lower_limit: 'float \| jax.Array', panel_width: 'float' = 0.25, max_panels: 'int' = 128, samples_per_panel: 'int' = 32, quadrature_rule: 'str' = 'simpson', recurrence: 'TailRatioRecurrence \| None' = None, derivative_metadata: 'TailDerivativeMetadata' = TailDerivativeMetadata(argument_derivative=False, lower_limit_derivative=False, parameter_derivative=False, note=''), regime_metadata: 'TailRegimeMetadata' = TailRegimeMetadata(decay_rate=None, oscillation_level=None, near_singularity=False, cancellation_risk=False, note=''), name: 'str' = 'tail_integral') -> None` |

@@ -1,0 +1,13 @@
+{
+  "platform": "gpu",
+  "devices": [
+    "cuda:0"
+  ],
+  "jax_enable_x64": true,
+  "env": {
+    "JAX_PLATFORM_NAME": "",
+    "XLA_PYTHON_CLIENT_PREALLOCATE": "",
+    "XLA_PYTHON_CLIENT_MEM_FRACTION": "",
+    "XLA_FLAGS": ""
+  }
+}

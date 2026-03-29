@@ -14,3 +14,16 @@ Current documents:
 - [ducc_review_implementation.md](/docs/implementation/external/ducc_review_implementation.md)
 - [parsinv_review_implementation.md](/docs/implementation/external/parsinv_review_implementation.md)
 - [strumpack_butterflypack_review_implementation.md](/docs/implementation/external/strumpack_butterflypack_review_implementation.md)
+
+```{toctree}
+:maxdepth: 2
+:hidden:
+
+barnesg_implementation
+boost_hypgeom_implementation
+boost_math_hypgeom_inventory_implementation
+cusf_compat_implementation
+ducc_review_implementation
+parsinv_review_implementation
+strumpack_butterflypack_review_implementation
+```

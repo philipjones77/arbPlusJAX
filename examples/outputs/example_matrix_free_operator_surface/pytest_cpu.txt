@@ -2,22 +2,6 @@
 =================================== FAILURES ===================================
 ___________________ test_complex_matrix_free_basic_contracts ___________________
 
->   apply_point = jrb_mat.jrb_mat_operator_apply_point(plan, x)
-
-tests/test_matrix_free_basic.py:54: 
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
-src/arbplusjax/jrb_mat.py:1650: in jrb_mat_operator_apply_point
-    return matrix_free_core.operator_apply_point(
-src/arbplusjax/matrix_free_core.py:1949: in operator_apply_point
-    out = point_from_midpoint(y)
-src/arbplusjax/jrb_mat.py:141: in _jrb_point_interval
-    return di.interval(di._below(x), di._above(x))
-src/arbplusjax/double_interval.py:76: in _below
-    return jnp.where(x <= huge, finite_branch, overflow_branch)
-../../miniforge3/envs/jax/lib/python3.12/site-packages/jax/_src/numpy/lax_numpy.py:2785: in where
-    return util._where(condition, x, y)
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
-
 >   return lax.select(condition, x_arr, y_arr) if not is_always_empty else x_arr
 E   jax._src.source_info_util.JaxStackTraceBeforeTransformation: AssertionError
 E   
@@ -66,11 +50,11 @@ The above exception was the direct cause of the following exception:
 
 tests/test_matrix_free_basic.py:157: 
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
-src/arbplusjax/jcb_mat.py:882: in jcb_mat_solve_action_point
+src/arbplusjax/jcb_mat.py:910: in jcb_mat_solve_action_point
     value, _ = jcb_mat_solve_action_with_diagnostics_point(
-src/arbplusjax/jcb_mat.py:945: in jcb_mat_solve_action_with_diagnostics_point
+src/arbplusjax/jcb_mat.py:973: in jcb_mat_solve_action_with_diagnostics_point
     x_mid, info, residual, rhs_norm, solve_meta = matrix_free_core.implicit_krylov_solve_midpoint(
-src/arbplusjax/matrix_free_core.py:1468: in implicit_krylov_solve_midpoint
+src/arbplusjax/matrix_free_core.py:1472: in implicit_krylov_solve_midpoint
     return impl(
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
@@ -105,8 +89,11 @@ rhs = Array([[ 1. ,  1. ,  1. ,  1. ],
             transpose_operator = operator_transpose_plan(operator, conjugate=conjugate)
         if transpose_preconditioner is None:
             transpose_preconditioner = preconditioner_transpose_plan(preconditioner, conjugate=conjugate)
+        sparse_factor_preconditioner = getattr(preconditioner, "kind", None) in {"sparse_lu_solve", "sparse_cholesky_solve"}
         if use_implicit_adjoint is None:
             use_implicit_adjoint = structured in {"symmetric", "spd", "hermitian", "hpd"} or transpose_operator is not None
+        if sparse_factor_preconditioner and structured not in {"symmetric", "spd", "hermitian", "hpd"}:
+            use_implicit_adjoint = False
     
         def mv(v):
             return operator_apply_midpoint(
@@ -168,24 +155,8 @@ E           AssertionError
 E           --------------------
 E           For simplicity, JAX has removed its internal frames from the traceback of the following exception. Set JAX_TRACEBACK_FILTERING=off to include these.
 
-src/arbplusjax/matrix_free_adjoint.py:94: AssertionError
+src/arbplusjax/matrix_free_adjoint.py:97: AssertionError
 __ test_complex_basic_logdet_surfaces_inflate_by_reported_scalar_uncertainty ___
-
->   apply_point = jrb_mat.jrb_mat_operator_apply_point(plan, x)
-
-tests/test_matrix_free_basic.py:54: 
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
-src/arbplusjax/jrb_mat.py:1650: in jrb_mat_operator_apply_point
-    return matrix_free_core.operator_apply_point(
-src/arbplusjax/matrix_free_core.py:1949: in operator_apply_point
-    out = point_from_midpoint(y)
-src/arbplusjax/jrb_mat.py:141: in _jrb_point_interval
-    return di.interval(di._below(x), di._above(x))
-src/arbplusjax/double_interval.py:76: in _below
-    return jnp.where(x <= huge, finite_branch, overflow_branch)
-../../miniforge3/envs/jax/lib/python3.12/site-packages/jax/_src/numpy/lax_numpy.py:2785: in where
-    return util._where(condition, x, y)
-_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
 >   return lax.select(condition, x_arr, y_arr) if not is_always_empty else x_arr
 E   jax._src.source_info_util.JaxStackTraceBeforeTransformation: AssertionError
@@ -211,20 +182,20 @@ The above exception was the direct cause of the following exception:
 
 tests/test_matrix_free_basic.py:370: 
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
-src/arbplusjax/jcb_mat.py:4973: in jcb_mat_logdet_solve_basic
+src/arbplusjax/jcb_mat.py:5013: in jcb_mat_logdet_solve_basic
     result = jcb_mat_logdet_solve_point(
-src/arbplusjax/jcb_mat.py:4934: in jcb_mat_logdet_solve_point
+src/arbplusjax/jcb_mat.py:4974: in jcb_mat_logdet_solve_point
     return matrix_free_core.combine_logdet_solve_point(
-src/arbplusjax/matrix_free_core.py:1306: in combine_logdet_solve_point
+src/arbplusjax/matrix_free_core.py:1310: in combine_logdet_solve_point
     return impl(
-src/arbplusjax/matrix_free_krylov.py:165: in combine_logdet_solve_point
+src/arbplusjax/matrix_free_krylov.py:167: in combine_logdet_solve_point
     solve_value, solve_diag = solve_with_diagnostics(operator, rhs)
                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-src/arbplusjax/jcb_mat.py:4939: in <lambda>
+src/arbplusjax/jcb_mat.py:4979: in <lambda>
     solve_with_diagnostics=lambda operator, rhs_value: jcb_mat_solve_action_with_diagnostics_point(
-src/arbplusjax/jcb_mat.py:945: in jcb_mat_solve_action_with_diagnostics_point
+src/arbplusjax/jcb_mat.py:973: in jcb_mat_solve_action_with_diagnostics_point
     x_mid, info, residual, rhs_norm, solve_meta = matrix_free_core.implicit_krylov_solve_midpoint(
-src/arbplusjax/matrix_free_core.py:1468: in implicit_krylov_solve_midpoint
+src/arbplusjax/matrix_free_core.py:1472: in implicit_krylov_solve_midpoint
     return impl(
 _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
 
@@ -259,8 +230,11 @@ rhs = Array([[ 1. ,  1. ,  1. ,  1. ],
             transpose_operator = operator_transpose_plan(operator, conjugate=conjugate)
         if transpose_preconditioner is None:
             transpose_preconditioner = preconditioner_transpose_plan(preconditioner, conjugate=conjugate)
+        sparse_factor_preconditioner = getattr(preconditioner, "kind", None) in {"sparse_lu_solve", "sparse_cholesky_solve"}
         if use_implicit_adjoint is None:
             use_implicit_adjoint = structured in {"symmetric", "spd", "hermitian", "hpd"} or transpose_operator is not None
+        if sparse_factor_preconditioner and structured not in {"symmetric", "spd", "hermitian", "hpd"}:
+            use_implicit_adjoint = False
     
         def mv(v):
             return operator_apply_midpoint(
@@ -322,8 +296,8 @@ E           AssertionError
 E           --------------------
 E           For simplicity, JAX has removed its internal frames from the traceback of the following exception. Set JAX_TRACEBACK_FILTERING=off to include these.
 
-src/arbplusjax/matrix_free_adjoint.py:94: AssertionError
+src/arbplusjax/matrix_free_adjoint.py:97: AssertionError
 =========================== short test summary info ============================
 FAILED tests/test_matrix_free_basic.py::test_complex_matrix_free_basic_contracts
 FAILED tests/test_matrix_free_basic.py::test_complex_basic_logdet_surfaces_inflate_by_reported_scalar_uncertainty
-2 failed, 27 passed in 83.85s (0:01:23)
+2 failed, 27 passed in 86.23s (0:01:26)

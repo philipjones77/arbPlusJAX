@@ -26,4 +26,4 @@ def test_repo_standards_verification_report_covers_runtime_compile_cache_and_rel
     assert "point_fast_jax_verification.md" in text
     assert "parameterized_ad_verification.md" in text
     assert "point_basic_function_verification.md" in text
-    assert "release_execution_checklist_standard.md" in text
+    assert "release_governance_standard.md" in text

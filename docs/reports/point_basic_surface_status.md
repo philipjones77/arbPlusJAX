@@ -5,8 +5,8 @@ Last updated: 2026-03-27T00:00:00Z
 This report joins the public metadata registry, the checked-in target inventory, and the current test/benchmark/notebook evidence for the public `point` and `basic` surfaces.
 
 Policy references:
-- [point_surface_standard.md](/docs/standards/point_surface_standard.md)
-- [point_fast_jax_standard.md](/docs/standards/point_fast_jax_standard.md)
+- [operational_jax_standard.md](/docs/standards/operational_jax_standard.md)
+- [fast_jax_standard.md](/docs/standards/fast_jax_standard.md)
 - [example_notebook_standard.md](/docs/standards/example_notebook_standard.md)
 - [benchmark_validation_policy_standard.md](/docs/standards/benchmark_validation_policy_standard.md)
 - [theory_notation_standard.md](/docs/standards/theory_notation_standard.md)

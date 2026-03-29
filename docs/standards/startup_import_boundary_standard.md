@@ -14,7 +14,7 @@ Companion documents:
 
 - [startup_compile_standard.md](/docs/standards/startup_compile_standard.md)
 - [lazy_loading_standard.md](/docs/standards/lazy_loading_standard.md)
-- [point_surface_standard.md](/docs/standards/point_surface_standard.md)
+- [operational_jax_standard.md](/docs/standards/operational_jax_standard.md)
 - [metadata_registry_standard.md](/docs/standards/metadata_registry_standard.md)
 
 ## Import Tiers
@@ -114,11 +114,10 @@ Disallowed:
 
 The code-level owner for this policy is:
 
-- [import_tiers.py](/home/phili/projects/arbplusJAX/src/arbplusjax/import_tiers.py)
+- [import_tiers.py](/src/arbplusjax/import_tiers.py)
 
 Required test coverage includes:
 
-- [test_import_tiers_policy.py](/home/phili/projects/arbplusJAX/tests/test_import_tiers_policy.py)
-- [test_api_startup_lazy_loading.py](/home/phili/projects/arbplusJAX/tests/test_api_startup_lazy_loading.py)
-- [test_family_import_boundaries.py](/home/phili/projects/arbplusJAX/tests/test_family_import_boundaries.py)
-
+- [test_import_tiers_policy.py](/tests/test_import_tiers_policy.py)
+- [test_api_startup_lazy_loading.py](/tests/test_api_startup_lazy_loading.py)
+- [test_family_import_boundaries.py](/tests/test_family_import_boundaries.py)

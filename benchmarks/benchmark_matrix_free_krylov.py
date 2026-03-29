@@ -22,6 +22,7 @@ import jax
 import jax.numpy as jnp
 
 acb_core = None
+api = None
 di = None
 jcb_mat = None
 jrb_mat = None
@@ -30,9 +31,10 @@ sparse_common = None
 
 
 def _load_matrix_free_modules():
-    global acb_core, di, jcb_mat, jrb_mat, precision, sparse_common
+    global acb_core, api, di, jcb_mat, jrb_mat, precision, sparse_common
     if jrb_mat is not None:
         return
+    from arbplusjax import api as _api
     from arbplusjax import acb_core as _acb_core
     from arbplusjax import double_interval as _di
     from arbplusjax import jcb_mat as _jcb_mat
@@ -40,6 +42,7 @@ def _load_matrix_free_modules():
     from arbplusjax import precision as _precision
     from arbplusjax import sparse_common as _sparse_common
 
+    api = _api
     acb_core = _acb_core
     di = _di
     jcb_mat = _jcb_mat
@@ -129,6 +132,7 @@ def run_real_case(n: int = 32, steps: int = 12, *, warmup: int = 2, runs: int = 
     x = _real_vec(n)
     op = jrb_mat.jrb_mat_dense_operator(a)
     plan = jrb_mat.jrb_mat_dense_operator_plan_prepare(a)
+    rplan = jrb_mat.jrb_mat_dense_operator_rmatvec_plan_prepare(a)
     precond = jrb_mat.jrb_mat_jacobi_preconditioner_plan_prepare(plan)
     probes = jnp.stack([x, _real_vec(n)], axis=0)
     shifts = jnp.asarray([0.0, 0.5, 1.0], dtype=jnp.float64)
@@ -148,8 +152,18 @@ def run_real_case(n: int = 32, steps: int = 12, *, warmup: int = 2, runs: int = 
     )
     apply_fn = jax.jit(lambda vec: jrb_mat.jrb_mat_operator_apply_point(op, vec))
     apply_plan_fn = jax.jit(lambda vec: jrb_mat.jrb_mat_operator_plan_apply(plan, vec))
+    rapply_plan_fn = jax.jit(lambda vec: jrb_mat.jrb_mat_operator_plan_apply(rplan, vec))
     logdet_fn = lambda ps: jrb_mat.jrb_mat_logdet_slq_point_jit(op, ps, steps)
     logdet_plan_fn = lambda ps: jrb_mat.jrb_mat_logdet_slq_point_jit(plan, ps, steps)
+    logdet_solve_plan_fn = lambda vec, ps: jrb_mat.jrb_mat_logdet_solve_point_jit(
+        plan,
+        vec,
+        ps,
+        steps=steps,
+        symmetric=True,
+        tol=1e-7,
+        maxiter=max(steps * 4, 8),
+    )
     det_fn = lambda ps: jrb_mat.jrb_mat_det_slq_point_jit(op, ps, steps)
     det_plan_fn = lambda ps: jrb_mat.jrb_mat_det_slq_point_jit(plan, ps, steps)
     solve_fn = lambda vec: jrb_mat.jrb_mat_solve_action_point_jit(op, vec, symmetric=True)
@@ -193,6 +207,7 @@ def run_real_case(n: int = 32, steps: int = 12, *, warmup: int = 2, runs: int = 
 
     apply_time = _time_call(apply_fn, x)
     apply_plan_time = _time_call(apply_plan_fn, x)
+    rapply_plan_time = _time_call(rapply_plan_fn, x)
     action_time = _time_call(action_fn, x)
     action_plan_time = _time_call(plan_action_fn, x)
     restarted_action_time = _time_call(restarted_action_fn, x)
@@ -200,6 +215,7 @@ def run_real_case(n: int = 32, steps: int = 12, *, warmup: int = 2, runs: int = 
     grad_time = _time_call(grad_fn, x)
     logdet_time = _time_call(logdet_fn, probes)
     logdet_plan_time = _time_call(logdet_plan_fn, probes)
+    logdet_solve_plan_time = _time_call(logdet_solve_plan_fn, x, probes)
     det_time = _time_call(det_fn, probes)
     det_plan_time = _time_call(det_plan_fn, probes)
     solve_time = _time_call(solve_fn, x)
@@ -210,6 +226,7 @@ def run_real_case(n: int = 32, steps: int = 12, *, warmup: int = 2, runs: int = 
     eigsh_plan_time = _time_call(eigsh_plan_fn)
     minres_plan_time = _time_call(minres_plan_fn, minres_rhs)
     logdet_grad_time = _time_call(logdet_grad_fn, probes)
+    logdet_solve_compile_time, logdet_solve_execute_time = _time_compile_execute(logdet_solve_plan_fn, x, probes)
     solve_compile_time, solve_execute_time = _time_compile_execute(solve_plan_fn, x)
     inverse_compile_time, inverse_execute_time = _time_compile_execute(inverse_plan_fn, x)
     multi_shift_compile_time, multi_shift_execute_time = _time_compile_execute(multi_shift_plan_fn, x)
@@ -224,11 +241,13 @@ def run_real_case(n: int = 32, steps: int = 12, *, warmup: int = 2, runs: int = 
             ("real_apply_plan", apply_plan_fn, (x,)),
             ("real_action_plan", plan_action_fn, (x,)),
             ("real_logdet_plan", logdet_plan_fn, (probes,)),
+            ("real_logdet_solve_plan", logdet_solve_plan_fn, (x, probes)),
             ("real_det_plan", det_plan_fn, (probes,)),
         ])
     return {
         "real_apply_cold_s": apply_time,
         "real_apply_plan_cold_s": apply_plan_time,
+        "real_rapply_plan_cold_s": rapply_plan_time,
         "real_action_cold_s": action_time,
         "real_action_plan_cold_s": action_plan_time,
         "real_restarted_action_cold_s": restarted_action_time,
@@ -236,6 +255,7 @@ def run_real_case(n: int = 32, steps: int = 12, *, warmup: int = 2, runs: int = 
         "real_grad_cold_s": grad_time,
         "real_logdet_cold_s": logdet_time,
         "real_logdet_plan_cold_s": logdet_plan_time,
+        "real_logdet_solve_plan_cold_s": logdet_solve_plan_time,
         "real_det_cold_s": det_time,
         "real_det_plan_cold_s": det_plan_time,
         "real_solve_action_cold_s": solve_time,
@@ -246,6 +266,8 @@ def run_real_case(n: int = 32, steps: int = 12, *, warmup: int = 2, runs: int = 
         "real_eigsh_plan_cold_s": eigsh_plan_time,
         "real_minres_plan_cold_s": minres_plan_time,
         "real_logdet_grad_cold_s": logdet_grad_time,
+        "real_logdet_solve_plan_compile_s": logdet_solve_compile_time,
+        "real_logdet_solve_plan_execute_s": logdet_solve_execute_time,
         "real_solve_action_plan_compile_s": solve_compile_time,
         "real_solve_action_plan_execute_s": solve_execute_time,
         "real_inverse_action_plan_compile_s": inverse_compile_time,
@@ -264,10 +286,12 @@ def run_real_case(n: int = 32, steps: int = 12, *, warmup: int = 2, runs: int = 
         "real_logdet_grad_execute_s": logdet_grad_execute_time,
         "real_apply_warm_s": _time_warm_mean(apply_fn, x, warmup=warmup, runs=runs),
         "real_apply_plan_warm_s": _time_warm_mean(apply_plan_fn, x, warmup=warmup, runs=runs),
+        "real_rapply_plan_warm_s": _time_warm_mean(rapply_plan_fn, x, warmup=warmup, runs=runs),
         "real_action_warm_s": _time_warm_mean(action_fn, x, warmup=warmup, runs=runs),
         "real_action_plan_warm_s": _time_warm_mean(plan_action_fn, x, warmup=warmup, runs=runs),
         "real_logdet_warm_s": _time_warm_mean(logdet_fn, probes, warmup=warmup, runs=runs),
         "real_logdet_plan_warm_s": _time_warm_mean(logdet_plan_fn, probes, warmup=warmup, runs=runs),
+        "real_logdet_solve_plan_warm_s": _time_warm_mean(logdet_solve_plan_fn, x, probes, warmup=warmup, runs=runs),
         "real_solve_action_plan_warm_s": _time_warm_mean(solve_plan_fn, x, warmup=warmup, runs=runs),
         "real_inverse_action_plan_warm_s": _time_warm_mean(inverse_plan_fn, x, warmup=warmup, runs=runs),
         "real_multi_shift_plan_warm_s": _time_warm_mean(multi_shift_plan_fn, x, warmup=warmup, runs=runs),
@@ -302,6 +326,7 @@ def run_sparse_real_parametric_case(steps: int = 12) -> dict[str, float]:
     bcoo = sparse_common.SparseBCOO(data=base_data, indices=indices, rows=4, cols=4, algebra="jrb")
     fixed_op = jrb_mat.jrb_mat_bcoo_operator(bcoo)
     fixed_plan = jrb_mat.jrb_mat_bcoo_operator_plan_prepare(bcoo)
+    fixed_rplan = jrb_mat.jrb_mat_bcoo_operator_rmatvec_plan_prepare(bcoo)
     bounds = jrb_mat.jrb_mat_bcoo_gershgorin_bounds(bcoo)
     sketch = probes
     residual = jnp.zeros((0, 4, 2), dtype=jnp.float64)
@@ -336,6 +361,7 @@ def run_sparse_real_parametric_case(steps: int = 12) -> dict[str, float]:
     inverse_sparse_plan_fn = lambda x: jrb_mat.jrb_mat_inverse_action_point_jit(fixed_plan, x, symmetric=True, tol=1e-7, maxiter=16)
     apply_fn = jax.jit(lambda x: jrb_mat.jrb_mat_operator_apply_point(fixed_op, x))
     apply_plan_fn = jax.jit(lambda x: jrb_mat.jrb_mat_operator_plan_apply(fixed_plan, x))
+    rapply_plan_fn = jax.jit(lambda x: jrb_mat.jrb_mat_operator_plan_apply(fixed_rplan, x))
     inverse_diag_local_fn = lambda: jrb_mat.jrb_mat_bcoo_inverse_diagonal_point(
         bcoo,
         overlap=0,
@@ -355,6 +381,7 @@ def run_sparse_real_parametric_case(steps: int = 12) -> dict[str, float]:
 
     apply_time = _time_call(apply_fn, vec)
     apply_plan_time = _time_call(apply_plan_fn, vec)
+    rapply_plan_time = _time_call(rapply_plan_fn, vec)
     logdet_time = _time_call(logdet_sparse_fn, probes)
     logdet_plan_time = _time_call(logdet_sparse_plan_fn, probes)
     logdet_leja_time = _time_call(logdet_leja_fn, sketch, residual)
@@ -371,6 +398,7 @@ def run_sparse_real_parametric_case(steps: int = 12) -> dict[str, float]:
     return {
         "sparse_real_apply_s": apply_time,
         "sparse_real_apply_plan_s": apply_plan_time,
+        "sparse_real_rapply_plan_s": rapply_plan_time,
         "sparse_real_logdet_s": logdet_time,
         "sparse_real_logdet_plan_s": logdet_plan_time,
         "sparse_real_det_s": det_time,
@@ -394,6 +422,7 @@ def run_complex_case(n: int = 24, steps: int = 10, *, warmup: int = 2, runs: int
     op = jcb_mat.jcb_mat_dense_operator(a)
     adj = jcb_mat.jcb_mat_dense_operator_adjoint(a)
     plan = jcb_mat.jcb_mat_dense_operator_plan_prepare(a)
+    rplan = jcb_mat.jcb_mat_dense_operator_rmatvec_plan_prepare(a)
     aplan = jcb_mat.jcb_mat_dense_operator_adjoint_plan_prepare(a)
     precond = jcb_mat.jcb_mat_jacobi_preconditioner_plan_prepare(plan)
     probes = jnp.stack([x, _complex_vec(n)], axis=0)
@@ -426,8 +455,19 @@ def run_complex_case(n: int = 24, steps: int = 10, *, warmup: int = 2, runs: int
     )
     apply_fn = jax.jit(lambda vec: jcb_mat.jcb_mat_operator_apply_point(op, vec))
     apply_plan_fn = jax.jit(lambda vec: jcb_mat.jcb_mat_operator_plan_apply(plan, vec))
+    rapply_plan_fn = jax.jit(lambda vec: jcb_mat.jcb_mat_operator_plan_apply(rplan, vec))
+    aapply_plan_fn = jax.jit(lambda vec: jcb_mat.jcb_mat_operator_plan_apply(aplan, vec))
     logdet_fn = lambda ps: jnp.real(jcb_mat.jcb_mat_logdet_slq_point_jit(op, ps, steps, adj))
     logdet_plan_fn = lambda ps: jnp.real(jcb_mat.jcb_mat_logdet_slq_point_jit(plan, ps, steps, aplan))
+    logdet_solve_plan_fn = lambda vec, ps: jcb_mat.jcb_mat_logdet_solve_point_jit(
+        plan,
+        vec,
+        ps,
+        steps=steps,
+        hermitian=True,
+        tol=1e-7,
+        maxiter=max(steps * 4, 8),
+    )
     det_fn = lambda ps: jnp.real(jcb_mat.jcb_mat_det_slq_point_jit(op, ps, steps, adj))
     det_plan_fn = lambda ps: jnp.real(jcb_mat.jcb_mat_det_slq_point_jit(plan, ps, steps, aplan))
     solve_fn = lambda vec: jcb_mat.jcb_mat_solve_action_point_jit(op, vec, hermitian=True)
@@ -470,6 +510,8 @@ def run_complex_case(n: int = 24, steps: int = 10, *, warmup: int = 2, runs: int
 
     apply_time = _time_call(apply_fn, x)
     apply_plan_time = _time_call(apply_plan_fn, x)
+    rapply_plan_time = _time_call(rapply_plan_fn, x)
+    aapply_plan_time = _time_call(aapply_plan_fn, x)
     action_time = _time_call(action_fn, x)
     action_plan_time = _time_call(action_plan_fn, x)
     restarted_action_time = _time_call(restarted_action_fn, x)
@@ -477,6 +519,7 @@ def run_complex_case(n: int = 24, steps: int = 10, *, warmup: int = 2, runs: int
     grad_time = _time_call(grad_fn, x)
     logdet_time = _time_call(logdet_fn, probes)
     logdet_plan_time = _time_call(logdet_plan_fn, probes)
+    logdet_solve_plan_time = _time_call(logdet_solve_plan_fn, x, probes)
     det_time = _time_call(det_fn, probes)
     det_plan_time = _time_call(det_plan_fn, probes)
     solve_time = _time_call(solve_fn, x)
@@ -487,6 +530,7 @@ def run_complex_case(n: int = 24, steps: int = 10, *, warmup: int = 2, runs: int
     eigsh_plan_time = _time_call(eigsh_fn)
     minres_plan_time = _time_call(minres_plan_fn, minres_rhs)
     logdet_grad_time = _time_call(logdet_grad_fn, probes)
+    logdet_solve_compile_time, logdet_solve_execute_time = _time_compile_execute(logdet_solve_plan_fn, x, probes)
     solve_compile_time, solve_execute_time = _time_compile_execute(solve_plan_fn, x)
     inverse_compile_time, inverse_execute_time = _time_compile_execute(inverse_plan_fn, x)
     multi_shift_compile_time, multi_shift_execute_time = _time_compile_execute(multi_shift_plan_fn, x)
@@ -501,11 +545,14 @@ def run_complex_case(n: int = 24, steps: int = 10, *, warmup: int = 2, runs: int
             ("complex_apply_plan", apply_plan_fn, (x,)),
             ("complex_action_plan", action_plan_fn, (x,)),
             ("complex_logdet_plan", logdet_plan_fn, (probes,)),
+            ("complex_logdet_solve_plan", logdet_solve_plan_fn, (x, probes)),
             ("complex_det_plan", det_plan_fn, (probes,)),
         ])
     return {
         "complex_apply_cold_s": apply_time,
         "complex_apply_plan_cold_s": apply_plan_time,
+        "complex_rapply_plan_cold_s": rapply_plan_time,
+        "complex_adjoint_apply_plan_cold_s": aapply_plan_time,
         "complex_action_cold_s": action_time,
         "complex_action_plan_cold_s": action_plan_time,
         "complex_restarted_action_cold_s": restarted_action_time,
@@ -513,6 +560,7 @@ def run_complex_case(n: int = 24, steps: int = 10, *, warmup: int = 2, runs: int
         "complex_grad_cold_s": grad_time,
         "complex_logdet_cold_s": logdet_time,
         "complex_logdet_plan_cold_s": logdet_plan_time,
+        "complex_logdet_solve_plan_cold_s": logdet_solve_plan_time,
         "complex_det_cold_s": det_time,
         "complex_det_plan_cold_s": det_plan_time,
         "complex_solve_action_cold_s": solve_time,
@@ -523,6 +571,8 @@ def run_complex_case(n: int = 24, steps: int = 10, *, warmup: int = 2, runs: int
         "complex_eigsh_plan_cold_s": eigsh_plan_time,
         "complex_minres_plan_cold_s": minres_plan_time,
         "complex_logdet_grad_cold_s": logdet_grad_time,
+        "complex_logdet_solve_plan_compile_s": logdet_solve_compile_time,
+        "complex_logdet_solve_plan_execute_s": logdet_solve_execute_time,
         "complex_solve_action_plan_compile_s": solve_compile_time,
         "complex_solve_action_plan_execute_s": solve_execute_time,
         "complex_inverse_action_plan_compile_s": inverse_compile_time,
@@ -540,8 +590,11 @@ def run_complex_case(n: int = 24, steps: int = 10, *, warmup: int = 2, runs: int
         "complex_logdet_grad_compile_s": logdet_grad_compile_time,
         "complex_logdet_grad_execute_s": logdet_grad_execute_time,
         "complex_apply_plan_warm_s": _time_warm_mean(apply_plan_fn, x, warmup=warmup, runs=runs),
+        "complex_rapply_plan_warm_s": _time_warm_mean(rapply_plan_fn, x, warmup=warmup, runs=runs),
+        "complex_adjoint_apply_plan_warm_s": _time_warm_mean(aapply_plan_fn, x, warmup=warmup, runs=runs),
         "complex_action_plan_warm_s": _time_warm_mean(action_plan_fn, x, warmup=warmup, runs=runs),
         "complex_logdet_plan_warm_s": _time_warm_mean(logdet_plan_fn, probes, warmup=warmup, runs=runs),
+        "complex_logdet_solve_plan_warm_s": _time_warm_mean(logdet_solve_plan_fn, x, probes, warmup=warmup, runs=runs),
         "complex_solve_action_plan_warm_s": _time_warm_mean(solve_plan_fn, x, warmup=warmup, runs=runs),
         "complex_inverse_action_plan_warm_s": _time_warm_mean(inverse_plan_fn, x, warmup=warmup, runs=runs),
         "complex_multi_shift_plan_warm_s": _time_warm_mean(multi_shift_plan_fn, x, warmup=warmup, runs=runs),
@@ -557,12 +610,15 @@ def run_sparse_complex_case(steps: int = 8) -> dict[str, float]:
     op = jcb_mat.jcb_mat_bcoo_operator(bcoo)
     adj = jcb_mat.jcb_mat_bcoo_operator_adjoint(bcoo)
     plan = jcb_mat.jcb_mat_bcoo_operator_plan_prepare(bcoo)
+    rplan = jcb_mat.jcb_mat_bcoo_operator_rmatvec_plan_prepare(bcoo)
     aplan = jcb_mat.jcb_mat_bcoo_operator_adjoint_plan_prepare(bcoo)
     x = _complex_vec(2)
     probes = jnp.stack([x, _complex_vec(2)], axis=0)
 
     apply_fn = jax.jit(lambda vec: jcb_mat.jcb_mat_operator_apply_point(op, vec))
     apply_plan_fn = jax.jit(lambda vec: jcb_mat.jcb_mat_operator_plan_apply(plan, vec))
+    rapply_plan_fn = jax.jit(lambda vec: jcb_mat.jcb_mat_operator_plan_apply(rplan, vec))
+    aapply_plan_fn = jax.jit(lambda vec: jcb_mat.jcb_mat_operator_plan_apply(aplan, vec))
     action_fn = jax.jit(lambda vec: jcb_mat.jcb_mat_funm_action_arnoldi_point(op, vec, _dense_exp_general, steps, adj))
     action_plan_fn = jax.jit(lambda vec: jcb_mat.jcb_mat_funm_action_arnoldi_point(plan, vec, _dense_exp_general, steps, aplan))
     restarted_fn = jax.jit(lambda vec: jcb_mat.jcb_mat_expm_action_arnoldi_restarted_point(op, vec, steps=steps, restarts=2, adjoint_matvec=adj))
@@ -579,6 +635,8 @@ def run_sparse_complex_case(steps: int = 8) -> dict[str, float]:
     return {
         "sparse_complex_apply_s": _time_call(apply_fn, x),
         "sparse_complex_apply_plan_s": _time_call(apply_plan_fn, x),
+        "sparse_complex_rapply_plan_s": _time_call(rapply_plan_fn, x),
+        "sparse_complex_adjoint_apply_plan_s": _time_call(aapply_plan_fn, x),
         "sparse_complex_action_s": _time_call(action_fn, x),
         "sparse_complex_action_plan_s": _time_call(action_plan_fn, x),
         "sparse_complex_restarted_s": _time_call(restarted_fn, x),
@@ -601,6 +659,48 @@ def _parse_sections(raw: str | None) -> set[str]:
     return out or {"real", "sparse_real", "complex", "sparse_complex"}
 
 
+def _prewarm_cases_for_sections(sections: set[str]) -> tuple[tuple[str, str, str], ...]:
+    cases: list[tuple[str, str, str]] = []
+    if "real" in sections:
+        cases.extend(
+            [
+                ("jrb", "dense", "apply"),
+                ("jrb", "dense", "rapply"),
+                ("jrb", "dense", "solve"),
+                ("jrb", "dense", "logdet"),
+                ("jrb", "dense", "multi_shift"),
+            ]
+        )
+    if "sparse_real" in sections:
+        cases.extend(
+            [
+                ("jrb", "sparse_bcoo", "apply"),
+                ("jrb", "sparse_bcoo", "rapply"),
+                ("jrb", "sparse_bcoo", "solve"),
+            ]
+        )
+    if "complex" in sections:
+        cases.extend(
+            [
+                ("jcb", "dense", "apply"),
+                ("jcb", "dense", "adjoint_apply"),
+                ("jcb", "dense", "solve"),
+                ("jcb", "dense", "logdet"),
+                ("jcb", "dense", "multi_shift"),
+            ]
+        )
+    if "sparse_complex" in sections:
+        cases.extend(
+            [
+                ("jcb", "sparse_bcoo", "apply"),
+                ("jcb", "sparse_bcoo", "adjoint_apply"),
+                ("jcb", "sparse_bcoo", "solve"),
+                ("jcb", "sparse_bcoo", "logdet"),
+            ]
+        )
+    return tuple(cases)
+
+
 def main():
     parser = argparse.ArgumentParser(description="Matrix-free Krylov benchmark with cold/warm timing separation.")
     parser.add_argument("--n-real", type=int, default=32)
@@ -611,6 +711,7 @@ def main():
     parser.add_argument("--warmup", type=int, default=2)
     parser.add_argument("--runs", type=int, default=5)
     parser.add_argument("--no-plan-precompile", action="store_true")
+    parser.add_argument("--startup-prewarm", action="store_true")
     parser.add_argument(
         "--sections",
         type=str,
@@ -619,6 +720,22 @@ def main():
     )
     args = parser.parse_args()
     sections = _parse_sections(args.sections)
+    if args.startup_prewarm:
+        _load_matrix_free_modules()
+        diagnostics = api.prewarm_matrix_free_kernels(
+            cases=_prewarm_cases_for_sections(sections),
+            backend=jax.default_backend(),
+            dense_problem_size=max(args.n_real, args.n_complex),
+            sparse_problem_size=max(args.n_real, args.n_complex),
+            steps=max(args.steps_real, args.steps_complex, args.steps_sparse),
+            probe_count=2,
+        )
+        print(f"[matrix_free_krylov] startup_prewarm_cases={len(diagnostics)}", flush=True)
+        for key, diag in diagnostics.items():
+            print(
+                f"[matrix_free_krylov] prewarmed {key} backend={diag.chosen_backend} size={diag.problem_size}",
+                flush=True,
+            )
 
     results: dict[str, float] = {}
     if "real" in sections:
@@ -652,6 +769,7 @@ def main():
     print(f"warmup: {args.warmup}")
     print(f"runs: {args.runs}")
     print(f"plan_precompile: {not args.no_plan_precompile}")
+    print(f"startup_prewarm: {args.startup_prewarm}")
     print(f"sections: {','.join(sorted(sections))}")
     for key, value in results.items():
         print(f"{key}: {value:.6f}")

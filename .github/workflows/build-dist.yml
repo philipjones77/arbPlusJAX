@@ -1,0 +1,30 @@
+name: build-dist
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install build tooling
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install build twine
+      - name: Build wheel and sdist
+        run: python -m build
+      - name: Verify distributions
+        run: python -m twine check dist/*
+      - name: Install from built wheel
+        run: |
+          python -m venv .venv-dist
+          . .venv-dist/bin/activate
+          python -m pip install --upgrade pip
+          python -m pip install dist/*.whl
+          python -c "import arbplusjax; print('import-ok')"

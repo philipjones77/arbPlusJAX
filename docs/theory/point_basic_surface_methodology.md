@@ -9,8 +9,8 @@ public `point` and `basic` surfaces.
 
 It is the theory/methodology companion to:
 
-- [point_surface_standard.md](/docs/standards/point_surface_standard.md)
-- [point_fast_jax_standard.md](/docs/standards/point_fast_jax_standard.md)
+- [operational_jax_standard.md](/docs/standards/operational_jax_standard.md)
+- [fast_jax_standard.md](/docs/standards/fast_jax_standard.md)
 - [point_basic_surface_status.md](/docs/reports/point_basic_surface_status.md)
 - [parameterized_ad_verification.md](/docs/reports/parameterized_ad_verification.md)
 

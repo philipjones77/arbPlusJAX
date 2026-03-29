@@ -40,16 +40,28 @@ Scope:
 - Hypergeom regularized lower batch: `2.226571`
 - Hypergeom regularized upper batch: `1.848764`
 
+## Operational Service Snapshot
+
+- incomplete gamma upper point padded float64 warm: `0.331140`
+- incomplete gamma upper basic padded float64 warm: `0.423250`
+- incomplete Bessel K point padded float64 warm: `0.846042`
+- provider Barnes double-gamma padded float64 warm: `n/a`
+- provider log Barnes double-gamma padded float64 warm: `n/a`
+
 ## Startup Probe Snapshot
 
 - [hypgeom_point_startup_probe.json](/benchmarks/results/hypgeom_point_startup_probe/hypgeom_point_startup_probe.json): import=`0.830366`, compile+first=`0.150424`, steady=`0.000087`
-- [double_gamma_point_startup_probe.json](/benchmarks/results/double_gamma_point_startup_probe/double_gamma_point_startup_probe.json): import=`1.458595`, compile_error_type=`ConcretizationTypeError`
+- [double_gamma_point_startup_probe.json](/benchmarks/results/double_gamma_point_startup_probe/double_gamma_point_startup_probe.json) IFJ: import=`2.145601`, compile+first=`23.801830`, steady=`0.019230`
+- provider Barnes startup: compile+first=`30.625186`, steady=`15.983087`
+- legacy BDG startup: compile_error_type=`ConcretizationTypeError`
 
 ## Notes
 
 - `special_function_hardening_benchmark.py` is the current cross-family benchmark/diagnostics rollup.
 - `special_function_ad_benchmark.py` is the current cross-family argument-vs-parameter AD benchmark rollup.
+- `benchmark_special_function_service_api.py` is the current repeated-call operational benchmark for point/basic service usage.
 - `hypgeom_status.md` remains the detailed family-by-family hypergeom engineering inventory.
 - The point-surface audit now compares public point wrappers against scalar family-owned exact-input evaluations; current remaining pfq drift is in the batched interval/mode path, not the point wrapper.
-- The Barnes startup probe still records a compile failure on the legacy `bdg_barnesgamma2` point path; the IFJ diagnostics-backed path and provider alias are the currently hardened public route.
+- The Barnes startup probe now records both the supported IFJ/provider startup path and the legacy BDG compile failure so the hardened route stays explicit.
+- Current CPU/GPU closeout for the special-function tranche excludes Barnes IFJ batch throughput; gamma, incomplete Bessel, and hypergeom are the backend-certified focus set.
 - Canonical notebook teaching is now split by ownership: gamma/incomplete-tail, Barnes/double-gamma, and hypergeom each have a dedicated example surface.

@@ -1,10 +1,18 @@
-Last updated: 2026-03-17T00:00:00Z
+Last updated: 2026-03-29T00:00:00Z
 
 # Contracts
 
 This directory is reserved for binding runtime and API guarantees.
 
 Operational obligations should go here rather than under `docs/`.
+
+This layer now sits explicitly alongside:
+
+- `docs/specs/` for semantic definitions and intended capability scope
+- `docs/objects/` for catalogs and inventories
+- `docs/implementation/` for code-structure explanation
+- `docs/reports/` for current measured/generated state
+- `docs/status/` for active completion tracking
 
 ## Active contract set
 
@@ -22,3 +30,6 @@ These contracts apply to the currently stabilized repo surface.
 
 - They do not promise that every experimental module is frozen.
 - They do define the current guarantees we expect downstream code to rely on.
+- They should be read together with the semantic category specs under
+  `docs/specs/` when a category needs both “what this means” and “what is
+  guaranteed today”.

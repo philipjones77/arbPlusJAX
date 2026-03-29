@@ -17,9 +17,8 @@ This document is a companion to:
 - [jax_api_runtime_standard.md](/docs/standards/jax_api_runtime_standard.md)
 - [caching_recompilation_standard.md](/docs/standards/caching_recompilation_standard.md)
 - [lazy_loading_standard.md](/docs/standards/lazy_loading_standard.md)
-- [point_fast_jax_standard.md](/docs/standards/point_fast_jax_standard.md)
+- [fast_jax_standard.md](/docs/standards/fast_jax_standard.md)
 - [backend_realized_performance_standard.md](/docs/standards/backend_realized_performance_standard.md)
-- [startup_compile_playbook_standard.md](/docs/standards/startup_compile_playbook_standard.md)
 
 ## Scope
 
@@ -116,6 +115,95 @@ modules, the repo no longer has one governed startup-compile policy.
 - A repo should not make each subsystem invent its own startup policy from
   scratch.
 
+## Shared Playbook
+
+Every adopting repo should implement the same sequence.
+
+### 1. Define one startup-compile policy
+
+- Treat startup compile as a repo-level runtime policy, not as a benchmark-only
+  complaint.
+- Require every public JAX hot path to expose a stable-shape execution path.
+- Acceptable stable-shape contracts include:
+  - fixed batch size
+  - `pad_to`
+  - shape buckets
+  - prepare/apply reuse
+
+### 2. Centralize JIT ownership
+
+- Put `jax.jit` in wrapper, binder, or runtime-boundary layers.
+- Do not let every family module invent its own compile policy independently.
+- Make the canonical compiled public entrypoint obvious in docs and examples.
+
+### 3. Make fixed-shape calling the default
+
+- The stable-shape path must be the default teaching path.
+- `pad_to` should be treated as the public compile contract, not as an obscure
+  escape hatch.
+- Examples, notebooks, and service snippets should show fixed-shape calling
+  first.
+
+### 4. Turn on persistent compilation cache everywhere
+
+- Canonical CLI, service, benchmark, and developer entrypoints must enable:
+  - `JAX_ENABLE_COMPILATION_CACHE=1`
+  - `JAX_COMPILATION_CACHE_DIR=<shared cache path>`
+- Cache configuration should come from one repo-owned helper or bootstrap path,
+  not from ad hoc per-script logic.
+
+### 5. Warm up intentionally
+
+- Define a bounded warmup routine for the top hot kernels.
+- Warm up the stable-shape path only.
+- Do not make the first real user request pay accidental compile cost when the
+  workload is known in advance.
+
+### 6. Reuse processes
+
+- Prefer long-lived worker processes for repeated workloads.
+- Treat excessive short-lived Python process spawning as a startup-compile
+  problem.
+- If multi-process execution is unavoidable, shared persistent cache is
+  mandatory.
+
+### 7. Add compile budgets to CI
+
+- Maintain representative startup probes.
+- Fail CI or release validation when:
+  - cold compile latency regresses materially
+  - warm latency regresses materially
+  - recompilation behavior regresses
+  - a representative probe stops compiling
+
+### 8. Separate import, backend init, and compile cost
+
+- Measure at least:
+  - import time
+  - first backend initialization time
+  - first compile plus first real execution
+  - steady repeated execution
+- Do not collapse these into one undifferentiated startup number.
+
+### 9. Remove dynamic/static argument mistakes
+
+- Audit `static_argnames`, method selectors, precision flags, dtypes, and mode
+  switches.
+- Compile-relevant controls should be explicit and stable.
+- Hidden invalidation boundaries are not acceptable.
+
+### 10. Publish one shared playbook
+
+- Each repo should carry one public startup-compile playbook and one
+  implementation template.
+- Shared expectations should cover:
+  - env vars
+  - shape-bucketing rules
+  - warmup policy
+  - probe structure
+  - CI budget policy
+  - JIT ownership model
+
 ## Anti-patterns
 
 - JIT compiling directly on arbitrary user-sized arrays in the canonical path
@@ -133,8 +221,8 @@ Repos that adopt this standard should provide:
 - at least one public example or contract test showing the stable-shape calling path
 - for point-mode families, at least one public compiled point-batch surface that satisfies the fast-JAX contract where the family is intended for repeated bulk evaluation
 - implementation-facing rollout notes that identify the main entrypoints and invalidation boundaries
-- one shared startup-compile playbook/template pair for reuse across sibling
-  repos
+- one implementation rollout note and one reusable repo-template document for
+  sibling repos
 
 ## Required Structural Fixes
 
@@ -164,7 +252,7 @@ Required patterns:
 - Add intentional warmup for the top hot-path kernels.
 - Add cold/warm/recompile probes and CI thresholds.
 - Update examples and docs so the stable-shape path is the default teaching path.
-- Publish the shared playbook and repo-template documents.
+- Publish the implementation rollout and repo-template documents.
 
 ## Repo Mapping In arbPlusJAX
 
@@ -177,3 +265,8 @@ This repo already contains evidence and partial adoption through:
 - a repo-wide `point fast JAX` program for point-mode public surfaces
 
 The remaining expectation is to treat these pieces as the default operating model rather than isolated benchmark conveniences.
+
+The implementation-facing companions remain:
+
+- [startup_compile_rollout_implementation.md](/docs/implementation/startup_compile_rollout_implementation.md)
+- [startup_compile_repo_template.md](/docs/implementation/startup_compile_repo_template.md)

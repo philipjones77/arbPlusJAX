@@ -34,6 +34,7 @@ Policy:
 | [docs/reports/hypgeom_status.md](/docs/reports/hypgeom_status.md) | `generated` | `python tools/hypgeom_status_report.py` |
 | [docs/reports/matrix_free_first_use_inventory.md](/docs/reports/matrix_free_first_use_inventory.md) | `generated` | `python tools/matrix_free_first_use_report.py` |
 | [docs/reports/matrix_free_krylov_benchmark.md](/docs/reports/matrix_free_krylov_benchmark.md) | `manual-authoritative` | `update the owning source document directly` |
+| [docs/reports/matrix_free_operator_status.md](/docs/reports/matrix_free_operator_status.md) | `manual-authoritative` | `update the owning source document directly` |
 | [docs/reports/matrix_surface_workbook.md](/docs/reports/matrix_surface_workbook.md) | `generated` | `python benchmarks/matrix_surface_workbook.py --n 4 --warmup 0 --runs 1 --steps 4` |
 | [docs/reports/new_functions.md](/docs/reports/new_functions.md) | `generated` | `python tools/function_provenance_report.py` |
 | [docs/reports/parameterized_ad_verification.md](/docs/reports/parameterized_ad_verification.md) | `generated` | `python tools/parameterized_ad_verification_report.py` |
@@ -42,6 +43,7 @@ Policy:
 | [docs/reports/point_fast_jax_category_matrix.md](/docs/reports/point_fast_jax_category_matrix.md) | `generated` | `python tools/point_fast_jax_category_report.py` |
 | [docs/reports/point_fast_jax_function_inventory.md](/docs/reports/point_fast_jax_function_inventory.md) | `generated` | `python tools/point_fast_jax_function_report.py` |
 | [docs/reports/point_fast_jax_verification.md](/docs/reports/point_fast_jax_verification.md) | `generated` | `python tools/point_fast_jax_verification_report.py` |
+| [docs/reports/production_readiness.md](/docs/reports/production_readiness.md) | `generated` | `python tools/production_readiness_report.py` |
 | [docs/reports/repo_organization_by_coverage_categories.md](/docs/reports/repo_organization_by_coverage_categories.md) | `manual-authoritative` | `update when the repo grouping model or coverage-category map changes` |
 | [docs/reports/repo_standards_verification.md](/docs/reports/repo_standards_verification.md) | `generated` | `python tools/repo_standards_verification_report.py` |
 | [docs/reports/report_status_refresh_inventory.md](/docs/reports/report_status_refresh_inventory.md) | `generated` | `python tools/report_status_refresh_inventory.py` |
@@ -49,10 +51,16 @@ Policy:
 | [docs/status/README.md](/docs/status/README.md) | `generated` | `python tools/generate_docs_indexes.py` |
 | [docs/status/api_runtime_todo.md](/docs/status/api_runtime_todo.md) | `manual-authoritative` | `update the owning source document directly` |
 | [docs/status/audit.md](/docs/status/audit.md) | `manual-authoritative` | `rerun the audit workflow and refresh the checked-in audit snapshot` |
+| [docs/status/capability_maturity_todo.md](/docs/status/capability_maturity_todo.md) | `manual-authoritative` | `update the owning source document directly` |
 | [docs/status/cross_cutting_todo.md](/docs/status/cross_cutting_todo.md) | `manual-authoritative` | `update the owning source document directly` |
 | [docs/status/curvature_todo.md](/docs/status/curvature_todo.md) | `manual-authoritative` | `update the owning source document directly` |
+| [docs/status/docs_publishing_todo.md](/docs/status/docs_publishing_todo.md) | `manual-authoritative` | `update the owning source document directly` |
 | [docs/status/matrix_free_completion_plan.md](/docs/status/matrix_free_completion_plan.md) | `manual-authoritative` | `update when matrix-free/operator completion planning changes` |
+| [docs/status/operational_support_todo.md](/docs/status/operational_support_todo.md) | `manual-authoritative` | `update the owning source document directly` |
 | [docs/status/point_fast_jax_plan.md](/docs/status/point_fast_jax_plan.md) | `manual-authoritative` | `update the owning source document directly` |
+| [docs/status/production_readiness_todo.md](/docs/status/production_readiness_todo.md) | `manual-authoritative` | `update when production-readiness governance or closeout state changes` |
+| [docs/status/release_packaging_todo.md](/docs/status/release_packaging_todo.md) | `manual-authoritative` | `update the owning source document directly` |
+| [docs/status/security_supply_chain_todo.md](/docs/status/security_supply_chain_todo.md) | `manual-authoritative` | `update the owning source document directly` |
 | [docs/status/sparse_completion_plan.md](/docs/status/sparse_completion_plan.md) | `manual-authoritative` | `update when sparse/block/vblock completion planning changes` |
 | [docs/status/special_functions_todo.md](/docs/status/special_functions_todo.md) | `manual-authoritative` | `update the owning source document directly` |
 | [docs/status/test_coverage_matrix.md](/docs/status/test_coverage_matrix.md) | `manual-authoritative` | `update when the category model or primary test ownership changes` |

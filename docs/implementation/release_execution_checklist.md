@@ -3,7 +3,7 @@ Last updated: 2026-03-27T00:00:00Z
 # Release Execution Checklist
 
 This is the concrete runbook for satisfying
-[release_execution_checklist_standard.md](/docs/standards/release_execution_checklist_standard.md).
+[release_governance_standard.md](/docs/standards/release_governance_standard.md).
 
 ## Required Deliverables
 
@@ -113,4 +113,3 @@ A release-quality close-out message should state:
 - whether startup/import, compile, AD, benchmark, and example surfaces were
   covered
 - what remains intentionally out of scope
-

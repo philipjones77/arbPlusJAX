@@ -128,7 +128,7 @@ python benchmarks/bench_report.py --run benchmarks/results/<run_dir> --out bench
 ## Source packaging
 Use:
 ```
-python tools/MAKE_ZIP.py
+python tools/make_zip.py
 ```
 The archive is written to `_bundles/` by default.
 The generated archive name is enforced as:

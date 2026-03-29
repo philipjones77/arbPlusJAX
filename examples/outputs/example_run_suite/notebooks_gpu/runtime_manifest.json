@@ -1,5 +1,5 @@
 {
-  "timestamp_utc": "2026-03-28T10:53:46Z",
+  "timestamp_utc": "2026-03-29T09:52:30Z",
   "repo_root": "/home/phili/projects/arbplusJAX",
   "environment_kind": "wsl",
   "os": {
@@ -14,7 +14,7 @@
     "version": "3.12.12"
   },
   "git": {
-    "commit": "ec6227c42b6c055115d746c0fe970e18c2a0e067"
+    "commit": "9cb45d1edfa74491233e7d3f63243e1c51e1548f"
   },
   "jax": {
     "requested_mode": "gpu",
@@ -35,7 +35,7 @@
   "example_notebooks": {
     "jax_dtype": "float64",
     "notebooks": [
-      "example_core_scalar_surface.ipynb"
+      "example_matrix_free_operator_surface.ipynb"
     ]
   }
 }

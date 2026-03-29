@@ -1,0 +1,28 @@
+name: docs-validate
+
+on:
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  docs-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install docs dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[docs]"
+      - name: Refresh generated docs indexes
+        run: python tools/generate_docs_indexes.py
+      - name: Run docs contract tests
+        run: python -m pytest -q tests/test_docs_indexes.py tests/test_docs_build_contracts.py tests/test_repo_link_policy.py
+      - name: Build HTML docs
+        run: python tools/build_docs.py --builder html
+      - name: Run linkcheck
+        run: python tools/build_docs.py --builder linkcheck

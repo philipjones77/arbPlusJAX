@@ -38,7 +38,7 @@ Current repo-wide public-surface status:
 
 The governing standard is:
 
-- [point_fast_jax_standard.md](/docs/standards/point_fast_jax_standard.md)
+- [fast_jax_standard.md](/docs/standards/fast_jax_standard.md)
 
 The implementation program is:
 
