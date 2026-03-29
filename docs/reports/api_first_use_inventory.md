@@ -14,7 +14,7 @@ Budgets:
 
 ## API Import
 
-- observed module count: `11`
+- observed module count: `12`
 
 ```json
 [
@@ -28,13 +28,14 @@ Budgets:
   "arbplusjax.kernel_helpers",
   "arbplusjax.lazy_imports",
   "arbplusjax.lazy_jit",
-  "arbplusjax.precision"
+  "arbplusjax.precision",
+  "arbplusjax.public_metadata"
 ]
 ```
 
 ## Core Point First Use (`eval_point("exp", ...)`)
 
-- observed module count: `12`
+- observed module count: `13`
 - `arbplusjax.point_wrappers_core` loaded: `True`
 
 ```json
@@ -50,13 +51,14 @@ Budgets:
   "arbplusjax.lazy_imports",
   "arbplusjax.lazy_jit",
   "arbplusjax.point_wrappers_core",
-  "arbplusjax.precision"
+  "arbplusjax.precision",
+  "arbplusjax.public_metadata"
 ]
 ```
 
 ## Matrix Dense First Use (`eval_point("arb_mat_zero", ...)`)
 
-- observed module count: `13`
+- observed module count: `14`
 - `arbplusjax.point_wrappers_matrix_dense` loaded: `True`
 - `arbplusjax.mat_common` loaded: `True`
 
@@ -74,13 +76,14 @@ Budgets:
   "arbplusjax.lazy_jit",
   "arbplusjax.mat_common",
   "arbplusjax.point_wrappers_matrix_dense",
-  "arbplusjax.precision"
+  "arbplusjax.precision",
+  "arbplusjax.public_metadata"
 ]
 ```
 
 ## Matrix Plan Prepare First Use (`eval_point("arb_mat_matvec_cached_prepare", ...)`)
 
-- observed module count: `13`
+- observed module count: `14`
 - `arbplusjax.point_wrappers_matrix_plans` loaded: `True`
 - `arbplusjax.mat_common` loaded: `True`
 
@@ -98,13 +101,14 @@ Budgets:
   "arbplusjax.lazy_jit",
   "arbplusjax.mat_common",
   "arbplusjax.point_wrappers_matrix_plans",
-  "arbplusjax.precision"
+  "arbplusjax.precision",
+  "arbplusjax.public_metadata"
 ]
 ```
 
 ## Matrix Plan Apply First Use (`eval_point("arb_mat_matvec_cached_apply", ...)`)
 
-- observed module count: `13`
+- observed module count: `14`
 - `arbplusjax.point_wrappers_matrix_plans` loaded: `True`
 - `arbplusjax.mat_common` loaded: `True`
 
@@ -122,13 +126,14 @@ Budgets:
   "arbplusjax.lazy_jit",
   "arbplusjax.mat_common",
   "arbplusjax.point_wrappers_matrix_plans",
-  "arbplusjax.precision"
+  "arbplusjax.precision",
+  "arbplusjax.public_metadata"
 ]
 ```
 
 ## Tail First Use (`tail_integral(...)`)
 
-- observed module count: `20`
+- observed module count: `21`
 - `arbplusjax.special.tail_acceleration` loaded: `True`
 
 ```json
@@ -144,6 +149,7 @@ Budgets:
   "arbplusjax.lazy_imports",
   "arbplusjax.lazy_jit",
   "arbplusjax.precision",
+  "arbplusjax.public_metadata",
   "arbplusjax.special",
   "arbplusjax.special.tail_acceleration",
   "arbplusjax.special.tail_acceleration.core",

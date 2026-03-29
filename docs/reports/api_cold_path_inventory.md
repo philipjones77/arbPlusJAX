@@ -20,8 +20,8 @@ Budgets:
 
 ## API Import
 
-- observed module count: `11`
-- `public_metadata` loaded: `False`
+- observed module count: `12`
+- `public_metadata` loaded: `True`
 - `point_wrappers_core` loaded: `False`
 
 ```json
@@ -36,7 +36,8 @@ Budgets:
   "arbplusjax.kernel_helpers",
   "arbplusjax.lazy_imports",
   "arbplusjax.lazy_jit",
-  "arbplusjax.precision"
+  "arbplusjax.precision",
+  "arbplusjax.public_metadata"
 ]
 ```
 

@@ -1,4 +1,4 @@
-Last updated: 2026-03-25T00:00:00Z
+Last updated: 2026-03-29T00:00:00Z
 
 # Matrix-Free Completion Plan
 
@@ -118,6 +118,18 @@ The goal is dense-style functional parity where matrix-free semantics make sense
 - the newest contour-action tranche now has a clean dedicated pytest slice,
   but broader heavy-chassis pytest completion is still slower than the newer
   lightweight regression path
+- retained CPU/GPU benchmark and executed-notebook evidence now exists in the
+  current WSL `jax` environment, and backend-policy/prewarm helpers now exist
+  for repeated operator-plan workloads:
+  - `choose_matrix_free_plan_policy(...)`
+  - `prewarm_matrix_free_kernels(...)`
+- backend-realized behavior is now characterized explicitly:
+  - CPU remains the default recommendation for many dense repeated
+    matrix-free/operator workloads
+  - GPU is retained-validated and selectively useful on sparse complex
+    operator-plan workloads
+  - prewarm and stable-plan reuse are part of the supported public calling
+    model rather than undocumented advice
 
 ### Remaining
 
@@ -207,6 +219,10 @@ Required matrix-free policy categories:
 - keep benchmark artifacts under:
   - `benchmarks/results/`
   - `experiments/benchmarks/outputs/`
+- keep the retained CPU/GPU comparison in
+  [matrix_free_operator_status.md](/docs/reports/matrix_free_operator_status.md)
+  aligned with benchmark refreshes so the dense-CPU / sparse-complex-GPU
+  crossover guidance stays current
 
 ## 8. Preconditioners, Multi-Shift, And Recycling
 

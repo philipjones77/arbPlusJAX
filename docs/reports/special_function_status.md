@@ -1,4 +1,4 @@
-Last updated: 2026-03-26T00:00:00Z
+Last updated: 2026-03-29T00:00:00Z
 
 # Special-Function Status
 
@@ -7,6 +7,12 @@ Generated from `tools/special_function_status_report.py` using the checked-in ha
 Scope:
 - production-facing special-function families with active hardening work in this repo
 - canonical API/binder surfaces, diagnostics surfaces, benchmarks, startup probes, and example notebooks
+
+## Closeout Status
+
+- special functions are now treated as closed for the governed production set excluding Barnes
+- that closed set is: incomplete gamma, incomplete Bessel, and hypergeometric canonical surfaces
+- Barnes / double-gamma remains the explicit exception backlog because its batched compiled throughput path is still compile-heavy
 
 ## Canonical Production Surfaces
 
@@ -42,11 +48,11 @@ Scope:
 
 ## Operational Service Snapshot
 
-- incomplete gamma upper point padded float64 warm: `0.331140`
-- incomplete gamma upper basic padded float64 warm: `0.423250`
-- incomplete Bessel K point padded float64 warm: `0.846042`
-- provider Barnes double-gamma padded float64 warm: `n/a`
-- provider log Barnes double-gamma padded float64 warm: `n/a`
+- incomplete gamma upper point padded float64 warm: CPU `0.331140`, GPU `0.283432`
+- incomplete gamma upper basic padded float64 warm: CPU `0.423250`, GPU `0.305107`
+- incomplete Bessel K point padded float64 warm: CPU `0.846042`, GPU `0.315276`
+- provider Barnes double-gamma padded float64 warm: CPU `n/a`, GPU `n/a`
+- provider log Barnes double-gamma padded float64 warm: CPU `n/a`, GPU `n/a`
 
 ## Startup Probe Snapshot
 
@@ -64,4 +70,5 @@ Scope:
 - The point-surface audit now compares public point wrappers against scalar family-owned exact-input evaluations; current remaining pfq drift is in the batched interval/mode path, not the point wrapper.
 - The Barnes startup probe now records both the supported IFJ/provider startup path and the legacy BDG compile failure so the hardened route stays explicit.
 - Current CPU/GPU closeout for the special-function tranche excludes Barnes IFJ batch throughput; gamma, incomplete Bessel, and hypergeom are the backend-certified focus set.
+- On the retained padded service benchmark for that non-Barnes closeout set, GPU is ahead for the current incomplete-gamma and incomplete-Bessel comparison rows.
 - Canonical notebook teaching is now split by ownership: gamma/incomplete-tail, Barnes/double-gamma, and hypergeom each have a dedicated example surface.

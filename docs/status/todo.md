@@ -1,4 +1,4 @@
-Last updated: 2026-03-27T00:00:00Z
+Last updated: 2026-03-29T00:00:00Z
 
 # TODO
 
@@ -222,8 +222,19 @@ Status: `in_progress`
     [mat_wrappers.py](/src/arbplusjax/mat_wrappers.py), with direct owner tests
     in
     [test_block_vblock_sparse_mode_surface.py](/tests/test_block_vblock_sparse_mode_surface.py)
+  - sparse-native point/basic operational apply is now explicitly closed for
+    CPU/GPU-tested `matvec`, `rmatvec`, cached `prepare/apply`, and compiled
+    cached-apply binders without dense fallback, as recorded in
+    [sparse_matrix_status.md](/docs/reports/sparse_matrix_status.md)
+  - retained sparse operational CPU/GPU artifacts now exist in
+    [benchmark_sparse_operational_surface_cpu_refresh.json](/benchmarks/results/benchmark_sparse_operational_surface/benchmark_sparse_operational_surface_cpu_refresh.json)
+    and
+    [benchmark_sparse_operational_surface_gpu_refresh.json](/benchmarks/results/benchmark_sparse_operational_surface/benchmark_sparse_operational_surface_gpu_refresh.json)
 - `in_progress`
   - direct owner tests now exist for `sparse_common`
+  - sparse solve/factor/basic parity beyond the operational apply layer is
+    still open and should not be confused with the now-closed sparse-native
+    apply tranche
 - `planned`
   - extend native interval/box sparse coverage beyond the now-landed direct core
     `basic` determinant, inverse, square, factor, and solve entrypoints into
@@ -334,6 +345,15 @@ Status: `in_progress`
   - fp64 solve/logdet gradient proof coverage now exists for the implicit
     adjoint path, and a latent-Gaussian Laplace worked example now exists under
     `examples/example_latent_gaussian_laplace.py`
+  - dedicated status and practical closeout documents now exist in
+    [matrix_free_operator_status.md](/docs/reports/matrix_free_operator_status.md)
+    and [matrix_free.md](/docs/practical/matrix_free.md)
+  - retained CPU/GPU matrix-free benchmark and executed-notebook evidence now
+    exists for the current WSL `jax` environment, with explicit backend-policy
+    and prewarm guidance for repeated workloads
+  - public backend helpers now exist for repeated operator-plan workloads:
+    `choose_matrix_free_plan_policy(...)` and
+    `prewarm_matrix_free_kernels(...)`
 
 ### Core Operator Infrastructure
 
@@ -468,10 +488,35 @@ Detailed backlog:
 
 ## 6. Special Functions
 
-Status: `in_progress`
+Status: `done`
+
+- `done`
+  - dedicated practical and status documents now exist in
+    [special_functions.md](/docs/practical/special_functions.md) and
+    [special_function_status.md](/docs/reports/special_function_status.md)
+  - canonical example notebooks now exist for gamma/incomplete-tail,
+    Barnes/double-gamma, and hypergeometric production surfaces
+  - CPU/GPU-tested operational service closeout is now recorded for the
+    non-Barnes backend-certified set: incomplete gamma, incomplete Bessel, and
+    hypergeometric surfaces
+  - argument- and parameter-direction AD proof slices now exist for the
+    non-Barnes backend-closeout set on CPU and CUDA
+- `done`
+  - the governed production set for special functions is now treated as closed:
+    incomplete gamma, incomplete Bessel, and hypergeometric canonical surfaces
+    are fast-JAX, operational-JAX, CPU/GPU-tested, benchmarked, notebooked,
+    and AD-covered
+- `in_progress`
+  - Barnes IFJ remains the explicit carved-out exception: it is
+    correctness/diagnostics hardened but still excluded from backend-throughput
+    closeout claims because its batched compiled path remains compile-heavy
+- `planned`
+  - extend the same backend-closeout claim to Barnes IFJ only after the
+    compiled batch path is materially less compile-bound
 
 Detailed backlog:
 - [special_functions_todo.md](/docs/status/special_functions_todo.md)
+- [special_function_status.md](/docs/reports/special_function_status.md)
 
 ## Theory And Methodology
 

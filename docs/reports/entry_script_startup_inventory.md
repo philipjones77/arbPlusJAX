@@ -11,23 +11,23 @@ Interpretation:
 
 | path | mode | mean startup s | min s | max s | arbplusjax modules | top-level arbplusjax imports | top-level jax imports |
 |---|---:|---:|---:|---:|---:|---|---|
-| [benchmarks/benchmark_api_surface.py](/benchmarks/benchmark_api_surface.py) | `help` | `0.457` | `0.421` | `0.516` | `0` | `-` | `jax, jax.numpy` |
-| [benchmarks/benchmark_matrix_service_api.py](/benchmarks/benchmark_matrix_service_api.py) | `help` | `0.480` | `0.434` | `0.531` | `0` | `-` | `jax, jax.numpy` |
-| [benchmarks/benchmark_special_function_service_api.py](/benchmarks/benchmark_special_function_service_api.py) | `help` | `0.412` | `0.407` | `0.421` | `0` | `-` | `jax, jax.numpy` |
-| [benchmarks/benchmark_matrix_free_krylov.py](/benchmarks/benchmark_matrix_free_krylov.py) | `help` | `0.422` | `0.404` | `0.451` | `0` | `-` | `jax, jax.numpy` |
-| [benchmarks/benchmark_core_scalar_service_api.py](/benchmarks/benchmark_core_scalar_service_api.py) | `help` | `0.404` | `0.401` | `0.410` | `0` | `-` | `jax, jax.numpy` |
-| [benchmarks/benchmark_dense_matrix_surface.py](/benchmarks/benchmark_dense_matrix_surface.py) | `help` | `0.397` | `0.391` | `0.404` | `0` | `-` | `jax, jax.numpy` |
-| [benchmarks/benchmark_sparse_matrix_surface.py](/benchmarks/benchmark_sparse_matrix_surface.py) | `help` | `0.422` | `0.392` | `0.440` | `0` | `-` | `jax, jax.numpy` |
-| [benchmarks/benchmark_block_sparse_matrix_surface.py](/benchmarks/benchmark_block_sparse_matrix_surface.py) | `help` | `0.435` | `0.400` | `0.473` | `0` | `-` | `jax, jax.numpy` |
-| [benchmarks/benchmark_vblock_sparse_matrix_surface.py](/benchmarks/benchmark_vblock_sparse_matrix_surface.py) | `help` | `0.412` | `0.384` | `0.433` | `0` | `-` | `jax, jax.numpy` |
-| [benchmarks/benchmark_matrix_stack_diagnostics.py](/benchmarks/benchmark_matrix_stack_diagnostics.py) | `help` | `0.414` | `0.375` | `0.464` | `0` | `-` | `jax, jax.numpy` |
-| [benchmarks/benchmark_arb_mat.py](/benchmarks/benchmark_arb_mat.py) | `help` | `0.402` | `0.379` | `0.434` | `0` | `-` | `jax, jax.numpy` |
-| [benchmarks/benchmark_acb_calc.py](/benchmarks/benchmark_acb_calc.py) | `help` | `0.428` | `0.390` | `0.473` | `0` | `-` | `jax, jax.numpy` |
-| [benchmarks/benchmark_barnes_double_gamma.py](/benchmarks/benchmark_barnes_double_gamma.py) | `help` | `0.423` | `0.370` | `0.473` | `0` | `-` | `jax, jax.numpy` |
-| [benchmarks/benchmark_hypgeom.py](/benchmarks/benchmark_hypgeom.py) | `help` | `error` | `-` | `-` | `-` | `-` | `jax.numpy` |
-| [benchmarks/compare_arb_mat.py](/benchmarks/compare_arb_mat.py) | `help` | `0.401` | `0.364` | `0.434` | `0` | `-` | `jax.numpy` |
-| [benchmarks/compare_acb_calc.py](/benchmarks/compare_acb_calc.py) | `help` | `0.418` | `0.409` | `0.427` | `0` | `-` | `jax.numpy` |
-| [examples/example_latent_gaussian_laplace.py](/examples/example_latent_gaussian_laplace.py) | `import` | `0.428` | `0.409` | `0.452` | `0` | `-` | `jax, jax.numpy` |
+| [benchmarks/benchmark_api_surface.py](/benchmarks/benchmark_api_surface.py) | `help` | `0.859` | `0.800` | `0.929` | `0` | `-` | `jax, jax.numpy` |
+| [benchmarks/benchmark_matrix_service_api.py](/benchmarks/benchmark_matrix_service_api.py) | `help` | `0.735` | `0.680` | `0.836` | `0` | `-` | `jax, jax.numpy` |
+| [benchmarks/benchmark_special_function_service_api.py](/benchmarks/benchmark_special_function_service_api.py) | `help` | `0.912` | `0.867` | `0.951` | `0` | `-` | `jax, jax.numpy` |
+| [benchmarks/benchmark_matrix_free_krylov.py](/benchmarks/benchmark_matrix_free_krylov.py) | `help` | `0.968` | `0.935` | `1.031` | `0` | `-` | `jax, jax.numpy` |
+| [benchmarks/benchmark_core_scalar_service_api.py](/benchmarks/benchmark_core_scalar_service_api.py) | `help` | `0.992` | `0.759` | `1.124` | `0` | `-` | `jax, jax.numpy` |
+| [benchmarks/benchmark_dense_matrix_surface.py](/benchmarks/benchmark_dense_matrix_surface.py) | `help` | `0.835` | `0.708` | `0.959` | `0` | `-` | `jax, jax.numpy` |
+| [benchmarks/benchmark_sparse_matrix_surface.py](/benchmarks/benchmark_sparse_matrix_surface.py) | `help` | `0.929` | `0.897` | `0.950` | `0` | `-` | `jax, jax.numpy` |
+| [benchmarks/benchmark_block_sparse_matrix_surface.py](/benchmarks/benchmark_block_sparse_matrix_surface.py) | `help` | `0.732` | `0.679` | `0.812` | `0` | `-` | `jax, jax.numpy` |
+| [benchmarks/benchmark_vblock_sparse_matrix_surface.py](/benchmarks/benchmark_vblock_sparse_matrix_surface.py) | `help` | `0.907` | `0.817` | `1.039` | `0` | `-` | `jax, jax.numpy` |
+| [benchmarks/benchmark_matrix_stack_diagnostics.py](/benchmarks/benchmark_matrix_stack_diagnostics.py) | `help` | `0.700` | `0.647` | `0.739` | `0` | `-` | `jax, jax.numpy` |
+| [benchmarks/benchmark_arb_mat.py](/benchmarks/benchmark_arb_mat.py) | `help` | `1.134` | `0.673` | `1.442` | `0` | `-` | `jax, jax.numpy` |
+| [benchmarks/benchmark_acb_calc.py](/benchmarks/benchmark_acb_calc.py) | `help` | `0.858` | `0.805` | `0.911` | `0` | `-` | `jax, jax.numpy` |
+| [benchmarks/benchmark_barnes_double_gamma.py](/benchmarks/benchmark_barnes_double_gamma.py) | `help` | `0.859` | `0.799` | `0.892` | `0` | `-` | `jax, jax.numpy` |
+| [benchmarks/benchmark_hypgeom.py](/benchmarks/benchmark_hypgeom.py) | `help` | `0.842` | `0.792` | `0.940` | `0` | `-` | `jax.numpy` |
+| [benchmarks/compare_arb_mat.py](/benchmarks/compare_arb_mat.py) | `help` | `0.721` | `0.669` | `0.800` | `0` | `-` | `jax.numpy` |
+| [benchmarks/compare_acb_calc.py](/benchmarks/compare_acb_calc.py) | `help` | `1.764` | `0.942` | `2.306` | `0` | `-` | `jax.numpy` |
+| [examples/example_latent_gaussian_laplace.py](/examples/example_latent_gaussian_laplace.py) | `import` | `0.848` | `0.811` | `0.885` | `0` | `-` | `jax, jax.numpy` |
 
 ## Remaining Top-Level `arbplusjax` Import Debt
 
@@ -57,10 +57,6 @@ Interpretation:
 
 - import-boundary debt still exists in `58` benchmark/example scripts that keep top-level `arbplusjax` imports
 - in this measured entry set, `0` scripts still have direct top-level `arbplusjax` imports and should be treated as remaining repo import debt
-- in this measured entry set, `0` scripts have zero top-level `arbplusjax` imports but still take at least `0.6s` to start; those are now mostly dominated by JAX import/backend/runtime bootstrap cost
-- `1` measured entry scripts currently fail before timing completes because of missing optional dependencies or other local runtime issues
+- in this measured entry set, `17` scripts have zero top-level `arbplusjax` imports but still take at least `0.6s` to start; those are now mostly dominated by JAX import/backend/runtime bootstrap cost
+- `0` measured entry scripts currently fail before timing completes because of missing optional dependencies or other local runtime issues
 - `--help` paths that still import `jax` at module top level will continue to pay significant cold-start cost even after repo-family lazy-loading is fixed
-
-## Measurement Failures
-
-- [benchmarks/benchmark_hypgeom.py](/benchmarks/benchmark_hypgeom.py) : `ModuleNotFoundError: No module named 'psutil'`

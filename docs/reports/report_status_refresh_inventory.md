@@ -47,6 +47,7 @@ Policy:
 | [docs/reports/repo_organization_by_coverage_categories.md](/docs/reports/repo_organization_by_coverage_categories.md) | `manual-authoritative` | `update when the repo grouping model or coverage-category map changes` |
 | [docs/reports/repo_standards_verification.md](/docs/reports/repo_standards_verification.md) | `generated` | `python tools/repo_standards_verification_report.py` |
 | [docs/reports/report_status_refresh_inventory.md](/docs/reports/report_status_refresh_inventory.md) | `generated` | `python tools/report_status_refresh_inventory.py` |
+| [docs/reports/sparse_matrix_status.md](/docs/reports/sparse_matrix_status.md) | `manual-authoritative` | `update the owning source document directly` |
 | [docs/reports/special_function_status.md](/docs/reports/special_function_status.md) | `generated` | `python tools/special_function_status_report.py` |
 | [docs/status/README.md](/docs/status/README.md) | `generated` | `python tools/generate_docs_indexes.py` |
 | [docs/status/api_runtime_todo.md](/docs/status/api_runtime_todo.md) | `manual-authoritative` | `update the owning source document directly` |

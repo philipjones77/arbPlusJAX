@@ -1,4 +1,4 @@
-Last updated: 2026-03-28T00:00:00Z
+Last updated: 2026-03-29T00:00:00Z
 
 # Special Functions TODO
 
@@ -12,50 +12,48 @@ Status legend:
 
 ## Current Status
 
-Status: `in_progress`
+Status: `done`
 
 - `done`
   - canonical example notebooks now exist for top-level gamma and
     Barnes/double-gamma production surfaces, with explicit production-calling
     guidance and benchmark-extension notes
+  - canonical example notebooks now also exist for the hypergeometric
+    production surface, so the production teaching surface is now split by
+    ownership across gamma/incomplete-tail, Barnes/double-gamma, and hypergeom
   - dedicated theory notes now exist for the gamma-family production stack
   - dedicated theory notes now exist for hypergeometric and Barnes/double-gamma
     production methodology
+  - practical runbook coverage now exists in
+    [special_functions.md](/docs/practical/special_functions.md)
+  - retained CPU/GPU operational service benchmark artifacts now exist for the
+    non-Barnes backend-closeout set in
+    [benchmark_special_function_service_api_cpu_refresh.json](/benchmarks/results/benchmark_special_function_service_api/benchmark_special_function_service_api_cpu_refresh.json)
+    and
+    [benchmark_special_function_service_api_gpu_refresh.json](/benchmarks/results/benchmark_special_function_service_api/benchmark_special_function_service_api_gpu_refresh.json)
+  - non-Barnes CPU/GPU service-contract, AD-direction, and hardening slices are
+    now explicitly part of the validated production set
+  - the governed production closeout is now explicit for the non-Barnes set:
+    incomplete gamma, incomplete Bessel, and hypergeom are treated as closed
+    for API, AD, fast-JAX, operational-JAX, CPU/GPU validation, benchmarks,
+    and notebook teaching
 - `in_progress`
-  - normalize special-function service benchmarks and diagnostics reporting more
-    fully across hypergeometric, Bessel, gamma, and Barnes families
-  - direct normalized special benchmark coverage now also includes
-    `benchmark_hypgeom_extra.py`
-  - continue converting notebook and benchmark guidance into schema-backed
-    artifacts rather than stdout-only summaries
+  - keep Barnes IFJ explicit as a correctness/diagnostics-hardened path that is
+    still excluded from backend-throughput closeout claims
 
-## Hardening Backlog
+## Barnes Exception Backlog
 
 Status: `in_progress`
 
-- continue hardening ordinary gamma, Barnes-family, and ordinary Bessel
-  families where coverage remains uneven
-- continue calibrating the generic tail-engine recurrence and sequence logic
-  across more families
-- bring incomplete `I` to the same regime maturity as incomplete `K`
 - finish hardening and characterization of the `bdg_*` Barnes and
   double-gamma family
 - keep extending Barnes/double-gamma diagnostics and provider contracts beyond
   the current scalar IFJ surface
+- lower startup and compiled-batch cost of Barnes IFJ before moving it into the
+  same CPU/GPU operational closeout set as gamma, incomplete Bessel, and
+  hypergeom
 - reduce runtime cost of rigorous/adaptive `bdg_*` samplers in
   [ball_wrappers.py](/src/arbplusjax/ball_wrappers.py)
-- continue hypergeometric engineering cleanup:
-  helper consolidation, family-specific adaptive/rigorous kernels, and
-  compile-noise reduction outside the current representative families
-- `pfq` fixed/padded basic and adaptive/rigorous mode-batch proofs are now
-  landed on the canonical real/complex paths
-- alternative hypergeometric hardening is now stronger:
-  Boost `pfq` fixed/padded mode-batch proofs and helper/`pfq` point-AD smoke
-  are landed, and CuSF `hyp1f1`/`hyp2f1` now have explicit mode containment
-  plus point-AD checks
-- regularized Boost `0f1`/`1f1` fixed-vs-padded containment and reciprocal
-  `pfq` fixed-vs-padded/mode-containment proofs are now landed
-- Boost helper aliases now have explicit cross-mode consistency checks
 - direct owner tests now exist for `bessel_kernels` and `barnesg`
 - extend benchmark and RF77-facing usage/report coverage where diagnostics
   exist but packaging is still incomplete

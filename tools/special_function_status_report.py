@@ -22,8 +22,11 @@ def render() -> str:
     hardening = _load_json(
         "benchmarks/results/special_function_hardening_benchmark/special_function_hardening_benchmark.json"
     )
-    service = _load_json(
+    service_cpu = _load_json(
         "benchmarks/results/benchmark_special_function_service_api/benchmark_special_function_service_api_cpu_refresh.json"
+    )
+    service_gpu = _load_json(
+        "benchmarks/results/benchmark_special_function_service_api/benchmark_special_function_service_api_gpu_refresh.json"
     )
     hypgeom_probe = _load_json("benchmarks/results/hypgeom_point_startup_probe/hypgeom_point_startup_probe.json")
     double_gamma_probe = _load_json(
@@ -35,7 +38,7 @@ def render() -> str:
     double_gamma_provider = double_gamma_probe["provider_barnesdoublegamma_point_path"]
     double_gamma_legacy = double_gamma_probe["bdg_barnesgamma2_point_path"]
 
-    def _find_warm(operation: str, implementation: str, dtype: str, mode: str | None = None) -> float | None:
+    def _find_warm(service: dict, operation: str, implementation: str, dtype: str, mode: str | None = None) -> float | None:
         for row in service.get("records", ()):
             if row.get("operation") != operation or row.get("implementation") != implementation or row.get("dtype") != dtype:
                 continue
@@ -50,7 +53,7 @@ def render() -> str:
                 return row.get("warm_time_s")
         return None
     lines = [
-        "Last updated: 2026-03-26T00:00:00Z",
+        "Last updated: 2026-03-29T00:00:00Z",
         "",
         "# Special-Function Status",
         "",
@@ -59,6 +62,12 @@ def render() -> str:
         "Scope:",
         "- production-facing special-function families with active hardening work in this repo",
         "- canonical API/binder surfaces, diagnostics surfaces, benchmarks, startup probes, and example notebooks",
+        "",
+        "## Closeout Status",
+        "",
+        "- special functions are now treated as closed for the governed production set excluding Barnes",
+        "- that closed set is: incomplete gamma, incomplete Bessel, and hypergeometric canonical surfaces",
+        "- Barnes / double-gamma remains the explicit exception backlog because its batched compiled throughput path is still compile-heavy",
         "",
         "## Canonical Production Surfaces",
         "",
@@ -94,11 +103,11 @@ def render() -> str:
         "",
         "## Operational Service Snapshot",
         "",
-        f"- incomplete gamma upper point padded float64 warm: {_fmt_float(_find_warm('incomplete_gamma_upper', 'service_api_padded', 'float64', mode='point'))}",
-        f"- incomplete gamma upper basic padded float64 warm: {_fmt_float(_find_warm('incomplete_gamma_upper', 'service_api_padded', 'float64', mode='basic'))}",
-        f"- incomplete Bessel K point padded float64 warm: {_fmt_float(_find_warm('incomplete_bessel_k', 'service_api_padded', 'float64', mode='point'))}",
-        f"- provider Barnes double-gamma padded float64 warm: {_fmt_float(_find_warm('provider_barnesdoublegamma', 'service_api_padded', 'float64', mode='point'))}",
-        f"- provider log Barnes double-gamma padded float64 warm: {_fmt_float(_find_warm('provider_log_barnesdoublegamma', 'service_api_padded', 'float64', mode='point'))}",
+        f"- incomplete gamma upper point padded float64 warm: CPU {_fmt_float(_find_warm(service_cpu, 'incomplete_gamma_upper', 'service_api_padded', 'float64', mode='point'))}, GPU {_fmt_float(_find_warm(service_gpu, 'incomplete_gamma_upper', 'service_api_padded', 'float64', mode='point'))}",
+        f"- incomplete gamma upper basic padded float64 warm: CPU {_fmt_float(_find_warm(service_cpu, 'incomplete_gamma_upper', 'service_api_padded', 'float64', mode='basic'))}, GPU {_fmt_float(_find_warm(service_gpu, 'incomplete_gamma_upper', 'service_api_padded', 'float64', mode='basic'))}",
+        f"- incomplete Bessel K point padded float64 warm: CPU {_fmt_float(_find_warm(service_cpu, 'incomplete_bessel_k', 'service_api_padded', 'float64', mode='point'))}, GPU {_fmt_float(_find_warm(service_gpu, 'incomplete_bessel_k', 'service_api_padded', 'float64', mode='point'))}",
+        f"- provider Barnes double-gamma padded float64 warm: CPU {_fmt_float(_find_warm(service_cpu, 'provider_barnesdoublegamma', 'service_api_padded', 'float64', mode='point'))}, GPU {_fmt_float(_find_warm(service_gpu, 'provider_barnesdoublegamma', 'service_api_padded', 'float64', mode='point'))}",
+        f"- provider log Barnes double-gamma padded float64 warm: CPU {_fmt_float(_find_warm(service_cpu, 'provider_log_barnesdoublegamma', 'service_api_padded', 'float64', mode='point'))}, GPU {_fmt_float(_find_warm(service_gpu, 'provider_log_barnesdoublegamma', 'service_api_padded', 'float64', mode='point'))}",
         "",
         "## Startup Probe Snapshot",
         "",
@@ -116,6 +125,7 @@ def render() -> str:
         "- The point-surface audit now compares public point wrappers against scalar family-owned exact-input evaluations; current remaining pfq drift is in the batched interval/mode path, not the point wrapper.",
         "- The Barnes startup probe now records both the supported IFJ/provider startup path and the legacy BDG compile failure so the hardened route stays explicit.",
         "- Current CPU/GPU closeout for the special-function tranche excludes Barnes IFJ batch throughput; gamma, incomplete Bessel, and hypergeom are the backend-certified focus set.",
+        "- On the retained padded service benchmark for that non-Barnes closeout set, GPU is ahead for the current incomplete-gamma and incomplete-Bessel comparison rows.",
         "- Canonical notebook teaching is now split by ownership: gamma/incomplete-tail, Barnes/double-gamma, and hypergeom each have a dedicated example surface.",
     ]
     return "\n".join(lines) + "\n"

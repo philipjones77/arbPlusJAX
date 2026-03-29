@@ -1,4 +1,4 @@
-Last updated: 2026-03-28T00:00:00Z
+Last updated: 2026-03-29T00:00:00Z
 
 # Curvature TODO
 
@@ -37,6 +37,15 @@ Status: `in_progress`
 - keep the implementation operator-first and matrix-optional
 - minimize duplication by delegating to current dense and Jones
   matrix-free/sparse surfaces where they already exist
+- explicit fast-JAX / operational-JAX contract coverage now exists for:
+  - dense curvature `matvec` / `solve` / `logdet` / inverse-diagonal under
+    `jit` and `vmap`
+  - posterior-precision parameter AD through `damping` and `jitter`
+  - variable- and parameter-direction AD on the HVP-facing curvature surface
+  - matrix-free `jrb` curvature apply / solve / `logdet` under repeated `jit`
+    reuse
+- the dedicated runtime proof slice is
+  [test_curvature_operational_contracts.py](/tests/test_curvature_operational_contracts.py)
 
 ## Phase 2 Bayesian And Approximation Surfaces
 

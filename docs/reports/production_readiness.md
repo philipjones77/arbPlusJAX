@@ -46,7 +46,7 @@ Current expected optional dependency groups from `pyproject.toml`:
 | `3. Dense Matrix Functionality` | `done` |
 | `4. Sparse / Block-Sparse / VBlock Functionality` | `in_progress` |
 | `5. Matrix-Free / Operator Functionality` | `in_progress` |
-| `6. Special Functions` | `in_progress` |
+| `6. Special Functions` | `done` |
 | `7. Analytic / Algebraic / Domain Functionality` | `in_progress` |
 | `8. API / Runtime / Metadata / Validation` | `in_progress` |
 

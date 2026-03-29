@@ -1,4 +1,4 @@
-Last updated: 2026-03-20T00:00:00Z
+Last updated: 2026-03-29T00:00:00Z
 
 # Sparse Completion Plan
 
@@ -132,6 +132,22 @@ This sub-tranche is now explicitly closed for:
 These paths are covered by no-dense-fallback regression tests and a dedicated
 CPU/GPU operational benchmark. The remaining sparse `basic` dense-lifting work
 is in the broader solve/factor layer, not this operational apply layer.
+
+Retained operational status:
+
+- [sparse_matrix_status.md](/docs/reports/sparse_matrix_status.md)
+- [benchmark_sparse_operational_surface_cpu_refresh.json](/benchmarks/results/benchmark_sparse_operational_surface/benchmark_sparse_operational_surface_cpu_refresh.json)
+- [benchmark_sparse_operational_surface_gpu_refresh.json](/benchmarks/results/benchmark_sparse_operational_surface/benchmark_sparse_operational_surface_gpu_refresh.json)
+
+Current interpretation:
+
+- the sparse operational point/basic layer is fast-JAX and operational-JAX in
+  the structural sense
+- GPU is validated on the sparse-native cached-apply binder path
+- CPU still wins in the retained sparse operational slice
+- the remaining open sparse work is now concentrated in solve/factor/basic
+  parity, structured diagnostics, and deeper selected-inverse / trace-inverse
+  work rather than in basic sparse-native apply
 
 ### Krylov Reuse And Shifted-Solve TODOs
 
